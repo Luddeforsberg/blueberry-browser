@@ -61,7 +61,13 @@ export const appMenuItems = (mainWindow: Window): OwnMenuItem[] => {
         { ...pageOnly("zoom-reset"), label: "Actual Size", accelerator: "CmdOrCtrl+0", click: () => mainWindow.resetActiveTabZoom() },
         { ...pageOnly("zoom-in"), label: "Zoom In", accelerator: "CmdOrCtrl+Plus", click: () => mainWindow.zoomActiveTab(1) },
         // On US keyboards + is Shift and =, and people press it without the Shift.
-        { ...pageOnly("zoom-in-equals"), label: "Zoom In", accelerator: "CmdOrCtrl+=", visible: false, click: () => mainWindow.zoomActiveTab(1) },
+        {
+          ...pageOnly("zoom-in-equals"),
+          label: "Zoom In",
+          accelerator: "CmdOrCtrl+=",
+          visible: false,
+          click: () => mainWindow.zoomActiveTab(1),
+        },
         { ...pageOnly("zoom-out"), label: "Zoom Out", accelerator: "CmdOrCtrl+-", click: () => mainWindow.zoomActiveTab(-1) },
         { type: "separator" },
         { label: "Toggle Sidebar", accelerator: SHORTCUTS.sidebar, click: () => mainWindow.toggleSidebar() },
@@ -71,7 +77,8 @@ export const appMenuItems = (mainWindow: Window): OwnMenuItem[] => {
           label: "Horizontal Tabs",
           type: "checkbox",
           checked: mainWindow.settings.layoutMode === "horizontal",
-          click: () => mainWindow.updateSettings({ layoutMode: mainWindow.settings.layoutMode === "horizontal" ? "vertical" : "horizontal" }),
+          click: () =>
+            mainWindow.updateSettings({ layoutMode: mainWindow.settings.layoutMode === "horizontal" ? "vertical" : "horizontal" }),
         },
         { type: "separator" },
         // For working on Blueberry itself, so a packaged app leaves them out.

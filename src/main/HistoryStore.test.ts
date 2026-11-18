@@ -11,9 +11,7 @@ describe("HistoryStore", () => {
     const file = tempFile();
     new HistoryStore(file).record("https://a.example/", "A", null, 1);
 
-    expect(new HistoryStore(file).recent()).toEqual([
-      { url: "https://a.example/", title: "A", favicon: null, visitedAt: 1 },
-    ]);
+    expect(new HistoryStore(file).recent()).toEqual([{ url: "https://a.example/", title: "A", favicon: null, visitedAt: 1 }]);
   });
 
   it("lists each page once in recent, newest first, up to the limit", () => {
@@ -90,16 +88,12 @@ describe("HistoryStore", () => {
 
   it("pages through visits that share a time without losing or repeating any", () => {
     const history = new HistoryStore(":memory:");
-    history.importVisits(
-      [1, 2, 3, 4, 5].map((n) => ({ url: `https://${n}.example/`, title: `${n}`, favicon: null, visitedAt: 7 }))
-    );
+    history.importVisits([1, 2, 3, 4, 5].map((n) => ({ url: `https://${n}.example/`, title: `${n}`, favicon: null, visitedAt: 7 })));
 
     const first = history.search({ limit: 2 });
     const second = history.search({ limit: 2, before: first.next! });
     const third = history.search({ limit: 2, before: second.next! });
-    expect([...first.entries, ...second.entries, ...third.entries].map((entry) => entry.title)).toEqual([
-      "5", "4", "3", "2", "1",
-    ]);
+    expect([...first.entries, ...second.entries, ...third.entries].map((entry) => entry.title)).toEqual(["5", "4", "3", "2", "1"]);
     expect(third.next).toBeNull();
 
     // A full last page has nothing after it.

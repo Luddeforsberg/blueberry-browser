@@ -1,15 +1,10 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import type { ChromeAPI, EventChannels, InvokeChannel, InvokeChannels } from "../shared/ipc";
 
-const invoke = <C extends InvokeChannel>(
-  channel: C,
-  ...args: InvokeChannels[C]["args"]
-): Promise<InvokeChannels[C]["result"]> => ipcRenderer.invoke(channel, ...args);
+const invoke = <C extends InvokeChannel>(channel: C, ...args: InvokeChannels[C]["args"]): Promise<InvokeChannels[C]["result"]> =>
+  ipcRenderer.invoke(channel, ...args);
 
-const subscribe = <C extends keyof EventChannels>(
-  channel: C,
-  callback: (payload: EventChannels[C]) => void
-) => {
+const subscribe = <C extends keyof EventChannels>(channel: C, callback: (payload: EventChannels[C]) => void) => {
   const listener = (_: IpcRendererEvent, payload: EventChannels[C]) => callback(payload);
   ipcRenderer.on(channel, listener);
   return () => {

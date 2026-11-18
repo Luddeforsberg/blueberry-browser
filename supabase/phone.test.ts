@@ -16,7 +16,16 @@ const SUPABASE_STANDINS = `
   alter default privileges in schema public grant all on functions to anon, authenticated;
 `;
 
-const SCOUT = { id: "m-1", name: "Scout", palette: "robin", accessory: "cap", instructions: "Find cables.", sites: ["webhallen.com"], tools: ["visit", "click"], from_gallery: false };
+const SCOUT = {
+  id: "m-1",
+  name: "Scout",
+  palette: "robin",
+  accessory: "cap",
+  instructions: "Find cables.",
+  sites: ["webhallen.com"],
+  tools: ["visit", "click"],
+  from_gallery: false,
+};
 const ENDPOINT = "https://fcm.googleapis.com/fcm/send/abc";
 const KEYS = `'BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM', 'tBHItJI5svbpez7KI4CCXg'`;
 
@@ -41,7 +50,8 @@ describe("the phone page's database rules", () => {
     await as(runner, `select public.accept_cloud_runner_link('${`user${Number(owner.slice(-12))}@example.com`}')`);
   };
   const sync = (uid: string | null, birds: unknown) => as(uid, `select public.sync_cloud_flock('${JSON.stringify(birds)}'::jsonb) as kept`);
-  const subscribe = (uid: string | null, endpoint = ENDPOINT) => as(uid, `select public.save_push_subscription('${endpoint}', ${KEYS}) as ok`);
+  const subscribe = (uid: string | null, endpoint = ENDPOINT) =>
+    as(uid, `select public.save_push_subscription('${endpoint}', ${KEYS}) as ok`);
 
   let ALICE = "";
   let RUNNER = "";
@@ -69,7 +79,12 @@ describe("the phone page's database rules", () => {
     expect(await as(RUNNER, "select id from public.cloud_flock")).toEqual([]);
     await expect(as(null, "select id from public.cloud_flock")).rejects.toThrow(/permission denied/);
     // Only through the function, which a runner can't use.
-    await expect(as(ALICE, `insert into public.cloud_flock (id, position, name, palette, accessory, instructions) values ('x', 0, 'X', 'robin', 'cap', 'Y')`)).rejects.toThrow(/permission denied/);
+    await expect(
+      as(
+        ALICE,
+        `insert into public.cloud_flock (id, position, name, palette, accessory, instructions) values ('x', 0, 'X', 'robin', 'cap', 'Y')`,
+      ),
+    ).rejects.toThrow(/permission denied/);
     await expect(sync(RUNNER, [SCOUT])).rejects.toThrow(/runner has no flock/);
     await expect(sync(null, [SCOUT])).rejects.toThrow(/permission denied/);
     // Bob's sync never touches hers.
@@ -96,7 +111,9 @@ describe("the phone page's database rules", () => {
     await expect(as(BOB, "select * from public.runner_push_subscriptions()")).rejects.toThrow(/Not a linked runner/);
     // A runner can't be notified itself, and can only drop its owner's.
     await expect(subscribe(RUNNER, "https://fcm.googleapis.com/fcm/send/runner")).rejects.toThrow(/can't be notified/);
-    expect(await as(RUNNER, "select public.runner_forget_push_subscription('https://web.push.apple.com/bobs') as ok")).toEqual([{ ok: false }]);
+    expect(await as(RUNNER, "select public.runner_forget_push_subscription('https://web.push.apple.com/bobs') as ok")).toEqual([
+      { ok: false },
+    ]);
     expect(await as(RUNNER, `select public.runner_forget_push_subscription('${ENDPOINT}') as ok`)).toEqual([{ ok: true }]);
     expect(await as(RUNNER, "select endpoint from public.runner_push_subscriptions()")).toEqual([]);
   });
@@ -105,7 +122,9 @@ describe("the phone page's database rules", () => {
     const alices = "https://fcm.googleapis.com/fcm/send/alices-phone";
     expect(await subscribe(ALICE, alices)).toEqual([{ ok: true }]);
     expect(await subscribe(BOB, alices)).toEqual([{ ok: false }]);
-    expect((await db.query("select owner from public.cloud_push_subscriptions where endpoint = $1", [alices])).rows).toEqual([{ owner: ALICE }]);
+    expect((await db.query("select owner from public.cloud_push_subscriptions where endpoint = $1", [alices])).rows).toEqual([
+      { owner: ALICE },
+    ]);
     expect(await subscribe(ALICE, alices)).toEqual([{ ok: true }]);
     // Nor take it away.
     expect(await as(BOB, `select public.forget_push_subscription('${alices}') as ok`)).toEqual([{ ok: false }]);

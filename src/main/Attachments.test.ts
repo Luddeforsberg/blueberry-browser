@@ -18,7 +18,10 @@ describe("Attachments", () => {
     const one = attachments.addFiles([text("a.txt")], []);
     expect(one).toMatchObject([{ kind: "text", name: "a.txt", problem: null }]);
 
-    const four = attachments.addFiles([1, 2, 3, 4].map((n) => text(`${n}.txt`)), [one[0].id]);
+    const four = attachments.addFiles(
+      [1, 2, 3, 4].map((n) => text(`${n}.txt`)),
+      [one[0].id],
+    );
     expect(four.every((chip) => chip.problem === null)).toBe(true);
     const five = [one[0].id, ...four.map((chip) => chip.id)];
     expect(five).toHaveLength(MAX_FILES);
@@ -32,7 +35,10 @@ describe("Attachments", () => {
 
   it("counts only what main kept towards the five, so ids made up in a renderer make no room", () => {
     const attachments = make();
-    const kept = attachments.addFiles([1, 2, 3, 4, 5].map((n) => text(`${n}.txt`)), ["made-up", "made-up-too"]);
+    const kept = attachments.addFiles(
+      [1, 2, 3, 4, 5].map((n) => text(`${n}.txt`)),
+      ["made-up", "made-up-too"],
+    );
     expect(kept.every((chip) => chip.problem === null)).toBe(true);
   });
 

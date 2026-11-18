@@ -25,8 +25,10 @@ const shownKey = (id: string, version: string) => `${id} ${version}`;
 
 const failure = (error: unknown): string => {
   if (error instanceof Unreachable) return CANT_REACH;
-  if (error instanceof ServerError && (error.status === 401 || error.status === 403)) return "The Gallery didn’t accept your sign-in. Sign out, sign in again and try once more.";
-  if (error instanceof ServerError && error.status === 400) return "The Gallery refused this. You may already have the most it allows, 20 published mascots.";
+  if (error instanceof ServerError && (error.status === 401 || error.status === 403))
+    return "The Gallery didn’t accept your sign-in. Sign out, sign in again and try once more.";
+  if (error instanceof ServerError && error.status === 400)
+    return "The Gallery refused this. You may already have the most it allows, 20 published mascots.";
   return "The Gallery couldn’t do that. Try again in a moment.";
 };
 
@@ -51,7 +53,7 @@ export class Gallery {
     private readonly mascots: MascotStore,
     private readonly file: string,
     private readonly site: string | undefined,
-    private readonly onChange: () => void
+    private readonly onChange: () => void,
   ) {
     this.saved = this.load();
   }
@@ -161,7 +163,11 @@ export class Gallery {
       const token = await this.account.accessToken();
       if (!token) return { ok: false, error: SIGN_IN_FIRST };
       // No row deleted means it's another account's, or already gone. Saying it worked could leave it public.
-      if (!(await this.server.deleteMascot(token, id))) return { ok: false, error: "That didn’t remove anything. It may be on another account, so sign in with the one that published it." };
+      if (!(await this.server.deleteMascot(token, id)))
+        return {
+          ok: false,
+          error: "That didn’t remove anything. It may be on another account, so sign in with the one that published it.",
+        };
       this.forgetPublished(id);
       for (const [key, entry] of this.shown) if (entry.id === id) this.shown.delete(key);
       this.onChange();
@@ -181,17 +187,19 @@ export class Gallery {
       return rows.flatMap((row) => {
         const entry = parsePublishedRow(row);
         if (!entry) return [];
-        return [{
-          id: entry.id,
-          name: entry.draft.name,
-          author: entry.author,
-          description: entry.description,
-          category: entry.category,
-          example: entry.example ?? null,
-          addCount: entry.addCount ?? 0,
-          link: publicPageLink(this.site, entry.id),
-          hidden: (row as { hidden?: unknown }).hidden === true,
-        }];
+        return [
+          {
+            id: entry.id,
+            name: entry.draft.name,
+            author: entry.author,
+            description: entry.description,
+            category: entry.category,
+            example: entry.example ?? null,
+            addCount: entry.addCount ?? 0,
+            link: publicPageLink(this.site, entry.id),
+            hidden: (row as { hidden?: unknown }).hidden === true,
+          },
+        ];
       });
     } catch {
       return null;

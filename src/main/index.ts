@@ -49,12 +49,14 @@ let cloud: CloudTabs | null = null;
 // Said once, after the window it sits on is open.
 let storeNotices: string[] = [];
 
-const storeNotice = (what: string, isAre: "is" | "are") => ({ movedTo }: StoreProblem) =>
-  storeNotices.push(
-    movedTo
-      ? `${what} ${isAre === "is" ? "was" : "were"} damaged and couldn't be read, so Blueberry started empty. The old file is at ${movedTo}.`
-      : `${what} couldn't be opened. The file wasn't changed, but anything new won't be kept after you quit.`
-  );
+const storeNotice =
+  (what: string, isAre: "is" | "are") =>
+  ({ movedTo }: StoreProblem) =>
+    storeNotices.push(
+      movedTo
+        ? `${what} ${isAre === "is" ? "was" : "were"} damaged and couldn't be read, so Blueberry started empty. The old file is at ${movedTo}.`
+        : `${what} couldn't be opened. The file wasn't changed, but anything new won't be kept after you quit.`,
+    );
 
 // Our own card with only OK, once the window's chrome has drawn.
 const showStoreNotices = (window: Window): void => {
@@ -65,22 +67,18 @@ const showStoreNotices = (window: Window): void => {
 
 const createWindow = (): Window => {
   settings ??= new SettingsStore(join(app.getPath("userData"), "settings.json"));
-  chatStore ??= openStore(
-    join(app.getPath("userData"), "chats.db"),
-    (file) => new ChatStore(file),
-    storeNotice("Your saved chats", "are")
-  );
+  chatStore ??= openStore(join(app.getPath("userData"), "chats.db"), (file) => new ChatStore(file), storeNotice("Your saved chats", "are"));
   historyStore ??= openStore(
     join(app.getPath("userData"), "history.db"),
     (file) => new HistoryStore(file),
-    storeNotice("Your browsing history", "is")
+    storeNotice("Your browsing history", "is"),
   );
   const bookmarks = new BookmarkStore(join(app.getPath("userData"), "bookmarks.json"));
   const pinned = new BookmarkStore(join(app.getPath("userData"), "pinned.json"));
   routineStore ??= openStore(
     join(app.getPath("userData"), "routines.db"),
     (file, recovered) => new RoutineStore(file, recovered),
-    storeNotice("Your routines", "are")
+    storeNotice("Your routines", "are"),
   );
   mascotStore ??= new MascotStore(join(app.getPath("userData"), "mascots.json"));
   try {
@@ -101,7 +99,18 @@ const createWindow = (): Window => {
     installSessionHandlers(session.defaultSession, sitePermissions, downloads);
   }
   const sessionStore = new SessionStore(join(app.getPath("userData"), "session.json"));
-  const window = new Window(settings, chatStore, bookmarks, pinned, routineStore, mascotStore, downloads, sitePermissions, historyStore, sessionStore);
+  const window = new Window(
+    settings,
+    chatStore,
+    bookmarks,
+    pinned,
+    routineStore,
+    mascotStore,
+    downloads,
+    sitePermissions,
+    historyStore,
+    sessionStore,
+  );
   cloud = window.cloud;
   showStoreNotices(window);
   menu = new AppMenu(window);

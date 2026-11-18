@@ -21,11 +21,8 @@ const clickMenu = (app: ElectronApplication, label: string) =>
 const findBarVisible = (app: ElectronApplication) =>
   app.evaluate(({ BaseWindow }) =>
     BaseWindow.getAllWindows()[0].contentView.children.some(
-      (view) =>
-        "webContents" in view &&
-        (view as Electron.WebContentsView).webContents.getURL().includes("view=find") &&
-        view.getVisible()
-    )
+      (view) => "webContents" in view && (view as Electron.WebContentsView).webContents.getURL().includes("view=find") && view.getVisible(),
+    ),
   );
 
 test("find, zoom and the page menu on a web page", async () => {
@@ -75,9 +72,9 @@ test("find, zoom and the page menu on a web page", async () => {
     await page.locator("#link").click({ button: "right" });
     await expect.poll(() => openMenuRows(app)).toContain("Open Link in New Tab");
     await chooseFromMenu(app, "Open Link in New Tab");
-    await expect.poll(() => chrome.evaluate(() => window.chromeAPI.browser.getTabs().then((tabs) => tabs.at(-1)?.url))).toBe(
-      `${origin}/next`
-    );
+    await expect
+      .poll(() => chrome.evaluate(() => window.chromeAPI.browser.getTabs().then((tabs) => tabs.at(-1)?.url)))
+      .toBe(`${origin}/next`);
     await chrome.evaluate(async (url) => {
       const tabs = await window.chromeAPI.browser.getTabs();
       await window.chromeAPI.browser.switchTab(tabs.find((tab) => tab.url === url)!.id);
@@ -97,7 +94,9 @@ test("find, zoom and the page menu on a web page", async () => {
     await clickMenu(app, "Zoom In");
     const badge = chrome.getByRole("button", { name: "Zoom 110%, reset to 100%" });
     await expect(badge).toBeVisible();
-    await expect.poll(() => page.evaluate(() => window.devicePixelRatio)).toBeCloseTo(1.1 * (await chrome.evaluate(() => window.devicePixelRatio)));
+    await expect
+      .poll(() => page.evaluate(() => window.devicePixelRatio))
+      .toBeCloseTo(1.1 * (await chrome.evaluate(() => window.devicePixelRatio)));
   } finally {
     await app.close();
   }

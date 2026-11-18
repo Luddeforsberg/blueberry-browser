@@ -108,7 +108,14 @@ export const approvalToAsk = ({ text, question, handoff }: ChatApproval): Approv
 
 // The approval a job's row says it's waiting on, as a chat shows one. Its page is in the cloud, so there's no tab here.
 export const approvalFromRow = (row: Record<string, unknown>): (ChatApproval & { askedAt: number }) | null => {
-  const { approval_id: id, approval_kind: kind, approval_text: text, approval_need: need, approval_site: site, approval_asked_at: askedAt } = row;
+  const {
+    approval_id: id,
+    approval_kind: kind,
+    approval_text: text,
+    approval_need: need,
+    approval_site: site,
+    approval_asked_at: askedAt,
+  } = row;
   if (typeof id !== "string" || typeof text !== "string") return null;
   const asked = typeof askedAt === "string" ? Date.parse(askedAt) : NaN;
   return {
@@ -116,7 +123,15 @@ export const approvalFromRow = (row: Record<string, unknown>): (ChatApproval & {
     text,
     askedAt: Number.isNaN(asked) ? Date.now() : asked,
     ...(kind === "question" ? { question: true } : {}),
-    ...(kind === "handoff" ? { handoff: { need: need === "captcha" ? ("captcha" as const) : ("sign-in" as const), tabId: "", site: typeof site === "string" ? site : "" } } : {}),
+    ...(kind === "handoff"
+      ? {
+          handoff: {
+            need: need === "captcha" ? ("captcha" as const) : ("sign-in" as const),
+            tabId: "",
+            site: typeof site === "string" ? site : "",
+          },
+        }
+      : {}),
   };
 };
 

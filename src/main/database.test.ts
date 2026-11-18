@@ -11,7 +11,11 @@ const tempFile = (name = "chats.db") => join(mkdtempSync(join(tmpdir(), "blueber
 
 const open = (file: string) => {
   const problems: StoreProblem[] = [];
-  const store = openStore(file, (path) => new ChatStore(path), (problem) => problems.push(problem));
+  const store = openStore(
+    file,
+    (path) => new ChatStore(path),
+    (problem) => problems.push(problem),
+  );
   return { store, problems };
 };
 
@@ -97,7 +101,7 @@ describe("openStore", () => {
         if (attempts++ === 0) throw Object.assign(new Error("database is locked"), { errcode: 5 });
         return new ChatStore(path);
       },
-      (problem) => problems.push(problem)
+      (problem) => problems.push(problem),
     );
 
     expect(problems).toEqual([{ movedTo: null }]);
@@ -120,7 +124,7 @@ describe("openStore", () => {
           recovered.push(isRecovered);
           return new ChatStore(path);
         },
-        () => {}
+        () => {},
       );
       return recovered;
     };
@@ -133,7 +137,11 @@ describe("openStore", () => {
     const file = tempFile("history.db");
     writeFileSync(file, "garbage".repeat(1000));
     const problems: StoreProblem[] = [];
-    const store = openStore(file, (path) => new HistoryStore(path), (problem) => problems.push(problem));
+    const store = openStore(
+      file,
+      (path) => new HistoryStore(path),
+      (problem) => problems.push(problem),
+    );
 
     expect(problems[0].movedTo).toContain("history.db.corrupt-");
     expect(existsSync(problems[0].movedTo!)).toBe(true);

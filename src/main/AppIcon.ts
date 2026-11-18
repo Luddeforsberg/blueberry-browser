@@ -43,7 +43,7 @@ export class AppIcon {
   constructor(
     folder: string,
     private readonly window: BaseWindow,
-    private readonly chosen: () => AppIconChoice
+    private readonly chosen: () => AppIconChoice,
   ) {
     this.picture = join(folder, "app-icon.png");
     this.drawnFor = join(folder, "app-icon.json");

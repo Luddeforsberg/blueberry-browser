@@ -1,9 +1,4 @@
-import {
-  ModelConfigError,
-  type GenerateTitle,
-  type ReplyMessage,
-  type StreamReply,
-} from "./agent";
+import { ModelConfigError, type GenerateTitle, type ReplyMessage, type StreamReply } from "./agent";
 import { randomUUID } from "crypto";
 import { firecrawlSearch } from "./webSearch";
 import { firecrawlFetch } from "./webFetch";
@@ -17,7 +12,19 @@ import type { ActionApproval } from "../shared/ipc";
 import type { ChatStore, StoredChat } from "./ChatStore";
 import type { Tab } from "./Tab";
 import type { CdpTab } from "./CdpTab";
-import type { ChatApproval, ChatStep, ChatThread, ChatThreadMessage, HandoffNeed, MascotProfile, MemoryFact, SaidOnTheWay, StepKind, UsedPage, WorkTabState } from "../shared/library";
+import type {
+  ChatApproval,
+  ChatStep,
+  ChatThread,
+  ChatThreadMessage,
+  HandoffNeed,
+  MascotProfile,
+  MemoryFact,
+  SaidOnTheWay,
+  StepKind,
+  UsedPage,
+  WorkTabState,
+} from "../shared/library";
 import type { JobWork } from "./WorkViews";
 import { BERRY, narrowSites, permissionsInWords, siteAllowed } from "../shared/mascots";
 import { asHistoryMessage } from "../shared/phone";
@@ -55,8 +62,7 @@ const publicApproval = ({ id, text, question, answers, why, handoff }: ChatAppro
   ...(handoff ? { handoff } : {}),
 });
 
-const titleFrom = (text: string): string =>
-  text.length > MAX_TITLE_LENGTH ? `${text.slice(0, MAX_TITLE_LENGTH - 1).trimEnd()}…` : text;
+const titleFrom = (text: string): string => (text.length > MAX_TITLE_LENGTH ? `${text.slice(0, MAX_TITLE_LENGTH - 1).trimEnd()}…` : text);
 
 // The cloud browser does one job at a time, and this reply came while it was on another.
 class CloudBusyError extends Error {
@@ -85,7 +91,12 @@ const errorMessage = (error: unknown): string => {
     return "The model is rate limited right now. Try again in a moment.";
   }
   // LangChain's OpenAI client says only "Connection error." with no network.
-  if (message.includes("network") || message.includes("fetch") || message.includes("econnrefused") || message.includes("connection error")) {
+  if (
+    message.includes("network") ||
+    message.includes("fetch") ||
+    message.includes("econnrefused") ||
+    message.includes("connection error")
+  ) {
     return "Couldn't reach the model. Check your connection and try again.";
   }
   return "Something went wrong with this reply. Try again.";
@@ -257,7 +268,10 @@ export interface TaskProgress {
 }
 
 // A runner with no window has no saved chats, so only what a task uses has to be there.
-export type ChatStoreLike = Pick<ChatStore, "chat" | "createChat" | "addMessage" | "filesOf" | "renameChat" | "deleteChat" | "needsTitle" | "setGeneratedTitle" | "setSeen">;
+export type ChatStoreLike = Pick<
+  ChatStore,
+  "chat" | "createChat" | "addMessage" | "filesOf" | "renameChat" | "deleteChat" | "needsTitle" | "setGeneratedTitle" | "setSeen"
+>;
 
 export interface TaskResult {
   text: string;
@@ -288,7 +302,10 @@ export class Chats {
   private readonly taskPopups = new Map<string, Set<string>>();
   // Tabs handed to the user. Nothing reaches these, from any job. `asking` is whether a job is still waiting: one that
   // stopped waiting after the user typed there leaves the tab here, until they send it with a message or close it.
-  private readonly handedOver = new Map<string, { touched: boolean; asking: boolean; host: string | null; entering: boolean; codeEntered: boolean }>();
+  private readonly handedOver = new Map<
+    string,
+    { touched: boolean; asking: boolean; host: string | null; entering: boolean; codeEntered: boolean }
+  >();
   // Codes sent from the phone, and until when to keep them out of anything going to the model. Memory only.
   private readonly enteredCodes = new Map<RegExp, number>();
   // Tabs that have been back from the user. A sign-in lands on an address that can carry a code or a token, and any
@@ -321,7 +338,7 @@ export class Chats {
     private readonly mascotOf: (id: string | null) => MascotProfile = () => BERRY,
     private readonly memory: ChatMemory | null = null,
     private readonly cloud: ChatCloud | null = null,
-    private readonly runner: ChatRunner | null = null
+    private readonly runner: ChatRunner | null = null,
   ) {}
 
   // Chats started in the cloud, whose later messages go there too. Memory only, so after a restart a chat works here.
@@ -388,7 +405,13 @@ export class Chats {
     const text = need === "code" ? `${who} needs you to enter a code on ${site}` : `${who} needs you to ${HANDOFF_WORDS[need]} on ${site}`;
     let done = false;
     try {
-      done = await this.wait(chatId, run, text, { handoff: { need: need === "code" ? "sign-in" : need, tabId: tab.id, site } }, (allow) => allow);
+      done = await this.wait(
+        chatId,
+        run,
+        text,
+        { handoff: { need: need === "code" ? "sign-in" : need, tabId: tab.id, site } },
+        (allow) => allow,
+      );
       return done;
     } finally {
       held.asking = false;
@@ -421,40 +444,42 @@ export class Chats {
     // Its own tabs, and the ones the user attached to this chat while no other job has them.
     const lent = (tab: Tab) => !page && !job.own.has(tab.id) && job.attached.has(tab.id) && this.inOtherHands(tab.id, chatId);
     const reaches = (tab: Tab) => !!page || job.own.has(tab.id) || (job.attached.has(tab.id) && !lent(tab));
-    const tools = run.cloud ? this.cloudTools(chatId, run, job, asked) : createPageTools<Tab>({
-      allTabs: () => this.browser.allTabs().filter(reaches),
-      // The tools say why a tab the user took or was handed is out of reach, so only one another job has goes unsaid.
-      activeTab: () => this.browser.allTabs().find((tab) => tab.id === job.current && !lent(tab)) ?? null,
-      openTab: (url) => {
-        const tab = this.browser.openBackgroundTab(url);
-        job.own.add(tab.id);
-        job.current = tab.id;
-        return tab;
-      },
-      canSee: () => !page || this.pageAccess,
-      onUse: (tab) => {
-        run.tabs.add(tab);
-        run.used.delete(tab);
-        run.used.add(tab);
-        run.sites.delete(siteOf(tab.url));
-        run.sites.add(siteOf(tab.url));
-        this.publishWorkingTabs();
-      },
-      stopped: () => run.controller.signal.aborted,
-      ownsEveryTab: !page,
-      ownsTab: (id) => job.own.has(id),
-      takenOver: job.takenOver,
-      heldByUser: (id) => this.handedOver.has(id),
-      handOver: (tab, need) => this.handOver(chatId, run, job, tab, need),
-      limits: unlimited(run.mascot) ? undefined : run.mascot,
-      asked,
-      beenTo: [...run.earlierSites, ...job.attachedSites],
-      attached: (id) => job.attached.has(id),
-      search: firecrawlSearch(),
-      fetchPage: firecrawlFetch(),
-      closeTab: (tab) => this.closeRunTab(run, tab),
-      ask: (question, answers) => this.askQuestion(chatId, run, question, answers),
-    });
+    const tools = run.cloud
+      ? this.cloudTools(chatId, run, job, asked)
+      : createPageTools<Tab>({
+          allTabs: () => this.browser.allTabs().filter(reaches),
+          // The tools say why a tab the user took or was handed is out of reach, so only one another job has goes unsaid.
+          activeTab: () => this.browser.allTabs().find((tab) => tab.id === job.current && !lent(tab)) ?? null,
+          openTab: (url) => {
+            const tab = this.browser.openBackgroundTab(url);
+            job.own.add(tab.id);
+            job.current = tab.id;
+            return tab;
+          },
+          canSee: () => !page || this.pageAccess,
+          onUse: (tab) => {
+            run.tabs.add(tab);
+            run.used.delete(tab);
+            run.used.add(tab);
+            run.sites.delete(siteOf(tab.url));
+            run.sites.add(siteOf(tab.url));
+            this.publishWorkingTabs();
+          },
+          stopped: () => run.controller.signal.aborted,
+          ownsEveryTab: !page,
+          ownsTab: (id) => job.own.has(id),
+          takenOver: job.takenOver,
+          heldByUser: (id) => this.handedOver.has(id),
+          handOver: (tab, need) => this.handOver(chatId, run, job, tab, need),
+          limits: unlimited(run.mascot) ? undefined : run.mascot,
+          asked,
+          beenTo: [...run.earlierSites, ...job.attachedSites],
+          attached: (id) => job.attached.has(id),
+          search: firecrawlSearch(),
+          fetchPage: firecrawlFetch(),
+          closeTab: (tab) => this.closeRunTab(run, tab),
+          ask: (question, answers) => this.askQuestion(chatId, run, question, answers),
+        });
     // A picture can't be gone through, so `Tab` refuses to take one instead. A refusal goes straight to the model too.
     return tools.map((tool) => ({
       ...tool,
@@ -671,11 +696,18 @@ export class Chats {
     const held = this.handedOver.get(tab.id);
     if (held?.asking) {
       const need = [...this.runs.values()].find((run) => run.approval?.handoff?.tabId === tab.id)?.approval?.handoff?.need;
-      return need === "code" ? "You’re entering a code there, so it stays yours" : need === "captcha" ? "You’re solving a captcha there, so it stays yours" : "You’re signing in there, so it stays yours";
+      return need === "code"
+        ? "You’re entering a code there, so it stays yours"
+        : need === "captcha"
+          ? "You’re solving a captcha there, so it stays yours"
+          : "You’re signing in there, so it stays yours";
     }
     if (this.isOwnTab(tab.id)) return "A job opened it, so it isn’t yours to give";
-    const working = [...this.runs.entries()].find(([id, run]) => id !== chatId && [...run.tabs].some(({ id: used }) => used === tab.id))?.[1];
-    if (working) return `${working.mascot.id === BERRY.id ? (this.browser.assistantName?.() ?? BERRY.name) : working.mascot.name} is working in it`;
+    const working = [...this.runs.entries()].find(
+      ([id, run]) => id !== chatId && [...run.tabs].some(({ id: used }) => used === tab.id),
+    )?.[1];
+    if (working)
+      return `${working.mascot.id === BERRY.id ? (this.browser.assistantName?.() ?? BERRY.name) : working.mascot.name} is working in it`;
     if (!siteAllowed(tab.url, mascot.sites)) {
       const [where] = permissionsInWords(mascot);
       return `${mascot.name} ${where.text.charAt(0).toLowerCase()}${where.text.slice(1)}`;
@@ -719,11 +751,11 @@ export class Chats {
   private closeJobTabs(chatId: string, run: Run): UsedPage[] {
     const job = this.jobs.get(chatId);
     if (!job || job.own.size === 0) return [];
-    const open = run.cloud
-      ? [...(run.usedInCloud ?? [])].filter((tab) => this.cloud?.page(tab.id) === tab)
-      : this.browser.allTabs();
+    const open = run.cloud ? [...(run.usedInCloud ?? [])].filter((tab) => this.cloud?.page(tab.id) === tab) : this.browser.allTabs();
     const tabOf = (id: string) => open.find((tab) => tab.id === id) ?? null;
-    const usedNow = new Set([...this.runs.values()].flatMap((other) => [...other.tabs, ...(other.sentPage ? [other.sentPage] : [])].map((tab) => tab.id)));
+    const usedNow = new Set(
+      [...this.runs.values()].flatMap((other) => [...other.tabs, ...(other.sentPage ? [other.sentPage] : [])].map((tab) => tab.id)),
+    );
     const used = run.cloud ? [...(run.usedInCloud ?? [])] : [...run.used];
     const pages = new Map<string, UsedPage>();
     used.forEach((tab) => {
@@ -820,7 +852,9 @@ export class Chats {
       if (!siteAllowed(tab.url, run.mascot.sites)) return "off-limits";
       return tab.trouble || tab.loadError ? "none" : "picture";
     };
-    return [...(run.usedInCloud ?? [])].filter((tab) => this.cloud?.page(tab.id) === tab).map((tab) => ({ tab, cloud: true, state: state(tab), site: siteOf(tab.url) }));
+    return [...(run.usedInCloud ?? [])]
+      .filter((tab) => this.cloud?.page(tab.id) === tab)
+      .map((tab) => ({ tab, cloud: true, state: state(tab), site: siteOf(tab.url) }));
   }
 
   thread(id: string): ChatThread | null {
@@ -904,7 +938,7 @@ export class Chats {
       // What the user attached in the prompt box: files main read and checked, and the ids of their tabs.
       files?: readonly PreparedFile[];
       tabs?: readonly string[];
-    }
+    },
   ): ChatThread | null {
     const message = text.trim();
     if (!message) return null;
@@ -951,7 +985,30 @@ export class Chats {
     this.finished.delete(id);
     this.memory?.dropOffers(id);
 
-    const run: Run = { controller: new AbortController(), partial: "", statusLine: null, steps: [], said: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot, earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]), memoryIds: [], memoryNote: "", answers: [], handedOver: false, cloud: inCloud, askAtLeast, onEnd, userPresent };
+    const run: Run = {
+      controller: new AbortController(),
+      partial: "",
+      statusLine: null,
+      steps: [],
+      said: [],
+      breakBeforeText: false,
+      approval: null,
+      tabs: new Set(),
+      used: new Set(),
+      sites: new Set(),
+      startedAt: Date.now(),
+      withPage: false,
+      mascot,
+      earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]),
+      memoryIds: [],
+      memoryNote: "",
+      answers: [],
+      handedOver: false,
+      cloud: inCloud,
+      askAtLeast,
+      onEnd,
+      userPresent,
+    };
     if (inCloud) this.cloudChats.add(id);
     this.runs.set(id, run);
     // A page in this window never goes with a job in the cloud.
@@ -1008,7 +1065,8 @@ export class Chats {
   // A job on the runner is over, and its reply is saved like any other.
   runnerFinished(chatId: string, { reply, steps, error }: { reply: string; steps: ChatStep[]; error: string | null }): void {
     if (!this.store.chat(chatId)) return;
-    if (reply || steps.length > 0) this.store.addMessage(chatId, { role: "assistant", content: reply, steps: steps.map((step) => ({ ...step, done: true })) });
+    if (reply || steps.length > 0)
+      this.store.addMessage(chatId, { role: "assistant", content: reply, steps: steps.map((step) => ({ ...step, done: true })) });
     if (error) this.errors.set(chatId, error);
     this.notify(chatId);
     if (reply && !error) void this.nameChat(chatId);
@@ -1146,10 +1204,24 @@ export class Chats {
   // the reply. A site's name and a question's wording are as close as a page can get, and whatever comes back goes through
   // `parseProposals` and waits for the user, so nothing is kept until they press Remember.
   private offerToRemember(sourceId: string, run: Run, failed: boolean, job: Pick<MemoryToOffer, "said" | "routine" | "stillWanted">): void {
-    const handedOver = run.handedOver || [...run.used].some((tab) => this.handedBack.has(tab) || this.handedOver.has(tab.id) || tab.heldForUser || tab.mayShowCode);
+    const handedOver =
+      run.handedOver ||
+      [...run.used].some((tab) => this.handedBack.has(tab) || this.handedOver.has(tab.id) || tab.heldForUser || tab.mayShowCode);
     const sites = [...run.sites].filter((site) => site.includes("."));
     // A routine's words were written earlier, so what's new is only what the user said during this run.
-    if (!this.memory || this.mascotOf(run.mascot.id).deletedAt !== null || !worthRemembering({ stopped: run.controller.signal.aborted, failed, replied: !!run.partial, handedOver, said: job.said.at(-1), answers: run.answers })) return;
+    if (
+      !this.memory ||
+      this.mascotOf(run.mascot.id).deletedAt !== null ||
+      !worthRemembering({
+        stopped: run.controller.signal.aborted,
+        failed,
+        replied: !!run.partial,
+        handedOver,
+        said: job.said.at(-1),
+        answers: run.answers,
+      })
+    )
+      return;
     void this.memory.propose({
       ...job,
       sourceId,
@@ -1169,7 +1241,7 @@ export class Chats {
     // Hears each piece of the answer as it's added, or nothing when the whole reply went out instead, as it does when the
     // answer is taken back or the status line goes.
     onWords: (content: string) => void,
-    onUsage?: (tokens: number) => void
+    onUsage?: (tokens: number) => void,
   ): Promise<void> {
     for await (const part of this.streamReply(messages, run.controller.signal, {
       tools,
@@ -1216,7 +1288,7 @@ export class Chats {
     onProgress: (progress: TaskProgress) => void,
     mascotId: string | null = null,
     sites: string[] = [],
-    { cloud = false, earlier = [], onText }: { cloud?: boolean; earlier?: ReplyMessage[]; onText?: (text: string) => void } = {}
+    { cloud = false, earlier = [], onText }: { cloud?: boolean; earlier?: ReplyMessage[]; onText?: (text: string) => void } = {},
   ): Promise<TaskResult> {
     let tokens = 0;
     const mascot = this.mascotOf(mascotId);
@@ -1255,10 +1327,20 @@ export class Chats {
     this.taskPopups.set(id, new Set());
     let error: string | null = null;
     try {
-      const said = [...earlier.flatMap(({ role, content }) => (role === "user" && typeof content === "string" ? [content] : [])), message].join("\n");
+      const said = [
+        ...earlier.flatMap(({ role, content }) => (role === "user" && typeof content === "string" ? [content] : [])),
+        message,
+      ].join("\n");
       const tools = this.jobTools(id, run, null, said);
       this.recall(id, run, message);
-      await this.consume(id, run, [...earlier, { role: "user", content: message }], tools, () => onText?.(run.partial), (used) => (tokens += used));
+      await this.consume(
+        id,
+        run,
+        [...earlier, { role: "user", content: message }],
+        tools,
+        () => onText?.(run.partial),
+        (used) => (tokens += used),
+      );
     } catch (caught) {
       if (!run.controller.signal.aborted) {
         console.error("Error in a task:", caught);
@@ -1289,7 +1371,9 @@ export class Chats {
 
   private publishWorkingTabs(): void {
     const runs = [...this.runs.values()];
-    const mascots = new Map(runs.filter((run) => run.mascot.id !== BERRY.id).flatMap((run) => [...run.tabs].map((tab) => [tab, run.mascot.id] as const)));
+    const mascots = new Map(
+      runs.filter((run) => run.mascot.id !== BERRY.id).flatMap((run) => [...run.tabs].map((tab) => [tab, run.mascot.id] as const)),
+    );
     this.events.onWorkingTabs(new Set(runs.flatMap((run) => [...run.tabs])), mascots);
   }
 
@@ -1310,7 +1394,13 @@ export class Chats {
     };
   }
 
-  private wait<T>(chatId: string, run: Run, text: string, kind: Pick<ChatApproval, "question" | "answers" | "why" | "handoff">, onAnswer: (allow: boolean, answer?: string) => T): Promise<T> {
+  private wait<T>(
+    chatId: string,
+    run: Run,
+    text: string,
+    kind: Pick<ChatApproval, "question" | "answers" | "why" | "handoff">,
+    onAnswer: (allow: boolean, answer?: string) => T,
+  ): Promise<T> {
     const { signal } = run.controller;
     return new Promise((resolve, reject) => {
       const stopped = () => reject(new Error("Stopped while waiting for approval"));
@@ -1350,10 +1440,26 @@ export class Chats {
   }
 
   // False if that request has already been answered or its reply has ended. `answer` is for a question.
-  decide(chatId: string, approvalId: string, allow: boolean, answer?: string, { fromPhone = false, fromApp = false }: { fromPhone?: boolean; fromApp?: boolean } = {}): boolean {
+  decide(
+    chatId: string,
+    approvalId: string,
+    allow: boolean,
+    answer?: string,
+    { fromPhone = false, fromApp = false }: { fromPhone?: boolean; fromApp?: boolean } = {},
+  ): boolean {
     const run = this.runs.get(chatId);
     // On the runner, only the user answers, from this window. The phone and apps can't.
-    if (!run && this.runner?.has(chatId)) return !fromPhone && !fromApp && this.runner.decide(chatId, approvalId, allow === true, typeof answer === "string" ? answer.trim().slice(0, MAX_ANSWER_LENGTH) : undefined);
+    if (!run && this.runner?.has(chatId))
+      return (
+        !fromPhone &&
+        !fromApp &&
+        this.runner.decide(
+          chatId,
+          approvalId,
+          allow === true,
+          typeof answer === "string" ? answer.trim().slice(0, MAX_ANSWER_LENGTH) : undefined,
+        )
+      );
     if (run?.approval?.id !== approvalId) return false;
     run.answeredElsewhere = fromPhone || fromApp;
     const { answer: finish } = run.approval;
@@ -1380,7 +1486,12 @@ export class Chats {
 
   // The chat as the model reads it. Only the newest message carries the page and the tabs attached to it, so older
   // screenshots don't go again. Files stay with the message they went with, so later questions can be about them.
-  private async requestMessages(chatId: string, seePage: boolean, mascot: MascotProfile, attachedTabs: readonly Tab[]): Promise<ReplyMessage[]> {
+  private async requestMessages(
+    chatId: string,
+    seePage: boolean,
+    mascot: MascotProfile,
+    attachedTabs: readonly Tab[],
+  ): Promise<ReplyMessage[]> {
     const files = this.store.filesOf(chatId);
     const messages = (this.store.chat(chatId)?.messages ?? []).map((message, index): ReplyMessage => {
       const history = toReplyMessage(message);
@@ -1417,7 +1528,7 @@ export class Chats {
             (error) => {
               console.error("Failed to capture screenshot:", error);
               return null;
-            }
+            },
           ),
       tab.getTabText().catch((error) => {
         console.error("Failed to get page text:", error);
@@ -1433,7 +1544,9 @@ export class Chats {
           url: this.withoutCodes(tab.url),
           text: text === null ? null : this.withoutCodes(text),
           screenshot,
-          note: framed ? `No picture of the page came with this, because it shows a frame from a site ${mascot.name} isn't allowed on.` : undefined,
+          note: framed
+            ? `No picture of the page came with this, because it shows a frame from a site ${mascot.name} isn't allowed on.`
+            : undefined,
         }
       : null;
   }

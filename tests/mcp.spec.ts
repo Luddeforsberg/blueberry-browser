@@ -11,17 +11,25 @@ import { startFakeModel } from "./fakeModel";
 
 const connect = async (url: string, token: string) => {
   const client = new Client({ name: "test", version: "1.0.0" });
-  await client.connect(new StreamableHTTPClientTransport(new URL(url), { requestInit: { headers: { Authorization: `Bearer ${token}`, "X-Blueberry-Client": "Claude Code" } } }));
+  await client.connect(
+    new StreamableHTTPClientTransport(new URL(url), {
+      requestInit: { headers: { Authorization: `Bearer ${token}`, "X-Blueberry-Client": "Claude Code" } },
+    }),
+  );
   return client;
 };
 
 // fetch won't send another Host, which is what a page reaching this computer through its own name would do.
 const statusWithHost = (url: string, host: string, token: string) =>
   new Promise<number>((resolve, reject) => {
-    const sent = request(url, { method: "POST", headers: { host, authorization: `Bearer ${token}`, "content-type": "application/json" } }, (response) => {
-      response.resume();
-      resolve(response.statusCode ?? 0);
-    });
+    const sent = request(
+      url,
+      { method: "POST", headers: { host, authorization: `Bearer ${token}`, "content-type": "application/json" } },
+      (response) => {
+        response.resume();
+        resolve(response.statusCode ?? 0);
+      },
+    );
     sent.on("error", reject);
     sent.end("{}");
   });
@@ -69,7 +77,9 @@ test("Claude gives Berry a job over MCP, can't allow its action, and the user do
 
     const client = await connect(url!, token);
     const { tools } = await client.listTools();
-    expect(tools.map(({ name }) => name)).toEqual(expect.arrayContaining(["list_agents", "run_browser_task", "get_task", "respond_to_task", "read_page"]));
+    expect(tools.map(({ name }) => name)).toEqual(
+      expect.arrayContaining(["list_agents", "run_browser_task", "get_task", "respond_to_task", "read_page"]),
+    );
     expect(jsonOf(await client.callTool({ name: "list_agents", arguments: {} }))[0].name).toBe("Berry");
 
     model.callTools({ name: "open_tab", args: { url: address } });
@@ -79,7 +89,9 @@ test("Claude gives Berry a job over MCP, can't allow its action, and the user do
     const { taskId } = jsonOf(await client.callTool({ name: "run_browser_task", arguments: { goal: "Find the cheapest cable" } }));
 
     // Opening a tab asks, with "always". Claude is told it's waiting, and can't say yes.
-    await expect.poll(async () => jsonOf(await client.callTool({ name: "get_task", arguments: { taskId } })).status).toBe("waiting_for_approval");
+    await expect
+      .poll(async () => jsonOf(await client.callTool({ name: "get_task", arguments: { taskId } })).status)
+      .toBe("waiting_for_approval");
     const refused = await client.callTool({ name: "respond_to_task", arguments: { taskId, answer: "Allow" } });
     expect(refused.isError).toBe(true);
     expect(textOf(refused)).toMatch(/Only the user can allow this/);
@@ -89,9 +101,14 @@ test("Claude gives Berry a job over MCP, can't allow its action, and the user do
     expect(library.chats.find(({ id }) => id === taskId)).toMatchObject({ from: "Claude Code" });
     const [waiting] = library.needsYou;
     expect(waiting).toMatchObject({ id: taskId, from: "Claude Code" });
-    await chrome.evaluate(({ id, approvalId }) => window.chromeAPI.chat.decide(id, approvalId, true), { id: waiting.id, approvalId: waiting.approval.id });
+    await chrome.evaluate(({ id, approvalId }) => window.chromeAPI.chat.decide(id, approvalId, true), {
+      id: waiting.id,
+      approvalId: waiting.approval.id,
+    });
 
-    await expect.poll(async () => jsonOf(await client.callTool({ name: "get_task", arguments: { taskId } })).status, { timeout: 15_000 }).toBe("done");
+    await expect
+      .poll(async () => jsonOf(await client.callTool({ name: "get_task", arguments: { taskId } })).status, { timeout: 15_000 })
+      .toBe("done");
     const done = await client.callTool({ name: "get_task", arguments: { taskId } });
     expect(textOf(done)).toMatch(/^Titles, addresses, page text/);
     expect(jsonOf(done)).toMatchObject({ reply: "Cables on 127.0.0.1 from €4.", from: "Claude Code" });

@@ -13,7 +13,12 @@ export interface CallAnswer {
 
 // One call with a deadline that covers reading the body too, since a server can send its headers and then stall.
 // Past the deadline it's aborted, and the promise rejects as a failed fetch does.
-export const fetchWithin = async (url: string, init: RequestInit, ms = CALL_DEADLINE_MS, fetcher: typeof fetch = fetch): Promise<CallAnswer> => {
+export const fetchWithin = async (
+  url: string,
+  init: RequestInit,
+  ms = CALL_DEADLINE_MS,
+  fetcher: typeof fetch = fetch,
+): Promise<CallAnswer> => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
   try {
@@ -35,4 +40,5 @@ export const oneAtATime = <T>(work: () => Promise<T>): (() => Promise<T>) => {
 };
 
 // Whether to ask again if a runner is linked: never asked, or not for a while.
-export const runnerLinkDue = (checkedAt: number | null, now: number): boolean => checkedAt === null || now - checkedAt >= RUNNER_LINK_EVERY_MS;
+export const runnerLinkDue = (checkedAt: number | null, now: number): boolean =>
+  checkedAt === null || now - checkedAt >= RUNNER_LINK_EVERY_MS;

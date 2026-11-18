@@ -60,7 +60,9 @@ export const proposalData = ({ said, routine, answers, sites }: JobToRemember, k
     said: (said.at(-1) ?? "").slice(0, MAX_SAID_LENGTH),
     earlier: said.slice(-MAX_SAID, -1).map((text) => text.slice(0, MAX_SAID_LENGTH)),
     ...(routine ? { routine: routine.slice(0, MAX_SAID_LENGTH * 2) } : {}),
-    answers: answers.slice(-MAX_ANSWERS).map(({ question, answer }) => ({ question: question.slice(0, MAX_SAID_LENGTH), answer: answer.slice(0, MAX_SAID_LENGTH) })),
+    answers: answers
+      .slice(-MAX_ANSWERS)
+      .map(({ question, answer }) => ({ question: question.slice(0, MAX_SAID_LENGTH), answer: answer.slice(0, MAX_SAID_LENGTH) })),
     sites,
     kept,
     declined,
@@ -76,7 +78,7 @@ const STANDING_WORDS = new RegExp(
     "alltid|jämt|brukar|oftast|vanligtvis|normalt|aldrig|varje gång|från och med nu|hädanefter|framöver|i fortsättningen",
     "kom ihåg|minns|tänk på",
   ].join("|")})(?![\\p{L}\\p{N}])`,
-  "iu"
+  "iu",
 );
 
 // Only what they just typed counts, so a chat doesn't offer again on every message after one that said "always".
@@ -85,8 +87,21 @@ export const statesAHabit = (said: string | undefined, answers: { answer: string
 
 // Whether a job is worth a model call. Failed or stopped ones say nothing about what was wanted. A tab handed to the user may
 // have had anything on it, so a job that had one offers nothing at all.
-export const worthRemembering = ({ stopped, failed, replied, handedOver, said, answers }: { stopped: boolean; failed: boolean; replied: boolean; handedOver: boolean; said: string | undefined; answers: { answer: string }[] }): boolean =>
-  !stopped && !failed && replied && !handedOver && statesAHabit(said, answers);
+export const worthRemembering = ({
+  stopped,
+  failed,
+  replied,
+  handedOver,
+  said,
+  answers,
+}: {
+  stopped: boolean;
+  failed: boolean;
+  replied: boolean;
+  handedOver: boolean;
+  said: string | undefined;
+  answers: { answer: string }[];
+}): boolean => !stopped && !failed && replied && !handedOver && statesAHabit(said, answers);
 
 const wordsOf = (text: string) => new Set(text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []);
 
@@ -110,7 +125,10 @@ export const covers = (known: KnownFact, text: string, site: string | null): boo
 
 // What's kept of what the model wrote. It isn't trusted for any of it: a site has to be one the job really used, and each
 // sentence goes through the same check as anything else that could be stored.
-export const parseProposals = (raw: string, { sites, kept, declined }: { sites: string[]; kept: KnownFact[]; declined: KnownFact[] }): KnownFact[] => {
+export const parseProposals = (
+  raw: string,
+  { sites, kept, declined }: { sites: string[]; kept: KnownFact[]; declined: KnownFact[] },
+): KnownFact[] => {
   let facts: unknown;
   try {
     ({ facts } = JSON.parse(raw.replace(/^[^{]*/, "").replace(/[^}]*$/, "")) as { facts?: unknown });
@@ -134,15 +152,25 @@ export const parseProposals = (raw: string, { sites, kept, declined }: { sites: 
 const mentions = (text: string, site: string): boolean => {
   const name = site.split(".").at(-2) ?? "";
   const names = name.length >= MIN_NAME_LENGTH ? [site, name] : [site];
-  return names.some((one) => new RegExp(`(?<![\\p{L}\\p{N}])${one.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "iu").test(text));
+  return names.some((one) =>
+    new RegExp(`(?<![\\p{L}\\p{N}])${one.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "iu").test(text),
+  );
 };
 
 // What goes into a job. Anything general always does. One about a site goes in when the job has a reason to be there: it's
 // on that site, the chat has already been there, the bird is limited to it, or the user's words name it. A site the job
 // only finds on the way brings its facts from the next message. Nothing about a site the bird can't use goes in, and only
 // so many fit, with the ones about a site first and the newest first.
-export const relevantFacts = (facts: MemoryFact[], { sites, text, allowed }: { sites: string[]; text: string; allowed: readonly string[] }): MemoryFact[] => {
+export const relevantFacts = (
+  facts: MemoryFact[],
+  { sites, text, allowed }: { sites: string[]; text: string; allowed: readonly string[] },
+): MemoryFact[] => {
   const newestFirst = [...facts].sort((a, b) => b.savedAt - a.savedAt);
-  const onSite = newestFirst.filter(({ site }) => site && siteAllowed(`https://${site}`, allowed) && (sites.some((one) => one === site || one.endsWith(`.${site}`)) || mentions(text, site)));
+  const onSite = newestFirst.filter(
+    ({ site }) =>
+      site &&
+      siteAllowed(`https://${site}`, allowed) &&
+      (sites.some((one) => one === site || one.endsWith(`.${site}`)) || mentions(text, site)),
+  );
   return [...onSite, ...newestFirst.filter(({ site }) => !site)].slice(0, MAX_FACTS_IN_PROMPT);
 };

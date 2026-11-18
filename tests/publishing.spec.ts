@@ -24,7 +24,13 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
   try {
     const chrome = await findView(author, "view=chrome");
     await chrome.evaluate(() =>
-      window.chromeAPI.mascots.save(null, { name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "Read svt.se and mail ana.private@example.com.", sites: ["svt.se"], tools: ["visit"] })
+      window.chromeAPI.mascots.save(null, {
+        name: "Scout",
+        look: { palette: "robin", accessory: "cap" },
+        instructions: "Read svt.se and mail ana.private@example.com.",
+        sites: ["svt.se"],
+        tools: ["visit"],
+      }),
     );
 
     // A chat, which is where the example comes from. The chat's other words must not go anywhere.
@@ -42,7 +48,9 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     await expect(chrome.getByText("Three stories from SVT.")).toBeVisible();
 
     // Signed out, Publish asks for an account first, in the page.
-    const scoutId = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).mascots.find((mascot) => mascot.name === "Scout")!.id;
+    const scoutId = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).mascots.find(
+      (mascot) => mascot.name === "Scout",
+    )!.id;
     await chrome.evaluate((id) => window.chromeAPI.browser.openPage("flock", { param: id }), scoutId);
     await expect(chrome.getByRole("button", { name: /^In the Gallery/ })).toContainText("Not published");
     await chrome.getByRole("button", { name: /^In the Gallery/ }).click();
@@ -98,7 +106,19 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
 
     // Only the listed fields left, and neither the password nor the session went anywhere but sign-in.
     const posted = server.received.find(({ method, path }) => method === "POST" && path.startsWith("/rest/v1/mascots"));
-    expect(Object.keys(JSON.parse(posted?.body ?? "{}")).sort()).toEqual(["accessory", "author_name", "category", "description", "example_answer", "example_prompt", "instructions", "name", "palette", "sites", "tools"]);
+    expect(Object.keys(JSON.parse(posted?.body ?? "{}")).sort()).toEqual([
+      "accessory",
+      "author_name",
+      "category",
+      "description",
+      "example_answer",
+      "example_prompt",
+      "instructions",
+      "name",
+      "palette",
+      "sites",
+      "tools",
+    ]);
     const notSignIn = server.received.filter(({ path }) => !path.startsWith("/auth/"));
     for (const { body } of notSignIn) {
       expect(body).not.toContain(PASSWORD);
@@ -106,7 +126,9 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     }
     expect(JSON.stringify(notSignIn.map(({ body }) => body).filter((body) => !body.includes("instructions")))).not.toContain(EMAIL);
     // Only ours: something else on a dev machine can probe a new port.
-    expect(server.received.filter(({ apikey, path }) => /^\/(rest|auth)\//.test(path) && apikey !== server.env.SUPABASE_PUBLISHABLE_KEY)).toEqual([]);
+    expect(
+      server.received.filter(({ apikey, path }) => /^\/(rest|auth)\//.test(path) && apikey !== server.env.SUPABASE_PUBLISHABLE_KEY),
+    ).toEqual([]);
 
     // The session is on disk only encrypted, and the renderer can't get it.
     const saved = readFileSync(join(authorProfile, "account.json"), "utf8");
@@ -133,11 +155,65 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
   }
 
   // Anything else stored there can't get past the app's own checks, whatever a request put in.
-  server.seed({ name: "Sneaky", palette: "robin", accessory: "cap", description: "Reaches home.", category: "Work", instructions: "Go.", sites: ["192.168.1.1"], tools: ["visit"], author_name: "Mallory" });
-  server.seed({ name: "Fake", palette: "robin", accessory: "cap", description: "Looks official.", category: "Work", instructions: "Go.", sites: [], tools: [], author_name: "Blueberry" });
-  server.seed({ name: "Berry", palette: "robin", accessory: "cap", description: "Looks like Berry.", category: "Work", instructions: "Go.", sites: [], tools: [], author_name: "Mallory" });
-  server.seed({ name: "Removed", palette: "robin", accessory: "cap", description: "Taken down.", category: "Work", instructions: "Go.", sites: [], tools: [], author_name: "Mallory", hidden: true });
-  server.seed({ name: "Popular", palette: "canary", accessory: "bow", description: "Lots of adds.", category: "Work", instructions: "Read.\u{E0049}\u200B", sites: [], tools: ["visit", "everything"], author_name: "Bea", add_count: 7, skipApprovals: true, created_at: "2026-01-01T00:00:00Z" });
+  server.seed({
+    name: "Sneaky",
+    palette: "robin",
+    accessory: "cap",
+    description: "Reaches home.",
+    category: "Work",
+    instructions: "Go.",
+    sites: ["192.168.1.1"],
+    tools: ["visit"],
+    author_name: "Mallory",
+  });
+  server.seed({
+    name: "Fake",
+    palette: "robin",
+    accessory: "cap",
+    description: "Looks official.",
+    category: "Work",
+    instructions: "Go.",
+    sites: [],
+    tools: [],
+    author_name: "Blueberry",
+  });
+  server.seed({
+    name: "Berry",
+    palette: "robin",
+    accessory: "cap",
+    description: "Looks like Berry.",
+    category: "Work",
+    instructions: "Go.",
+    sites: [],
+    tools: [],
+    author_name: "Mallory",
+  });
+  server.seed({
+    name: "Removed",
+    palette: "robin",
+    accessory: "cap",
+    description: "Taken down.",
+    category: "Work",
+    instructions: "Go.",
+    sites: [],
+    tools: [],
+    author_name: "Mallory",
+    hidden: true,
+  });
+  server.seed({
+    name: "Popular",
+    palette: "canary",
+    accessory: "bow",
+    description: "Lots of adds.",
+    category: "Work",
+    instructions: "Read.\u{E0049}\u200B",
+    sites: [],
+    tools: ["visit", "everything"],
+    author_name: "Bea",
+    add_count: 7,
+    skipApprovals: true,
+    created_at: "2026-01-01T00:00:00Z",
+  });
 
   // A stranger on another computer, with no account.
   const strangerProfile = inTempDir("stranger");
@@ -146,7 +222,8 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     const chrome = await findView(stranger, "view=chrome");
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("mascot-gallery"));
     const people = chrome.getByRole("region", { name: "From people" });
-    const names = (group: typeof people) => group.getByRole("button").evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label")));
+    const names = (group: typeof people) =>
+      group.getByRole("button").evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label")));
     // Anything breaking the rules isn't shown, and the most added come first, each saying who and how many.
     await expect.poll(() => names(people)).toEqual(["Popular", "Scout"]);
     await expect(people.getByRole("button", { name: "Popular" })).toContainText("Bea · 7 adds");
@@ -199,7 +276,13 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     // Hidden characters and unknown tools don't come through on the other one.
     const entries = (await chrome.evaluate(() => window.chromeAPI.mascots.gallery())).entries;
     const popular = entries.find((entry) => entry.draft.name === "Popular");
-    expect(popular?.draft).toEqual({ name: "Popular", look: { palette: "canary", accessory: "bow" }, instructions: "Read.", sites: [], tools: ["visit"] });
+    expect(popular?.draft).toEqual({
+      name: "Popular",
+      look: { palette: "canary", accessory: "bow" },
+      instructions: "Read.",
+      sites: [],
+      tools: ["visit"],
+    });
 
     // With the server gone, the starters still show and the page says so.
     server.state.down = true;
@@ -217,21 +300,45 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
 
 test("a blueberry://mascot link opens that Gallery entry, fetched again, and adds nothing", async () => {
   const server = await startFakeSupabase();
-  const scout = server.seed({ name: "Scout", palette: "robin", accessory: "cap", description: "Sums up SVT.", category: "News and research", instructions: "Read svt.se.", sites: ["svt.se"], tools: ["visit"], author_name: "Ana" });
+  const scout = server.seed({
+    name: "Scout",
+    palette: "robin",
+    accessory: "cap",
+    description: "Sums up SVT.",
+    category: "News and research",
+    instructions: "Read svt.se.",
+    sites: ["svt.se"],
+    tools: ["visit"],
+    author_name: "Ana",
+  });
   const profile = inTempDir("linked");
   const app = await launchApp(profile, { modelEnv: server.env });
   // The way the system hands a link over: `open-url` on a Mac, a second launch's arguments on Windows and Linux.
-  const openUrl = (link: string) => app.evaluate(({ app: electronApp }, url) => electronApp.emit("open-url", { preventDefault: () => {} }, url), link);
-  const secondLaunch = (link: string) => app.evaluate(({ app: electronApp }, url) => electronApp.emit("second-instance", {}, ["blueberry-browser", "--some-switch", url], process.cwd()), link);
-  const activePage = () => chrome.evaluate(async () => (await window.chromeAPI.browser.getTabs()).find((tab) => tab.isActive)?.page ?? null);
+  const openUrl = (link: string) =>
+    app.evaluate(({ app: electronApp }, url) => electronApp.emit("open-url", { preventDefault: () => {} }, url), link);
+  const secondLaunch = (link: string) =>
+    app.evaluate(
+      ({ app: electronApp }, url) => electronApp.emit("second-instance", {}, ["blueberry-browser", "--some-switch", url], process.cwd()),
+      link,
+    );
+  const activePage = () =>
+    chrome.evaluate(async () => (await window.chromeAPI.browser.getTabs()).find((tab) => tab.isActive)?.page ?? null);
   let chrome = await findView(app, "view=chrome");
   try {
     // It registers for the scheme, which a test only writes down.
-    expect(await app.evaluate(() => (globalThis as { fakeProtocols?: unknown[][] }).fakeProtocols?.map(([scheme]) => scheme))).toEqual(["blueberry"]);
+    expect(await app.evaluate(() => (globalThis as { fakeProtocols?: unknown[][] }).fakeProtocols?.map(([scheme]) => scheme))).toEqual([
+      "blueberry",
+    ]);
 
     // Anything but the one form does nothing at all.
     expect(await activePage()).toBe("new-tab");
-    for (const link of [`blueberry://mascot/${scout.id}?add=1`, `blueberry://mascot/${scout.id}/`, `blueberry://routine/${scout.id}`, "blueberry://mascot/javascript:alert(1)", `blueberry://mascot/${"a".repeat(5000)}`]) {
+    for (const link of [
+      `blueberry://mascot/${scout.id}?add=1`,
+      `blueberry://mascot/${scout.id}/`,
+      `blueberry://routine/${scout.id}`,
+      "blueberry://mascot/javascript:alert(1)",
+      `blueberry://mascot/${"a".repeat(5000)}`,
+    ]) {
       await openUrl(link);
       await secondLaunch(link);
     }
@@ -292,9 +399,17 @@ test("with no server set up there's no sign-in or publish control, and the Galle
   try {
     const chrome = await findView(app, "view=chrome");
     await chrome.evaluate(() =>
-      window.chromeAPI.mascots.save(null, { name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "Read.", sites: [], tools: [] })
+      window.chromeAPI.mascots.save(null, {
+        name: "Scout",
+        look: { palette: "robin", accessory: "cap" },
+        instructions: "Read.",
+        sites: [],
+        tools: [],
+      }),
     );
-    const scoutId = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).mascots.find((mascot) => mascot.name === "Scout")!.id;
+    const scoutId = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).mascots.find(
+      (mascot) => mascot.name === "Scout",
+    )!.id;
     await chrome.evaluate((id) => window.chromeAPI.browser.openPage("flock", { param: id }), scoutId);
     await expect(chrome.getByRole("button", { name: /^Limits/ })).toBeVisible();
     await expect(chrome.getByText("In the Gallery")).toHaveCount(0);

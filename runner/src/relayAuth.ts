@@ -3,7 +3,12 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { dirname } from "path";
 import type { Response } from "express";
 import type { OAuthRegisteredClientsStore } from "@modelcontextprotocol/sdk/server/auth/clients.js";
-import { InvalidClientMetadataError, InvalidGrantError, InvalidTargetError, InvalidTokenError } from "@modelcontextprotocol/sdk/server/auth/errors.js";
+import {
+  InvalidClientMetadataError,
+  InvalidGrantError,
+  InvalidTargetError,
+  InvalidTokenError,
+} from "@modelcontextprotocol/sdk/server/auth/errors.js";
 import type { AuthorizationParams, OAuthServerProvider } from "@modelcontextprotocol/sdk/server/auth/provider.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import type { OAuthClientInformationFull, OAuthTokenRevocationRequest, OAuthTokens } from "@modelcontextprotocol/sdk/shared/auth.js";
@@ -175,8 +180,18 @@ export class RelayAuth implements OAuthServerProvider {
         }
         const method = client.token_endpoint_auth_method === "none" ? "none" : "client_secret_post";
         const name = typeof client.client_name === "string" ? client.client_name.slice(0, 100) : undefined;
-        const clientId = signed(this.keys, { t: "client", r: uris, m: method, ...(name ? { n: name } : {}), at: Math.floor(this.now() / 1000), k: randomUUID() });
-        return { ...this.clientsStore.getClient(clientId)!, client_id_issued_at: Math.floor(this.now() / 1000) } as OAuthClientInformationFull;
+        const clientId = signed(this.keys, {
+          t: "client",
+          r: uris,
+          m: method,
+          ...(name ? { n: name } : {}),
+          at: Math.floor(this.now() / 1000),
+          k: randomUUID(),
+        });
+        return {
+          ...this.clientsStore.getClient(clientId)!,
+          client_id_issued_at: Math.floor(this.now() / 1000),
+        } as OAuthClientInformationFull;
       },
     };
   }
@@ -184,7 +199,8 @@ export class RelayAuth implements OAuthServerProvider {
   // --- The sign-in page ---
 
   async authorize(client: OAuthClientInformationFull, params: AuthorizationParams, res: Response): Promise<void> {
-    if (params.resource && params.resource.href !== this.options.resource.href) throw new InvalidTargetError("This server is only for its own MCP address.");
+    if (params.resource && params.resource.href !== this.options.resource.href)
+      throw new InvalidTargetError("This server is only for its own MCP address.");
     const request = signed(this.keys, {
       t: "form",
       c: client.client_id,
@@ -193,15 +209,27 @@ export class RelayAuth implements OAuthServerProvider {
       ...(params.state !== undefined ? { s: params.state } : {}),
       x: this.now() + FORM_TTL_MS,
     });
-    res.status(200).type("html").send(signInPage({ app: appName(params.redirectUri), request }));
+    res
+      .status(200)
+      .type("html")
+      .send(signInPage({ app: appName(params.redirectUri), request }));
   }
 
   // The form's answer: the password goes to Supabase once and is forgotten, and so is the session it gives, once the
   // grant is made. Gives where to send the browser next.
-  async signIn(form: { request?: unknown; email?: unknown; password?: unknown }, from: string): Promise<{ redirect: string } | { page: string }> {
+  async signIn(
+    form: { request?: unknown; email?: unknown; password?: unknown },
+    from: string,
+  ): Promise<{ redirect: string } | { page: string }> {
     const request = unsigned(this.keys, form.request);
     if (!request || request.t !== "form" || typeof request.x !== "number" || request.x < this.now()) {
-      return { page: signInPage({ app: "This app", request: null, problem: "This sign-in has run out. Start connecting again from ChatGPT or Claude." }) };
+      return {
+        page: signInPage({
+          app: "This app",
+          request: null,
+          problem: "This sign-in has run out. Start connecting again from ChatGPT or Claude.",
+        }),
+      };
     }
     const client = await this.clientsStore.getClient(String(request.c));
     const redirectUri = String(request.r);
@@ -211,12 +239,14 @@ export class RelayAuth implements OAuthServerProvider {
     const password = typeof form.password === "string" ? form.password : "";
     if (!email || !password) return again("Give your Blueberry email and password.");
     // Nobody else's password is sent anywhere, and nobody else's tries count against the owner's.
-    if (email.toLowerCase() !== this.options.owner.toLowerCase()) return again("Only the Blueberry account this is set up for can connect here.");
+    if (email.toLowerCase() !== this.options.owner.toLowerCase())
+      return again("Only the Blueberry account this is set up for can connect here.");
     if (!this.mayTry(from)) return again("Too many tries. Wait a few minutes and try again.");
     let secret: string;
     try {
       const session = await this.options.server.signIn(email, password);
-      if (!session || session.email.toLowerCase() !== this.options.owner.toLowerCase()) return again("Only the Blueberry account this is set up for can connect here.");
+      if (!session || session.email.toLowerCase() !== this.options.owner.toLowerCase())
+        return again("Only the Blueberry account this is set up for can connect here.");
       try {
         secret = await this.options.grants.create(session.accessToken);
       } finally {
@@ -224,14 +254,22 @@ export class RelayAuth implements OAuthServerProvider {
         await this.options.server.signOut(session.accessToken).catch(() => {});
       }
     } catch (error) {
-      if (error instanceof ServerError && error.status === 400 && error.code === "invalid_credentials") return again("That email and password didn't match.");
-      if (error instanceof ServerError) return again("Set up keeping going with your Mac off in Blueberry first, under Settings > Cloud, then try again.");
+      if (error instanceof ServerError && error.status === 400 && error.code === "invalid_credentials")
+        return again("That email and password didn't match.");
+      if (error instanceof ServerError)
+        return again("Set up keeping going with your Mac off in Blueberry first, under Settings > Cloud, then try again.");
       return again(error instanceof Unreachable ? "Couldn't reach Blueberry's server. Try again." : "That didn't work. Try again.");
     }
     const code = randomBytes(32).toString("base64url");
     this.dropExpired();
     if (this.codes.size >= MAX_CODES) this.codes.delete(this.codes.keys().next().value as string);
-    this.codes.set(hash(code), { clientId: client.client_id, redirectUri, challenge: String(request.ch), secret, expiresAt: this.now() + CODE_TTL_MS });
+    this.codes.set(hash(code), {
+      clientId: client.client_id,
+      redirectUri,
+      challenge: String(request.ch),
+      secret,
+      expiresAt: this.now() + CODE_TTL_MS,
+    });
     const target = new URL(redirectUri);
     target.searchParams.set("code", code);
     if (typeof request.s === "string") target.searchParams.set("state", request.s);
@@ -254,22 +292,43 @@ export class RelayAuth implements OAuthServerProvider {
     return code.challenge;
   }
 
-  async exchangeAuthorizationCode(client: OAuthClientInformationFull, authorizationCode: string, _verifier?: string, redirectUri?: string, resource?: URL): Promise<OAuthTokens> {
+  async exchangeAuthorizationCode(
+    client: OAuthClientInformationFull,
+    authorizationCode: string,
+    _verifier?: string,
+    redirectUri?: string,
+    resource?: URL,
+  ): Promise<OAuthTokens> {
     const key = hash(authorizationCode);
     const code = this.codes.get(key);
     // Used once, whatever happens next.
     this.codes.delete(key);
     if (!code || code.clientId !== client.client_id || code.expiresAt < this.now()) throw new InvalidGrantError("That code isn't valid.");
     if (redirectUri !== undefined && redirectUri !== code.redirectUri) throw new InvalidGrantError("The redirect_uri doesn't match.");
-    if (resource && resource.href !== this.options.resource.href) throw new InvalidTargetError("This server is only for its own MCP address.");
+    if (resource && resource.href !== this.options.resource.href)
+      throw new InvalidTargetError("This server is only for its own MCP address.");
     const now = this.now();
-    const grant: Grant = { id: randomUUID(), clientId: client.client_id, secret: code.secret, accessHash: "", accessExpiresAt: 0, refreshHash: "", createdAt: now, lastUsedAt: now };
+    const grant: Grant = {
+      id: randomUUID(),
+      clientId: client.client_id,
+      secret: code.secret,
+      accessHash: "",
+      accessExpiresAt: 0,
+      refreshHash: "",
+      createdAt: now,
+      lastUsedAt: now,
+    };
     this.grants.set(grant.id, grant);
     while (this.grants.size > MAX_GRANTS) this.end(this.grants.keys().next().value as string);
     return this.issue(grant);
   }
 
-  async exchangeRefreshToken(client: OAuthClientInformationFull, refreshToken: string, _scopes?: string[], resource?: URL): Promise<OAuthTokens> {
+  async exchangeRefreshToken(
+    client: OAuthClientInformationFull,
+    refreshToken: string,
+    _scopes?: string[],
+    resource?: URL,
+  ): Promise<OAuthTokens> {
     const grant = this.grants.get(this.connectionOf(refreshToken) ?? "");
     if (!grant) throw new InvalidGrantError("That refresh token isn't valid.");
     // A token of this connection that isn't its newest was used already, so it was copied: the whole connection ends,
@@ -278,7 +337,8 @@ export class RelayAuth implements OAuthServerProvider {
       this.end(grant.id);
       throw new InvalidGrantError("That refresh token was already used, so this connection has ended. Connect again.");
     }
-    if (resource && resource.href !== this.options.resource.href) throw new InvalidTargetError("This server is only for its own MCP address.");
+    if (resource && resource.href !== this.options.resource.href)
+      throw new InvalidTargetError("This server is only for its own MCP address.");
     if (this.expired(grant)) {
       this.end(grant.id);
       throw new InvalidGrantError("This connection has run out. Connect again.");
@@ -289,8 +349,16 @@ export class RelayAuth implements OAuthServerProvider {
 
   async verifyAccessToken(token: string): Promise<AuthInfo> {
     const grant = this.byHash("accessHash", token);
-    if (!grant || grant.accessExpiresAt < this.now() || this.expired(grant)) throw new InvalidTokenError("Connect again from ChatGPT or Claude.");
-    return { token, clientId: grant.clientId, scopes: [], expiresAt: Math.floor(grant.accessExpiresAt / 1000), resource: this.options.resource, extra: { grantId: grant.id } };
+    if (!grant || grant.accessExpiresAt < this.now() || this.expired(grant))
+      throw new InvalidTokenError("Connect again from ChatGPT or Claude.");
+    return {
+      token,
+      clientId: grant.clientId,
+      scopes: [],
+      expiresAt: Math.floor(grant.accessExpiresAt / 1000),
+      resource: this.options.resource,
+      extra: { grantId: grant.id },
+    };
   }
 
   async revokeToken(client: OAuthClientInformationFull, request: OAuthTokenRevocationRequest): Promise<void> {
@@ -371,7 +439,12 @@ export class RelayAuth implements OAuthServerProvider {
     }
     try {
       for (const grant of JSON.parse(plain) as Grant[]) {
-        if (typeof grant?.id === "string" && typeof grant.secret === "string" && typeof grant.createdAt === "number" && typeof grant.lastUsedAt === "number") {
+        if (
+          typeof grant?.id === "string" &&
+          typeof grant.secret === "string" &&
+          typeof grant.createdAt === "number" &&
+          typeof grant.lastUsedAt === "number"
+        ) {
           this.grants.set(grant.id, grant);
         }
       }

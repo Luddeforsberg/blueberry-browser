@@ -52,7 +52,7 @@ export class MenuView {
   constructor(
     region: "menu" | "drop-menu",
     attach: (view: WebContentsView) => MenuSurface,
-    private readonly options: { mascotsHidden: () => boolean; refocus: boolean }
+    private readonly options: { mascotsHidden: () => boolean; refocus: boolean },
   ) {
     this.chromeView = createChromeView(region);
     this.chromeView.view.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
@@ -262,7 +262,8 @@ const validSheets = (input: unknown, entries: MenuEntry[]): MenuSheetBox[] | nul
   for (const sheet of input) {
     const { path, width, height, rowTop } = (sheet ?? {}) as Record<string, unknown>;
     if (typeof path !== "string" || !finite(width) || !finite(height) || !finite(rowTop)) return null;
-    if (width <= 0 || width > MAX_SHEET.width || height <= 0 || height > MAX_SHEET.height || rowTop < 0 || rowTop > MAX_SHEET.height) return null;
+    if (width <= 0 || width > MAX_SHEET.width || height <= 0 || height > MAX_SHEET.height || rowTop < 0 || rowTop > MAX_SHEET.height)
+      return null;
     if (!hasSheet(entries, path)) return null;
     sheets.push({ path, width, height, rowTop });
   }

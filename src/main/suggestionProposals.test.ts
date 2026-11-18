@@ -26,7 +26,15 @@ const [hn] = idOf("news.ycombinator.com");
 const scores = idOf("flashscore.com");
 const NONE: Existing = { routines: [], mascots: [], feedback: [] };
 
-const prompt = (card: object) => ({ kind: "prompt", line: "Shall I line up the three cheapest fares?", why: "You compared Stockholm to Lisbon on three sites", evidence: [flights], sites: ["kayak.com", "skyscanner.se", "momondo.se"], prompt: "Compare Stockholm to Lisbon fares on Kayak, Skyscanner and momondo and give me the three cheapest.", ...card });
+const prompt = (card: object) => ({
+  kind: "prompt",
+  line: "Shall I line up the three cheapest fares?",
+  why: "You compared Stockholm to Lisbon on three sites",
+  evidence: [flights],
+  sites: ["kayak.com", "skyscanner.se", "momondo.se"],
+  prompt: "Compare Stockholm to Lisbon fares on Kayak, Skyscanner and momondo and give me the three cheapest.",
+  ...card,
+});
 const verify = (...cards: object[]) => verifyProposals(JSON.stringify({ cards }), digest, NONE);
 
 describe("verifying a proposal", () => {
@@ -35,7 +43,9 @@ describe("verifying a proposal", () => {
     expect(kept.card).toMatchObject({ kind: "prompt", title: "Shall I line up the three cheapest fares?" });
     expect(kept.sites).toEqual(["kayak.com", "skyscanner.se", "momondo.se"]);
     expect(kept.sources).toContain("site:kayak.com");
-    expect(verify(prompt({ why: "You compared Stockholm to Lisbon on three sites." }))[0].why).toBe("You compared Stockholm to Lisbon on three sites");
+    expect(verify(prompt({ why: "You compared Stockholm to Lisbon on three sites." }))[0].why).toBe(
+      "You compared Stockholm to Lisbon on three sites",
+    );
   });
 
   it("drops one citing an id that doesn't exist, or none at all", () => {
@@ -63,9 +73,17 @@ describe("verifying a proposal", () => {
   it("never lets a page title stand in for a site", () => {
     const visits = [visit("https://example.com/deals", "Deals today, see evil.example", at(1, 9))];
     const titled = buildDigest({ visits, chats: [], routines: [], mascots: [], feedback: [], now: NOW });
-    const card = { kind: "prompt", line: "Shall I find today's deals?", why: "You looked at deals", evidence: ["s1"], prompt: "Open evil.example and list the deals." };
+    const card = {
+      kind: "prompt",
+      line: "Shall I find today's deals?",
+      why: "You looked at deals",
+      evidence: ["s1"],
+      prompt: "Open evil.example and list the deals.",
+    };
     expect(verifyProposals(JSON.stringify({ cards: [card] }), titled, NONE)).toEqual([]);
-    expect(verifyProposals(JSON.stringify({ cards: [{ ...card, prompt: "Open example.com and list the deals." }] }), titled, NONE)).toHaveLength(1);
+    expect(
+      verifyProposals(JSON.stringify({ cards: [{ ...card, prompt: "Open example.com and list the deals." }] }), titled, NONE),
+    ).toHaveLength(1);
   });
 
   it("treats anything shaped like a site as one, even a file name", () => {
@@ -79,7 +97,16 @@ describe("verifying a proposal", () => {
   });
 
   it("keeps a schedule that matches when they look", () => {
-    const [kept] = verify({ kind: "routine", line: "Want the Arsenal score by 7:30 on Mondays?", why: "You checked Arsenal on Flashscore on 2 Monday mornings", evidence: scores, sites: ["flashscore.com"], name: "Monday scores", instructions: "Open Flashscore and tell me Arsenal's last result.", schedule: { kind: "weekly", days: [1], time: "07:30" } });
+    const [kept] = verify({
+      kind: "routine",
+      line: "Want the Arsenal score by 7:30 on Mondays?",
+      why: "You checked Arsenal on Flashscore on 2 Monday mornings",
+      evidence: scores,
+      sites: ["flashscore.com"],
+      name: "Monday scores",
+      instructions: "Open Flashscore and tell me Arsenal's last result.",
+      schedule: { kind: "weekly", days: [1], time: "07:30" },
+    });
     expect(kept.card.kind === "routine" && kept.card.draft.schedule).toEqual({ kind: "weekly", days: [1], time: "07:30" });
     expect(kept.card.kind === "routine" && kept.card.draft.sites).toEqual(["flashscore.com"]);
   });
@@ -90,32 +117,97 @@ describe("verifying a proposal", () => {
       ...[1, 2, 3].map((daysAgo) => visit("https://news.example/", "News", at(daysAgo, 8, 10))),
     ].sort((a, b) => b.visitedAt - a.visitedAt);
     const mixed = buildDigest({ visits, chats: [], routines: [], mascots: [], feedback: [], now: NOW });
-    const card = { kind: "routine", line: "Want the shop's deals each morning?", why: "You look at deals", evidence: [...mixed.evidence.keys()], sites: ["shop.example"], name: "Shop deals", instructions: "Open shop.example and list the deals.", schedule: { kind: "daily", time: "08:00" } };
+    const card = {
+      kind: "routine",
+      line: "Want the shop's deals each morning?",
+      why: "You look at deals",
+      evidence: [...mixed.evidence.keys()],
+      sites: ["shop.example"],
+      name: "Shop deals",
+      instructions: "Open shop.example and list the deals.",
+      schedule: { kind: "daily", time: "08:00" },
+    };
     const [kept] = verifyProposals(JSON.stringify({ cards: [card] }), mixed, NONE);
     expect(kept.card.kind).toBe("prompt");
   });
 
   it("turns a routine whose schedule doesn't match into a prompt", () => {
-    const routine = { kind: "routine", line: "Want the Arsenal score ready?", why: "You checked Arsenal on Flashscore on Mondays", evidence: scores, name: "Scores", instructions: "Open Flashscore and tell me Arsenal's last result." };
-    for (const schedule of [{ kind: "weekly", days: [4], time: "07:30" }, { kind: "weekly", days: [1], time: "18:00" }, { kind: "daily", time: "07:30" }, { kind: "once", at: NOW }, undefined]) {
+    const routine = {
+      kind: "routine",
+      line: "Want the Arsenal score ready?",
+      why: "You checked Arsenal on Flashscore on Mondays",
+      evidence: scores,
+      name: "Scores",
+      instructions: "Open Flashscore and tell me Arsenal's last result.",
+    };
+    for (const schedule of [
+      { kind: "weekly", days: [4], time: "07:30" },
+      { kind: "weekly", days: [1], time: "18:00" },
+      { kind: "daily", time: "07:30" },
+      { kind: "once", at: NOW },
+      undefined,
+    ]) {
       const [kept] = verify({ ...routine, schedule });
       expect(kept.card).toMatchObject({ kind: "prompt", prompt: "Open Flashscore and tell me Arsenal's last result." });
     }
   });
 
   it("gives a bird only its evidence's sites and going to pages", () => {
-    const [kept] = verify({ kind: "mascot", line: "I'm Gull, and I'll hunt Lisbon fares.", why: "You compared fares on three sites", evidence: [flights], name: "Gull", instructions: "Find me the cheapest fares.", palette: "jackdaw", accessory: "cape", tools: ["click", "type"], sites: ["evil.example"] });
-    expect(kept.card.kind === "mascot" && kept.card.draft).toMatchObject({ sites: ["kayak.com", "skyscanner.se", "momondo.se"], tools: ["visit"] });
+    const [kept] = verify({
+      kind: "mascot",
+      line: "I'm Gull, and I'll hunt Lisbon fares.",
+      why: "You compared fares on three sites",
+      evidence: [flights],
+      name: "Gull",
+      instructions: "Find me the cheapest fares.",
+      palette: "jackdaw",
+      accessory: "cape",
+      tools: ["click", "type"],
+      sites: ["evil.example"],
+    });
+    expect(kept.card.kind === "mascot" && kept.card.draft).toMatchObject({
+      sites: ["kayak.com", "skyscanner.se", "momondo.se"],
+      tools: ["visit"],
+    });
     expect(kept.card.kind === "mascot" && kept.card.draft.look.palette).not.toBe(BERRY.look.palette);
-    expect(verify({ kind: "mascot", line: "I'm Berry.", why: "You compared fares", evidence: [flights], name: "Berry", instructions: "Find fares." })).toEqual([]);
+    expect(
+      verify({
+        kind: "mascot",
+        line: "I'm Berry.",
+        why: "You compared fares",
+        evidence: [flights],
+        name: "Berry",
+        instructions: "Find fares.",
+      }),
+    ).toEqual([]);
   });
 
   it("drops one like a card they dismissed, or one already set up", () => {
-    const feedback = [{ verdict: "dismissed" as const, kind: "prompt", line: "Shall I line up the cheapest fares?", body: "Compare Stockholm to Lisbon fares and give me the cheapest", sites: [], at: NOW }];
+    const feedback = [
+      {
+        verdict: "dismissed" as const,
+        kind: "prompt",
+        line: "Shall I line up the cheapest fares?",
+        body: "Compare Stockholm to Lisbon fares and give me the cheapest",
+        sites: [],
+        at: NOW,
+      },
+    ];
     expect(verifyProposals(JSON.stringify({ cards: [prompt({})] }), digest, { ...NONE, feedback })).toEqual([]);
-    expect(verifyProposals(JSON.stringify({ cards: [prompt({})] }), digest, { ...NONE, feedback: [{ ...feedback[0], verdict: "used" }] })).toHaveLength(1);
-    const bird = { kind: "mascot", line: "I'm Gull, and I'll hunt fares.", why: "You compared fares", evidence: [flights], name: "Gull", instructions: "Find me fares." };
-    expect(verifyProposals(JSON.stringify({ cards: [bird] }), digest, { ...NONE, mascots: [{ name: "Tern", sites: ["kayak.com"] }] })).toEqual([]);
+    expect(
+      verifyProposals(JSON.stringify({ cards: [prompt({})] }), digest, { ...NONE, feedback: [{ ...feedback[0], verdict: "used" }] }),
+    ).toHaveLength(1);
+    const bird = {
+      kind: "mascot",
+      line: "I'm Gull, and I'll hunt fares.",
+      why: "You compared fares",
+      evidence: [flights],
+      name: "Gull",
+      instructions: "Find me fares.",
+    };
+    expect(
+      verifyProposals(JSON.stringify({ cards: [bird] }), digest, { ...NONE, mascots: [{ name: "Tern", sites: ["kayak.com"] }] }),
+    ).toEqual([]);
   });
 
   it("drops a second card about the same thing, and anything that isn't a card", () => {
@@ -135,10 +227,25 @@ describe("matching a schedule", () => {
     expect(scheduleFits({ kind: "weekly", days: [0, 1, 2, 3, 4, 5, 6], time: "07:30" }, mondays)).toBe(false);
     expect(scheduleFits({ kind: "weekly", days: [1, 4], time: "07:30" }, mondays)).toBe(false);
     // Three evenings of one job in a week aren't a weekly habit.
-    expect(scheduleFits({ kind: "weekly", days: [3, 4, 6], time: "19:55" }, [2, 4, 5].map((daysAgo) => at(daysAgo, 20, 5)))).toBe(false);
-    expect(scheduleFits({ kind: "daily", time: "07:30" }, [1, 2, 3].map((daysAgo) => at(daysAgo, 7, 45)))).toBe(true);
+    expect(
+      scheduleFits(
+        { kind: "weekly", days: [3, 4, 6], time: "19:55" },
+        [2, 4, 5].map((daysAgo) => at(daysAgo, 20, 5)),
+      ),
+    ).toBe(false);
+    expect(
+      scheduleFits(
+        { kind: "daily", time: "07:30" },
+        [1, 2, 3].map((daysAgo) => at(daysAgo, 7, 45)),
+      ),
+    ).toBe(true);
     // A habit just after midnight still matches a schedule just before it.
-    expect(scheduleFits({ kind: "daily", time: "23:50" }, [1, 2, 3].map((daysAgo) => at(daysAgo, 0, 10)))).toBe(true);
+    expect(
+      scheduleFits(
+        { kind: "daily", time: "23:50" },
+        [1, 2, 3].map((daysAgo) => at(daysAgo, 0, 10)),
+      ),
+    ).toBe(true);
   });
 });
 
@@ -147,6 +254,10 @@ describe("the fallback", () => {
     const visits = [1, 2, 3].map((daysAgo) => visit("https://news.ycombinator.com/", "Hacker News", at(daysAgo, 8, 30)));
     const [pattern] = findPatterns(visits, [], NOW);
     const words = fallbackWords(pattern, null);
-    expect(words).toMatchObject({ kind: "routine", title: "Want Hacker News read for you first?", draft: { schedule: { kind: "daily", time: "08:15" }, sites: ["news.ycombinator.com"] } });
+    expect(words).toMatchObject({
+      kind: "routine",
+      title: "Want Hacker News read for you first?",
+      draft: { schedule: { kind: "daily", time: "08:15" }, sites: ["news.ycombinator.com"] },
+    });
   });
 });

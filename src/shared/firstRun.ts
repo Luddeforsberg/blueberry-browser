@@ -12,7 +12,7 @@ export const firstRunSteps = ({ accounts, browsers }: { accounts: boolean; brows
 // the rest by having been passed, which Settings keeps.
 export const firstRunStart = (
   steps: FirstRunStep[],
-  { passed, signedIn, hasKey }: { passed: FirstRunStep[]; signedIn: boolean; hasKey: boolean }
+  { passed, signedIn, hasKey }: { passed: FirstRunStep[]; signedIn: boolean; hasKey: boolean },
 ): number => {
   const done = (step: FirstRunStep) => (step === "account" ? signedIn : (step === "brain" && hasKey) || passed.includes(step));
   const at = steps.findIndex((step) => !done(step));

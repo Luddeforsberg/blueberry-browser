@@ -33,7 +33,18 @@ export interface Session {
   height: number;
 }
 
-const PAGES: readonly InternalPage[] = ["new-tab", "chat", "routines", "settings", "downloads", "gallery", "history", "flock", "mascot-gallery", "needs-you"];
+const PAGES: readonly InternalPage[] = [
+  "new-tab",
+  "chat",
+  "routines",
+  "settings",
+  "downloads",
+  "gallery",
+  "history",
+  "flock",
+  "mascot-gallery",
+  "needs-you",
+];
 const MAX_ENTRIES = 50;
 const WRITE_DELAY_MS = 500;
 
@@ -48,11 +59,9 @@ const text = (value: unknown): string => (typeof value === "string" ? value : ""
 // Only the address and title are kept. A page's saved state can hold what was posted to it, passwords included.
 export const savedEntries = (
   entries: ReadonlyArray<{ url?: unknown; title?: unknown }>,
-  index: number
+  index: number,
 ): { entries: SavedEntry[]; index: number } => {
-  const kept = entries.flatMap(({ url, title }, at) =>
-    canRestore(url) ? [{ at, entry: { url, title: text(title) } }] : []
-  );
+  const kept = entries.flatMap(({ url, title }, at) => (canRestore(url) ? [{ at, entry: { url, title: text(title) } }] : []));
   const current = kept.findIndex(({ at }) => at === index);
   if (current === -1) return { entries: [], index: 0 };
   const start = Math.max(0, current - Math.floor(MAX_ENTRIES / 2));
@@ -90,7 +99,10 @@ export const sanitizeSession = (raw: unknown): Session | null => {
   if (kept.length === 0) return null;
   return {
     tabs: kept.flatMap(({ tab }) => (tab ? [tab] : [])),
-    active: Math.max(0, kept.findIndex(({ wasActive }) => wasActive)),
+    active: Math.max(
+      0,
+      kept.findIndex(({ wasActive }) => wasActive),
+    ),
     sidebarOpen: input.sidebarOpen !== false,
     chatOpen: input.chatOpen === true,
     width: size(input.width),

@@ -48,7 +48,10 @@ test("a bird does a job in a cloud tab, asking before it clicks, and the user ca
     model.callTools({ name: "read_page", args: {} });
     // Naming the site keeps its cloud tab open once the job is done.
     model.replyWith("Ordered it on 127.0.0.1");
-    const sent = await chrome.evaluate((address) => window.chromeAPI.chat.send(null, `Order the thing on ${address}`, { seePage: false, cloud: true }), shop);
+    const sent = await chrome.evaluate(
+      (address) => window.chromeAPI.chat.send(null, `Order the thing on ${address}`, { seePage: false, cloud: true }),
+      shop,
+    );
     expect(sent).not.toBeNull();
 
     // The same approval as anywhere, in Needs you and on the chat.
@@ -58,7 +61,11 @@ test("a bird does a job in a cloud tab, asking before it clicks, and the user ca
     await expect(card.locator("p").getByText(`Click the button “Place order” on ${shop}`)).toBeVisible();
     await card.getByRole("button", { name: "Allow", exact: true }).click();
 
-    await expect.poll(async () => (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id))?.messages.at(-1)?.content, { timeout: 15_000 }).toBe("Ordered it on 127.0.0.1");
+    await expect
+      .poll(async () => (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id))?.messages.at(-1)?.content, {
+        timeout: 15_000,
+      })
+      .toBe("Ordered it on 127.0.0.1");
     // Real input reached the page in the cloud browser, and nothing opened in this window.
     expect(JSON.stringify(model.requests.at(-1)?.messages.at(-1))).toContain("Order placed");
     const tabs = await chrome.evaluate(() => window.chromeAPI.browser.getTabs());
@@ -109,7 +116,10 @@ test("a cloud job shows in the working view beside its chat, and pressing the pi
     model.callTools({ name: "open_tab", args: { url: shop } });
     model.replyWith("Had a look");
     const finish = model.holdBeforeFirstToken();
-    const sent = await chrome.evaluate((address) => window.chromeAPI.chat.send(null, `Have a look at the shop on ${address}`, { seePage: false, cloud: true }), shop);
+    const sent = await chrome.evaluate(
+      (address) => window.chromeAPI.chat.send(null, `Have a look at the shop on ${address}`, { seePage: false, cloud: true }),
+      shop,
+    );
     await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), sent!.id);
 
     const view = chrome.getByRole("complementary", { name: /working on/ });
@@ -129,7 +139,11 @@ test("a cloud job shows in the working view beside its chat, and pressing the pi
     await expect(chrome.getByRole("button", { name: "Take over" })).toBeVisible();
 
     finish();
-    await expect.poll(async () => (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id))?.messages.at(-1)?.content, { timeout: 15_000 }).toBe("Had a look");
+    await expect
+      .poll(async () => (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id))?.messages.at(-1)?.content, {
+        timeout: 15_000,
+      })
+      .toBe("Had a look");
     const saved = JSON.stringify(await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id));
     expect(saved).not.toContain("data:image");
     expect(JSON.stringify(model.requests)).not.toContain("data:image");

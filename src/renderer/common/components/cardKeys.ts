@@ -73,7 +73,9 @@ export interface CardRegion {
 }
 
 const isField = (target: EventTarget | null): boolean =>
-  target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || (target instanceof HTMLElement && target.isContentEditable);
+  target instanceof HTMLInputElement ||
+  target instanceof HTMLTextAreaElement ||
+  (target instanceof HTMLElement && target.isContentEditable);
 
 export const useCardKeys = (keys: CardKeys): { region: CardRegion; on: KeysOn } => {
   const ref = useRef<HTMLElement>(null);

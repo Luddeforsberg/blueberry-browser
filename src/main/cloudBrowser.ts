@@ -55,7 +55,7 @@ export class CloudSessions {
   constructor(
     private readonly browser: CloudBrowser,
     private readonly onChange: () => void = () => {},
-    private readonly idleMs = IDLE_MS
+    private readonly idleMs = IDLE_MS,
   ) {}
 
   get status(): CloudStatus {
@@ -198,7 +198,11 @@ export class CloudSessions {
   async open(jobId: string, id: string, url: string, events: CdpTabEvents, allows?: (url: string) => boolean): Promise<CdpTab> {
     if (this.owner !== jobId) throw new Error("The cloud browser is working on another job.");
     const tab = await this.newTab(id, jobId, events);
-    const load = () => tab.loadURL(url).then(() => tab.settled(), () => {});
+    const load = () =>
+      tab.loadURL(url).then(
+        () => tab.settled(),
+        () => {},
+      );
     if (allows) await tab.withNavigationLimit(allows, load);
     else await load();
     this.onChange();
@@ -221,7 +225,10 @@ export class CloudSessions {
   // A page the user opened themselves, such as a site to see whether they're signed in. It belongs to no job.
   async openForUser(id: string, url: string, events: CdpTabEvents): Promise<CdpTab> {
     const tab = await this.newTab(id, "", events);
-    await tab.loadURL(url).then(() => tab.settled(), () => {});
+    await tab.loadURL(url).then(
+      () => tab.settled(),
+      () => {},
+    );
     this.onChange();
     return tab;
   }

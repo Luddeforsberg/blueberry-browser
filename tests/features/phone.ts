@@ -16,7 +16,14 @@ const MAC_CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome
 export const PHONE_BROWSER = process.platform === "win32" ? { channel: "msedge" } : { executablePath: MAC_CHROME };
 export const phoneBrowserMissing = process.platform !== "win32" && !existsSync(MAC_CHROME);
 
-const TYPES: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".png": "image/png", ".webmanifest": "application/manifest+json", ".woff2": "font/woff2" };
+const TYPES: Record<string, string> = {
+  ".html": "text/html",
+  ".js": "text/javascript",
+  ".css": "text/css",
+  ".png": "image/png",
+  ".webmanifest": "application/manifest+json",
+  ".woff2": "font/woff2",
+};
 
 // Someone else's page, as it would show in the live view, which is Browserbase's.
 const LIVE_PAGE = `<!doctype html><title>Shop</title><style>body{font:16px system-ui;margin:24px;color:#222;background:#fff}</style><h1>shop.example</h1><p>1 m cable, 49 kr</p><button>Place order</button>`;
@@ -39,7 +46,11 @@ export interface PhoneDrive {
 
 // The page's clock is fixed at `now`, and `settleTimes` puts the server's times just before it, as the app's clock is in
 // driveFakes.cjs.
-export async function drivePhone(open: (phone: PhoneDrive) => Promise<void>, theme: Theme, now: number): Promise<{ png: Buffer; restless: string | null }> {
+export async function drivePhone(
+  open: (phone: PhoneDrive) => Promise<void>,
+  theme: Theme,
+  now: number,
+): Promise<{ png: Buffer; restless: string | null }> {
   const supabase = await startFakeSupabase({ cloudJobs: true });
   const base = supabase.env.SUPABASE_URL;
   const site = createServer(async (request, response) => {
@@ -51,7 +62,9 @@ export async function drivePhone(open: (phone: PhoneDrive) => Promise<void>, the
     }
     if (path === "/config.js") {
       response.setHeader("content-type", "text/javascript");
-      response.end(`export const SUPABASE_URL = ${JSON.stringify(base)}; export const SUPABASE_PUBLISHABLE_KEY = ${JSON.stringify(FAKE_KEY)}; export const GET_BLUEBERRY_URL = "/"; export const VAPID_PUBLIC_KEY = "";`);
+      response.end(
+        `export const SUPABASE_URL = ${JSON.stringify(base)}; export const SUPABASE_PUBLISHABLE_KEY = ${JSON.stringify(FAKE_KEY)}; export const GET_BLUEBERRY_URL = "/"; export const VAPID_PUBLIC_KEY = "";`,
+      );
       return;
     }
     try {
@@ -67,15 +80,25 @@ export async function drivePhone(open: (phone: PhoneDrive) => Promise<void>, the
   const app = `http://127.0.0.1:${(site.address() as AddressInfo).port}/app/`;
 
   const token = async (email: string, password: string) => {
-    const response = await fetch(`${base}/auth/v1/token?grant_type=password`, { method: "POST", headers: { apikey: FAKE_KEY, "content-type": "application/json" }, body: JSON.stringify({ email, password }) });
+    const response = await fetch(`${base}/auth/v1/token?grant_type=password`, {
+      method: "POST",
+      headers: { apikey: FAKE_KEY, "content-type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
     return ((await response.json()) as { access_token: string }).access_token;
   };
-  const rpc = (who: () => Promise<string>) => async (name: string, body: object = {}) => {
-    const response = await fetch(`${base}/rest/v1/rpc/${name}`, { method: "POST", headers: { apikey: FAKE_KEY, authorization: `Bearer ${await who()}`, "content-type": "application/json" }, body: JSON.stringify(body) });
-    if (response.status !== 200) throw new Error(`${name} answered ${response.status}`);
-    const text = await response.text();
-    return text ? JSON.parse(text) : null;
-  };
+  const rpc =
+    (who: () => Promise<string>) =>
+    async (name: string, body: object = {}) => {
+      const response = await fetch(`${base}/rest/v1/rpc/${name}`, {
+        method: "POST",
+        headers: { apikey: FAKE_KEY, authorization: `Bearer ${await who()}`, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (response.status !== 200) throw new Error(`${name} answered ${response.status}`);
+      const text = await response.text();
+      return text ? JSON.parse(text) : null;
+    };
 
   const browser = await chromium.launch(PHONE_BROWSER);
   try {
@@ -88,7 +111,14 @@ export async function drivePhone(open: (phone: PhoneDrive) => Promise<void>, the
     await owner("link_cloud_runner", { p_email: RUNNER });
     await runner("accept_cloud_runner_link", { p_owner_email: OWNER });
 
-    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true, colorScheme: theme, reducedMotion: "reduce" });
+    const context = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      deviceScaleFactor: 1,
+      isMobile: true,
+      hasTouch: true,
+      colorScheme: theme,
+      reducedMotion: "reduce",
+    });
     await context.clock.setFixedTime(now);
     await context.route("https://www.browserbase.com/**", (route) => route.fulfill({ contentType: "text/html", body: LIVE_PAGE }));
     const page = await context.newPage();
@@ -102,9 +132,11 @@ export async function drivePhone(open: (phone: PhoneDrive) => Promise<void>, the
     const at = `'${new Date(now - 60_000).toISOString()}'`;
     const settleTimes = async () => {
       await supabase.cloudRows(
-        `update public.cloud_jobs set created_at = ${at}, updated_at = ${at}, claimed_at = ${at}, heartbeat_at = ${at}, finished_at = case when finished_at is null then null else ${at}::timestamptz end`
+        `update public.cloud_jobs set created_at = ${at}, updated_at = ${at}, claimed_at = ${at}, heartbeat_at = ${at}, finished_at = case when finished_at is null then null else ${at}::timestamptz end`,
       );
-      await supabase.cloudRows(`update public.cloud_approvals set created_at = ${at}, decided_at = case when decided_at is null then null else ${at}::timestamptz end`);
+      await supabase.cloudRows(
+        `update public.cloud_approvals set created_at = ${at}, decided_at = case when decided_at is null then null else ${at}::timestamptz end`,
+      );
     };
     await open({ page, owner, runner, signIn, settleTimes });
     let last: Buffer | null = null;

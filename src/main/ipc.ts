@@ -195,10 +195,7 @@ const withoutHashOrQuery = (url: string): string | null => {
 };
 
 // Only the top frame of the expected chrome view, still showing our own page, may call in.
-export const isTrustedSender = (
-  event: IpcSender,
-  endpoint: ChromeEndpoint
-): boolean => {
+export const isTrustedSender = (event: IpcSender, endpoint: ChromeEndpoint): boolean => {
   const frame = event.senderFrame;
   if (event.sender !== endpoint.webContents || !frame) return false;
   if (frame !== event.sender.mainFrame) return false;
@@ -230,7 +227,7 @@ const ids = (value: unknown, what: string): string[] => {
 export const sendToRenderer = <C extends keyof EventChannels>(
   webContents: Pick<WebContents, "send" | "isDestroyed">,
   channel: C,
-  payload: EventChannels[C]
+  payload: EventChannels[C],
 ): void => {
   if (!webContents.isDestroyed()) webContents.send(channel, payload);
 };

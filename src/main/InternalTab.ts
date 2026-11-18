@@ -37,7 +37,7 @@ export class InternalTab {
     readonly id: string,
     readonly page: InternalPage,
     public param: string | null = null,
-    title?: string
+    title?: string,
   ) {
     this.title = title || TITLES[page];
   }

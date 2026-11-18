@@ -23,7 +23,10 @@ const DAY_MINUTES = 24 * 60;
 const WEEK_SPAN_MS = 6 * 86_400_000;
 const SITE_NAME = /\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b/gi;
 // Written without an address these pass for ordinary words, so the big ones are listed.
-const WELL_KNOWN_SITES = "reddit youtube twitter facebook instagram tiktok linkedin amazon ebay wikipedia netflix spotify google bing gmail whatsapp telegram discord".split(" ");
+const WELL_KNOWN_SITES =
+  "reddit youtube twitter facebook instagram tiktok linkedin amazon ebay wikipedia netflix spotify google bing gmail whatsapp telegram discord".split(
+    " ",
+  );
 const TAKEN_NAMES = ["berry", "pip", "milo", "max"];
 
 const palettes = PALETTES.filter(({ id }) => id !== BERRY.look.palette).map(({ id }) => id);
@@ -111,7 +114,8 @@ const namesOnly = (text: string, hosts: string[], otherNames: string[]): boolean
 const DIGEST_ID = /\b[sqcrmf]\d{1,3}\b/i;
 
 // Every number it says comes from what it cites.
-const numbersFit = (text: string, allowed: Set<number>): boolean => (text.match(/\d+/g) ?? []).every((digits) => allowed.has(Number(digits)));
+const numbersFit = (text: string, allowed: Set<number>): boolean =>
+  (text.match(/\d+/g) ?? []).every((digits) => allowed.has(Number(digits)));
 
 const minutesOf = (at: number) => {
   const date = new Date(at);
@@ -147,7 +151,11 @@ export const scheduleFits = (schedule: RoutineSchedule, times: number[]): boolea
 const sameSites = (a: string[], b: string[]) => a.length > 0 && a.length === b.length && a.every((site) => b.includes(site));
 const overlaps = (a: string[], b: string[]) => a.some((site) => b.includes(site));
 const textOf = (card: SuggestionWords): string =>
-  card.kind === "prompt" ? card.prompt : card.kind === "routine" ? `${card.draft.name} ${card.draft.instructions}` : `${card.draft.name} ${card.draft.instructions}`;
+  card.kind === "prompt"
+    ? card.prompt
+    : card.kind === "routine"
+      ? `${card.draft.name} ${card.draft.instructions}`
+      : `${card.draft.name} ${card.draft.instructions}`;
 
 export const feedbackOf = (proposal: { card: SuggestionWords; sites: string[] }, verdict: Feedback["verdict"], at: number): Feedback => ({
   verdict,
@@ -164,7 +172,7 @@ export const repeatsDismissed = (proposal: { card: SuggestionWords; sites: strin
   return feedback.some(
     (old) =>
       old.verdict === "dismissed" &&
-      ((old.kind === proposal.card.kind && sameSites(old.sites, proposal.sites)) || areSimilar(own, wordsOf(`${old.line} ${old.body}`)))
+      ((old.kind === proposal.card.kind && sameSites(old.sites, proposal.sites)) || areSimilar(own, wordsOf(`${old.line} ${old.body}`))),
   );
 };
 
@@ -179,13 +187,14 @@ export const alreadyThere = (proposal: Proposal, { routines, mascots }: Existing
       (routine) =>
         overlaps(routine.sites, sites) ||
         sites.some((site) => `${routine.name} ${routine.instructions}`.toLowerCase().includes(site)) ||
-        areSimilar(own, wordsOf(`${routine.name} ${routine.instructions}`))
+        areSimilar(own, wordsOf(`${routine.name} ${routine.instructions}`)),
     );
   }
   return false;
 };
 
-export const proposalId = (card: { kind: string; title: string }) => `ai-${createHash("sha1").update(`${card.kind}:${card.title}`).digest("hex").slice(0, 10)}`;
+export const proposalId = (card: { kind: string; title: string }) =>
+  `ai-${createHash("sha1").update(`${card.kind}:${card.title}`).digest("hex").slice(0, 10)}`;
 
 const mascotDraft = (raw: Record<string, unknown>, name: string, instructions: string, sites: string[]): MascotDraft | null => {
   const parsed = parseMascotDraft({
@@ -212,9 +221,13 @@ const verifyOne = (raw: Record<string, unknown>, digest: Digest): Proposal | nul
   const evidence = cited as Evidence[];
 
   const hosts = [...new Set(evidence.flatMap((item) => item.hosts))];
-  const asked = (Array.isArray(raw.sites) ? raw.sites : []).flatMap((site) => (typeof site === "string" ? (normaliseSite(site) ?? []) : []));
+  const asked = (Array.isArray(raw.sites) ? raw.sites : []).flatMap((site) =>
+    typeof site === "string" ? (normaliseSite(site) ?? []) : [],
+  );
   // Sites only ever come from the evidence. Anything else the model named is dropped.
-  const fromEvidence = hosts.filter((host) => asked.some((site) => siteAllowed(`https://${host}`, [site]) || siteAllowed(`https://${site}`, [host])));
+  const fromEvidence = hosts.filter((host) =>
+    asked.some((site) => siteAllowed(`https://${host}`, [site]) || siteAllowed(`https://${site}`, [host])),
+  );
   const sites = fromEvidence.length > 0 ? fromEvidence : hosts;
 
   const line = words(raw.line, MAX_LINE);
@@ -222,9 +235,10 @@ const verifyOne = (raw: Record<string, unknown>, digest: Digest): Proposal | nul
   const why = words(raw.why, MAX_WHY)?.replace(/[\s.!?…]+$/, "") || null;
   if (!line || !why) return null;
 
-  const otherNames = [...WELL_KNOWN_SITES, ...digest.allHosts.flatMap((host) => (hosts.includes(host) ? [] : [host, nameOfSite(host) ?? ""]))].filter(
-    (name) => name.length > 2 && !hosts.some((host) => host.includes(name.toLowerCase()))
-  );
+  const otherNames = [
+    ...WELL_KNOWN_SITES,
+    ...digest.allHosts.flatMap((host) => (hosts.includes(host) ? [] : [host, nameOfSite(host) ?? ""])),
+  ].filter((name) => name.length > 2 && !hosts.some((host) => host.includes(name.toLowerCase())));
   const fits = (...texts: string[]) => texts.every((text) => !DIGEST_ID.test(text) && namesOnly(text, hosts, otherNames));
 
   const times = evidence.flatMap((item) => item.times);
@@ -253,7 +267,10 @@ const verifyOne = (raw: Record<string, unknown>, digest: Digest): Proposal | nul
     const parsed = parseDraft({ name, instructions, schedule: raw.schedule, sites });
     // A schedule that isn't when they really do it is dropped, and what's left is a job for now.
     // Its habit is only the visits to its own sites, or for a job with none, its searches and chats.
-    const ownTimes = sites.length > 0 ? evidence.flatMap((item) => sites.flatMap((site) => item.siteTimes[site] ?? [])) : evidence.filter((item) => item.hosts.length === 0).flatMap((item) => item.times);
+    const ownTimes =
+      sites.length > 0
+        ? evidence.flatMap((item) => sites.flatMap((site) => item.siteTimes[site] ?? []))
+        : evidence.filter((item) => item.hosts.length === 0).flatMap((item) => item.times);
     if ("error" in parsed || !scheduleFits(parsed.draft.schedule, ownTimes)) return asPrompt(instructions);
     const schedule = parsed.draft.schedule;
     const scheduleNumbers = "time" in schedule ? schedule.time.split(":").map(Number) : [];
@@ -287,7 +304,8 @@ export const verifyProposals = (reply: string, digest: Digest, existing: Existin
     if (!proposal || alreadyThere(proposal, existing) || repeatsDismissed(proposal, existing.feedback)) continue;
     // Never two about the same thing.
     const own = wordsOf(`${proposal.card.title} ${textOf(proposal.card)}`);
-    if (kept.some((other) => other.card.id === proposal.card.id || areSimilar(own, wordsOf(`${other.card.title} ${textOf(other.card)}`)))) continue;
+    if (kept.some((other) => other.card.id === proposal.card.id || areSimilar(own, wordsOf(`${other.card.title} ${textOf(other.card)}`))))
+      continue;
     kept.push(proposal);
   }
   return kept.slice(0, MAX_CARDS);
@@ -305,7 +323,12 @@ export const fallbackWords = (pattern: Pattern, recentMessage: string | null): S
       const prompt = recentMessage ? plainText(recentMessage).slice(0, MAX_PROMPT) : null;
       return prompt ? { id, kind: "prompt", title: "Want me to take this one again?", prompt } : null;
     }
-    return { id, kind: "prompt", title: `Shall I check ${labels} for you?`, prompt: `Open ${hosts.join(" and ")} and tell me in a few short points what's new since I last looked.` };
+    return {
+      id,
+      kind: "prompt",
+      title: `Shall I check ${labels} for you?`,
+      prompt: `Open ${hosts.join(" and ")} and tell me in a few short points what's new since I last looked.`,
+    };
   }
   if (pattern.kind === "routine" && pattern.schedule) {
     return {

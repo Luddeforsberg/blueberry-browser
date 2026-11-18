@@ -38,11 +38,9 @@ export const DEFAULT_SETTINGS: Settings = {
   appIconGround: "paper",
 };
 
-const pick = <T>(value: unknown, allowed: readonly T[], fallback: T): T =>
-  allowed.includes(value as T) ? (value as T) : fallback;
+const pick = <T>(value: unknown, allowed: readonly T[], fallback: T): T => (allowed.includes(value as T) ? (value as T) : fallback);
 
-const bool = (value: unknown, fallback: boolean): boolean =>
-  typeof value === "boolean" ? value : fallback;
+const bool = (value: unknown, fallback: boolean): boolean => (typeof value === "boolean" ? value : fallback);
 
 const width = (value: unknown, range: { min: number; max: number }, fallback: number): number =>
   typeof value === "number" && Number.isFinite(value) ? clampWidth(value, range) : fallback;

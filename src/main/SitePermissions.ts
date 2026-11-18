@@ -5,8 +5,19 @@ import type { PermissionPrompt, SavedSitePermission, SiteDecision, SitePermissio
 
 // Everything a site can be asked about. Electron's own names go through `ASKED` to reach these.
 const SITE_PERMISSIONS: readonly SitePermission[] = [
-  "camera", "microphone", "location", "notifications", "midi", "screen", "clipboard-read", "idle-detection",
-  "window-management", "local-fonts", "speaker-selection", "local-network", "open-external",
+  "camera",
+  "microphone",
+  "location",
+  "notifications",
+  "midi",
+  "screen",
+  "clipboard-read",
+  "idle-detection",
+  "window-management",
+  "local-fonts",
+  "speaker-selection",
+  "local-network",
+  "open-external",
 ];
 
 const ASKED: Record<string, SitePermission> = {
@@ -31,9 +42,21 @@ const ASKED: Record<string, SitePermission> = {
 // Ordinary parts of the web that reveal nothing, or where the user already answered in a picker of the system's
 // own, such as choosing a file. Everything else, including USB, HID, serial, NFC and anything new, is refused.
 const ALWAYS_ALLOWED = new Set([
-  "fullscreen", "pointerLock", "keyboardLock", "clipboard-sanitized-write", "mediaKeySystem", "storage-access",
-  "top-level-storage-access", "fileSystem", "persistent-storage", "background-fetch", "background-sync",
-  "periodic-background-sync", "screen-wake-lock", "sensors", "payment-handler",
+  "fullscreen",
+  "pointerLock",
+  "keyboardLock",
+  "clipboard-sanitized-write",
+  "mediaKeySystem",
+  "storage-access",
+  "top-level-storage-access",
+  "fileSystem",
+  "persistent-storage",
+  "background-fetch",
+  "background-sync",
+  "periodic-background-sync",
+  "screen-wake-lock",
+  "sensors",
+  "payment-handler",
 ]);
 
 // Too much to hand over for good, so Allow lasts for one request. Block is still remembered.
@@ -100,7 +123,7 @@ export class SitePermissions {
 
   get saved(): SavedSitePermission[] {
     return [...this.decisions].flatMap(([origin, decisions]) =>
-      [...decisions].map(([permission, decision]) => ({ origin, permission, decision }))
+      [...decisions].map(([permission, decision]) => ({ origin, permission, decision })),
     );
   }
 
@@ -123,9 +146,15 @@ export class SitePermissions {
     return new Promise((resolve) => {
       // An Allow that lasts for one request has to answer exactly one.
       const once = answer.some((name) => ASK_EVERY_TIME.includes(name));
-      const same = !once && this.pending.find(
-        (entry) => entry.contents === contents && entry.origin === origin && entry.wanted.join() === wanted.join() && entry.permissions.join() === answer.join()
-      );
+      const same =
+        !once &&
+        this.pending.find(
+          (entry) =>
+            entry.contents === contents &&
+            entry.origin === origin &&
+            entry.wanted.join() === wanted.join() &&
+            entry.permissions.join() === answer.join(),
+        );
       if (same) {
         same.answers.push(resolve);
         return;
@@ -145,7 +174,9 @@ export class SitePermissions {
     const wanted =
       permission === "media"
         ? mediaPermissions(details.mediaType === "video" || details.mediaType === "audio" ? [details.mediaType] : undefined)
-        : ASKED[permission] ? [ASKED[permission]] : [];
+        : ASKED[permission]
+          ? [ASKED[permission]]
+          : [];
     return wanted.length > 0 && wanted.every((name) => this.decisions.get(origin)?.get(name) === "allow");
   }
 

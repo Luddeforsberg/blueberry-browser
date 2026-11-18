@@ -38,7 +38,11 @@ const load = async () => {
     if (asking.some((id) => !(state.jobs ?? []).some((known) => known.ask?.approval_id === id))) state.said = null;
     state.jobs = jobs;
     state.flock = flockFromRows(flock);
-    state.flockShared = flock.map((row) => row.updated_at).sort().at(-1) ?? null;
+    state.flockShared =
+      flock
+        .map((row) => row.updated_at)
+        .sort()
+        .at(-1) ?? null;
     if (linked !== undefined) {
       state.linked = linked?.accepted === true;
       linkCheckedAt = Date.now();
@@ -97,7 +101,12 @@ const show = (force = false) => {
   const { name, id } = route();
   const key = `${name}/${id ?? ""}`;
   if (key !== screen.key) {
-    const mount = { home: () => mountHome(app), job: () => mountJob(app, id), full: () => mountFull(app, id, false), yours: () => mountFull(app, id, true) }[name];
+    const mount = {
+      home: () => mountHome(app),
+      job: () => mountJob(app, id),
+      full: () => mountFull(app, id, false),
+      yours: () => mountFull(app, id, true),
+    }[name];
     screen = { key, update: mount() };
     scrollTo(0, 0);
   }

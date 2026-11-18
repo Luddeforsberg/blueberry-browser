@@ -70,10 +70,12 @@ const kindOf = ({ approval }: NeedsYouItem): RequestKind => {
 // The words of the request itself are the same as on the card: only these lines go around them.
 const wordsFor = (item: NeedsYouItem, name: string, kind: RequestKind, longest: number): { kind: RequestKind; text: string } => {
   const { text } = item.approval;
-  if (text.length > longest) return { kind: "computer", text: `${name} is asking something too long to show here. It’s waiting for you at the computer.` };
+  if (text.length > longest)
+    return { kind: "computer", text: `${name} is asking something too long to show here. It’s waiting for you at the computer.` };
   if (kind === "code") return { kind, text: `${text}. Reply with it.` };
   if (kind === "computer") return { kind, text: `${text}. It’s waiting for you at the computer.` };
-  if (kind === "question") return { kind, text: `${name} asks, for “${item.job}”:\n\n${text}\n\nReply with your answer. Don’t send passwords or codes for this.` };
+  if (kind === "question")
+    return { kind, text: `${name} asks, for “${item.job}”:\n\n${text}\n\nReply with your answer. Don’t send passwords or codes for this.` };
   return { kind, text: `${name}, for “${item.job}”:\n\n${text}` };
 };
 
@@ -101,11 +103,11 @@ export class Phone {
 
   constructor(
     private readonly channel: PhoneChannel,
-    private readonly deps: PhoneDeps
+    private readonly deps: PhoneDeps,
   ) {
     channel.listen(
       (reply) => void this.onReply(reply).catch(() => console.error("Couldn't deal with a reply from the phone.")),
-      (choice) => this.onChoice(choice)
+      (choice) => this.onChoice(choice),
     );
   }
 
@@ -145,8 +147,23 @@ export class Phone {
     const name = this.deps.nameOf(item);
     const id = item.approval.id;
     const { kind, text } = wordsFor(item, name, kindOf(item), this.channel.longestText);
-    const choices = kind === "approval" ? [{ label: "Allow", data: `allow:${id}` }, { label: "Don’t allow", data: `deny:${id}` }] : [];
-    const request: Request = { item, name, kind, text, handle: null, sent: this.channel.send(text, choices), answeredHere: false, allowed: null };
+    const choices =
+      kind === "approval"
+        ? [
+            { label: "Allow", data: `allow:${id}` },
+            { label: "Don’t allow", data: `deny:${id}` },
+          ]
+        : [];
+    const request: Request = {
+      item,
+      name,
+      kind,
+      text,
+      handle: null,
+      sent: this.channel.send(text, choices),
+      answeredHere: false,
+      allowed: null,
+    };
     this.requests.set(id, request);
     void request.sent.then((handle) => {
       request.handle = handle;
@@ -188,12 +205,17 @@ export class Phone {
   }
 
   private async onReply({ text, ref, replyTo }: IncomingReply): Promise<void> {
-    const open = [...this.requests.values()].flatMap((request) => (request.handle === null ? [] : [{ ...request, handle: request.handle, request }]));
+    const open = [...this.requests.values()].flatMap((request) =>
+      request.handle === null ? [] : [{ ...request, handle: request.handle, request }],
+    );
     const target = bindReply(text, replyTo, open);
     const looksLikeACode = plausibleCode(text) !== null;
 
     if ("refused" in target) {
-      const said = this.refusal(target.refused, open.map(({ request }) => request));
+      const said = this.refusal(
+        target.refused,
+        open.map(({ request }) => request),
+      );
       const removed = looksLikeACode ? await this.channel.deleteIncoming(ref) : true;
       await this.channel.send(removed ? said : `${said} I couldn’t delete your message, so delete it yourself.`);
       return;
@@ -217,7 +239,8 @@ export class Phone {
     // Whatever it is, it was meant for a page and doesn't stay in the chat.
     const site = approval.handoff?.site ?? "that site";
     const code = plausibleCode(text);
-    let problem: string | null = "That doesn’t look like a code, so nothing was typed. Send only the code: letters or digits, with at most one space or dash. Passwords are never sent this way.";
+    let problem: string | null =
+      "That doesn’t look like a code, so nothing was typed. Send only the code: letters or digits, with at most one space or dash. Passwords are never sent this way.";
     if (code !== null) {
       // Set first, as going in ends the request, and the phone says what happened below rather than "at the computer".
       const alreadyEntering = request.answeredHere;
@@ -226,7 +249,10 @@ export class Phone {
       if (result === "entered") {
         problem = null;
         this.deps.onAnswered(approval.id, `Code entered. ${request.name} carries on.`);
-        await this.channel.edit(target.to.handle, `${request.text}\n\nEntered the code on ${site}. ${request.name} is checking whether it worked.`);
+        await this.channel.edit(
+          target.to.handle,
+          `${request.text}\n\nEntered the code on ${site}. ${request.name} is checking whether it worked.`,
+        );
       } else {
         request.answeredHere = alreadyEntering;
         problem = CODE_REFUSED[result](site);
@@ -241,9 +267,13 @@ export class Phone {
     if (why === "closed") return "That’s no longer waiting, so nothing happened.";
     if (why === "nothing-waiting") return "Nothing’s waiting for you right now, so nothing happened.";
     if (why === "not-by-reply") return "A reply can’t answer that, so nothing happened. Use its buttons, or the computer.";
-    if (why === "looks-like-a-code") return "That looks like a code, and answers to questions go to the model, so it wasn’t passed on. If it really is your answer, type it at the computer.";
+    if (why === "looks-like-a-code")
+      return "That looks like a code, and answers to questions go to the model, so it wasn’t passed on. If it really is your answer, type it at the computer.";
     const takers = open.filter(({ kind }) => kind === "code" || kind === "question");
-    const list = takers.map(({ item, kind, name }) => `• ${kind === "code" ? `${name}: a code for ${item.approval.handoff?.site}` : `${name}: a question for “${item.job}”`}`);
+    const list = takers.map(
+      ({ item, kind, name }) =>
+        `• ${kind === "code" ? `${name}: a code for ${item.approval.handoff?.site}` : `${name}: a question for “${item.job}”`}`,
+    );
     return `More than one thing is waiting, so nothing was used. Reply to the message you’re answering:\n${list.join("\n")}`;
   }
 }

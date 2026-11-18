@@ -124,7 +124,11 @@ export const runnerSession = ({ url, key, email, password }: DbConfig, server = 
 
 export type RunnerSession = ReturnType<typeof runnerSession>;
 
-export const supabaseDb = ({ url, key, owner }: DbConfig, auth: RunnerSession, send: typeof fetch = fetch): RunnerDb & PushDb & RoutineDb & RelayDb & { accept(): Promise<boolean>; setRelayUrl(url: string | null): Promise<void> } => {
+export const supabaseDb = (
+  { url, key, owner }: DbConfig,
+  auth: RunnerSession,
+  send: typeof fetch = fetch,
+): RunnerDb & PushDb & RoutineDb & RelayDb & { accept(): Promise<boolean>; setRelayUrl(url: string | null): Promise<void> } => {
   const call = async (name: string, body: object): Promise<{ status: number; text: string }> => {
     const authorization = `Bearer ${await auth.token()}`;
     try {
@@ -188,14 +192,16 @@ export const supabaseDb = ({ url, key, owner }: DbConfig, auth: RunnerSession, s
     // Cut to the row's limits, so a long reply or many steps can't stop how it ended being saved.
     update: async (jobId, update) => {
       const { status, steps, reply, error, liveView } = fitJobUpdate(update);
-      return (await rpc<boolean>("runner_update_job", {
-        p_job: jobId,
-        p_status: status ?? null,
-        p_steps: steps ?? null,
-        p_reply: reply ?? null,
-        p_error: error ?? null,
-        p_live_view: liveView ?? null,
-      })) !== false;
+      return (
+        (await rpc<boolean>("runner_update_job", {
+          p_job: jobId,
+          p_status: status ?? null,
+          p_steps: steps ?? null,
+          p_reply: reply ?? null,
+          p_error: error ?? null,
+          p_live_view: liveView ?? null,
+        })) !== false
+      );
     },
     ask: async (jobId, { kind, text, need, site }) => {
       const id = await rpc<unknown>("runner_ask", { p_job: jobId, p_kind: kind, p_text: text, p_need: need, p_site: site });
@@ -205,7 +211,9 @@ export const supabaseDb = ({ url, key, owner }: DbConfig, auth: RunnerSession, s
     // Where the owner wants a notification. Only the address and its keys, to send one with no content.
     pushSubscriptions: async () =>
       ((await rpc<Record<string, unknown>[]>("runner_push_subscriptions", {})) ?? []).flatMap((row): PushSubscriptionRow[] =>
-        typeof row.endpoint === "string" && typeof row.p256dh === "string" && typeof row.auth === "string" ? [{ endpoint: row.endpoint, p256dh: row.p256dh, auth: row.auth }] : []
+        typeof row.endpoint === "string" && typeof row.p256dh === "string" && typeof row.auth === "string"
+          ? [{ endpoint: row.endpoint, p256dh: row.p256dh, auth: row.auth }]
+          : [],
       ),
     forgetPushSubscription: async (endpoint) => {
       await rpc("runner_forget_push_subscription", { p_endpoint: endpoint });
@@ -214,7 +222,7 @@ export const supabaseDb = ({ url, key, owner }: DbConfig, auth: RunnerSession, s
       ((await rpc<Record<string, unknown>[]>("runner_due_routines", {})) ?? []).flatMap((row): DueRoutine[] =>
         typeof row.id === "string" && typeof row.time_zone === "string" && typeof row.next_run_at === "string"
           ? [{ id: row.id, schedule: row.schedule, timeZone: row.time_zone, dueAt: row.next_run_at }]
-          : []
+          : [],
       ),
     startRoutine: async (routineId, dueAt, next) => {
       const id = await rpc<unknown>("runner_start_routine", { p_routine: routineId, p_due: dueAt, p_next: next });

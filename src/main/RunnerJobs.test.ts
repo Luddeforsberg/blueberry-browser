@@ -25,20 +25,42 @@ const setUp = () => {
   const account = { state: { status: "signed-in", email: ANA, problem: null } as AccountState };
   const tokenOf = () => account.state.email ?? "";
   const server = {
-    startCloudJob: vi.fn(async (token: string, job: { prompt: string; history: unknown[]; conversationId: string; afterJobId: string | null }) => {
-      await answering;
-      if (!link.accepted) throw new ServerError(400, "");
-      const conversation = [...jobs.values()].filter(({ row }) => row.conversation_id === job.conversationId).map(({ row }) => row);
-      if (conversation.some((row) => !["done", "failed", "stopped"].includes(String(row.status)))) throw new ServerError(409, "");
-      // Refused unless it was built on the conversation's newest job, as the server does.
-      if ((conversation.at(-1)?.id ?? null) !== job.afterJobId) throw new ServerError(409, "");
-      const id = `job-${++made}`;
-      jobs.set(id, { owner: token, row: { id, conversation_id: job.conversationId, prompt: job.prompt, mascot: { id: "berry" }, created_at: `2026-11-02T10:00:${String(made).padStart(2, "0")}Z`, status: "waiting", steps: [{ text: "Opened shop.example", done: true }], reply: "", live_view_url: LIVE, approval_id: `${id}-a`, approval_kind: "approval", approval_text: "Click Place order" } });
-      return id;
-    }),
+    startCloudJob: vi.fn(
+      async (token: string, job: { prompt: string; history: unknown[]; conversationId: string; afterJobId: string | null }) => {
+        await answering;
+        if (!link.accepted) throw new ServerError(400, "");
+        const conversation = [...jobs.values()].filter(({ row }) => row.conversation_id === job.conversationId).map(({ row }) => row);
+        if (conversation.some((row) => !["done", "failed", "stopped"].includes(String(row.status)))) throw new ServerError(409, "");
+        // Refused unless it was built on the conversation's newest job, as the server does.
+        if ((conversation.at(-1)?.id ?? null) !== job.afterJobId) throw new ServerError(409, "");
+        const id = `job-${++made}`;
+        jobs.set(id, {
+          owner: token,
+          row: {
+            id,
+            conversation_id: job.conversationId,
+            prompt: job.prompt,
+            mascot: { id: "berry" },
+            created_at: `2026-11-02T10:00:${String(made).padStart(2, "0")}Z`,
+            status: "waiting",
+            steps: [{ text: "Opened shop.example", done: true }],
+            reply: "",
+            live_view_url: LIVE,
+            approval_id: `${id}-a`,
+            approval_kind: "approval",
+            approval_text: "Click Place order",
+          },
+        });
+        return id;
+      },
+    ),
     cloudConversationJobs: async (token: string) =>
-      [...jobs.values()].filter(({ owner }) => owner === token).map(({ row }) => row).reverse(),
-    cloudConversation: async (token: string, id: string) => [...jobs.values()].filter(({ owner, row }) => owner === token && row.conversation_id === id).map(({ row }) => row),
+      [...jobs.values()]
+        .filter(({ owner }) => owner === token)
+        .map(({ row }) => row)
+        .reverse(),
+    cloudConversation: async (token: string, id: string) =>
+      [...jobs.values()].filter(({ owner, row }) => owner === token && row.conversation_id === id).map(({ row }) => row),
     forgetCloudConversation: vi.fn(async (token: string, id: string) => {
       jobs.forEach(({ owner, row }, key) => owner === token && row.conversation_id === id && jobs.delete(key));
     }),
@@ -62,10 +84,15 @@ const setUp = () => {
   const transcript: { role: "user" | "assistant"; content: string }[] = [];
   const runner = new RunnerJobs(
     server,
-    { get state() { return account.state; }, accessToken: async () => {
-      await refreshing;
-      return account.state.status === "signed-in" ? tokenOf() : null;
-    } },
+    {
+      get state() {
+        return account.state;
+      },
+      accessToken: async () => {
+        await refreshing;
+        return account.state.status === "signed-in" ? tokenOf() : null;
+      },
+    },
     join(mkdtempSync(join(tmpdir(), "runner-jobs-")), "runner-jobs.json"),
     {
       changed,
@@ -80,22 +107,41 @@ const setUp = () => {
         if (chatId === "chat-1") transcript.push({ role: "user", content: prompt });
       },
     },
-    5
+    5,
   );
   const signIn = (email: string | null) => {
-    account.state = email ? { status: "signed-in", email, problem: null, problemAbout: null } : { status: "signed-out", email: null, problem: null, problemAbout: null };
+    account.state = email
+      ? { status: "signed-in", email, problem: null, problemAbout: null }
+      : { status: "signed-out", email: null, problem: null, problemAbout: null };
     runner.accountChanged();
   };
   // As `Chats` sends: the history read from the chat when it goes, and the message saved once the runner has it.
   const send = async (chatId = "chat-1", prompt = "Order it") => {
-    const problem = await runner.start(chatId, { prompt, earlier: () => (chatId === "chat-1" ? [...transcript] : []), mascot: BERRY, actionApproval: "risky" });
+    const problem = await runner.start(chatId, {
+      prompt,
+      earlier: () => (chatId === "chat-1" ? [...transcript] : []),
+      mascot: BERRY,
+      actionApproval: "risky",
+    });
     if (chatId === "chat-1") transcript.push({ role: "user", content: prompt });
     return problem;
   };
   // A job sent from the phone, as Ana, in a conversation of its own or one it follows up.
   const fromPhone = (prompt: string, conversationId = `phone-${made + 1}`, status = "running") => {
     const id = `job-${++made}`;
-    jobs.set(id, { owner: ANA, row: { id, conversation_id: conversationId, prompt, mascot: { id: "m-scout" }, created_at: `2026-11-02T10:00:${String(made).padStart(2, "0")}Z`, status, steps: [], reply: status === "done" ? "Done there" : "" } });
+    jobs.set(id, {
+      owner: ANA,
+      row: {
+        id,
+        conversation_id: conversationId,
+        prompt,
+        mascot: { id: "m-scout" },
+        created_at: `2026-11-02T10:00:${String(made).padStart(2, "0")}Z`,
+        status,
+        steps: [],
+        reply: status === "done" ? "Done there" : "",
+      },
+    });
     return id;
   };
   const hold = (set: (gate: Promise<void> | null) => void) => {
@@ -108,7 +154,23 @@ const setUp = () => {
   };
   const holdTokens = () => hold((gate) => (refreshing = gate));
   const holdAnswers = () => hold((gate) => (answering = gate));
-  return { runner, jobs, signIn, send, changed, finished, server, holdTokens, holdAnswers, link, fromPhone, adopt, followedUp, chats, transcript };
+  return {
+    runner,
+    jobs,
+    signIn,
+    send,
+    changed,
+    finished,
+    server,
+    holdTokens,
+    holdAnswers,
+    link,
+    fromPhone,
+    adopt,
+    followedUp,
+    chats,
+    transcript,
+  };
 };
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 40));
@@ -271,9 +333,14 @@ describe("conversations from elsewhere", () => {
     // Sent and finished on the phone before this computer looked.
     fromPhone("And the charger?", conversation, "done");
     expect(await send("chat-1", "Thanks")).toBeNull();
-    const calls = (server.startCloudJob as unknown as { mock: { calls: [string, { prompt: string; history: unknown[]; afterJobId: string | null }][] } }).mock.calls;
+    const calls = (
+      server.startCloudJob as unknown as { mock: { calls: [string, { prompt: string; history: unknown[]; afterJobId: string | null }][] } }
+    ).mock.calls;
     // Refused once as built on job-1, then sent after job-2 with its exchange.
-    expect(calls.slice(-2).map(([, job]) => [job.prompt, job.afterJobId])).toEqual([["Thanks", "job-1"], ["Thanks", "job-2"]]);
+    expect(calls.slice(-2).map(([, job]) => [job.prompt, job.afterJobId])).toEqual([
+      ["Thanks", "job-1"],
+      ["Thanks", "job-2"],
+    ]);
     expect(calls.at(-1)?.[1].history).toEqual([
       { role: "user", content: "Order it" },
       { role: "assistant", content: "Ordered" },
@@ -334,14 +401,23 @@ describe("the flock shared with the phone", () => {
   const make = (accepted: boolean) => {
     const account = { state: { status: "signed-in", email: ANA, problem: null } as AccountState };
     const syncCloudFlock = vi.fn(async () => {});
-    const server = { myCloudRunner: async () => ({ email: "runner@example.com", accepted, relayUrl: null }), syncCloudFlock, cloudConversationJobs: async () => [] } as unknown as GalleryServer;
+    const server = {
+      myCloudRunner: async () => ({ email: "runner@example.com", accepted, relayUrl: null }),
+      syncCloudFlock,
+      cloudConversationJobs: async () => [],
+    } as unknown as GalleryServer;
     const flock = [BERRY, SCOUT];
     const runner = new RunnerJobs(
       server,
-      { get state() { return account.state; }, accessToken: async () => (account.state.status === "signed-in" ? "token" : null) },
+      {
+        get state() {
+          return account.state;
+        },
+        accessToken: async () => (account.state.status === "signed-in" ? "token" : null),
+      },
       join(mkdtempSync(join(tmpdir(), "runner-jobs-")), "runner-jobs.json"),
       { changed: vi.fn(), finished: vi.fn(), contextId: () => null, flock: () => flock },
-      5
+      5,
     );
     return { runner, account, syncCloudFlock, flock };
   };
@@ -350,7 +426,9 @@ describe("the flock shared with the phone", () => {
     const { runner, account, syncCloudFlock, flock } = make(true);
     await settle();
     expect(syncCloudFlock).toHaveBeenCalledTimes(1);
-    expect(syncCloudFlock).toHaveBeenLastCalledWith("token", [expect.objectContaining({ id: "m-1", name: "Scout", sites: ["webhallen.com"] })]);
+    expect(syncCloudFlock).toHaveBeenLastCalledWith("token", [
+      expect.objectContaining({ id: "m-1", name: "Scout", sites: ["webhallen.com"] }),
+    ]);
     await runner.flockChanged();
     expect(syncCloudFlock).toHaveBeenCalledTimes(1);
     flock.push({ ...SCOUT, id: "m-2", name: "Penny" });
@@ -435,7 +513,7 @@ describe("routines kept in the cloud", () => {
       { state: { status: "signed-in", email: ANA, problem: null } as AccountState, accessToken: async () => "token" },
       join(mkdtempSync(join(tmpdir(), "runner-jobs-")), "runner-jobs.json"),
       { changed: vi.fn(), finished: vi.fn(), contextId: () => null, routines: rows },
-      5
+      5,
     );
     return { runner, keys, syncCloudRoutine, forgetCloudRoutine };
   };

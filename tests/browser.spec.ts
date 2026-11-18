@@ -17,10 +17,7 @@ declare global {
   }
 }
 
-const PNG = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYPj/HwAEAgH/1oN2SgAAAABJRU5ErkJggg==",
-  "base64"
-);
+const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYPj/HwAEAgH/1oN2SgAAAABJRU5ErkJggg==", "base64");
 
 let server: Server;
 let origin: string;
@@ -121,9 +118,7 @@ test.beforeAll(async () => {
         </script></body>`);
       return;
     }
-    response.end(
-      '<!doctype html><title>Fixture</title><link rel="icon" href="/icon.png"><body>hello from the page</body>'
-    );
+    response.end('<!doctype html><title>Fixture</title><link rel="icon" href="/icon.png"><body>hello from the page</body>');
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -188,10 +183,7 @@ test("page text reaches the chat", async () => {
 test("a new tab becomes the active tab", async () => {
   const before = await getTabs();
 
-  const created = await chrome.evaluate(
-    (url) => window.chromeAPI.browser.createTab(url),
-    `${origin}/`
-  );
+  const created = await chrome.evaluate((url) => window.chromeAPI.browser.createTab(url), `${origin}/`);
 
   expect(await getTabs()).toHaveLength(before.length + 1);
   expect((await activeTab()).id).toBe(created.id);
@@ -200,9 +192,7 @@ test("a new tab becomes the active tab", async () => {
 test("the sidebar lists tabs as they change, without being asked", async () => {
   await openFixture();
 
-  const tab = chrome
-    .getByRole("list", { name: "Tabs" })
-    .getByRole("button", { name: "Fixture", exact: true });
+  const tab = chrome.getByRole("list", { name: "Tabs" }).getByRole("button", { name: "Fixture", exact: true });
   await expect(tab).toBeVisible();
   await expect(tab).toHaveAttribute("aria-current", "page");
 });
@@ -227,8 +217,7 @@ test("back and forward reflect the page's real history", async () => {
 
 test("links that open a new window become tabs, from every tab and from the chrome", async () => {
   const page = await openFixture();
-  const windows = () =>
-    app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows().length);
+  const windows = () => app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows().length);
   const count = (await getTabs()).length;
 
   await page.evaluate((url) => void window.open(url), `${origin}/from-page`);
@@ -260,7 +249,11 @@ test("a page's popup is a real one, shown as a tab, and closing itself goes back
     const bounds = () => app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].getBounds());
     const before = await bounds();
 
-    await page.evaluate(() => window.addEventListener("message", (event) => { document.title = `Got ${event.data}`; }));
+    await page.evaluate(() =>
+      window.addEventListener("message", (event) => {
+        document.title = `Got ${event.data}`;
+      }),
+    );
     const opened = await page.evaluate((url) => {
       (window as Window & { popup?: Window | null }).popup = window.open(url, "signin", "width=300,height=200");
       return (window as Window & { popup?: Window | null }).popup !== null;
@@ -274,7 +267,9 @@ test("a page's popup is a real one, shown as a tab, and closing itself goes back
     const preferences = await app.evaluate(({ webContents }, origin) => {
       const popup = webContents.getAllWebContents().find((contents) => contents.getURL().startsWith(origin));
       // Electron's own record of what the page was made with, which its types leave out.
-      const made = (popup as (typeof popup & { getLastWebPreferences?: () => Electron.WebPreferences | null }) | undefined)?.getLastWebPreferences?.();
+      const made = (
+        popup as (typeof popup & { getLastWebPreferences?: () => Electron.WebPreferences | null }) | undefined
+      )?.getLastWebPreferences?.();
       const { sandbox, contextIsolation, nodeIntegration, preload } = made ?? {};
       return { sandbox, contextIsolation, nodeIntegration, preload };
     }, signInOrigin);
@@ -313,9 +308,7 @@ test("the app reopens after its last window closes", async () => {
   test.skip(process.platform !== "darwin", "Only macOS keeps running with no windows");
 
   await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].close());
-  await expect.poll(() =>
-    app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows().length)
-  ).toBe(0);
+  await expect.poll(() => app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows().length)).toBe(0);
 
   const windows = await app.evaluate(({ app, BaseWindow }) => {
     app.emit("activate");
@@ -599,7 +592,7 @@ const placedView = (url: string) =>
   app.evaluate(({ BaseWindow }, address) => {
     const window = BaseWindow.getAllWindows()[0];
     const view = window.contentView.children.find(
-      (child) => "webContents" in child && (child as Electron.WebContentsView).webContents.getURL() === address
+      (child) => "webContents" in child && (child as Electron.WebContentsView).webContents.getURL() === address,
     );
     return {
       bounds: view?.getBounds(),
@@ -608,7 +601,9 @@ const placedView = (url: string) =>
       // The chrome is the first view that loads the app's own page.
       underChrome:
         window.contentView.children.indexOf(view!) <
-        window.contentView.children.findIndex((child) => "webContents" in child && (child as Electron.WebContentsView).webContents.getURL().includes("view=chrome")),
+        window.contentView.children.findIndex(
+          (child) => "webContents" in child && (child as Electron.WebContentsView).webContents.getURL().includes("view=chrome"),
+        ),
     };
   }, url);
 
@@ -688,7 +683,9 @@ test("Berry finds more on a page, chooses dropdown options, and says what really
   // Reports what's really selected, including when the page undoes it.
   expect(await resultOf("choose_option", { ref: named("Size").ref, option: "Small" })).toContain('now shows ["Small"]');
   expect(await value("#size")).toBe("s");
-  expect(await resultOf("choose_option", { ref: named("Sticky").ref, option: "Other" })).toContain("didn't hold: the dropdown shows [\"Keep\"]");
+  expect(await resultOf("choose_option", { ref: named("Sticky").ref, option: "Other" })).toContain(
+    'didn\'t hold: the dropdown shows ["Keep"]',
+  );
   expect(await resultOf("choose_option", { ref: named("Size").ref, option: "s" })).toContain('now shows ["Small"]');
   expect(await resultOf("choose_option", { ref: named("Size").ref, option: "Huge" })).toContain("no single option matches");
   expect(await resultOf("choose_option", { ref: named("Size").ref, option: "Gone" })).toContain("disabled");
@@ -816,7 +813,9 @@ test("Berry only acts on a page once allowed, and shows what will happen", async
 
   model.callTools({ name: "type_text", args: { ref: "e2", text: "hi there", submit: true } });
   await askInPanel("Write a note");
-  await expect(card.locator("p").getByText(`Type “hi there” into the field “Note” and submit it on ${origin}/form, which goes to ${origin}/form`)).toBeVisible();
+  await expect(
+    card.locator("p").getByText(`Type “hi there” into the field “Note” and submit it on ${origin}/form, which goes to ${origin}/form`),
+  ).toBeVisible();
   await card.getByRole("button", { name: "Allow", exact: true }).click();
   await expect.poll(() => page.title()).toBe("Sent hi there");
   await expect(card).toHaveCount(0);
@@ -845,7 +844,11 @@ test("by default Berry acts without asking unless it's risky, and Settings can t
   const unnamed = listed.elements.find((element) => element.name === "")!.ref;
 
   let done = 1;
-  for (const [name, expected] of [["Next page", "Next page"], ["Load more", "Load more"], ["Find", "Find"]]) {
+  for (const [name, expected] of [
+    ["Next page", "Next page"],
+    ["Load more", "Load more"],
+    ["Find", "Find"],
+  ]) {
     await act("click", { ref: ref(name) });
     await expect(replies()).toHaveCount(++done);
     expect(await clicked()).toBe(expected);
@@ -855,7 +858,12 @@ test("by default Berry acts without asking unless it's risky, and Settings can t
   await expect(replies()).toHaveCount(++done);
   await expect(card).toHaveCount(0);
 
-  for (const [element, expected] of [[ref("Delete account"), "Delete account"], [ref("Ta bort inlägg"), "Ta bort inlägg"], [unnamed, "”"], [ref("Go"), "Go"]]) {
+  for (const [element, expected] of [
+    [ref("Delete account"), "Delete account"],
+    [ref("Ta bort inlägg"), "Ta bort inlägg"],
+    [unnamed, "”"],
+    [ref("Go"), "Go"],
+  ]) {
     await act("click", { ref: element });
     await expect(card.locator("p").getByText(expected, { exact: false })).toBeVisible();
     await card.getByRole("button", { name: "Don’t allow" }).click();
@@ -940,9 +948,7 @@ test("chats are still there after a restart", async () => {
   app = await launchApp(profile, { modelEnv: model.env });
   chrome = await findView(app, "view=chrome");
   const { id } = (await chrome.evaluate(() => window.chromeAPI.chat.send(null, "Remember this", { seePage: false })))!;
-  await expect
-    .poll(async () => (await chrome.evaluate((chatId) => window.chromeAPI.library.getChat(chatId), id))?.partial)
-    .toBeNull();
+  await expect.poll(async () => (await chrome.evaluate((chatId) => window.chromeAPI.library.getChat(chatId), id))?.partial).toBeNull();
   await app.close();
 
   app = await launchApp(profile, { modelEnv: model.env });
@@ -1200,8 +1206,8 @@ test("a reply takes over from Thinking in place, and isn't redrawn when it ends"
         document
           .getAnimations()
           .filter((animation) => (animation as CSSAnimation).animationName === "fade-in")
-          .map((animation) => animation.finished)
-      ).then(() => undefined)
+          .map((animation) => animation.finished),
+      ).then(() => undefined),
     );
   model.replyWith("first words ", "and the rest");
   const releaseStart = model.holdBeforeFirstToken();
@@ -1295,9 +1301,7 @@ test("the page card follows the sidebar and chat as they open and close", async 
 
   // A tab opened now gets the same space as the others.
   const second = await openFixture("/second");
-  await expect
-    .poll(() => second.evaluate(() => window.innerWidth))
-    .toBe(width - 8 - 8 - 348 - 8);
+  await expect.poll(() => second.evaluate(() => window.innerWidth)).toBe(width - 8 - 8 - 348 - 8);
 });
 
 test("the chrome fills the window as it resizes", async () => {
@@ -1308,9 +1312,7 @@ test("the chrome fills the window as it resizes", async () => {
   });
   expect(width).toBeGreaterThanOrEqual(1100);
 
-  await expect
-    .poll(() => chrome.evaluate(() => [window.innerWidth, window.innerHeight]))
-    .toEqual([width, height]);
+  await expect.poll(() => chrome.evaluate(() => [window.innerWidth, window.innerHeight])).toEqual([width, height]);
 });
 
 const setContentSize = (width: number, height: number) =>
@@ -1320,18 +1322,16 @@ const setContentSize = (width: number, height: number) =>
       baseWindow.setContentSize(width, height);
       return baseWindow.getContentSize();
     },
-    [width, height]
+    [width, height],
   );
 
 const overlayVisible = () =>
   app.evaluate(({ BaseWindow }) =>
     BaseWindow.getAllWindows()[0]
       .contentView.children.find((view) =>
-        "webContents" in view
-          ? (view as Electron.WebContentsView).webContents.getURL().includes("view=overlay")
-          : false
+        "webContents" in view ? (view as Electron.WebContentsView).webContents.getURL().includes("view=overlay") : false,
       )
-      ?.getVisible()
+      ?.getVisible(),
   );
 
 test("horizontal tabs put a tab row above the toolbar, with the same tabs", async () => {
@@ -1342,17 +1342,13 @@ test("horizontal tabs put a tab row above the toolbar, with the same tabs", asyn
   await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ layoutMode: "horizontal" }));
 
   await expect(chrome.getByRole("navigation", { name: "Sidebar" })).toHaveCount(0);
-  const tab = chrome
-    .getByRole("list", { name: "Tabs" })
-    .getByRole("button", { name: "Fixture", exact: true });
+  const tab = chrome.getByRole("list", { name: "Tabs" }).getByRole("button", { name: "Fixture", exact: true });
   await expect(tab).toHaveAttribute("aria-current", "page");
   await expect
     .poll(() => page.evaluate(() => [window.innerWidth, window.innerHeight]))
     // The tab row and the toolbar, and no bookmarks bar with nothing saved.
     .toEqual([width - 16, height - 42 - 44 - 8]);
-  expect(
-    await app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById("horizontal-tabs")?.checked)
-  ).toBe(true);
+  expect(await app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById("horizontal-tabs")?.checked)).toBe(true);
 
   await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ layoutMode: "vertical" }));
   await expect(chrome.getByRole("navigation", { name: "Sidebar" })).toBeVisible();
@@ -1390,7 +1386,8 @@ test("in the tab row at the smallest window, the active tab has as much room for
   await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ layoutMode: "horizontal" }));
   await openFixture("/a");
   await openFixture("/b");
-  for (const page of ["history", "downloads", "settings"] as const) await chrome.evaluate((page) => window.chromeAPI.browser.openPage(page), page);
+  for (const page of ["history", "downloads", "settings"] as const)
+    await chrome.evaluate((page) => window.chromeAPI.browser.openPage(page), page);
   const row = chrome.getByRole("list", { name: "Tabs" });
   const titles = () =>
     row.getByRole("listitem").evaluateAll((items) =>
@@ -1398,7 +1395,7 @@ test("in the tab row at the smallest window, the active tab has as much room for
         active: !!item.querySelector("[aria-current]"),
         width: item.getBoundingClientRect().width,
         title: item.querySelector("button span.truncate")!.getBoundingClientRect().width,
-      }))
+      })),
     );
 
   await expect.poll(async () => (await titles()).length).toBe(6);
@@ -1429,7 +1426,7 @@ test("off a Mac, the menu button opens the app's own menu just under itself", as
   const sheetInWindow = async () => {
     const view = await app.evaluate(({ BaseWindow }) => {
       const found = BaseWindow.getAllWindows()[0].contentView.children.find(
-        (child) => "webContents" in child && (child as Electron.WebContentsView).webContents.getURL().includes("view=menu")
+        (child) => "webContents" in child && (child as Electron.WebContentsView).webContents.getURL().includes("view=menu"),
       );
       return found?.getBounds();
     });
@@ -1493,10 +1490,7 @@ test("the sidebar and chat resize within their limits, by pointer or keyboard", 
 
   await chrome.evaluate(() => window.chromeAPI.layout.toggleChat());
   await chrome.evaluate(() => window.chromeAPI.layout.resize("chat", 400));
-  await expect(chrome.getByRole("separator", { name: "Resize Berry" })).toHaveAttribute(
-    "aria-valuenow",
-    "400"
-  );
+  await expect(chrome.getByRole("separator", { name: "Resize Berry" })).toHaveAttribute("aria-valuenow", "400");
   await expect.poll(pageWidth).toBe(width - 250 - 8 - 400 - 8);
 });
 
@@ -1511,9 +1505,7 @@ test("the collapsed sidebar floats over the page when the pointer reaches the le
   await expect.poll(overlayVisible).toBe(true);
 
   const overlay = await findView(app, "view=overlay");
-  await expect(
-    overlay.getByRole("list", { name: "Tabs" }).getByRole("button", { name: "Fixture", exact: true })
-  ).toBeVisible();
+  await expect(overlay.getByRole("list", { name: "Tabs" }).getByRole("button", { name: "Fixture", exact: true })).toBeVisible();
 
   await overlay.evaluate(() => window.chromeAPI.layout.hideFloatingSidebar());
   await expect.poll(overlayVisible).toBe(false);
@@ -1604,9 +1596,7 @@ test("settings are saved and come back after a restart", async () => {
   app = await launchApp(profile);
   chrome = await findView(app, "view=chrome");
 
-  await expect
-    .poll(() => chrome.evaluate(() => window.chromeAPI.settings.getSettings().then((s) => s.layoutMode)))
-    .toBe("horizontal");
+  await expect.poll(() => chrome.evaluate(() => window.chromeAPI.settings.getSettings().then((s) => s.layoutMode))).toBe("horizontal");
   await expect(chrome.getByRole("navigation", { name: "Sidebar" })).toHaveCount(0);
 });
 
@@ -1675,7 +1665,10 @@ test("the menu beside the dock sits at the bottom of the sidebar and opens Setti
   expect(buttonBox!.y + buttonBox!.height).toBeGreaterThan(sidebarBox!.y + sidebarBox!.height - 24);
 
   await button.click();
-  await sidebar.getByRole("dialog", { name: "Account" }).getByRole("button", { name: /^Settings/ }).click();
+  await sidebar
+    .getByRole("dialog", { name: "Account" })
+    .getByRole("button", { name: /^Settings/ })
+    .click();
   await expect.poll(async () => (await activeTab()).page).toBe("settings");
   // One highlight: the Settings tab has it, and the menu it was opened from has closed.
   const tab = sidebar.getByRole("list", { name: "Tabs", exact: true }).getByRole("button", { name: "Settings", exact: true });
@@ -1688,14 +1681,19 @@ test("dragging a tab reorders it in both layouts, and a short press only selects
   const pointerEvents = await chrome.evaluateHandle(() => {
     const events: Array<{ type: string; pointerId: number; buttons: number; x: number; y: number; trusted: boolean }> = [];
     for (const type of ["pointerdown", "pointermove", "pointerup", "pointercancel", "lostpointercapture"] as const) {
-      window.addEventListener(type, (event) => events.push({
-        type: event.type,
-        pointerId: event.pointerId,
-        buttons: event.buttons,
-        x: event.clientX,
-        y: event.clientY,
-        trusted: event.isTrusted,
-      }), true);
+      window.addEventListener(
+        type,
+        (event) =>
+          events.push({
+            type: event.type,
+            pointerId: event.pointerId,
+            buttons: event.buttons,
+            x: event.clientX,
+            y: event.clientY,
+            trusted: event.isTrusted,
+          }),
+        true,
+      );
     }
     return events;
   });
@@ -1718,15 +1716,17 @@ test("dragging a tab reorders it in both layouts, and a short press only selects
   // A press with no movement selects and keeps the order.
   await tabs.nth(0).getByRole("button", { name: "New tab", exact: true }).click();
   await expect.poll(async () => (await activeTab()).page).toBe("new-tab");
-  expect(await tabOrder(), `Stationary-click pointer events: ${JSON.stringify(await pointerEvents.jsonValue())}`).toEqual(["new-tab", "/a", "/b"]);
+  expect(await tabOrder(), `Stationary-click pointer events: ${JSON.stringify(await pointerEvents.jsonValue())}`).toEqual([
+    "new-tab",
+    "/a",
+    "/b",
+  ]);
 
   // Windows can report the real cursor mid-press, far away and with no button down. That isn't a drag.
   const pressed = (await tabs.nth(0).boundingBox())!;
   await chrome.mouse.move(pressed.x + 20, pressed.y + pressed.height / 2);
   await chrome.mouse.down();
-  await chrome.evaluate(() =>
-    window.dispatchEvent(new PointerEvent("pointermove", { clientX: 512, clientY: 384, buttons: 0 }))
-  );
+  await chrome.evaluate(() => window.dispatchEvent(new PointerEvent("pointermove", { clientX: 512, clientY: 384, buttons: 0 })));
   await chrome.mouse.up();
   // Long enough for a drop to settle, if this had been taken for one.
   await chrome.waitForTimeout(500);
@@ -1802,8 +1802,7 @@ test("the floating sidebar slides in, and slides out before hiding", async () =>
   await chrome.evaluate(() => window.chromeAPI.layout.toggleSidebar());
   const overlay = await findView(app, "view=overlay");
   const slideRuns = () => overlay.evaluate(() => window.slideRuns);
-  const cardLeft = () =>
-    overlay.evaluate(() => document.querySelector("[data-slide]")!.getBoundingClientRect().left);
+  const cardLeft = () => overlay.evaluate(() => document.querySelector("[data-slide]")!.getBoundingClientRect().left);
   await overlay.evaluate(() => {
     window.slideRuns = 0;
     document.addEventListener("transitionrun", (event) => {
@@ -1883,7 +1882,9 @@ test("right-clicking Berry beside the greeting opens its menu", async () => {
   await bird.click({ button: "right", timeout: 2000 });
   await expect.poll(() => openMenuRows(app)).toEqual(["Keep Berry Still", "Hide Berry"]);
   await chooseFromMenu(app, "Keep Berry Still");
-  await expect.poll(() => chrome.evaluate(() => window.chromeAPI.settings.getSettings().then(({ keepBerryStill }) => keepBerryStill))).toBe(true);
+  await expect
+    .poll(() => chrome.evaluate(() => window.chromeAPI.settings.getSettings().then(({ keepBerryStill }) => keepBerryStill)))
+    .toBe(true);
 });
 
 test("the component gallery shows Berry in every mood", async () => {

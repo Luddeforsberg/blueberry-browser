@@ -54,13 +54,7 @@ import { RunnerJobs } from "./RunnerJobs";
 import { MacJobs } from "./MacJobs";
 import { confirmCloudLogin, readSiteCookies } from "./cloudLoginAccess";
 import { suggestLoginSites } from "./cloudLogins";
-import {
-  computeLayout,
-  MIN_WINDOW,
-  TAB_ROW_HEIGHT,
-  TOOLBAR_HEIGHT,
-  type Layout,
-} from "./Layout";
+import { computeLayout, MIN_WINDOW, TAB_ROW_HEIGHT, TOOLBAR_HEIGHT, type Layout } from "./Layout";
 import { sendToRenderer } from "./ipc";
 import type {
   ChromeRegion,
@@ -89,7 +83,16 @@ import { AppIcon } from "./AppIcon";
 export type BrowserTab = Tab | InternalTab;
 
 // Only one of these pages is open at a time, so opening it again switches to it.
-const SINGLE_INSTANCE_PAGES: InternalPage[] = ["routines", "settings", "downloads", "history", "flock", "mascot-gallery", "needs-you", "recording"];
+const SINGLE_INSTANCE_PAGES: InternalPage[] = [
+  "routines",
+  "settings",
+  "downloads",
+  "history",
+  "flock",
+  "mascot-gallery",
+  "needs-you",
+  "recording",
+];
 
 // Window materials need macOS, or Windows 11 22H2 (build 22621) and later.
 const supportsGlass = (): boolean => {
@@ -188,7 +191,7 @@ export class Window {
     readonly downloads: Downloads,
     readonly sitePermissions: SitePermissions,
     private readonly history: HistoryStore,
-    private readonly sessionStore: SessionStore
+    private readonly sessionStore: SessionStore,
   ) {
     nativeTheme.themeSource = settingsStore.get().appearance;
     // Before a site could only be in one list, it could be saved both ways. It stays on top.
@@ -208,9 +211,7 @@ export class Window {
       autoHideMenuBar: false,
       titleBarStyle: "hidden",
       trafficLightPosition: this.windowButtonPosition(),
-      ...(process.platform === "darwin" && this.glassSupported
-        ? { vibrancy: "sidebar" as const }
-        : {}),
+      ...(process.platform === "darwin" && this.glassSupported ? { vibrancy: "sidebar" as const } : {}),
       ...(process.platform === "win32"
         ? {
             titleBarOverlay: this.titleBarOverlay(),
@@ -247,22 +248,26 @@ export class Window {
     });
     this.openLinksInTabs(this.previews.chromeView.view.webContents);
     const { contentView } = this._baseWindow;
-    this.menus = new MenuView("menu", (view) => {
-      contentView.addChildView(view);
-      return {
-        area: () => {
-          const { width, height } = this._baseWindow.getContentBounds();
-          return { x: 0, y: 0, width, height };
-        },
-        show: (rect) => {
-          // Adding a view again moves it to the top, above tabs and other views opened since.
-          contentView.addChildView(view);
-          view.setBounds(rect);
-          view.setVisible(true);
-        },
-        hide: () => view.setVisible(false),
-      };
-    }, { mascotsHidden: () => !this.settings.showBerry, refocus: true });
+    this.menus = new MenuView(
+      "menu",
+      (view) => {
+        contentView.addChildView(view);
+        return {
+          area: () => {
+            const { width, height } = this._baseWindow.getContentBounds();
+            return { x: 0, y: 0, width, height };
+          },
+          show: (rect) => {
+            // Adding a view again moves it to the top, above tabs and other views opened since.
+            contentView.addChildView(view);
+            view.setBounds(rect);
+            view.setVisible(true);
+          },
+          hide: () => view.setVisible(false),
+        };
+      },
+      { mascotsHidden: () => !this.settings.showBerry, refocus: true },
+    );
     this.siteZoom = new SiteZoom({
       levels: () => this.settings.siteZoom,
       save: (siteZoom) => {
@@ -273,12 +278,12 @@ export class Window {
       tabs: () => this.allTabs.filter((tab) => tab.existingView),
     });
     this.permissionPrompt = new PermissionPromptView(this._baseWindow, sitePermissions, {
-      activeContents: () => (this.settings.onboarded ? this.activeTab?.webContents ?? null : null),
+      activeContents: () => (this.settings.onboarded ? (this.activeTab?.webContents ?? null) : null),
       page: () => this.layout.page,
     });
     const offDownloads = downloads.onChange((list) => sendToRenderer(this.chrome.view.webContents, "downloads:updated", list));
     const offSaved = sitePermissions.onChange(() =>
-      sendToRenderer(this.chrome.view.webContents, "permissions:saved-updated", sitePermissions.saved)
+      sendToRenderer(this.chrome.view.webContents, "permissions:saved-updated", sitePermissions.saved),
     );
 
     const onDownload = (_: unknown, __: unknown, contents: WebContents) => this.closeTabLeftEmpty(contents);
@@ -297,9 +302,16 @@ export class Window {
       if (this.aiKey.inUse) this.firstJobDone("key");
     });
     setSavedKeyReader(() => this.aiKey.inUse, { ownAddressOnly: app.isPackaged });
-    this.gallery = new Gallery(server, this.account, mascotStore, join(app.getPath("userData"), "gallery.json"), process.env.BLUEBERRY_SITE_URL, () => {
-      this.broadcast("library:updated", this.librarySnapshot);
-    });
+    this.gallery = new Gallery(
+      server,
+      this.account,
+      mascotStore,
+      join(app.getPath("userData"), "gallery.json"),
+      process.env.BLUEBERRY_SITE_URL,
+      () => {
+        this.broadcast("library:updated", this.librarySnapshot);
+      },
+    );
 
     this.telegram = new TelegramChannel(join(app.getPath("userData"), "phone.json"), () => {
       sendToRenderer(this.chrome.view.webContents, "phone:updated", this.telegram.state);
@@ -345,7 +357,7 @@ export class Window {
         confirmLogin: (site) => confirmCloudLogin(this._baseWindow, site),
         readCookies: (site) => readSiteCookies(site),
       },
-      localCloud ? (localCloud === "1" ? { executable: process.env.BLUEBERRY_CLOUD_CHROME || undefined } : { endpoint: localCloud }) : null
+      localCloud ? (localCloud === "1" ? { executable: process.env.BLUEBERRY_CLOUD_CHROME || undefined } : { endpoint: localCloud }) : null,
     );
     this.cloud.start();
 
@@ -369,44 +381,53 @@ export class Window {
         }),
     });
 
-    this.chats = new Chats(chatStore, streamReply, generateTitle, {
-      activeTab: () => this.activeTab,
-      allTabs: () => this.allTabs,
-      openBackgroundTab: (url) => this.createBackgroundTab(url),
-      // The window closes with its last tab, so Berry never takes that one, or the one the user is looking at.
-      closeTab: (tabId) => this.tabCount > 1 && tabId !== this.activeTabId && this.closeTab(tabId, false),
-      // Saved with the session from now on, like any other tab of theirs.
-      giveToUser: (tabId) => {
-        if (!this.backgroundTabs.delete(tabId)) return;
-        this.unvisitedTabs.add(tabId);
-        this.saveSessionSoon();
+    this.chats = new Chats(
+      chatStore,
+      streamReply,
+      generateTitle,
+      {
+        activeTab: () => this.activeTab,
+        allTabs: () => this.allTabs,
+        openBackgroundTab: (url) => this.createBackgroundTab(url),
+        // The window closes with its last tab, so Berry never takes that one, or the one the user is looking at.
+        closeTab: (tabId) => this.tabCount > 1 && tabId !== this.activeTabId && this.closeTab(tabId, false),
+        // Saved with the session from now on, like any other tab of theirs.
+        giveToUser: (tabId) => {
+          if (!this.backgroundTabs.delete(tabId)) return;
+          this.unvisitedTabs.add(tabId);
+          this.saveSessionSoon();
+        },
+        actionApproval: () => this.settings.actionApproval,
+        assistantName: () => (this.settings.showBerry ? BERRY.name : "Assistant"),
+        chatInFront: (chatId) => this.isChatInFront(chatId),
       },
-      actionApproval: () => this.settings.actionApproval,
-      assistantName: () => (this.settings.showBerry ? BERRY.name : "Assistant"),
-      chatInFront: (chatId) => this.isChatInFront(chatId),
-    }, {
-      onChunk: (chatId, content) =>
-        sendToRenderer(this.chrome.view.webContents, "chat:chunk", { chatId, content }),
-      onThread: (thread) => {
-        this.syncChatTabTitle(thread);
-        sendToRenderer(this.chrome.view.webContents, "chat:updated", thread);
-        this.workViews.sync();
+      {
+        onChunk: (chatId, content) => sendToRenderer(this.chrome.view.webContents, "chat:chunk", { chatId, content }),
+        onThread: (thread) => {
+          this.syncChatTabTitle(thread);
+          sendToRenderer(this.chrome.view.webContents, "chat:updated", thread);
+          this.workViews.sync();
+        },
+        onListChanged: () => this.publishLibrary(),
+        onDecided: (approvalId, allow) => this.phone.noteDecided(approvalId, allow),
+        onWorkingTabs: (working, mascots) => {
+          // A reply stopped by the window closing ends after the window has gone.
+          if (this._baseWindow.isDestroyed()) return;
+          const { layout } = this;
+          this.allTabs.forEach((tab) => {
+            tab.setBerryWorking(working.has(tab));
+            tab.workingMascotId = mascots.get(tab) ?? null;
+            this.placeTab(tab, layout);
+          });
+          this.notifyTabs();
+          this.workViews.sync();
+        },
       },
-      onListChanged: () => this.publishLibrary(),
-      onDecided: (approvalId, allow) => this.phone.noteDecided(approvalId, allow),
-      onWorkingTabs: (working, mascots) => {
-        // A reply stopped by the window closing ends after the window has gone.
-        if (this._baseWindow.isDestroyed()) return;
-        const { layout } = this;
-        this.allTabs.forEach((tab) => {
-          tab.setBerryWorking(working.has(tab));
-          tab.workingMascotId = mascots.get(tab) ?? null;
-          this.placeTab(tab, layout);
-        });
-        this.notifyTabs();
-        this.workViews.sync();
-      },
-    }, (id) => this.mascotStore.resolve(id), this.memory, this.cloud, this.runnerJobs);
+      (id) => this.mascotStore.resolve(id),
+      this.memory,
+      this.cloud,
+      this.runnerJobs,
+    );
 
     this.workViews = new WorkViews({
       chrome: () => this.chrome.view.webContents,
@@ -499,11 +520,22 @@ export class Window {
         const chat = this.chats.thread(chatId);
         if (!chat || this.chats.work(chatId)?.outcome === "stopped") return null;
         const last = chat.messages.at(-1);
-        return { mascotId: chat.mascotId ?? BERRY.id, title: chat.title, error: chat.error, text: last?.role === "assistant" ? last.content : "" };
+        return {
+          mascotId: chat.mascotId ?? BERRY.id,
+          title: chat.title,
+          error: chat.error,
+          text: last?.role === "assistant" ? last.content : "",
+        };
       },
       chatOnScreen: (chatId) => {
         const entry = this.activeEntry;
-        return this._baseWindow.isFocused() && this.windowShowing && entry instanceof InternalTab && entry.page === "chat" && entry.param === chatId;
+        return (
+          this._baseWindow.isFocused() &&
+          this.windowShowing &&
+          entry instanceof InternalTab &&
+          entry.page === "chat" &&
+          entry.param === chatId
+        );
       },
       progress: (chatId) => {
         const chat = this.chats.thread(chatId);
@@ -532,7 +564,11 @@ export class Window {
       showBlueberry: () => this.bringForward(),
     });
 
-    this.mcp = new McpConnector(join(app.getPath("userData"), "mcp.json"), () => this.mcpTools, () => sendToRenderer(this.chrome.view.webContents, "mcp:updated", this.mcp.state));
+    this.mcp = new McpConnector(
+      join(app.getPath("userData"), "mcp.json"),
+      () => this.mcpTools,
+      () => sendToRenderer(this.chrome.view.webContents, "mcp:updated", this.mcp.state),
+    );
 
     // Relay jobs on this Mac, run as an MCP job is: no page, a `from`, and every limit and approval of the chat.
     this.macJobs = new MacJobs(server, this.account, {
@@ -548,7 +584,13 @@ export class Window {
           tools: bird.tools,
           askAtLeast,
           from,
-          onEnd: (ended) => onEnd({ ...ended, reply: clean(ended.reply), steps: ended.steps.map((step) => ({ ...step, text: clean(step.text) })), error: ended.error && clean(ended.error) }),
+          onEnd: (ended) =>
+            onEnd({
+              ...ended,
+              reply: clean(ended.reply),
+              steps: ended.steps.map((step) => ({ ...step, text: clean(step.text) })),
+              error: ended.error && clean(ended.error),
+            }),
         });
         return sent?.id ?? null;
       },
@@ -731,7 +773,14 @@ export class Window {
       stopRoutineRun: (runId) => this.routines.stop(runId),
       cancelRoutineRequest: (id) => this.routines.cancelRequest(id),
       tabs: () =>
-        this.allTabs.map((tab) => ({ id: tab.id, title: tab.title, url: tab.url, active: tab.id === this.activeTabId, working: tab.berryWorking, heldForUser: tab.heldForUser })),
+        this.allTabs.map((tab) => ({
+          id: tab.id,
+          title: tab.title,
+          url: tab.url,
+          active: tab.id === this.activeTabId,
+          working: tab.berryWorking,
+          heldForUser: tab.heldForUser,
+        })),
       readTab: (tabId, offset) => {
         const tab = this.allTabs.find(({ id }) => id === tabId);
         return tab ? readTabText(tab, offset) : Promise.resolve(`There is no web page in tab ${tabId}.`);
@@ -784,7 +833,9 @@ export class Window {
     return {
       pinned: this.pinnedStore.get(),
       bookmarks: this.bookmarkStore.get(),
-      chats: this.chatStore.summaries().map((chat) => ({ ...chat, running: this.chats.isRunning(chat.id), cloud: this.chats.inCloud(chat.id) })),
+      chats: this.chatStore
+        .summaries()
+        .map((chat) => ({ ...chat, running: this.chats.isRunning(chat.id), cloud: this.chats.inCloud(chat.id) })),
       routines: this.routines.list(),
       mascots: this.mascotStore.all(),
       needsYou: this.needsYou,
@@ -875,12 +926,7 @@ export class Window {
     return {
       isDark: nativeTheme.shouldUseDarkColors,
       glass: this.glassSupported && !nativeTheme.prefersReducedTransparency,
-      platform:
-        process.platform === "darwin"
-          ? "mac"
-          : process.platform === "win32"
-            ? "windows"
-            : "other",
+      platform: process.platform === "darwin" ? "mac" : process.platform === "win32" ? "windows" : "other",
     };
   }
 
@@ -925,10 +971,7 @@ export class Window {
     // A chat's or routine's own tabs last as long as its work, so they aren't the user's to get back.
     const entries = this.entries.filter((tab) => !this.backgroundTabs.has(tab.id) && !(tab instanceof InternalTab && tab.page === "cloud"));
     return {
-      tabs: entries.map(
-        (tab): SavedTab =>
-          tab instanceof Tab ? tab.saved : { page: tab.page, param: tab.param, title: tab.title }
-      ),
+      tabs: entries.map((tab): SavedTab => (tab instanceof Tab ? tab.saved : { page: tab.page, param: tab.param, title: tab.title })),
       active: entries.findIndex((tab) => tab.id === this.activeTabId),
       sidebarOpen: this.sidebarOpen,
       chatOpen: this.chatOpen,
@@ -955,7 +998,10 @@ export class Window {
   // Sites to offer in Settings > Cloud > Signed in to, from history and bookmarks. Names only.
   cloudLoginSuggestions(): string[] {
     const urls = [...this.history.recent(500), ...this.bookmarkStore.get(), ...this.pinnedStore.get()].map(({ url }) => url);
-    return suggestLoginSites(urls, this.cloud.state.logins.map(({ site }) => site));
+    return suggestLoginSites(
+      urls,
+      this.cloud.state.logins.map(({ site }) => site),
+    );
   }
 
   // A page in the cloud browser, shown by the chrome. Opened behind the user, like any tab a job opens.
@@ -976,7 +1022,7 @@ export class Window {
       (tab) =>
         tab instanceof InternalTab &&
         tab.page === page &&
-        (SINGLE_INSTANCE_PAGES.includes(page) || (param !== null && tab.param === param))
+        (SINGLE_INSTANCE_PAGES.includes(page) || (param !== null && tab.param === param)),
     );
     if (existing) {
       // A one-of-a-kind page can be asked to show something else, such as the item a notification was about.
@@ -1016,9 +1062,7 @@ export class Window {
     }
 
     const tab = this.createWebTab(tabId, url);
-    this.tabsMap = new Map(
-      this.entries.map((existing) => [existing.id, existing.id === tabId ? tab : existing])
-    );
+    this.tabsMap = new Map(this.entries.map((existing) => [existing.id, existing.id === tabId ? tab : existing]));
     this.syncTabViews();
     this.notifyTabs();
     this.updateAllBounds();
@@ -1064,7 +1108,8 @@ export class Window {
           attachPageMenu(withView, {
             openMenu: (items, at, page) => {
               const view = withView.existingView?.getBounds();
-              if (view) this.menus.open(items, { x: view.x + at.x, y: view.y + at.y, width: 0, height: 0 }, { label: "Page", mac: this.mac, page });
+              if (view)
+                this.menus.open(items, { x: view.x + at.x, y: view.y + at.y, width: 0, height: 0 }, { label: "Page", mac: this.mac, page });
             },
             openTab: (address) => this.createTab(address),
             askBerry: (text) => this.askBerryAbout(text),
@@ -1076,7 +1121,7 @@ export class Window {
         },
       },
       restored,
-      popup
+      popup,
     );
     return tab;
   }
@@ -1312,9 +1357,7 @@ export class Window {
   }
 
   private chatTabs(chatId: string): InternalTab[] {
-    return this.entries.filter(
-      (tab): tab is InternalTab => tab instanceof InternalTab && tab.page === "chat" && tab.param === chatId
-    );
+    return this.entries.filter((tab): tab is InternalTab => tab instanceof InternalTab && tab.page === "chat" && tab.param === chatId);
   }
 
   private syncChatTabTitle({ id, title }: ChatThread): void {
@@ -1401,7 +1444,8 @@ export class Window {
   async confirmUnpublish(id: string): Promise<PublishResult> {
     const yes = await this.menus.ask({
       question: "Take this mascot out of the Gallery?",
-      detail: "Its public page and its count go. Your own mascot stays, and so do copies other people have already added, because nothing here can reach them.",
+      detail:
+        "Its public page and its count go. Your own mascot stays, and so do copies other people have already added, because nothing here can reach them.",
       action: "Unpublish",
       mascot: null,
     });
@@ -1481,10 +1525,11 @@ export class Window {
         label: "Remove Bookmark",
         icon: "delete",
         danger: true,
-        click: () => this.saveBookmarks(() => {
-          this.bookmarkStore.removeUrl(site.url);
-          this.pinnedStore.removeUrl(site.url);
-        }),
+        click: () =>
+          this.saveBookmarks(() => {
+            this.bookmarkStore.removeUrl(site.url);
+            this.pinnedStore.removeUrl(site.url);
+          }),
       },
     ];
     return new Promise((resolve) => this.openMenu(items, anchor, from, "Bookmark", resolve));
@@ -1532,7 +1577,12 @@ export class Window {
   showBerryMenu(anchor: unknown): void {
     const { keepBerryStill, showBerry } = this.settings;
     const items: OwnMenuItem[] = [
-      { label: "Keep Berry Still", type: "checkbox", checked: keepBerryStill, click: () => this.updateSettings({ keepBerryStill: !keepBerryStill }) },
+      {
+        label: "Keep Berry Still",
+        type: "checkbox",
+        checked: keepBerryStill,
+        click: () => this.updateSettings({ keepBerryStill: !keepBerryStill }),
+      },
       { label: "Hide Berry", type: "checkbox", checked: !showBerry, click: () => this.updateSettings({ showBerry: !showBerry }) },
     ];
     this.openMenu(items, anchor, "chrome", "Berry");
@@ -1758,7 +1808,7 @@ export class Window {
         chatWidth: this.settings.chatWidth,
         platform: process.platform,
         savedSites: this.pinnedStore.get().length + this.bookmarkStore.get().length > 0,
-      }
+      },
     );
   }
 
@@ -1827,12 +1877,18 @@ export class Window {
 }
 
 const loaded = (contents: WebContents): Promise<void> =>
-  contents.isDestroyed() || !contents.isLoading() ? Promise.resolve() : new Promise((resolve) => contents.once("did-finish-load", () => resolve()));
+  contents.isDestroyed() || !contents.isLoading()
+    ? Promise.resolve()
+    : new Promise((resolve) => contents.once("did-finish-load", () => resolve()));
 
 // What a renderer asked to open, checked: a known kind, a mascot named by a string, and a rect of finite numbers.
 const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 const validPopover = (input: unknown): Popover | null => {
-  const { kind, mascotId, anchor } = (input ?? {}) as { kind?: unknown; mascotId?: unknown; anchor?: { x?: unknown; y?: unknown; width?: unknown; height?: unknown } };
+  const { kind, mascotId, anchor } = (input ?? {}) as {
+    kind?: unknown;
+    mascotId?: unknown;
+    anchor?: { x?: unknown; y?: unknown; width?: unknown; height?: unknown };
+  };
   const { x, y, width, height } = anchor ?? {};
   if (!finite(x) || !finite(y) || !finite(width) || !finite(height)) return null;
   const rect = { x, y, width, height };

@@ -45,7 +45,13 @@ describe("BookmarkStore", () => {
     store.add("https://c.example/", "C");
     expect(new BookmarkStore(file).get().map(({ favicon }) => favicon)).toEqual(["https://cdn.a.example/icon.png", undefined, undefined]);
 
-    writeFileSync(file, JSON.stringify([{ ...site, favicon: "javascript:alert(1)" }, { ...site, id: "b", favicon: 7 }]));
+    writeFileSync(
+      file,
+      JSON.stringify([
+        { ...site, favicon: "javascript:alert(1)" },
+        { ...site, id: "b", favicon: 7 },
+      ]),
+    );
     expect(new BookmarkStore(file).get()).toEqual([site, { ...site, id: "b" }]);
   });
 
@@ -57,8 +63,17 @@ describe("BookmarkStore", () => {
     store.add("https://b.example/", "B", icon(MAX_ICON_LENGTH + 1));
     expect(store.get().map(({ favicon }) => favicon?.length)).toEqual([MAX_ICON_LENGTH, undefined]);
 
-    writeFileSync(file, JSON.stringify([{ ...site, favicon: icon(MAX_ICON_LENGTH) }, { ...site, id: "b", favicon: icon(1024 * 1024) }]));
-    expect(new BookmarkStore(file).get()).toEqual([{ ...site, favicon: icon(MAX_ICON_LENGTH) }, { ...site, id: "b" }]);
+    writeFileSync(
+      file,
+      JSON.stringify([
+        { ...site, favicon: icon(MAX_ICON_LENGTH) },
+        { ...site, id: "b", favicon: icon(1024 * 1024) },
+      ]),
+    );
+    expect(new BookmarkStore(file).get()).toEqual([
+      { ...site, favicon: icon(MAX_ICON_LENGTH) },
+      { ...site, id: "b" },
+    ]);
   });
 
   it("uses the address when a page has no title", () => {

@@ -125,13 +125,7 @@ export class Tab implements PageTarget {
   // The tab whose page opened this one, which can send it anywhere again by name.
   private readonly opener: Tab | null;
 
-  constructor(
-    id: string,
-    url: string,
-    events: TabEvents,
-    restored?: SavedWebTab,
-    popup?: { page: WebContents; opener: Tab }
-  ) {
+  constructor(id: string, url: string, events: TabEvents, restored?: SavedWebTab, popup?: { page: WebContents; opener: Tab }) {
     this._id = id;
     this.events = events;
     this._url = url;
@@ -441,10 +435,12 @@ export class Tab implements PageTarget {
   private removeWorkingStyle(): void {
     if (!this.webContentsView) return;
     const contents = this.webContentsView.webContents;
-    void this.workingStyle?.then((key) => {
-      if (key && !contents.isDestroyed()) return contents.removeInsertedCSS(key);
-      return undefined;
-    }).catch(() => {});
+    void this.workingStyle
+      ?.then((key) => {
+        if (key && !contents.isDestroyed()) return contents.removeInsertedCSS(key);
+        return undefined;
+      })
+      .catch(() => {});
     this.workingStyle = null;
   }
 
@@ -517,7 +513,12 @@ export class Tab implements PageTarget {
     if (!image || image.isEmpty() || !this.canBePictured || holdsStarted !== this.holdsStarted) return null;
     const size = image.getSize();
     const top = cut
-      ? image.crop({ x: 0, y: 0, width: Math.min(size.width, Math.round(size.height / cut)), height: Math.min(size.height, Math.round(size.width * cut)) })
+      ? image.crop({
+          x: 0,
+          y: 0,
+          width: Math.min(size.width, Math.round(size.height / cut)),
+          height: Math.min(size.height, Math.round(size.width * cut)),
+        })
       : image;
     return top.resize({ width, quality: "good" }).toJPEG(PICTURE_QUALITY);
   }
@@ -633,9 +634,7 @@ export class Tab implements PageTarget {
   // Runs in a world of its own. The page shares its DOM but can't see its variables.
   async runInPage<T = unknown>(code: string): Promise<T> {
     this.refuseWhileHeld();
-    return await this.fromPage(() =>
-      this.view.webContents.executeJavaScriptInIsolatedWorld(AGENT_WORLD, [{ code }], true)
-    );
+    return await this.fromPage(() => this.view.webContents.executeJavaScriptInIsolatedWorld(AGENT_WORLD, [{ code }], true));
   }
 
   // For `Recordings` only. It waits for as long as the page takes, because the answer is the user's next move, so this
@@ -687,7 +686,9 @@ export class Tab implements PageTarget {
   // The page and what's in its frames, each frame labelled with where it really comes from.
   async getTextWithFrames(allowsFrame: (origin: string) => boolean = () => true): Promise<string> {
     const text = await this.getTabText();
-    const frames = this.webContents.mainFrame.framesInSubtree.filter((frame) => frame.parent && allowsFrame(frame.origin)).slice(0, MAX_FRAMES_READ);
+    const frames = this.webContents.mainFrame.framesInSubtree
+      .filter((frame) => frame.parent && allowsFrame(frame.origin))
+      .slice(0, MAX_FRAMES_READ);
     const parts = await Promise.all(
       frames.map(async (frame) => {
         let timer: NodeJS.Timeout | undefined;
@@ -697,7 +698,7 @@ export class Tab implements PageTarget {
         const found = await Promise.race([frame.executeJavaScript(FRAME_TEXT).catch(() => null), timeout]);
         clearTimeout(timer);
         return typeof found === "string" && found.trim() ? `\n\n[Frame from ${frame.origin}]\n${found}` : "";
-      })
+      }),
     );
     return text + parts.join("");
   }

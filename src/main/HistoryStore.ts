@@ -50,21 +50,15 @@ export class HistoryStore {
   record(url: string, title: string, favicon: string | null, now = Date.now()): void {
     if (!isWeb(url)) return;
     const previous = this.newestFor(url);
-    const newest = this.db.prepare("SELECT id FROM visits ORDER BY visited_at DESC, id DESC LIMIT 1").get() as
-      | { id: number }
-      | undefined;
+    const newest = this.db.prepare("SELECT id FROM visits ORDER BY visited_at DESC, id DESC LIMIT 1").get() as { id: number } | undefined;
     const name = title || previous?.title || url;
     const icon = favicon ?? previous?.favicon ?? null;
     // Reloading a page isn't a new visit, so it only moves the last one on. Coming back to it later is one.
     if (previous && previous.id === newest?.id && now - previous.visitedAt < RELOAD_WINDOW_MS) {
-      this.db
-        .prepare("UPDATE OR IGNORE visits SET title = ?, favicon = ?, visited_at = ? WHERE id = ?")
-        .run(name, icon, now, previous.id);
+      this.db.prepare("UPDATE OR IGNORE visits SET title = ?, favicon = ?, visited_at = ? WHERE id = ?").run(name, icon, now, previous.id);
       return;
     }
-    this.db
-      .prepare("INSERT OR IGNORE INTO visits (url, title, favicon, visited_at) VALUES (?, ?, ?, ?)")
-      .run(url, name, icon, now);
+    this.db.prepare("INSERT OR IGNORE INTO visits (url, title, favicon, visited_at) VALUES (?, ?, ?, ?)").run(url, name, icon, now);
   }
 
   // Titles and favicons arrive after the navigation that recorded the visit.
@@ -81,7 +75,7 @@ export class HistoryStore {
     return this.db
       .prepare(
         `SELECT url, title, favicon, MAX(visited_at) AS visitedAt FROM visits
-         GROUP BY url ORDER BY visitedAt DESC LIMIT ?`
+         GROUP BY url ORDER BY visitedAt DESC LIMIT ?`,
       )
       .all(limit) as unknown as Visit[];
   }
@@ -89,16 +83,14 @@ export class HistoryStore {
   // Every visit since then, newest first, up to a limit.
   since(time: number, limit: number): Visit[] {
     return this.db
-      .prepare("SELECT url, title, favicon, visited_at AS visitedAt FROM visits WHERE visited_at >= ? ORDER BY visited_at DESC, id DESC LIMIT ?")
+      .prepare(
+        "SELECT url, title, favicon, visited_at AS visitedAt FROM visits WHERE visited_at >= ? ORDER BY visited_at DESC, id DESC LIMIT ?",
+      )
       .all(time, limit) as unknown as Visit[];
   }
 
   // Newest first. Pass the last page's `next` as `before` to go on from it.
-  search({
-    query = "",
-    before,
-    limit = DEFAULT_PAGE_SIZE,
-  }: { query?: string; before?: HistoryCursor; limit?: number } = {}): HistoryPage {
+  search({ query = "", before, limit = DEFAULT_PAGE_SIZE }: { query?: string; before?: HistoryCursor; limit?: number } = {}): HistoryPage {
     const size = Math.max(1, Math.min(limit, MAX_PAGE_SIZE));
     const pattern = `%${query.trim().replace(/[\\%_]/g, "\\$&")}%`;
     const rows = this.db
@@ -106,7 +98,7 @@ export class HistoryStore {
         `SELECT ${ENTRY_COLUMNS} FROM visits
          WHERE (title LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\')
            AND (? IS NULL OR visited_at < ? OR (visited_at = ? AND id < ?))
-         ORDER BY visited_at DESC, id DESC LIMIT ?`
+         ORDER BY visited_at DESC, id DESC LIMIT ?`,
       )
       .all(
         pattern,
@@ -115,7 +107,7 @@ export class HistoryStore {
         before?.visitedAt ?? null,
         before?.visitedAt ?? null,
         before?.id ?? null,
-        size + 1
+        size + 1,
       ) as unknown as HistoryEntry[];
     const entries = rows.slice(0, size);
     const last = entries.at(-1);
@@ -143,7 +135,7 @@ export class HistoryStore {
          WHERE title LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\'
          GROUP BY url
          ORDER BY (url LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\') DESC, lastVisit DESC
-         LIMIT ?`
+         LIMIT ?`,
       )
       .all(SUGGEST_VISITS, anywhere, anywhere, ...hosts, Math.max(1, Math.min(limit, SUGGEST_LIMIT))) as unknown as VisitedPage[];
   }
@@ -163,9 +155,7 @@ export class HistoryStore {
   // For bringing history in from another browser. Importing the same visits twice adds nothing the second
   // time. Returns how many were added.
   importVisits(visits: Visit[]): number {
-    const insert = this.db.prepare(
-      "INSERT OR IGNORE INTO visits (url, title, favicon, visited_at) VALUES (?, ?, ?, ?)"
-    );
+    const insert = this.db.prepare("INSERT OR IGNORE INTO visits (url, title, favicon, visited_at) VALUES (?, ?, ?, ?)");
     let added = 0;
     this.db.exec("BEGIN");
     try {

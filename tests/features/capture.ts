@@ -53,7 +53,9 @@ const layersOf = (app: ElectronApplication, view: string, masks: Mask[]) =>
     async ({ BaseWindow }, { view, masks, css, script }) => {
       const views = (window: Electron.BaseWindow) =>
         window.contentView.children.filter((child): child is Electron.WebContentsView => "webContents" in child);
-      const window = BaseWindow.getAllWindows().find((candidate) => views(candidate).some((child) => child.webContents.getURL().includes(`view=${view}`)));
+      const window = BaseWindow.getAllWindows().find((candidate) =>
+        views(candidate).some((child) => child.webContents.getURL().includes(`view=${view}`)),
+      );
       if (!window) throw new Error(`No window holds view=${view}`);
       const { width, height } = window.getContentBounds();
       const layers: Layer[] = [];
@@ -69,7 +71,7 @@ const layersOf = (app: ElectronApplication, view: string, masks: Mask[]) =>
         for (const mask of masks.filter((each) => url.includes(each.view))) {
           const found = await contents
             .executeJavaScript(
-              `[...document.querySelectorAll(${JSON.stringify(mask.selector)})].map((element) => { const r = element.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; })`
+              `[...document.querySelectorAll(${JSON.stringify(mask.selector)})].map((element) => { const r = element.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; })`,
             )
             .catch(() => []);
           rects.push(...found);
@@ -79,7 +81,7 @@ const layersOf = (app: ElectronApplication, view: string, masks: Mask[]) =>
       }
       return { width, height, layers };
     },
-    { view, masks, css: STILL_CSS, script: STILL_SCRIPT }
+    { view, masks, css: STILL_CSS, script: STILL_SCRIPT },
   );
 
 const compose = ({ width, height, layers }: { width: number; height: number; layers: Layer[] }, theme: "light" | "dark"): PNG => {
@@ -143,7 +145,7 @@ const changedBox = (a: PNG, b: PNG): string | null => {
 // never rests is saved anyway, with where it kept changing.
 export async function captureWindow(
   app: ElectronApplication,
-  { view = "chrome", theme }: { view?: string; theme: "light" | "dark" }
+  { view = "chrome", theme }: { view?: string; theme: "light" | "dark" },
 ): Promise<{ png: Buffer; restless: string | null }> {
   let last: PNG | null = null;
   let restless: string | null = "while it was opening";

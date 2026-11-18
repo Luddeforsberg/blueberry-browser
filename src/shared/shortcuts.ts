@@ -20,7 +20,13 @@ export const SHORTCUTS = {
 const SIGNS: Record<string, string> = { Left: "←", Right: "→", Up: "↑", Down: "↓", Plus: "+" };
 
 // Other names Electron takes for the same modifiers.
-const ALIASES: Record<string, string> = { Command: "CmdOrCtrl", Cmd: "CmdOrCtrl", CommandOrControl: "CmdOrCtrl", Control: "Ctrl", Option: "Alt" };
+const ALIASES: Record<string, string> = {
+  Command: "CmdOrCtrl",
+  Cmd: "CmdOrCtrl",
+  CommandOrControl: "CmdOrCtrl",
+  Control: "Ctrl",
+  Option: "Alt",
+};
 
 // An Electron accelerator's keys one by one, as the platform writes them: ⇧ ⌘ J on a Mac, Ctrl Shift J elsewhere.
 export const shortcutKeys = (accelerator: string, mac: boolean): string[] => {

@@ -8,7 +8,7 @@ export const installSessionHandlers = (session: Session, permissions: SitePermis
     void permissions.request(contents, permission, details).then(callback);
   });
   session.setPermissionCheckHandler((contents, permission, requestingOrigin, details) =>
-    permissions.check(contents, permission, requestingOrigin, details)
+    permissions.check(contents, permission, requestingOrigin, details),
   );
 
   // We have no chooser for USB, HID or serial devices, so sites can't be given one.
@@ -21,7 +21,7 @@ export const installSessionHandlers = (session: Session, permissions: SitePermis
       (error) => {
         console.error("Failed to list screens to share:", error);
         callback(null);
-      }
+      },
     );
   });
 

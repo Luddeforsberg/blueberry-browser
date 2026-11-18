@@ -58,9 +58,12 @@ const added = [...newFiles.keys()].filter((file) => !oldFiles.has(file));
 
 const escape = (text) => String(text).replace(/[&<>"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[char]);
 const link = (folder, file) => escape(relative(report, join(folder, file)).replaceAll("\\", "/"));
-const picture = (label, src) => `<figure><figcaption>${label}</figcaption><a href="${src}"><img src="${src}" alt="${label}" loading="lazy"></a></figure>`;
+const picture = (label, src) =>
+  `<figure><figcaption>${label}</figcaption><a href="${src}"><img src="${src}" alt="${label}" loading="lazy"></a></figure>`;
 const list = (title, files, folder) =>
-  files.length ? `<h2>${title} (${files.length})</h2><ul>${files.map((file) => `<li><a href="${link(folder, file)}">${escape(file)}</a></li>`).join("")}</ul>` : "";
+  files.length
+    ? `<h2>${title} (${files.length})</h2><ul>${files.map((file) => `<li><a href="${link(folder, file)}">${escape(file)}</a></li>`).join("")}</ul>`
+    : "";
 
 const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Baseline comparison</title>
 <style>
@@ -80,7 +83,7 @@ ${changed
     ({ file, why }) =>
       `<section><h2>${escape(file)}</h2><p>${escape(why)}</p><div class="row">${picture("Old", link(before, file))}${picture("New", link(after, file))}${
         existsSync(join(report, file)) ? picture("Difference", escape(file)) : ""
-      }</div></section>`
+      }</div></section>`,
   )
   .join("\n")}
 ${list("Missing from the new baseline", missing, before)}

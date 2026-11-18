@@ -37,9 +37,12 @@ describe("the cloud jobs' database rules", () => {
     await db.query("insert into auth.users values ($1, $2)", [id, `user${users}@example.com`]);
     return id;
   };
-  const emailOf = async (id: string) => (await db.query<{ email: string }>("select email from auth.users where id = $1", [id])).rows[0].email;
-  const offer = async (owner: string, runner: string) => (await as<{ ok: boolean }>(owner, `select public.link_cloud_runner('${await emailOf(runner)}') as ok`))[0].ok;
-  const accept = async (runner: string, owner: string) => (await as<{ ok: boolean }>(runner, `select public.accept_cloud_runner_link('${await emailOf(owner)}') as ok`))[0].ok;
+  const emailOf = async (id: string) =>
+    (await db.query<{ email: string }>("select email from auth.users where id = $1", [id])).rows[0].email;
+  const offer = async (owner: string, runner: string) =>
+    (await as<{ ok: boolean }>(owner, `select public.link_cloud_runner('${await emailOf(runner)}') as ok`))[0].ok;
+  const accept = async (runner: string, owner: string) =>
+    (await as<{ ok: boolean }>(runner, `select public.accept_cloud_runner_link('${await emailOf(owner)}') as ok`))[0].ok;
 
   // Each test has its own owner and that owner's runner, and another owner with a runner of his own.
   let ALICE = "";
@@ -58,12 +61,22 @@ describe("the cloud jobs' database rules", () => {
 
   const start = async (uid: string, prompt = "Order the thing") =>
     (await as(uid, `select public.start_cloud_job('${prompt}', '[]', ${MASCOT}, 'risky', null) as id`))[0].id as string;
-  const claim = async (runner: string) => (await as(runner, "select id, status, prompt from public.runner_claim_job()")) as { id: string; status: string; prompt: string }[];
-  const job = async (id: string) => (await db.query<{ status: string; stop_requested: boolean; steps: unknown; live_view_url: string | null }>("select * from public.cloud_jobs where id = $1", [id])).rows[0];
+  const claim = async (runner: string) =>
+    (await as(runner, "select id, status, prompt from public.runner_claim_job()")) as { id: string; status: string; prompt: string }[];
+  const job = async (id: string) =>
+    (
+      await db.query<{ status: string; stop_requested: boolean; steps: unknown; live_view_url: string | null }>(
+        "select * from public.cloud_jobs where id = $1",
+        [id],
+      )
+    ).rows[0];
   const ask = async (runner: string, jobId: string, kind = "approval") =>
-    (await as(runner, `select public.runner_ask('${jobId}', '${kind}', 'Click the button “Place order” on shop.example') as id`))[0].id as string;
-  const decide = (uid: string | null, approval: string, allow = true) => as<{ decided: boolean }>(uid, `select public.decide_cloud_approval('${approval}', ${allow}) as decided`);
-  const decision = async (approval: string) => (await db.query("select decision, answer from public.cloud_approvals where id = $1", [approval])).rows[0];
+    (await as(runner, `select public.runner_ask('${jobId}', '${kind}', 'Click the button “Place order” on shop.example') as id`))[0]
+      .id as string;
+  const decide = (uid: string | null, approval: string, allow = true) =>
+    as<{ decided: boolean }>(uid, `select public.decide_cloud_approval('${approval}', ${allow}) as decided`);
+  const decision = async (approval: string) =>
+    (await db.query("select decision, answer from public.cloud_approvals where id = $1", [approval])).rows[0];
 
   beforeAll(async () => {
     db = new PGlite();
@@ -98,7 +111,12 @@ describe("the cloud jobs' database rules", () => {
   it("lets the runner write what happened, and ask, but never decide", async () => {
     const id = await start(ALICE);
     await claim(RUNNER);
-    expect(await as(RUNNER, `select public.runner_update_job('${id}', p_steps => '[{"text":"Opened shop.example","done":true}]', p_live_view => 'https://www.browserbase.com/devtools-fullscreen/inspector.html') as stop`)).toEqual([{ stop: false }]);
+    expect(
+      await as(
+        RUNNER,
+        `select public.runner_update_job('${id}', p_steps => '[{"text":"Opened shop.example","done":true}]', p_live_view => 'https://www.browserbase.com/devtools-fullscreen/inspector.html') as stop`,
+      ),
+    ).toEqual([{ stop: false }]);
     expect((await job(id)).steps).toEqual([{ text: "Opened shop.example", done: true }]);
     const approval = await ask(RUNNER, id);
     expect((await job(id)).status).toBe("waiting");
@@ -106,9 +124,18 @@ describe("the cloud jobs' database rules", () => {
 
     // Not through the function, not by writing the column, and not by asking with the answer already in.
     await expect(decide(RUNNER, approval)).rejects.toThrow(/can't decide/);
-    await expect(as(RUNNER, `update public.cloud_approvals set decision = 'allow' where id = '${approval}'`)).rejects.toThrow(/permission denied/);
-    await expect(as(RUNNER, `insert into public.cloud_approvals (job_id, owner, kind, text, decision) values ('${id}', '${ALICE}', 'approval', 'Anything', 'allow')`)).rejects.toThrow(/permission denied/);
-    await expect(as(RUNNER, `update public.cloud_jobs set action_approval = 'never' where id = '${id}'`)).rejects.toThrow(/permission denied/);
+    await expect(as(RUNNER, `update public.cloud_approvals set decision = 'allow' where id = '${approval}'`)).rejects.toThrow(
+      /permission denied/,
+    );
+    await expect(
+      as(
+        RUNNER,
+        `insert into public.cloud_approvals (job_id, owner, kind, text, decision) values ('${id}', '${ALICE}', 'approval', 'Anything', 'allow')`,
+      ),
+    ).rejects.toThrow(/permission denied/);
+    await expect(as(RUNNER, `update public.cloud_jobs set action_approval = 'never' where id = '${id}'`)).rejects.toThrow(
+      /permission denied/,
+    );
     // Nor anyone signed out, nor another user.
     await expect(decide(null, approval)).rejects.toThrow(/permission denied/);
     expect(await decide(BOB, approval)).toEqual([{ decided: false }]);
@@ -123,7 +150,9 @@ describe("the cloud jobs' database rules", () => {
 
   it("doesn't let a runner start jobs", async () => {
     await expect(start(RUNNER)).rejects.toThrow(/can't start jobs/);
-    await expect(as(RUNNER, `insert into public.cloud_jobs (owner, prompt, mascot) values ('${ALICE}', 'More', ${MASCOT})`)).rejects.toThrow(/permission denied/);
+    await expect(
+      as(RUNNER, `insert into public.cloud_jobs (owner, prompt, mascot) values ('${ALICE}', 'More', ${MASCOT})`),
+    ).rejects.toThrow(/permission denied/);
     expect((await db.query(`select id from public.cloud_jobs where owner in ('${ALICE}', '${RUNNER}')`)).rows).toEqual([]);
   });
 
@@ -154,7 +183,9 @@ describe("the cloud jobs' database rules", () => {
     for (const set of ["status = 'done'", "reply = 'Done'", `owner = '${BOB}'`, "live_view_url = 'https://www.browserbase.com/x'"]) {
       await expect(as(ALICE, `update public.cloud_jobs set ${set} where id = '${id}'`)).rejects.toThrow(/permission denied/);
     }
-    await expect(as(ALICE, `insert into public.cloud_approvals (job_id, owner, kind, text) values ('${id}', '${ALICE}', 'approval', 'x')`)).rejects.toThrow(/permission denied/);
+    await expect(
+      as(ALICE, `insert into public.cloud_approvals (job_id, owner, kind, text) values ('${id}', '${ALICE}', 'approval', 'x')`),
+    ).rejects.toThrow(/permission denied/);
     await expect(claim(ALICE)).rejects.toThrow(/Not a linked runner/);
     await expect(as(null, "select * from public.cloud_jobs")).rejects.toThrow(/permission denied/);
     // Stopping and removing are the owner's, not the runner's.
@@ -162,7 +193,9 @@ describe("the cloud jobs' database rules", () => {
     expect(await as(RUNNER, `select public.forget_cloud_job('${id}') as gone`)).toEqual([{ gone: false }]);
     // A live view that isn't Browserbase's can't be stored at all.
     await claim(RUNNER);
-    await expect(as(RUNNER, `select public.runner_update_job('${id}', p_live_view => 'https://evil.example/browserbase.com/')`)).rejects.toThrow(/live_view_shape/);
+    await expect(
+      as(RUNNER, `select public.runner_update_job('${id}', p_live_view => 'https://evil.example/browserbase.com/')`),
+    ).rejects.toThrow(/live_view_shape/);
 
     expect(await as(ALICE, `select public.stop_cloud_job('${id}') as stopped`)).toEqual([{ stopped: true }]);
     expect((await job(id)).stop_requested).toBe(true);

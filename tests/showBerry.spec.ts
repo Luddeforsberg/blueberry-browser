@@ -110,13 +110,20 @@ test("show Berry a job once, see the notes, and it becomes a routine that runs",
     await page.keyboard.type("said in the frame");
 
     // Another tab comes into it, and closing that one doesn't stop anything.
-    const other = await chrome.evaluate((url) => window.chromeAPI.browser.createTab(url).then(({ id }) => id), `${origin}/search?private=yes`);
-    await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.recording.state())).steps.at(-1)?.text).toBe("Opened 127.0.0.1 in a new tab");
+    const other = await chrome.evaluate(
+      (url) => window.chromeAPI.browser.createTab(url).then(({ id }) => id),
+      `${origin}/search?private=yes`,
+    );
+    await expect
+      .poll(async () => (await chrome.evaluate(() => window.chromeAPI.recording.state())).steps.at(-1)?.text)
+      .toBe("Opened 127.0.0.1 in a new tab");
     await chrome.evaluate((id) => window.chromeAPI.browser.closeTab(id), other);
 
     // While the user is on one of our own pages, the tab behind isn't theirs to be watched on.
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings"));
-    await expect.poll(() => chrome.evaluate(() => window.chromeAPI.browser.getTabs().then((tabs) => tabs.some(({ page }) => page === "settings")))).toBe(true);
+    await expect
+      .poll(() => chrome.evaluate(() => window.chromeAPI.browser.getTabs().then((tabs) => tabs.some(({ page }) => page === "settings"))))
+      .toBe(true);
     await page.waitForTimeout(200);
     await page.evaluate(() => history.pushState({}, "", "/product/1/elsewhere"));
     await page.waitForTimeout(200);
@@ -169,12 +176,14 @@ test("show Berry a job once, see the notes, and it becomes a routine that runs",
     await expect(notes.filter({ hasText: "left over" })).toHaveCount(0);
 
     // The model's words, with a site of its own that goes nowhere.
-    model.titleWith(JSON.stringify({
-      name: "Buy a cable",
-      instructions: `1. Go to ${origin}/shop\n2. Search for usb-c cable`,
-      sites: ["evil.example"],
-      changes: [{ label: "Search term", value: "usb-c cable" }],
-    }));
+    model.titleWith(
+      JSON.stringify({
+        name: "Buy a cable",
+        instructions: `1. Go to ${origin}/shop\n2. Search for usb-c cable`,
+        sites: ["evil.example"],
+        changes: [{ label: "Search term", value: "usb-c cable" }],
+      }),
+    );
     await chrome.getByRole("button", { name: "Turn this into a routine" }).click();
     await expect(chrome.getByRole("heading", { name: "What should I do?" })).toBeVisible();
     const sent = JSON.stringify(model.titleRequests[0].messages);
@@ -230,8 +239,9 @@ test("show Berry a job once, see the notes, and it becomes a routine that runs",
     await chrome.evaluate((id) => window.chromeAPI.browser.openPage("routines", { param: `${id}/does` }), routine.id);
     await chrome.getByRole("button", { name: "Search term: ask me each run" }).click();
     await chrome.getByRole("button", { name: "Save" }).click();
-    await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).routines[0].instructions).toBe(`1. Go to ${origin}/shop\n2. Search for hdmi cable`);
-
+    await expect
+      .poll(async () => (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).routines[0].instructions)
+      .toBe(`1. Go to ${origin}/shop\n2. Search for hdmi cable`);
   } finally {
     await app.close();
     model.close();
@@ -323,10 +333,12 @@ test("copying from a page and pasting it in is noted, and a secret is copied wit
     expect(said).not.toContain(PASSWORD);
     expect(said).not.toContain("shown-secret");
   } finally {
-    await app.evaluate(async ({ clipboard }) => {
-      const saved = (globalThis as { savedClipboard?: Electron.ClipboardItem[] }).savedClipboard ?? [];
-      await (saved.length > 0 ? clipboard.write(saved) : clipboard.clear());
-    }).catch(() => {});
+    await app
+      .evaluate(async ({ clipboard }) => {
+        const saved = (globalThis as { savedClipboard?: Electron.ClipboardItem[] }).savedClipboard ?? [];
+        await (saved.length > 0 ? clipboard.write(saved) : clipboard.clear());
+      })
+      .catch(() => {});
     await app.close();
     server.close();
   }

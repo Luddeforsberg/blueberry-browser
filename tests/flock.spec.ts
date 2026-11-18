@@ -29,7 +29,9 @@ test.beforeAll(async () => {
         <a target="named" href="/page">A named tab</a> <a target="named" href="http://localhost:${port}/secret-named">The named tab off the site</a>`,
     };
     response.setHeader("content-type", "text/html");
-    response.end(`<!doctype html><title>Page</title><body>${links[request.url ?? ""] ?? `<a href="http://localhost:${port}/secret-link">A plain link away</a>`}</body>`);
+    response.end(
+      `<!doctype html><title>Page</title><body>${links[request.url ?? ""] ?? `<a href="http://localhost:${port}/secret-link">A plain link away</a>`}</body>`,
+    );
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   port = (server.address() as AddressInfo).port;
@@ -53,7 +55,13 @@ test("a mascot chats inside its limits, and is still itself after a restart", as
 
   // Making one in steps is in mascotsPage.spec.ts. This one is about what its limits hold.
   await chrome.evaluate(() =>
-    window.chromeAPI.mascots.save(null, { name: "Scout", look: { palette: "kingfisher", accessory: "crown" }, instructions: "Always answer like a sea captain.", sites: ["127.0.0.1"], tools: ["visit", "click", "type"] })
+    window.chromeAPI.mascots.save(null, {
+      name: "Scout",
+      look: { palette: "kingfisher", accessory: "crown" },
+      instructions: "Always answer like a sea captain.",
+      sites: ["127.0.0.1"],
+      tools: ["visit", "click", "type"],
+    }),
   );
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock"));
 
@@ -100,7 +108,9 @@ test("a mascot chats inside its limits, and is still itself after a restart", as
   model.callTools({ name: "click", args: { ref: "e4" } });
   await chrome.getByRole("textbox", { name: "Message" }).fill("Follow the link");
   await chrome.getByRole("textbox", { name: "Message" }).press("Enter");
-  await expect.poll(() => model.requests.at(-1)?.messages.filter((message) => message.role === "tool").length, { timeout: 15_000 }).toBeGreaterThanOrEqual(10);
+  await expect
+    .poll(() => model.requests.at(-1)?.messages.filter((message) => message.role === "tool").length, { timeout: 15_000 })
+    .toBeGreaterThanOrEqual(10);
   await expect(chrome.getByRole("button", { name: "Save as routine" })).toBeVisible({ timeout: 15_000 });
   await chrome.waitForTimeout(800);
   const tools = JSON.stringify(model.requests.at(-1)?.messages.filter((message) => message.role === "tool"));

@@ -76,7 +76,11 @@ export const readingTime = (line: string): number => Math.min(Math.max(3000 + li
 
 // Who, and what kind of thing it's waiting for, as a notification says it: never the question, the site or the words.
 export const askingWords = (who: string, { approval }: Pick<NeedsYouItem, "approval">): string =>
-  approval.handoff ? `${who} needs you to ${HANDOFF_WORDS[approval.handoff.need]}` : approval.question ? `${who} has a question for you` : `${who} needs your OK`;
+  approval.handoff
+    ? `${who} needs you to ${HANDOFF_WORDS[approval.handoff.need]}`
+    : approval.question
+      ? `${who} has a question for you`
+      : `${who} needs your OK`;
 
 export interface DesktopFacts {
   // Oldest first.
@@ -105,7 +109,12 @@ const count = (n: number, what: string): string | null => (n > 0 ? `${n} ${what}
 
 // A job waiting for the user is still running, but it's said once, as asking.
 const notWaiting = ({ needsYou, running }: Pick<DesktopFacts, "needsYou" | "running">): DesktopRunning[] =>
-  running.filter((job) => !needsYou.some((item) => (job.chatId !== null && item.id === job.chatId) || (job.routineId !== null && item.routineId === job.routineId)));
+  running.filter(
+    (job) =>
+      !needsYou.some(
+        (item) => (job.chatId !== null && item.id === job.chatId) || (job.routineId !== null && item.routineId === job.routineId),
+      ),
+  );
 
 // What the drop shows. The faces are whoever has the most to say, in the order asking, finished, working, and with
 // nothing going on, whoever the next job goes to. What comes out by itself is only an ask, which stays until it's
@@ -113,7 +122,7 @@ const notWaiting = ({ needsYou, running }: Pick<DesktopFacts, "needsYou" | "runn
 // of thing, and the reply's own first sentence. Pointed at, it says what a press does, or what's going.
 export const desktopDrop = (
   facts: DesktopFacts,
-  { pointed, announcing, shortcut }: { pointed: boolean; announcing: string | null; shortcut: boolean }
+  { pointed, announcing, shortcut }: { pointed: boolean; announcing: string | null; shortcut: boolean },
 ): { faces: DesktopFace[]; working: boolean; says: DesktopDropSays } => {
   const { needsYou, results } = facts;
   const running = notWaiting(facts);
@@ -157,7 +166,12 @@ export const desktopTray = (facts: DesktopFacts, flock: MascotProfile[], keyFor:
           ? "delivered"
           : "rest";
   return {
-    flock: flock.map((mascot) => ({ name: facts.nameOf(mascot), look: mascot.look, mood: moodOf(mascot.id), chosen: mascot.id === chosen.id })),
+    flock: flock.map((mascot) => ({
+      name: facts.nameOf(mascot),
+      look: mascot.look,
+      mood: moodOf(mascot.id),
+      chosen: mascot.id === chosen.id,
+    })),
     asks: needsYou.map((item) => ({
       ...faceOf(facts, item.mascotId, "asking"),
       key: keyFor({ kind: "ask", chatId: item.id, approvalId: item.approval.id }),
@@ -167,7 +181,15 @@ export const desktopTray = (facts: DesktopFacts, flock: MascotProfile[], keyFor:
     working: running.flatMap((job) => {
       const target = targetOf(job);
       return target
-        ? [{ ...faceOf(facts, job.mascotId, "fetching"), key: keyFor({ kind: "open", target }), title: job.title, step: job.step ?? null, since: job.since ?? null }]
+        ? [
+            {
+              ...faceOf(facts, job.mascotId, "fetching"),
+              key: keyFor({ kind: "open", target }),
+              title: job.title,
+              step: job.step ?? null,
+              since: job.since ?? null,
+            },
+          ]
         : [];
     }),
     finished: [...finishedToday].reverse().map((ended) => ({
@@ -221,7 +243,8 @@ export const checkDecision = (shown: ShownAsk | null, waiting: readonly NeedsYou
   if (!shown || shown.decided) return { ok: false, why: "gone" };
   if (typeof decision !== "object" || decision === null) return { ok: false, why: "invalid" };
   const { key, allow, answer } = decision as { key?: unknown; allow?: unknown; answer?: unknown };
-  if (typeof key !== "string" || typeof allow !== "boolean" || (answer !== undefined && typeof answer !== "string")) return { ok: false, why: "invalid" };
+  if (typeof key !== "string" || typeof allow !== "boolean" || (answer !== undefined && typeof answer !== "string"))
+    return { ok: false, why: "invalid" };
   if (key !== shown.key) return { ok: false, why: "stale" };
   const live = waiting.find((item) => item.id === shown.item.id);
   if (!live || !sameAsk(shown.item.approval, live.approval)) return { ok: false, why: "gone" };
@@ -238,17 +261,30 @@ export const checkDecision = (shown: ShownAsk | null, waiting: readonly NeedsYou
 
 // What the sheet says for a moment after an answer, as Needs you says it.
 export const saidWords = (name: string, question: boolean, allow: boolean): string =>
-  question ? (allow ? `Answered. ${name} carries on.` : `Skipped. ${name} carries on without it.`) : allow ? `Allowed. ${name} carries on.` : `Not allowed, and ${name} knows.`;
+  question
+    ? allow
+      ? `Answered. ${name} carries on.`
+      : `Skipped. ${name} carries on without it.`
+    : allow
+      ? `Allowed. ${name} carries on.`
+      : `Not allowed, and ${name} knows.`;
 
 // This computer or the cloud, by the new tab's rule: there while the cloud can be used, unless the mascot only reads the
 // page in front, and on Cloud to begin with for one set to work there.
-export const desktopCloud = (mascot: Pick<MascotProfile, "tools" | "worksInCloud">, available: { runner: boolean; cloud: boolean }): { fits: boolean; on: boolean } => {
+export const desktopCloud = (
+  mascot: Pick<MascotProfile, "tools" | "worksInCloud">,
+  available: { runner: boolean; cloud: boolean },
+): { fits: boolean; on: boolean } => {
   const fits = (available.runner || available.cloud) && mascot.tools.includes("visit");
   return { fits, on: fits && mascot.worksInCloud === true };
 };
 
 // Where a job from the box goes. The runner keeps going with this computer off, so it's used whenever there is one.
-export const desktopWhere = (mascot: Pick<MascotProfile, "tools" | "worksInCloud">, available: { runner: boolean; cloud: boolean }, wantsCloud: boolean): { runner: boolean; cloud: boolean } => {
+export const desktopWhere = (
+  mascot: Pick<MascotProfile, "tools" | "worksInCloud">,
+  available: { runner: boolean; cloud: boolean },
+  wantsCloud: boolean,
+): { runner: boolean; cloud: boolean } => {
   const inCloud = desktopCloud(mascot, available).fits && wantsCloud === true;
   return { runner: inCloud && available.runner, cloud: inCloud && !available.runner && available.cloud };
 };

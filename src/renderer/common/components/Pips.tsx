@@ -65,7 +65,10 @@ const strength = (value: number, off: number) => off + (1 - off) * value;
 // How strong each dot is in each frame, as drawn, for the phone page, which draws them without React. A mark has one.
 export const pipOpacities = (pattern: PipPattern | PipMark): { frames: number[][]; ms: number } => {
   const moving = pattern in MOVING ? MOVING[pattern as PipPattern] : null;
-  return { frames: (moving ?? [MARKS[pattern as PipMark]]).map((frame) => frame.map((value) => strength(value, PIP_OFF))), ms: moving ? SPEED_MS[pattern as PipPattern] : 0 };
+  return {
+    frames: (moving ?? [MARKS[pattern as PipMark]]).map((frame) => frame.map((value) => strength(value, PIP_OFF))),
+    ms: moving ? SPEED_MS[pattern as PipPattern] : 0,
+  };
 };
 
 // Which pips a step has: the pattern while it's the live one, and its kind's still mark once it's done (DESIGN.md
@@ -90,9 +93,17 @@ export const Pips: React.FC<{ pattern: PipPattern | PipMark; still?: boolean; cl
   const shown = moving ? moving[frame] : MARKS[pattern as PipMark];
 
   return (
-    <span aria-hidden data-pips={pattern} className={cn("inline-grid shrink-0 grid-cols-[repeat(3,3px)] gap-[2px] align-middle", className)}>
+    <span
+      aria-hidden
+      data-pips={pattern}
+      className={cn("inline-grid shrink-0 grid-cols-[repeat(3,3px)] gap-[2px] align-middle", className)}
+    >
       {shown.map((value, index) => (
-        <i key={index} className="size-[3px] rounded-full bg-current transition-opacity duration-[140ms] ease-linear" style={{ opacity: strength(value, PIP_OFF) }} />
+        <i
+          key={index}
+          className="size-[3px] rounded-full bg-current transition-opacity duration-[140ms] ease-linear"
+          style={{ opacity: strength(value, PIP_OFF) }}
+        />
       ))}
     </span>
   );

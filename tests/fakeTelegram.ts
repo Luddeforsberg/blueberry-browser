@@ -106,7 +106,14 @@ export const startFakeTelegram = async () => {
     userSends: (text: string, replyTo?: number) => message(text, USER_CHAT, replyTo),
     strangerSends: (text: string) => message(text, 999),
     userPresses: (button: { callback_data: string }, messageId: number) =>
-      push({ callback_query: { id: `press-${messageId}`, from: { id: USER_CHAT }, message: { message_id: messageId, chat: { id: USER_CHAT, type: "private" } }, data: button.callback_data } }),
+      push({
+        callback_query: {
+          id: `press-${messageId}`,
+          from: { id: USER_CHAT },
+          message: { message_id: messageId, chat: { id: USER_CHAT, type: "private" } },
+          data: button.callback_data,
+        },
+      }),
     close: () => {
       wake?.();
       server.closeAllConnections();

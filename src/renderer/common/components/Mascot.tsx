@@ -1,26 +1,13 @@
 import React, { useId, useRef } from "react";
 import { MessageCircle } from "lucide-react";
-import type {
-  MascotAccessory,
-  MascotLook,
-  MascotPalette,
-} from "@shared/library";
+import type { MascotAccessory, MascotLook, MascotPalette } from "@shared/library";
 import { cn } from "../lib/utils";
 import { mascotDetail, type MascotDetail } from "./mascotDetail";
 import { useFrame, useStill } from "./motion";
 import { pipFrames } from "./Pips";
 import { useMascotReaction, type Reaction } from "./useMascotReaction";
 
-export type Mood =
-  | "rest"
-  | "sitting"
-  | "curious"
-  | "thinking"
-  | "fetching"
-  | "asking"
-  | "delivered"
-  | "oops"
-  | "off-duty";
+export type Mood = "rest" | "sitting" | "curious" | "thinking" | "fetching" | "asking" | "delivered" | "oops" | "off-duty";
 
 // Every mood has words, so nothing depends on seeing the drawing.
 export const MOOD_LABELS: Record<Mood, string> = {
@@ -36,13 +23,7 @@ export const MOOD_LABELS: Record<Mood, string> = {
 };
 
 // DESIGN.md section 9: the six berries. Each is drawn on a 48-unit square, body bottom at 46.
-export type BerryKind =
-  | "blueberry"
-  | "lingon"
-  | "cloudberry"
-  | "gooseberry"
-  | "raspberry"
-  | "currant";
+export type BerryKind = "blueberry" | "lingon" | "cloudberry" | "gooseberry" | "raspberry" | "currant";
 
 // A look is saved by its old palette id, in files, published rows and the phone's flock, so the ids stay and each
 // draws as the berry nearest the colour its owner chose. Berry is the blueberry.
@@ -75,8 +56,7 @@ const url = (id: string) => `url(#${id})`;
 
 // The beaded berries, as rows of beads: each row's height, where its beads are along it, and their radius.
 type Bead = [x: number, y: number, r: number];
-const beads = (rows: [y: number, xs: number[], r: number][]): Bead[] =>
-  rows.flatMap(([y, xs, r]) => xs.map((x): Bead => [x, y, r]));
+const beads = (rows: [y: number, xs: number[], r: number][]): Bead[] => rows.flatMap(([y, xs, r]) => xs.map((x): Bead => [x, y, r]));
 const CLOUD_BEADS = beads([
   [17.6, [19.6, 28.4], 5.6],
   [23.4, [14.2, 24, 33.8], 6.5],
@@ -90,8 +70,7 @@ const RASP_BEADS = beads([
   [37.6, [17.6, 24, 30.4], 4.1],
   [42.6, [21, 27], 3.5],
 ]);
-const beadCircles = (list: Bead[]) =>
-  list.map(([x, y, r]) => <circle key={`${x} ${y}`} cx={x} cy={y} r={r} />);
+const beadCircles = (list: Bead[]) => list.map(([x, y, r]) => <circle key={`${x} ${y}`} cx={x} cy={y} r={r} />);
 
 // Each berry's outline, with no fill of its own: its body, and the clip that keeps its shade inside it. Shapes only,
 // since a clip path takes no groups.
@@ -121,9 +100,7 @@ const GOOSE_VEINS = [-0.8, -0.42, 0, 0.42, 0.8];
 
 // What a berry's skin looks like up close, from 48px.
 const TEXTURE: Record<BerryKind, React.ReactNode> = {
-  blueberry: (
-    <ellipse cx={21} cy={21.5} rx={13} ry={6.5} fill={WHITE} opacity={0.12} />
-  ),
+  blueberry: <ellipse cx={21} cy={21.5} rx={13} ry={6.5} fill={WHITE} opacity={0.12} />,
   lingon: null,
   cloudberry: CLOUD_BEADS.map(([x, y, r]) => {
     const cx = one(x - r * 0.3);
@@ -167,66 +144,26 @@ const TEXTURE: Record<BerryKind, React.ReactNode> = {
         opacity={0.55}
         strokeLinecap="round"
       />
-      <circle
-        cx={one(x - r * 0.38)}
-        cy={one(y - r * 0.4)}
-        r={0.95}
-        fill={WHITE}
-        opacity={0.55}
-      />
+      <circle cx={one(x - r * 0.38)} cy={one(y - r * 0.4)} r={0.95} fill={WHITE} opacity={0.55} />
     </React.Fragment>
   )),
-  currant: (
-    <ellipse
-      cx={19}
-      cy={23}
-      rx={11}
-      ry={7.5}
-      fill={c("currant-bloom")}
-      opacity={0.35}
-    />
-  ),
+  currant: <ellipse cx={19} cy={23} rx={11} ry={7.5} fill={c("currant-bloom")} opacity={0.35} />,
 };
 
 // Under 48px only the gooseberry keeps two of its veins, as they're part of its outline.
 const SMALL_TEXTURE: Partial<Record<BerryKind, React.ReactNode>> = {
-  gooseberry: (
-    <path
-      d="M24 12.4Q12.5 29 24 45.6M24 12.4Q35.5 29 24 45.6"
-      stroke={c("gooseberry-stripe")}
-      strokeWidth={1.5}
-      fill="none"
-    />
-  ),
+  gooseberry: <path d="M24 12.4Q12.5 29 24 45.6M24 12.4Q35.5 29 24 45.6" stroke={c("gooseberry-stripe")} strokeWidth={1.5} fill="none" />,
 };
 
 // A soft shine at the top left. The lingon's is brighter, so it looks glossy.
 const SHINE: Record<"lingon" | "other", React.ReactNode> = {
   lingon: (
     <>
-      <ellipse
-        cx={15.6}
-        cy={21.4}
-        rx={4.2}
-        ry={2.5}
-        transform="rotate(-38 15.6 21.4)"
-        fill={WHITE}
-        opacity={0.8}
-      />
+      <ellipse cx={15.6} cy={21.4} rx={4.2} ry={2.5} transform="rotate(-38 15.6 21.4)" fill={WHITE} opacity={0.8} />
       <circle cx={20.2} cy={18} r={1.1} fill={WHITE} opacity={0.7} />
     </>
   ),
-  other: (
-    <ellipse
-      cx={14.6}
-      cy={22.6}
-      rx={3.4}
-      ry={2}
-      transform="rotate(-38 14.6 22.6)"
-      fill={WHITE}
-      opacity={0.5}
-    />
-  ),
+  other: <ellipse cx={14.6} cy={22.6} rx={3.4} ry={2} transform="rotate(-38 14.6 22.6)" fill={WHITE} opacity={0.5} />,
 };
 
 // What grows on top, which with the outline says which berry it is, down to 14px.
@@ -240,72 +177,24 @@ const TOP: Record<BerryKind, React.ReactNode> = {
         strokeWidth={1.3}
         strokeLinejoin="round"
       />
-      <ellipse
-        cx={24}
-        cy={15.6}
-        rx={4.2}
-        ry={1.5}
-        fill={c("blueberry-crown-hollow")}
-      />
+      <ellipse cx={24} cy={15.6} rx={4.2} ry={1.5} fill={c("blueberry-crown-hollow")} />
     </>
   ),
   lingon: (
     <>
-      <path
-        d="M24 13.6q-.4-4 2.2-6.6"
-        stroke={c("stem")}
-        strokeWidth={1.7}
-        fill="none"
-        strokeLinecap="round"
-      />
-      <ellipse
-        cx={30.2}
-        cy={7.2}
-        rx={4.6}
-        ry={2.3}
-        transform="rotate(-18 30.2 7.2)"
-        fill={c("lingon-leaf")}
-      />
-      <ellipse
-        cx={22.6}
-        cy={10}
-        rx={2.5}
-        ry={1.3}
-        transform="rotate(38 22.6 10)"
-        fill={c("lingon-leaf-small")}
-      />
+      <path d="M24 13.6q-.4-4 2.2-6.6" stroke={c("stem")} strokeWidth={1.7} fill="none" strokeLinecap="round" />
+      <ellipse cx={30.2} cy={7.2} rx={4.6} ry={2.3} transform="rotate(-18 30.2 7.2)" fill={c("lingon-leaf")} />
+      <ellipse cx={22.6} cy={10} rx={2.5} ry={1.3} transform="rotate(38 22.6 10)" fill={c("lingon-leaf-small")} />
     </>
   ),
   cloudberry: (
     <>
-      <ellipse
-        cx={18.6}
-        cy={11.6}
-        rx={4.6}
-        ry={2.1}
-        transform="rotate(-28 18.6 11.6)"
-        fill={c("cloudberry-leaf")}
-      />
-      <ellipse
-        cx={29.4}
-        cy={11.6}
-        rx={4.6}
-        ry={2.1}
-        transform="rotate(28 29.4 11.6)"
-        fill={c("cloudberry-leaf")}
-      />
+      <ellipse cx={18.6} cy={11.6} rx={4.6} ry={2.1} transform="rotate(-28 18.6 11.6)" fill={c("cloudberry-leaf")} />
+      <ellipse cx={29.4} cy={11.6} rx={4.6} ry={2.1} transform="rotate(28 29.4 11.6)" fill={c("cloudberry-leaf")} />
       <ellipse cx={24} cy={9.4} rx={2.1} ry={4.2} fill={c("cloudberry-leaf")} />
     </>
   ),
-  gooseberry: (
-    <path
-      d="M24 12.8q-.3-3.6 1.8-6.2"
-      stroke={c("gooseberry-tuft")}
-      strokeWidth={1.8}
-      fill="none"
-      strokeLinecap="round"
-    />
-  ),
+  gooseberry: <path d="M24 12.8q-.3-3.6 1.8-6.2" stroke={c("gooseberry-tuft")} strokeWidth={1.8} fill="none" strokeLinecap="round" />,
   raspberry: (
     <>
       <path
@@ -315,32 +204,15 @@ const TOP: Record<BerryKind, React.ReactNode> = {
         strokeWidth={1.1}
         strokeLinejoin="round"
       />
-      <path
-        d="M24 10V6.2"
-        stroke={c("leaf")}
-        strokeWidth={1.6}
-        strokeLinecap="round"
-      />
+      <path d="M24 10V6.2" stroke={c("leaf")} strokeWidth={1.6} strokeLinecap="round" />
     </>
   ),
   currant: (
     <>
-      <path
-        d="M24 14.6q.6-4.2 5.4-6.4"
-        stroke={c("currant-stem")}
-        strokeWidth={1.5}
-        fill="none"
-        strokeLinecap="round"
-      />
+      <path d="M24 14.6q.6-4.2 5.4-6.4" stroke={c("currant-stem")} strokeWidth={1.5} fill="none" strokeLinecap="round" />
       <circle cx={31} cy={7.4} r={2.8} fill={c("currant")} />
       <circle cx={30.2} cy={6.6} r={0.75} fill={WHITE} opacity={0.6} />
-      <path
-        d="M24 16v-2.6M22.6 14.6l1.4.9 1.4-.9"
-        stroke={c("currant-tuft")}
-        strokeWidth={1.1}
-        fill="none"
-        strokeLinecap="round"
-      />
+      <path d="M24 16v-2.6M22.6 14.6l1.4.9 1.4-.9" stroke={c("currant-tuft")} strokeWidth={1.1} fill="none" strokeLinecap="round" />
     </>
   ),
 };
@@ -356,28 +228,9 @@ const ACCESSORY_BEHIND: Partial<Record<MascotAccessory, React.ReactNode>> = {
   ),
   headphones: (
     <>
-      <path
-        d="M4.4 30C4.4 6 43.6 6 43.6 30"
-        fill="none"
-        stroke={c("headphones")}
-        strokeWidth={2.8}
-      />
-      <rect
-        x={1.2}
-        y={25}
-        width={6.6}
-        height={11.4}
-        rx={3.2}
-        fill={c("headphones")}
-      />
-      <rect
-        x={40.2}
-        y={25}
-        width={6.6}
-        height={11.4}
-        rx={3.2}
-        fill={c("headphones")}
-      />
+      <path d="M4.4 30C4.4 6 43.6 6 43.6 30" fill="none" stroke={c("headphones")} strokeWidth={2.8} />
+      <rect x={1.2} y={25} width={6.6} height={11.4} rx={3.2} fill={c("headphones")} />
+      <rect x={40.2} y={25} width={6.6} height={11.4} rx={3.2} fill={c("headphones")} />
     </>
   ),
 };
@@ -387,11 +240,7 @@ const leansRight = (kind: BerryKind) => kind === "lingon" || kind === "currant";
 
 // Worn in front: the crown and the bow small and at an angle beside the top, and the glasses on the eyes, in ink, or
 // light on the currant (tokens.css).
-const accessoryInFront = (
-  accessory: MascotAccessory,
-  kind: BerryKind,
-  working: boolean,
-): React.ReactNode => {
+const accessoryInFront = (accessory: MascotAccessory, kind: BerryKind, working: boolean): React.ReactNode => {
   switch (accessory) {
     case "crown": {
       const x = leansRight(kind) ? 12.6 : 34;
@@ -426,28 +275,9 @@ const accessoryInFront = (
     case "glasses":
       return working ? null : (
         <>
-          <circle
-            cx={18}
-            cy={28}
-            r={5.8}
-            fill="none"
-            stroke={c("glasses")}
-            strokeWidth={1.7}
-          />
-          <circle
-            cx={30}
-            cy={28}
-            r={5.8}
-            fill="none"
-            stroke={c("glasses")}
-            strokeWidth={1.7}
-          />
-          <path
-            d="M23.5 27.4q.5-.6 1 0"
-            stroke={c("glasses")}
-            strokeWidth={1.7}
-            fill="none"
-          />
+          <circle cx={18} cy={28} r={5.8} fill="none" stroke={c("glasses")} strokeWidth={1.7} />
+          <circle cx={30} cy={28} r={5.8} fill="none" stroke={c("glasses")} strokeWidth={1.7} />
+          <path d="M23.5 27.4q.5-.6 1 0" stroke={c("glasses")} strokeWidth={1.7} fill="none" />
         </>
       );
     default:
@@ -480,23 +310,13 @@ const Bar: React.FC<{
   );
 };
 const Line: React.FC<{ d: string; width?: number }> = ({ d, width = 2.6 }) => (
-  <path
-    d={d}
-    stroke={EYE}
-    strokeWidth={width}
-    fill="none"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  />
+  <path d={d} stroke={EYE} strokeWidth={width} fill="none" strokeLinecap="round" strokeLinejoin="round" />
 );
 
 // While it works, the two eyes become the pips, one dot chasing round, bigger under 28px. Held still, every dot shows at
 // the same strength.
 const WORKING_STILL = 0.7;
-const WorkingFace: React.FC<{ still: boolean; small: boolean }> = ({
-  still,
-  small,
-}) => {
+const WorkingFace: React.FC<{ still: boolean; small: boolean }> = ({ still, small }) => {
   const { frames, ms } = pipFrames("think");
   const frame = useFrame(frames.length, ms, !still);
   const off = small ? 0.4 : 0.22;
@@ -510,11 +330,7 @@ const WorkingFace: React.FC<{ still: boolean; small: boolean }> = ({
             cy={cy}
             r={small ? 2.6 : 2.1}
             fill={EYE}
-            opacity={
-              still
-                ? WORKING_STILL
-                : off + (1 - off) * frames[frame][row * 3 + column]
-            }
+            opacity={still ? WORKING_STILL : off + (1 - off) * frames[frame][row * 3 + column]}
           />
         )),
       )}
@@ -574,15 +390,7 @@ const Mouth: React.FC<{ mood: Mood }> = ({ mood }) => {
     case "asking":
       return <Line d="M22.6 36h2.8" width={1.7} />;
     case "delivered":
-      return (
-        <path
-          d="M20.6 34.2q3.4 4.8 6.8 0z"
-          fill={EYE}
-          stroke={EYE}
-          strokeWidth={1}
-          strokeLinejoin="round"
-        />
-      );
+      return <path d="M20.6 34.2q3.4 4.8 6.8 0z" fill={EYE} stroke={EYE} strokeWidth={1} strokeLinejoin="round" />;
     case "oops":
       return <Line d="M20.8 37q1.6-1.6 3.2 0t3.2 0" width={1.6} />;
     case "off-duty":
@@ -607,15 +415,7 @@ const Defs: React.FC<{ ids: Ids; kinds: BerryKind[] }> = ({ ids, kinds }) => (
       <stop offset={0.55} stopColor="#4d4d4d" />
       <stop offset={1} stopColor={WHITE} />
     </radialGradient>
-    <mask
-      id={ids.fade}
-      maskUnits="userSpaceOnUse"
-      maskContentUnits="userSpaceOnUse"
-      x={-10}
-      y={-10}
-      width={68}
-      height={68}
-    >
+    <mask id={ids.fade} maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x={-10} y={-10} width={68} height={68}>
       <rect x={-10} y={-10} width={68} height={68} fill={WHITE} />
       <ellipse cx={24} cy={30} rx={15} ry={11.5} fill={url(ids.fadeGradient)} />
     </mask>
@@ -665,11 +465,7 @@ const Top: React.FC<{
   working: boolean;
 }> = ({ kind, accessory, working }) => (
   <>
-    {accessory === "cap" ? (
-      <g transform="translate(0 -5)">{TOP[kind]}</g>
-    ) : (
-      TOP[kind]
-    )}
+    {accessory === "cap" ? <g transform="translate(0 -5)">{TOP[kind]}</g> : TOP[kind]}
     {accessoryInFront(accessory, kind, working)}
   </>
 );
@@ -779,20 +575,9 @@ export const Mascot: React.FC<MascotProps> = ({
       {!plain && <Defs ids={ids} kinds={kinds} />}
       <g transform={drawn === "curious" ? "rotate(-10 24 29)" : undefined}>
         {each((berry) => (
-          <Body
-            kind={berry}
-            fill={c(inverted ? "inverted-body" : berry)}
-            plain={plain}
-            detail={detail}
-            ids={ids}
-          />
+          <Body kind={berry} fill={c(inverted ? "inverted-body" : berry)} plain={plain} detail={detail} ids={ids} />
         ))}
-        <Eyes
-          mood={drawn}
-          still={held}
-          shut={shut}
-          small={detail === "small"}
-        />
+        <Eyes mood={drawn} still={held} shut={shut} small={detail === "small"} />
         {detail !== "small" && <Mouth mood={drawn} />}
         {ACCESSORY_BEHIND[look.accessory]}
         {each((berry) => (

@@ -18,11 +18,13 @@ const el = (tag, props = {}, ...children) => {
   return node;
 };
 
-document.getElementById("flock").replaceChildren(...FLOCK.map(({ name, what, palette, accessory }) => {
-  const perch = el("div", { className: "perch" });
-  perch.innerHTML = BIRDS[accessory];
-  const drawing = perch.querySelector("svg");
-  drawing.dataset.mascot = palette;
-  drawing.setAttribute("aria-hidden", "true");
-  return el("li", {}, perch, el("p", { className: "name", textContent: name }), el("p", { className: "what", textContent: what }));
-}));
+document.getElementById("flock").replaceChildren(
+  ...FLOCK.map(({ name, what, palette, accessory }) => {
+    const perch = el("div", { className: "perch" });
+    perch.innerHTML = BIRDS[accessory];
+    const drawing = perch.querySelector("svg");
+    drawing.dataset.mascot = palette;
+    drawing.setAttribute("aria-hidden", "true");
+    return el("li", {}, perch, el("p", { className: "name", textContent: name }), el("p", { className: "what", textContent: what }));
+  }),
+);

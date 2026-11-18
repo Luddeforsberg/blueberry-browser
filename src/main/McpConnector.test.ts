@@ -14,7 +14,13 @@ vi.mock("electron", () => ({
   },
 }));
 
-const connector = () => new McpConnector(join(mkdtempSync(join(tmpdir(), "mcp-")), "mcp.json"), () => [], () => {}, true);
+const connector = () =>
+  new McpConnector(
+    join(mkdtempSync(join(tmpdir(), "mcp-")), "mcp.json"),
+    () => [],
+    () => {},
+    true,
+  );
 
 describe("McpConnector", () => {
   it("doesn't come up if it's switched off while it's still starting", async () => {

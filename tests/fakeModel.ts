@@ -65,8 +65,17 @@ export const startFakeModel = async () => {
           object: "chat.completion",
           created: 0,
           model: TITLE_MODEL,
-          choices: [{ index: 0, message: { role: "assistant", content: asksWhatToRemember ? memory : asksForSuggestions ? (suggest?.(human) ?? '{"cards":[]}') : title }, finish_reason: "stop" }],
-        })
+          choices: [
+            {
+              index: 0,
+              message: {
+                role: "assistant",
+                content: asksWhatToRemember ? memory : asksForSuggestions ? (suggest?.(human) ?? '{"cards":[]}') : title,
+              },
+              finish_reason: "stop",
+            },
+          ],
+        }),
       );
       return;
     }

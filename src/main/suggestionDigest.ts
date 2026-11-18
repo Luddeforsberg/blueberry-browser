@@ -173,8 +173,16 @@ export const buildDigest = ({ visits, chats, routines, mascots, feedback, now }:
       id,
       hosts,
       times: [start],
-      siteTimes: Object.fromEntries(hosts.map((host) => [host, steps.flatMap((step) => ("host" in step && step.host === host ? [step.at] : [])).slice(0, 1)])),
-      numbers: [minutes, pages.length, steps.length, ...hosts.map((host) => steps.filter((step) => "host" in step && step.host === host).length), ...numbersIn(when(start))],
+      siteTimes: Object.fromEntries(
+        hosts.map((host) => [host, steps.flatMap((step) => ("host" in step && step.host === host ? [step.at] : [])).slice(0, 1)]),
+      ),
+      numbers: [
+        minutes,
+        pages.length,
+        steps.length,
+        ...hosts.map((host) => steps.filter((step) => "host" in step && step.host === host).length),
+        ...numbersIn(when(start)),
+      ],
       text,
       sources: hosts.map((host) => `site:${host}`),
     });
@@ -193,7 +201,15 @@ export const buildDigest = ({ visits, chats, routines, mascots, feedback, now }:
       const id = `q${index + 1}`;
       const sorted = [...times].sort((a, b) => b - a);
       const days = new Set(times.map(dayOf)).size;
-      add({ id, hosts: [], times, siteTimes: {}, numbers: [times.length, days, ...sorted.flatMap((at) => numbersIn(when(at)))], text: query, sources: [`search:${query}`] });
+      add({
+        id,
+        hosts: [],
+        times,
+        siteTimes: {},
+        numbers: [times.length, days, ...sorted.flatMap((at) => numbersIn(when(at)))],
+        text: query,
+        sources: [`search:${query}`],
+      });
       return { id, query, times: times.length, days, when: sorted.slice(0, MAX_SEARCH_TIMES).map(when) };
     });
 
@@ -206,31 +222,53 @@ export const buildDigest = ({ visits, chats, routines, mascots, feedback, now }:
     .slice(0, MAX_CHATS)
     .map(({ id: chatId, title, updatedAt, outcome }, index) => {
       const id = `c${index + 1}`;
-      add({ id, hosts: [], times: [updatedAt], siteTimes: {}, numbers: numbersIn(`${title} ${when(updatedAt)}`), text: title, sources: [`chat:${chatId}`] });
+      add({
+        id,
+        hosts: [],
+        times: [updatedAt],
+        siteTimes: {},
+        numbers: numbersIn(`${title} ${when(updatedAt)}`),
+        text: title,
+        sources: [`chat:${chatId}`],
+      });
       return { id, title, when: when(updatedAt), ...(outcome === "done" ? {} : { outcome }) };
     });
 
   // What the user named and limited things to goes through the same filters as their history.
   const shareableSites = (sites: string[]) => sites.filter((site) => isShareable(`https://${site}/`));
-  const routineData = routines.flatMap((routine) => {
-    const name = titleToShare(routine.name);
-    return name ? [{ ...routine, name: name.slice(0, 60), sites: shareableSites(routine.sites) }] : [];
-  }).slice(0, MAX_ROUTINES).map((routine, index) => {
-    const id = `r${index + 1}`;
-    const { name } = routine;
-    const runs = routine.runs.slice(0, MAX_RUNS);
-    const failed = runs.filter(({ status }) => status === "failed" || status === "interrupted").length;
-    add({
-      id,
-      hosts: routine.sites,
-      times: [],
-      siteTimes: {},
-      numbers: [runs.length, failed, ...numbersIn(`${name} ${routine.schedule}`), ...runs.flatMap(({ startedAt }) => numbersIn(when(startedAt)))],
-      text: `${name} ${routine.sites.join(" ")}`,
-      sources: [`routine:${routine.id}`],
+  const routineData = routines
+    .flatMap((routine) => {
+      const name = titleToShare(routine.name);
+      return name ? [{ ...routine, name: name.slice(0, 60), sites: shareableSites(routine.sites) }] : [];
+    })
+    .slice(0, MAX_ROUTINES)
+    .map((routine, index) => {
+      const id = `r${index + 1}`;
+      const { name } = routine;
+      const runs = routine.runs.slice(0, MAX_RUNS);
+      const failed = runs.filter(({ status }) => status === "failed" || status === "interrupted").length;
+      add({
+        id,
+        hosts: routine.sites,
+        times: [],
+        siteTimes: {},
+        numbers: [
+          runs.length,
+          failed,
+          ...numbersIn(`${name} ${routine.schedule}`),
+          ...runs.flatMap(({ startedAt }) => numbersIn(when(startedAt))),
+        ],
+        text: `${name} ${routine.sites.join(" ")}`,
+        sources: [`routine:${routine.id}`],
+      });
+      return {
+        id,
+        name,
+        schedule: routine.schedule,
+        ...(routine.sites.length ? { sites: routine.sites } : {}),
+        lastRuns: runs.map(({ status, startedAt }) => ({ when: when(startedAt), result: status })),
+      };
     });
-    return { id, name, schedule: routine.schedule, ...(routine.sites.length ? { sites: routine.sites } : {}), lastRuns: runs.map(({ status, startedAt }) => ({ when: when(startedAt), result: status })) };
-  });
 
   const flockData = mascots
     .flatMap(({ name, sites }) => {
@@ -253,7 +291,7 @@ export const buildDigest = ({ visits, chats, routines, mascots, feedback, now }:
     0,
     ...visits.slice(0, 1).map(({ visitedAt }) => visitedAt),
     ...chats.map(({ updatedAt }) => updatedAt),
-    ...routines.flatMap(({ runs }) => runs.slice(0, 1).map(({ startedAt }) => startedAt))
+    ...routines.flatMap(({ runs }) => runs.slice(0, 1).map(({ startedAt }) => startedAt)),
   );
   return {
     data: {

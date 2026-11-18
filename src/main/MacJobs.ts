@@ -34,7 +34,11 @@ export interface MacJobsHost {
   linked: () => boolean;
   // Starts the reply as `bird`, which only narrows the one in the flock with the same id. Says the chat's id, or null if
   // it couldn't start, such as for a bird that isn't in the flock. `onEnd` hears how that reply ended, and no later one.
-  start: (prompt: string, options: { bird: MascotProfile; askAtLeast: ActionApproval; from: string }, onEnd: (ended: EndedReply) => void) => string | null;
+  start: (
+    prompt: string,
+    options: { bird: MascotProfile; askAtLeast: ActionApproval; from: string },
+    onEnd: (ended: EndedReply) => void,
+  ) => string | null;
   // The reply so far, while it runs. Null once the chat is gone.
   progress: (chatId: string) => { reply: string; steps: ChatStep[]; waiting: boolean } | null;
   stop: (chatId: string) => void;
@@ -70,7 +74,7 @@ export class MacJobs {
     private readonly account: Pick<Account, "state" | "accessToken">,
     private readonly host: MacJobsHost,
     private readonly pollMs = POLL_MS,
-    private readonly now: () => number = Date.now
+    private readonly now: () => number = Date.now,
   ) {}
 
   start(): void {
@@ -159,7 +163,8 @@ export class MacJobs {
     const row = await this.withToken(account, (token) => this.server!.macClaimJob(token));
     if (!row) return;
     const jobId = String(row.id);
-    const fail = (error: string) => this.withToken(account, (token) => this.server!.macUpdateJob(token, jobId, { status: "failed", error }));
+    const fail = (error: string) =>
+      this.withToken(account, (token) => this.server!.macUpdateJob(token, jobId, { status: "failed", error }));
     // Turned off, unlinked, signed out or quit while it was being taken: it doesn't start. Signed out, it times out there.
     if (!this.wanted(account)) {
       await fail(this.destroyed ? QUIT_BEFORE : OFF_BEFORE);
@@ -172,9 +177,13 @@ export class MacJobs {
       return;
     }
     const job: Current = { account, jobId, chatId: "", ended: null, stopped: false, why: null, finalTries: 0 };
-    const chatId = this.host.start(String(row.prompt), { bird, askAtLeast: actionApprovalFromRow(row.action_approval), from: RELAY_FROM }, (ended) => {
-      job.ended = ended;
-    });
+    const chatId = this.host.start(
+      String(row.prompt),
+      { bird, askAtLeast: actionApprovalFromRow(row.action_approval), from: RELAY_FROM },
+      (ended) => {
+        job.ended = ended;
+      },
+    );
     if (!chatId) {
       await fail(NO_BIRD);
       return;

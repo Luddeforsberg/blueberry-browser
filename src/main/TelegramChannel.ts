@@ -45,7 +45,7 @@ export const telegramApiBase = (override: string | undefined, packaged: boolean)
 class TelegramError extends Error {
   constructor(
     readonly status: number,
-    readonly retryAfter: number | null
+    readonly retryAfter: number | null,
   ) {
     super(`Telegram answered ${status}`);
   }
@@ -101,7 +101,7 @@ export class TelegramChannel implements PhoneChannel {
   constructor(
     private readonly file: string,
     private readonly onChange: () => void,
-    private readonly api = telegramApiBase(process.env.BLUEBERRY_TELEGRAM_API, app.isPackaged)
+    private readonly api = telegramApiBase(process.env.BLUEBERRY_TELEGRAM_API, app.isPackaged),
   ) {}
 
   listen(onReply: (reply: IncomingReply) => void, onChoice: (choice: IncomingChoice) => void): void {
@@ -155,7 +155,9 @@ export class TelegramChannel implements PhoneChannel {
     try {
       username = (await this.request<{ username?: string }>(token, "getMe", {}, AbortSignal.timeout(CALL_ABORT_MS))).username;
     } catch (error) {
-      return refuse(error instanceof TelegramError ? "Telegram didn’t accept that token." : "Couldn’t reach Telegram, so nothing was saved. Try again.");
+      return refuse(
+        error instanceof TelegramError ? "Telegram didn’t accept that token." : "Couldn’t reach Telegram, so nothing was saved. Try again.",
+      );
     }
     if (!username) return refuse("Telegram didn’t say what this bot is called.");
     if (this.closed) return this.state;
@@ -212,7 +214,9 @@ export class TelegramChannel implements PhoneChannel {
         text,
         // Telegram's servers would fetch any address in the message for a preview, and it may be one with data in it.
         link_preview_options: { is_disabled: true },
-        ...(choices.length > 0 ? { reply_markup: { inline_keyboard: [choices.map(({ label, data }) => ({ text: label, callback_data: data }))] } } : {}),
+        ...(choices.length > 0
+          ? { reply_markup: { inline_keyboard: [choices.map(({ label, data }) => ({ text: label, callback_data: data }))] } }
+          : {}),
       });
       if (this.problem === CANT_MESSAGE) this.setProblem(null);
       return String(sent.message_id);
@@ -226,14 +230,19 @@ export class TelegramChannel implements PhoneChannel {
   // Without a keyboard, so the buttons go.
   async edit(handle: string, text: string): Promise<void> {
     if (!this.ready) return;
-    await this.call("editMessageText", { chat_id: this.chatId, message_id: Number(handle), text, link_preview_options: { is_disabled: true } }).catch((error) => this.noteFailure(error));
+    await this.call("editMessageText", {
+      chat_id: this.chatId,
+      message_id: Number(handle),
+      text,
+      link_preview_options: { is_disabled: true },
+    }).catch((error) => this.noteFailure(error));
   }
 
   async deleteIncoming(ref: string): Promise<boolean> {
     if (!this.ready) return false;
     return this.call("deleteMessage", { chat_id: this.chatId, message_id: Number(ref) }).then(
       () => true,
-      () => false
+      () => false,
     );
   }
 
@@ -251,7 +260,9 @@ export class TelegramChannel implements PhoneChannel {
     let backoff = FIRST_BACKOFF_MS;
     while (!signal.aborted) {
       try {
-        const params = caughtUp ? { offset, timeout: POLL_SECONDS, allowed_updates: ONLY_THESE_UPDATES } : { offset: -1, limit: 1, timeout: 0, allowed_updates: ONLY_THESE_UPDATES };
+        const params = caughtUp
+          ? { offset, timeout: POLL_SECONDS, allowed_updates: ONLY_THESE_UPDATES }
+          : { offset: -1, limit: 1, timeout: 0, allowed_updates: ONLY_THESE_UPDATES };
         const updates = await this.call<Update[]>("getUpdates", params, AbortSignal.any([signal, AbortSignal.timeout(POLL_ABORT_MS)]));
         if (signal.aborted) return;
         backoff = FIRST_BACKOFF_MS;
@@ -287,7 +298,9 @@ export class TelegramChannel implements PhoneChannel {
         handle: String(choice.message.message_id),
         data: choice.data,
         acknowledge: (note) => {
-          void this.call("answerCallbackQuery", { callback_query_id: choice.id, ...(note ? { text: note } : {}) }).catch((error) => this.noteFailure(error));
+          void this.call("answerCallbackQuery", { callback_query_id: choice.id, ...(note ? { text: note } : {}) }).catch((error) =>
+            this.noteFailure(error),
+          );
         },
       });
     }
@@ -306,7 +319,9 @@ export class TelegramChannel implements PhoneChannel {
       this.chatId = chat.id;
       this.pairing = null;
       this.save();
-      void this.send("Connected. When a job needs you and you’re away from the computer, it asks here. Telegram can read these messages, so passwords are never sent this way.");
+      void this.send(
+        "Connected. When a job needs you and you’re away from the computer, it asks here. Telegram can read these messages, so passwords are never sent this way.",
+      );
       this.onChange();
       return;
     }
@@ -364,7 +379,11 @@ export class TelegramChannel implements PhoneChannel {
     try {
       const { token, botName, chatId } = JSON.parse(readFileSync(this.file, "utf8"));
       if (typeof token !== "string" || !safeStorage.isEncryptionAvailable()) return null;
-      return { token: safeStorage.decryptString(Buffer.from(token, "base64")), botName: typeof botName === "string" ? botName : null, chatId: typeof chatId === "number" ? chatId : null };
+      return {
+        token: safeStorage.decryptString(Buffer.from(token, "base64")),
+        botName: typeof botName === "string" ? botName : null,
+        chatId: typeof chatId === "number" ? chatId : null,
+      };
     } catch {
       return null;
     }
@@ -375,7 +394,11 @@ export class TelegramChannel implements PhoneChannel {
     try {
       mkdirSync(dirname(this.file), { recursive: true });
       const temp = `${this.file}.tmp`;
-      writeFileSync(temp, JSON.stringify({ token: safeStorage.encryptString(this.token).toString("base64"), botName: this.botName, chatId: this.chatId }), { mode: 0o600 });
+      writeFileSync(
+        temp,
+        JSON.stringify({ token: safeStorage.encryptString(this.token).toString("base64"), botName: this.botName, chatId: this.chatId }),
+        { mode: 0o600 },
+      );
       renameSync(temp, this.file);
       this.notSaved = false;
     } catch {

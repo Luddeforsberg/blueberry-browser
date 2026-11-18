@@ -18,7 +18,14 @@ test("a mascot that works in the cloud starts the box on Cloud, and it can still
     await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].setSize(1400, 860));
     const chrome = await findView(app, "view=chrome");
     await chrome.evaluate(() =>
-      window.chromeAPI.mascots.save(null, { name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "Find things.", sites: [], tools: ["visit"], worksInCloud: true })
+      window.chromeAPI.mascots.save(null, {
+        name: "Scout",
+        look: { palette: "robin", accessory: "cap" },
+        instructions: "Find things.",
+        sites: [],
+        tools: ["visit"],
+        worksInCloud: true,
+      }),
     );
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("new-tab"));
 

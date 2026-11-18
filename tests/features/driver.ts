@@ -44,7 +44,8 @@ const settingsFor = (needs: Needs, look: Look, profile: string): Partial<Setting
 
 // Launches the built app with what the feature needs, opens the state, and returns its picture.
 export async function driveFeature(feature: Feature, stateName: string, look: Look): Promise<{ png: Buffer; restless: string | null }> {
-  if (!Object.hasOwn(feature.states, stateName)) throw new Error(`${feature.name} has no state "${stateName}". It has: ${Object.keys(feature.states).join(", ")}`);
+  if (!Object.hasOwn(feature.states, stateName))
+    throw new Error(`${feature.name} has no state "${stateName}". It has: ${Object.keys(feature.states).join(", ")}`);
   if (feature.surface === "phone") return drivePhone(feature.states[stateName].open, look.theme, NOW);
   const state = feature.states[stateName];
   const needs: Needs = { ...feature.needs, ...state.needs, settings: { ...feature.needs?.settings, ...state.needs?.settings } };
@@ -73,7 +74,10 @@ export async function driveFeature(feature: Feature, stateName: string, look: Lo
     });
     // A state that can't be reached fails in seconds, not at the end of the test's time.
     app.context().setDefaultTimeout(STEP_TIMEOUT_MS);
-    await app.evaluate(({ BaseWindow }, size) => BaseWindow.getAllWindows()[0].setSize(size.width, size.height), { width: look.width, height: HEIGHT });
+    await app.evaluate(({ BaseWindow }, size) => BaseWindow.getAllWindows()[0].setSize(size.width, size.height), {
+      width: look.width,
+      height: HEIGHT,
+    });
     const chrome = await findView(app, "view=chrome");
     await chrome.evaluate(() => document.fonts.ready.then(() => undefined));
     const drive: Drive = { app, chrome, model, site, supabase, look };

@@ -8,7 +8,16 @@ const at = (daysAgo: number, hour: number, minute = 0) => {
 };
 const visit = (url: string, title: string, visitedAt: number) => ({ url, title, visitedAt });
 const digestOf = (input: Partial<DigestInput>) =>
-  buildDigest({ visits: [], chats: [], routines: [], mascots: [], feedback: [], now: NOW, ...input, ...(input.visits ? { visits: [...input.visits].sort((a, b) => b.visitedAt - a.visitedAt) } : {}) });
+  buildDigest({
+    visits: [],
+    chats: [],
+    routines: [],
+    mascots: [],
+    feedback: [],
+    now: NOW,
+    ...input,
+    ...(input.visits ? { visits: [...input.visits].sort((a, b) => b.visitedAt - a.visitedAt) } : {}),
+  });
 const data = (input: Partial<DigestInput>) => digestOf(input).data as Record<string, Array<Record<string, unknown>>>;
 
 describe("sessions", () => {
@@ -23,11 +32,17 @@ describe("sessions", () => {
     });
     expect(sessions).toHaveLength(2);
     expect(sessions[0]).toMatchObject({ id: "s1", pages: [{ site: "news.ycombinator.com", title: "Hacker News" }] });
-    expect(sessions[1]).toMatchObject({ id: "s2", minutes: 39, pages: [{ site: "kayak.com" }, { site: "skyscanner.se" }, { site: "momondo.se" }] });
+    expect(sessions[1]).toMatchObject({
+      id: "s2",
+      minutes: 39,
+      pages: [{ site: "kayak.com" }, { site: "skyscanner.se" }, { site: "momondo.se" }],
+    });
   });
 
   it("counts the same page again rather than listing it twice", () => {
-    const { sessions } = data({ visits: [0, 1, 2].map((minute) => visit("https://news.ycombinator.com/", "Hacker News", at(1, 8, minute))) });
+    const { sessions } = data({
+      visits: [0, 1, 2].map((minute) => visit("https://news.ycombinator.com/", "Hacker News", at(1, 8, minute))),
+    });
     expect(sessions[0].pages).toEqual([{ site: "news.ycombinator.com", title: "Hacker News", times: 3 }]);
   });
 
@@ -36,7 +51,9 @@ describe("sessions", () => {
   });
 
   it("gives each session's sites to its evidence", () => {
-    const digest = digestOf({ visits: [visit("https://www.kayak.com/a", "KAYAK", at(1, 8)), visit("https://github.com/", "GitHub", at(1, 8, 5))] });
+    const digest = digestOf({
+      visits: [visit("https://www.kayak.com/a", "KAYAK", at(1, 8)), visit("https://github.com/", "GitHub", at(1, 8, 5))],
+    });
     expect(digest.evidence.get("s1")?.hosts).toEqual(["kayak.com", "github.com"]);
     expect(digest.evidence.get("s1")?.sources).toEqual(["site:kayak.com", "site:github.com"]);
   });
@@ -53,7 +70,7 @@ describe("exclusions", () => {
           visit("https://example.com/reset?token=abc", "Reset", at(1, 8, 3)),
           visit("https://example.com/a/9f8e7d6c5b4a39281706f5e4d3c2b1a0", "Shared doc", at(1, 8, 4)),
         ],
-      })
+      }),
     );
     ["Inbox", "Swedbank", "localhost", "token", "Shared doc"].forEach((word) => expect(sent).not.toContain(word));
   });
@@ -66,7 +83,7 @@ describe("exclusions", () => {
           visit("https://example.com/cb#state=x&session=s3cr3t", "Signed in s3cr3t", at(1, 8, 1)),
           visit("https://docs.example.org/guide#install", "Guide to secret thing", at(1, 8, 2)),
         ],
-      })
+      }),
     );
     expect(sent).not.toContain("abc123");
     expect(sent).not.toContain("s3cr3t");
@@ -107,7 +124,9 @@ describe("search queries", () => {
 
   it("are counted with when, and shown in their session, without the search engine as a site", () => {
     const digest = digestOf({
-      visits: [1, 4, 6].map((daysAgo) => visit("https://www.google.com/search?q=best+usb-c+hub", "best usb-c hub - Google Search", at(daysAgo, 21))),
+      visits: [1, 4, 6].map((daysAgo) =>
+        visit("https://www.google.com/search?q=best+usb-c+hub", "best usb-c hub - Google Search", at(daysAgo, 21)),
+      ),
     });
     const { searches, sessions } = digest.data as Record<string, Array<Record<string, unknown>>>;
     expect(searches).toEqual([expect.objectContaining({ id: "q1", query: "best usb-c hub", times: 3, days: 3 })]);
@@ -122,10 +141,17 @@ describe("chats, routines, the flock and feedback", () => {
     const sent = JSON.stringify(
       data({
         feedback: [
-          { verdict: "used", kind: "prompt", line: "Want me to take this one again?", body: "My password is hunter2, log in and pay", sites: [], at: at(1, 9) },
+          {
+            verdict: "used",
+            kind: "prompt",
+            line: "Want me to take this one again?",
+            body: "My password is hunter2, log in and pay",
+            sites: [],
+            at: at(1, 9),
+          },
           { verdict: "dismissed", kind: "prompt", line: "Shall I check your bank balance?", body: "Check it", sites: [], at: at(1, 9) },
         ],
-      }).feedback
+      }).feedback,
     );
     expect(sent).toContain("Want me to take this one again?");
     expect(sent).not.toContain("hunter2");
@@ -156,11 +182,34 @@ describe("chats, routines, the flock and feedback", () => {
         { id: "a", title: "Cheap flights to Lisbon", updatedAt: at(1, 9), outcome: "failed" },
         { id: "b", title: "Summarise the report", updatedAt: at(2, 9), outcome: "done" },
       ],
-      routines: [{ id: "r", name: "Price watch", schedule: "Every day at 07:00", sites: ["prisjakt.nu"], runs: [{ status: "failed", startedAt: at(1, 7) }, { status: "failed", startedAt: at(2, 7) }] }],
+      routines: [
+        {
+          id: "r",
+          name: "Price watch",
+          schedule: "Every day at 07:00",
+          sites: ["prisjakt.nu"],
+          runs: [
+            { status: "failed", startedAt: at(1, 7) },
+            { status: "failed", startedAt: at(2, 7) },
+          ],
+        },
+      ],
       mascots: [{ name: "Ada", sites: ["github.com"] }],
-      feedback: [{ verdict: "dismissed", kind: "prompt", line: "Shall I read Hacker News?", body: "Read it", sites: ["news.ycombinator.com"], at: at(1, 9) }],
+      feedback: [
+        {
+          verdict: "dismissed",
+          kind: "prompt",
+          line: "Shall I read Hacker News?",
+          body: "Read it",
+          sites: ["news.ycombinator.com"],
+          at: at(1, 9),
+        },
+      ],
     });
-    expect(chats).toEqual([expect.objectContaining({ id: "c1", title: "Cheap flights to Lisbon", outcome: "failed" }), expect.not.objectContaining({ outcome: expect.anything() })]);
+    expect(chats).toEqual([
+      expect.objectContaining({ id: "c1", title: "Cheap flights to Lisbon", outcome: "failed" }),
+      expect.not.objectContaining({ outcome: expect.anything() }),
+    ]);
     expect(routines[0]).toMatchObject({ id: "r1", name: "Price watch", lastRuns: [{ result: "failed" }, { result: "failed" }] });
     expect(flock).toEqual([{ id: "m1", name: "Ada", sites: ["github.com"] }]);
     expect(feedback[0]).toMatchObject({ id: "f1", dismissed: true, line: "Shall I read Hacker News?" });

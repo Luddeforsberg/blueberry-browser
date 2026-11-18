@@ -10,11 +10,25 @@ const boxes = new Map();
 
 // Where a live page goes. `url` is null before there is one, and the slot says what's coming instead.
 export const liveSlot = (url, place, { name = "Berry", conversation = "", yours = false, empty = "" } = {}) =>
-  el("div", { className: `live-slot ${place}`, dataLiveSlot: url ?? "", dataPlace: place, dataName: name, dataConversation: conversation, dataYours: yours ? "1" : "" },
-    url ? null : el("p", { className: "live-empty", textContent: empty }));
+  el(
+    "div",
+    {
+      className: `live-slot ${place}`,
+      dataLiveSlot: url ?? "",
+      dataPlace: place,
+      dataName: name,
+      dataConversation: conversation,
+      dataYours: yours ? "1" : "",
+    },
+    url ? null : el("p", { className: "live-empty", textContent: empty }),
+  );
 
 const make = (url) => {
-  const frame = el("iframe", { title: "The page in the cloud", sandbox: "allow-same-origin allow-scripts allow-forms", referrerPolicy: "no-referrer" });
+  const frame = el("iframe", {
+    title: "The page in the cloud",
+    sandbox: "allow-same-origin allow-scripts allow-forms",
+    referrerPolicy: "no-referrer",
+  });
   frame.src = url;
   const words = el("span");
   const tag = el("span", { className: "live-tag" }, el("span", { className: "live-tag-icon" }), words);
@@ -28,7 +42,8 @@ const make = (url) => {
 
 const layerOf = (node) => Number(node.closest("[data-layer]")?.dataset.layer ?? 1);
 // The highest layer showing: a sheet over the screen, unless it's on its way out.
-const topLayer = () => Math.max(1, ...[...document.querySelectorAll("#sheets [data-layer]:not([data-closing])")].map((node) => Number(node.dataset.layer)));
+const topLayer = () =>
+  Math.max(1, ...[...document.querySelectorAll("#sheets [data-layer]:not([data-closing])")].map((node) => Number(node.dataset.layer)));
 
 const TAGS = {
   job: ["lock", (name) => `Locked while ${name} works`],
@@ -47,7 +62,12 @@ const place = (entry, slot, showing) => {
   }
   // Only the part inside what it scrolls in shows, so it never draws over a bar.
   const clipper = slot.closest("[data-clip]")?.getBoundingClientRect() ?? { top: 0, left: 0, right: innerWidth, bottom: innerHeight };
-  const cut = [Math.max(0, clipper.top - rect.top), Math.max(0, rect.right - clipper.right), Math.max(0, rect.bottom - clipper.bottom), Math.max(0, clipper.left - rect.left)];
+  const cut = [
+    Math.max(0, clipper.top - rect.top),
+    Math.max(0, rect.right - clipper.right),
+    Math.max(0, rect.bottom - clipper.bottom),
+    Math.max(0, clipper.left - rect.left),
+  ];
   box.classList.remove("hidden");
   box.style.transform = `translate(${rect.left}px, ${rect.top}px)`;
   box.style.width = `${rect.width}px`;

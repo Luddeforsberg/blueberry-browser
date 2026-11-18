@@ -22,7 +22,7 @@ const makeTabs = () =>
       confirmLogin: async () => true,
       readCookies: async () => [],
     },
-    { endpoint: "http://127.0.0.1:1" }
+    { endpoint: "http://127.0.0.1:1" },
   );
 
 describe("CloudTabs", () => {
@@ -96,7 +96,7 @@ describe("CloudTabs", () => {
         confirmLogin: async () => true,
         readCookies: async () => [],
       },
-      { endpoint: "http://127.0.0.1:1" }
+      { endpoint: "http://127.0.0.1:1" },
     );
     tabs.start();
     expect(await tabs.checkLogin("example.com")).toBeNull();
@@ -124,7 +124,7 @@ describe("CloudTabs", () => {
         confirmLogin: async () => true,
         readCookies: async () => [],
       },
-      { endpoint: "http://127.0.0.1:1" }
+      { endpoint: "http://127.0.0.1:1" },
     );
     tabs.start();
     // As when the window closes, and then Quit asks again.

@@ -6,8 +6,18 @@ import type { DownloadAction, DownloadInfo, DownloadState, Settings } from "../s
 
 type Item = Pick<
   DownloadItem,
-  | "getFilename" | "getURL" | "getSavePath" | "setSavePath" | "setSaveDialogOptions"
-  | "getReceivedBytes" | "getTotalBytes" | "isPaused" | "canResume" | "pause" | "resume" | "cancel"
+  | "getFilename"
+  | "getURL"
+  | "getSavePath"
+  | "setSavePath"
+  | "setSaveDialogOptions"
+  | "getReceivedBytes"
+  | "getTotalBytes"
+  | "isPaused"
+  | "canResume"
+  | "pause"
+  | "resume"
+  | "cancel"
 > & {
   on(event: "updated", listener: (event: unknown, state: "progressing" | "interrupted") => void): unknown;
   once(event: "done", listener: (event: unknown, state: "completed" | "cancelled" | "interrupted") => void): unknown;
@@ -93,7 +103,7 @@ export class Downloads {
 
   constructor(
     private readonly file: string,
-    private readonly deps: DownloadsDeps
+    private readonly deps: DownloadsDeps,
   ) {
     try {
       const raw: unknown = JSON.parse(readFileSync(file, "utf8"));
@@ -214,7 +224,10 @@ export class Downloads {
   }
 
   private async checkFile(record: DownloadInfo): Promise<boolean> {
-    const exists = await fs.access(record.path).then(() => true, () => false);
+    const exists = await fs.access(record.path).then(
+      () => true,
+      () => false,
+    );
     if (exists === !record.missing) return exists;
     this.records = this.records.map((entry) => (entry.id === record.id ? { ...entry, missing: !exists } : entry));
     this.notify();
@@ -263,11 +276,14 @@ export class Downloads {
   private trim(): void {
     let extra = this.records.length - MAX_DOWNLOADS;
     if (extra <= 0) return;
-    this.records = [...this.records].reverse().filter((entry) => {
-      if (extra <= 0 || this.live.has(entry.id)) return true;
-      extra -= 1;
-      return false;
-    }).reverse();
+    this.records = [...this.records]
+      .reverse()
+      .filter((entry) => {
+        if (extra <= 0 || this.live.has(entry.id)) return true;
+        extra -= 1;
+        return false;
+      })
+      .reverse();
   }
 
   // Only changes of state reach the disk, so progress never writes the file many times a second.

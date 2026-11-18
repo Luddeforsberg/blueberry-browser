@@ -12,7 +12,7 @@ const COLOURS: Record<string, string> = { red: "rgb(220, 30, 30)", green: "rgb(3
 const previewView = (app: ElectronApplication) =>
   app.evaluate(({ BaseWindow }) => {
     const view = BaseWindow.getAllWindows()[0].contentView.children.find(
-      (child) => "webContents" in child && (child as Electron.WebContentsView).webContents.getURL().includes("view=preview")
+      (child) => "webContents" in child && (child as Electron.WebContentsView).webContents.getURL().includes("view=preview"),
     );
     return view ? { visible: view.getVisible(), bounds: view.getBounds() } : null;
   });
@@ -38,7 +38,7 @@ test("resting on a tab behind shows a card of it, in both layouts, and it gets o
     response.setHeader("content-type", "text/html");
     response.end(
       `<!doctype html><title>${name[0].toUpperCase()}${name.slice(1)} page</title>` +
-        `<body style="margin:0;height:100vh;background:${COLOURS[name] ?? "white"}" onclick="document.title='Clicked'"></body>`
+        `<body style="margin:0;height:100vh;background:${COLOURS[name] ?? "white"}" onclick="document.title='Clicked'"></body>`,
     );
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -49,7 +49,9 @@ test("resting on a tab behind shows a card of it, in both layouts, and it gets o
     const tabs = () => chrome.evaluate(() => window.chromeAPI.browser.getTabs());
     const open = async (name: string) => {
       await chrome.evaluate((url) => window.chromeAPI.browser.createTab(url), `${origin}/${name}`);
-      await expect.poll(async () => (await tabs()).find((tab) => tab.isActive)?.title).toBe(`${name[0].toUpperCase()}${name.slice(1)} page`);
+      await expect
+        .poll(async () => (await tabs()).find((tab) => tab.isActive)?.title)
+        .toBe(`${name[0].toUpperCase()}${name.slice(1)} page`);
     };
     // Red and green have been in front and left, blue is in front, and the new tab page is one of Blueberry's own.
     const [start] = await tabs();

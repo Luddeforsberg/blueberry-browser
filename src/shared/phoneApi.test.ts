@@ -12,7 +12,10 @@ vi.stubGlobal("localStorage", {
   removeItem: (key: string) => void kept.delete(key),
 });
 // A session that's about to run out, so the next call refreshes it first.
-kept.set("blueberry.session", JSON.stringify({ accessToken: "old", refreshToken: "refresh-1", expiresAt: Date.now() + 1_000, email: "ana@example.com", userId: "u-1" }));
+kept.set(
+  "blueberry.session",
+  JSON.stringify({ accessToken: "old", refreshToken: "refresh-1", expiresAt: Date.now() + 1_000, email: "ana@example.com", userId: "u-1" }),
+);
 
 type Answer = (url: string, init: RequestInit) => Promise<Response>;
 const asked: string[] = [];
@@ -50,7 +53,14 @@ describe("the phone page's calls", () => {
 
     answer = async (url) =>
       url.includes("/auth/v1/token")
-        ? new Response(JSON.stringify({ access_token: "new", refresh_token: "refresh-2", expires_in: 3600, user: { id: "u-1", email: "ana@example.com" } }))
+        ? new Response(
+            JSON.stringify({
+              access_token: "new",
+              refresh_token: "refresh-2",
+              expires_in: 3600,
+              user: { id: "u-1", email: "ana@example.com" },
+            }),
+          )
         : new Response(JSON.stringify([{ id: "m-1" }]));
     expect(await api.flock()).toEqual([{ id: "m-1" }]);
     expect(asked.slice(1)).toEqual(["/auth/v1/token?grant_type=refresh_token", expect.stringMatching(/^\/rest\/v1\/cloud_flock/)]);

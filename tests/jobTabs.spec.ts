@@ -45,7 +45,10 @@ test.describe("a job's tabs", () => {
     paths.forEach((path) => model.callTools({ name: "open_tab", args: { url: `${site.origin}${path}` } }));
     model.replyWith(reply);
     const finish = model.holdBeforeFirstToken();
-    const sent = await chrome.evaluate((origin) => window.chromeAPI.chat.send(null, `Find it on ${origin} and add it to my cart`, { seePage: false }), site.origin);
+    const sent = await chrome.evaluate(
+      (origin) => window.chromeAPI.chat.send(null, `Find it on ${origin} and add it to my cart`, { seePage: false }),
+      site.origin,
+    );
     await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), sent!.id);
     return { chatId: sent!.id, finish };
   };
@@ -63,7 +66,9 @@ test.describe("a job's tabs", () => {
     finish();
     await expect(chrome.getByRole("list", { name: "Pages it used" }).getByRole("button")).toHaveCount(3);
     // The last page it worked in is where the reply sends you, so it's yours now. The others have gone.
-    await expect.poll(async () => (await tabs()).filter(({ url }) => url.startsWith(site.origin)).map(({ url, jobChatId }) => [url, jobChatId])).toEqual([[`${site.origin}/c`, null]]);
+    await expect
+      .poll(async () => (await tabs()).filter(({ url }) => url.startsWith(site.origin)).map(({ url, jobChatId }) => [url, jobChatId]))
+      .toEqual([[`${site.origin}/c`, null]]);
     await expect(underChat()).toHaveCount(0);
     await expect(userTabs().getByText("Page /c")).toBeVisible();
     // Not in history until the user goes there, and then it is.
@@ -96,7 +101,9 @@ test.describe("a job's tabs", () => {
 
     finish();
     await expect(chrome.getByRole("list", { name: "Pages it used" }).getByRole("button")).toHaveCount(1);
-    await expect.poll(async () => (await tabs()).filter(({ url }) => url.startsWith(site.origin)).map(({ url }) => url)).toEqual([`${site.origin}/a`]);
+    await expect
+      .poll(async () => (await tabs()).filter(({ url }) => url.startsWith(site.origin)).map(({ url }) => url))
+      .toEqual([`${site.origin}/a`]);
     await chrome.screenshot({ path: join(SHOTS, "3-taken-over.png") });
   });
 });

@@ -4,7 +4,17 @@ import { AIMessage, fakeModel, ToolMessage } from "langchain";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type { PageTool } from "./browserTools";
-import { forProvider, generateTitle, ModelConfigError, modelConfig, ReplySorter, shortenOldResults, streamReply, systemPrompt, type ReplyPart } from "./agent";
+import {
+  forProvider,
+  generateTitle,
+  ModelConfigError,
+  modelConfig,
+  ReplySorter,
+  shortenOldResults,
+  streamReply,
+  systemPrompt,
+  type ReplyPart,
+} from "./agent";
 import { NO_KEY } from "../shared/aiKey";
 
 const NO_TOOLS = {
@@ -56,8 +66,20 @@ describe("modelConfig", () => {
 
   it("uses a key saved in Settings before the .env one, with the .env models only for their own provider", () => {
     const env = { OPENAI_API_KEY: "env-key", LLM_MODEL: "custom", LLM_TITLE_MODEL: "custom-title" };
-    expect(modelConfig(env, { service: "openai", key: "saved-key" })).toEqual({ provider: "openai", apiKey: "saved-key", model: "custom", titleModel: "custom-title", ownAddressOnly: false });
-    expect(modelConfig(env, { service: "anthropic", key: "saved-key" }, true)).toEqual({ provider: "anthropic", apiKey: "saved-key", model: "claude-sonnet-5-5", titleModel: "claude-haiku-5-5", ownAddressOnly: true });
+    expect(modelConfig(env, { service: "openai", key: "saved-key" })).toEqual({
+      provider: "openai",
+      apiKey: "saved-key",
+      model: "custom",
+      titleModel: "custom-title",
+      ownAddressOnly: false,
+    });
+    expect(modelConfig(env, { service: "anthropic", key: "saved-key" }, true)).toEqual({
+      provider: "anthropic",
+      apiKey: "saved-key",
+      model: "claude-sonnet-5-5",
+      titleModel: "claude-haiku-5-5",
+      ownAddressOnly: true,
+    });
     // A key from the .env file is the developer's, and goes where their environment says.
     expect(modelConfig(env, null, true).ownAddressOnly).toBe(false);
     expect(modelConfig({ LLM_PROVIDER: "gemini" }, { service: "openai", key: "saved-key" }).apiKey).toBe("saved-key");
@@ -67,27 +89,41 @@ describe("modelConfig", () => {
 describe("streamReply", () => {
   it("streams the model's text through the agent", async () => {
     const model = new FakeListChatModel({ responses: ["hello there"] });
-    const text = await collect(
-      streamReply([{ role: "user", content: "hi" }], new AbortController().signal, NO_TOOLS, model)
-    );
+    const text = await collect(streamReply([{ role: "user", content: "hi" }], new AbortController().signal, NO_TOOLS, model));
     expect(text).toBe("hello there");
   });
 
   it("shows what it writes before a tool call as a status line, and answers with its last message only", async () => {
-    const look: PageTool = { name: "read_page", description: "Reads the page", schema: z.object({}), label: () => "Read example.com", run: async () => "page" };
+    const look: PageTool = {
+      name: "read_page",
+      description: "Reads the page",
+      schema: z.object({}),
+      label: () => "Read example.com",
+      run: async () => "page",
+    };
     const model = fakeModel()
       .respond(new AIMessage({ content: "I'll read the page first.", tool_calls: [{ name: "read_page", args: {}, id: "call-1" }] }))
       .respond(new AIMessage("It says hello."));
     const parts: ReplyPart[] = [];
-    for await (const part of streamReply([{ role: "user", content: "hi" }], new AbortController().signal, { ...NO_TOOLS, tools: [look] }, model)) parts.push(part);
+    for await (const part of streamReply(
+      [{ role: "user", content: "hi" }],
+      new AbortController().signal,
+      { ...NO_TOOLS, tools: [look] },
+      model,
+    ))
+      parts.push(part);
     expect(parts).toEqual([{ statusLine: "I'll read the page first." }, "It says hello."]);
   });
 
   it("lets it ask or plan first only where the user is there to answer", async () => {
-    const tools = [{ name: "read_page", description: "Reads the page", schema: z.object({}), label: () => "Read", run: async () => "page" }];
+    const tools = [
+      { name: "read_page", description: "Reads the page", schema: z.object({}), label: () => "Read", run: async () => "page" },
+    ];
     const promptWith = async (userPresent?: boolean) => {
       const model = fakeModel().respond(new AIMessage({ content: "ok" }));
-      await collect(streamReply([{ role: "user", content: "hi" }], new AbortController().signal, { ...NO_TOOLS, tools, userPresent }, model));
+      await collect(
+        streamReply([{ role: "user", content: "hi" }], new AbortController().signal, { ...NO_TOOLS, tools, userPresent }, model),
+      );
       return JSON.stringify(model.calls[0]?.messages[0]?.content);
     };
     expect(await promptWith(true)).toContain("The user is here to answer.");
@@ -110,7 +146,7 @@ describe("streamReply", () => {
 
   it("reports the tokens each model call used", async () => {
     const model = fakeModel().respond(
-      new AIMessage({ content: "hello", usage_metadata: { input_tokens: 10, output_tokens: 5, total_tokens: 15 } })
+      new AIMessage({ content: "hello", usage_metadata: { input_tokens: 10, output_tokens: 5, total_tokens: 15 } }),
     );
     const used: number[] = [];
 
@@ -119,8 +155,8 @@ describe("streamReply", () => {
         [{ role: "user", content: "hi" }],
         new AbortController().signal,
         { ...NO_TOOLS, onUsage: (tokens) => used.push(tokens) },
-        model as unknown as BaseChatModel
-      )
+        model as unknown as BaseChatModel,
+      ),
     );
 
     expect(used.reduce((sum, tokens) => sum + tokens, 0)).toBe(15);
@@ -151,8 +187,8 @@ describe("streamReply", () => {
             return () => steps.push(`end ${step}`);
           },
         },
-        model
-      )
+        model,
+      ),
     );
 
     expect(text).toBe("the answer");
@@ -193,7 +229,14 @@ describe("a mascot's limits and approvals", () => {
       .respond(new AIMessage({ content: "", tool_calls: [{ name: "click", args: {}, id: "call-1" }] }))
       .respond(new AIMessage({ content: "done" })) as unknown as BaseChatModel;
   const reply = (tool: PageTool, approve: () => Promise<boolean>, mode: "risky" | "always" | "never" = "risky") =>
-    collect(streamReply([{ role: "user", content: "hi" }], new AbortController().signal, { ...NO_TOOLS, tools: [tool], approve, actionApproval: () => mode }, clicking()));
+    collect(
+      streamReply(
+        [{ role: "user", content: "hi" }],
+        new AbortController().signal,
+        { ...NO_TOOLS, tools: [tool], approve, actionApproval: () => mode },
+        clicking(),
+      ),
+    );
 
   it("still asks before a risky action on a site it's allowed, and does nothing if told no", async () => {
     const run = vi.fn(async () => "clicked");
@@ -222,7 +265,12 @@ describe("a mascot's limits and approvals", () => {
           new AbortController().signal,
           {
             ...NO_TOOLS,
-            tools: [click({ whyRisky: async () => (isRisky ? { reason: "risky-word" } : null), allowedLabel: () => "Clicked “Delete” on example.com" })],
+            tools: [
+              click({
+                whyRisky: async () => (isRisky ? { reason: "risky-word" } : null),
+                allowedLabel: () => "Clicked “Delete” on example.com",
+              }),
+            ],
             approve: async () => true,
             actionApproval: () => mode,
             onStep: (text, shown) => {
@@ -230,8 +278,8 @@ describe("a mascot's limits and approvals", () => {
               return () => {};
             },
           },
-          clicking()
-        )
+          clicking(),
+        ),
       );
     await run("risky", true);
     await run("never", true);
@@ -281,7 +329,10 @@ describe("ReplySorter", () => {
 
   it("gives words back as the answer when the message ended up calling nothing", () => {
     const sorter = new ReplySorter();
-    expect([...sorter.chunk("Here's what I found.", true), ...sorter.ended(false)]).toEqual([{ statusLine: "Here's what I found." }, "Here's what I found."]);
+    expect([...sorter.chunk("Here's what I found.", true), ...sorter.ended(false)]).toEqual([
+      { statusLine: "Here's what I found." },
+      "Here's what I found.",
+    ]);
   });
 
   it("starts each message afresh", () => {
@@ -306,7 +357,7 @@ describe("streamReply with a tool that returns an image", () => {
       .respond(new AIMessage({ content: "", tool_calls: [{ name: "screenshot", args: {}, id: "call-1" }] }))
       .respond(new AIMessage("seen"));
     await collect(
-      streamReply([{ role: "user", content: "hi" }], new AbortController().signal, { ...NO_TOOLS, tools: [screenshot(result)] }, model)
+      streamReply([{ role: "user", content: "hi" }], new AbortController().signal, { ...NO_TOOLS, tools: [screenshot(result)] }, model),
     );
     return model.calls.at(-1)?.messages.at(-1);
   };
@@ -339,7 +390,7 @@ describe("streamReply with a bad tool call", () => {
     };
 
     const text = await collect(
-      streamReply([{ role: "user", content: "hi" }], new AbortController().signal, { ...NO_TOOLS, tools: [tool] }, model)
+      streamReply([{ role: "user", content: "hi" }], new AbortController().signal, { ...NO_TOOLS, tools: [tool] }, model),
     );
 
     expect(text).toBe("recovered");
@@ -354,7 +405,7 @@ describe("streamReply with an action that needs approval", () => {
         new AIMessage({
           content: "",
           tool_calls: ids.map((id) => ({ name: "click", args: { ref: `e-${id}` }, id })),
-        })
+        }),
       )
       .respond(new AIMessage("finished"));
 
@@ -369,9 +420,7 @@ describe("streamReply with an action that needs approval", () => {
   });
 
   const reply = (tool: PageTool, model: BaseChatModel, approve: (text: string) => Promise<boolean>) =>
-    collect(
-      streamReply([{ role: "user", content: "hi" }], new AbortController().signal, { ...NO_TOOLS, tools: [tool], approve }, model)
-    );
+    collect(streamReply([{ role: "user", content: "hi" }], new AbortController().signal, { ...NO_TOOLS, tools: [tool], approve }, model));
 
   it("runs once allowed, showing the user what will happen", async () => {
     const tool = click();
@@ -437,12 +486,7 @@ describe("streamReply with an action that needs approval", () => {
   });
 
   describe("when it's only asked about if risky", () => {
-    const ask = (
-      tool: PageTool,
-      model: BaseChatModel,
-      actionApproval: () => "risky" | "never",
-      asked: string[]
-    ) =>
+    const ask = (tool: PageTool, model: BaseChatModel, actionApproval: () => "risky" | "never", asked: string[]) =>
       collect(
         streamReply(
           [{ role: "user", content: "hi" }],
@@ -456,8 +500,8 @@ describe("streamReply with an action that needs approval", () => {
               return true;
             },
           },
-          model
-        )
+          model,
+        ),
       );
 
     it("runs a safe action without asking, and asks about a risky one", async () => {
@@ -493,10 +537,19 @@ describe("streamReply with an action that needs approval", () => {
     it("says which rule made each call ask", async () => {
       const because = async (tool: PageTool, mode: "risky" | "always") => {
         const approve = vi.fn(async () => true);
-        await collect(streamReply([{ role: "user", content: "hi" }], new AbortController().signal, { ...NO_TOOLS, tools: [tool], approve, actionApproval: () => mode }, callsTool("1")));
+        await collect(
+          streamReply(
+            [{ role: "user", content: "hi" }],
+            new AbortController().signal,
+            { ...NO_TOOLS, tools: [tool], approve, actionApproval: () => mode },
+            callsTool("1"),
+          ),
+        );
         return approve.mock.calls.map((call) => (call as unknown[])[1]);
       };
-      expect(await because(click({ whyRisky: async () => ({ reason: "new-site", mark: "e-1" }) }), "risky")).toEqual([{ reason: "new-site", mark: "e-1" }]);
+      expect(await because(click({ whyRisky: async () => ({ reason: "new-site", mark: "e-1" }) }), "risky")).toEqual([
+        { reason: "new-site", mark: "e-1" },
+      ]);
       expect(await because(click(), "risky")).toEqual([{ reason: "tool-always-asks" }]);
       expect(await because(click({ whyRisky: async () => null }), "always")).toEqual([{ reason: "always-ask" }]);
     });
@@ -532,7 +585,13 @@ describe("streamReply with an action that needs approval", () => {
     });
 
     it("drops old pictures, and leaves short results alone", async () => {
-      const picture = new ToolMessage({ tool_call_id: "p", content: [{ type: "text", text: "A page" }, { type: "image_url", image_url: { url: "data:image/jpeg;base64,x" } }] });
+      const picture = new ToolMessage({
+        tool_call_id: "p",
+        content: [
+          { type: "text", text: "A page" },
+          { type: "image_url", image_url: { url: "data:image/jpeg;base64,x" } },
+        ],
+      });
       const short = new ToolMessage({ tool_call_id: "s", content: "short" });
       const [first, second] = await shortenOldResults([picture, short, ...results(14)]);
       expect(first.content).toContain("A page");
@@ -545,17 +604,13 @@ describe("streamReply with an action that needs approval", () => {
     await expect(
       reply(click(), callsTool("1"), async () => {
         throw new Error("Stopped");
-      })
+      }),
     ).rejects.toThrow("Stopped");
   });
 });
 
 describe("generateTitle", () => {
-  const titled = (response: string) =>
-    generateTitle(
-      [{ role: "user", content: "hi" }],
-      new FakeListChatModel({ responses: [response] })
-    );
+  const titled = (response: string) => generateTitle([{ role: "user", content: "hi" }], new FakeListChatModel({ responses: [response] }));
 
   it("cleans up the model's answer", async () => {
     expect(await titled("Trip to Porto")).toBe("Trip to Porto");
@@ -600,17 +655,30 @@ describe("forProvider", () => {
   it("sends a PDF to Anthropic once, as a document", async () => {
     const { ChatAnthropic } = await import("@langchain/anthropic");
     const seen = { body: "" };
-    const model = new ChatAnthropic({ apiKey: "key", model: "claude-sonnet-5-5", maxRetries: 0, clientOptions: { fetch: catching(seen) as never } });
+    const model = new ChatAnthropic({
+      apiKey: "key",
+      model: "claude-sonnet-5-5",
+      maxRetries: 0,
+      clientOptions: { fetch: catching(seen) as never },
+    });
     const { messages } = await requestBody(model, forProvider(content, "anthropic"), seen);
     const documents = messages[0].content.filter((block: { type: string }) => block.type === "document");
-    expect(documents).toEqual([{ type: "document", title: "itinerary.pdf", source: { type: "base64", media_type: "application/pdf", data: "JVBERi0=" } }]);
+    expect(documents).toEqual([
+      { type: "document", title: "itinerary.pdf", source: { type: "base64", media_type: "application/pdf", data: "JVBERi0=" } },
+    ]);
   });
 
   it("sends a PDF to OpenAI as a named file, through either API", async () => {
     const { ChatOpenAI } = await import("@langchain/openai");
     for (const useResponsesApi of [true, false]) {
       const seen = { body: "" };
-      const model = new ChatOpenAI({ apiKey: "key", model: "gpt-6.1-terra", maxRetries: 0, useResponsesApi, configuration: { fetch: catching(seen) as never } });
+      const model = new ChatOpenAI({
+        apiKey: "key",
+        model: "gpt-6.1-terra",
+        maxRetries: 0,
+        useResponsesApi,
+        configuration: { fetch: catching(seen) as never },
+      });
       const body = await requestBody(model, forProvider(content, "openai"), seen);
       const sent = JSON.stringify(useResponsesApi ? body.input : body.messages);
       expect(sent).toContain(useResponsesApi ? '"type":"input_file"' : '"type":"file"');

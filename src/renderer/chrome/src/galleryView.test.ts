@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 import type { GalleryMascot } from "@shared/library";
 import { addsLine, filterGallery, freeName, galleryFacts, galleryGroups, galleryKinds, sortGallery } from "./galleryView";
 
-const entry = (name: string, category: string, sites: string[], tools: GalleryMascot["draft"]["tools"], published?: { adds: number; at: number }): GalleryMascot => ({
+const entry = (
+  name: string,
+  category: string,
+  sites: string[],
+  tools: GalleryMascot["draft"]["tools"],
+  published?: { adds: number; at: number },
+): GalleryMascot => ({
   id: name,
   author: published ? "Ana" : "Blueberry",
   category,
@@ -50,7 +56,14 @@ const fifth = entry("Fifth", "Work", [], [], { adds: 1, at: 9 });
 
 describe("sortGallery", () => {
   it("puts people's first, most added then newest, and keeps Blueberry's own order after them", () => {
-    expect(names(sortGallery([tidy, quiet, older, watch, newer, top]))).toEqual(["Top", "Newer", "Older", "Quiet", "Pipeline Tidy", "Competitor Watch"]);
+    expect(names(sortGallery([tidy, quiet, older, watch, newer, top]))).toEqual([
+      "Top",
+      "Newer",
+      "Older",
+      "Quiet",
+      "Pipeline Tidy",
+      "Competitor Watch",
+    ]);
   });
 });
 
@@ -76,13 +89,16 @@ describe("galleryGroups", () => {
   });
 
   it("is one group with how many were found while searching, even none", () => {
-    expect(galleryGroups([tidy, top, quiet], "o", null).map(({ label, entries }) => [label, names(entries)])).toEqual([["3 found", ["Top", "Quiet", "Pipeline Tidy"]]]);
+    expect(galleryGroups([tidy, top, quiet], "o", null).map(({ label, entries }) => [label, names(entries)])).toEqual([
+      ["3 found", ["Top", "Quiet", "Pipeline Tidy"]],
+    ]);
     expect(galleryGroups([tidy], "nothing", null)).toEqual([{ key: "found", label: "0 found", entries: [] }]);
   });
 });
 
 describe("galleryFacts", () => {
-  const facts = (from: GalleryMascot) => galleryFacts(from).map(({ label, lines }) => [label, lines.map(({ text, limited }) => (limited ? `🔒 ${text}` : text))]);
+  const facts = (from: GalleryMascot) =>
+    galleryFacts(from).map(({ label, lines }) => [label, lines.map(({ text, limited }) => (limited ? `🔒 ${text}` : text))]);
 
   it("gives a person's how many times it was added, and its limits in the tool layer's words, with a padlock only on a real limit", () => {
     expect(facts(entry("Roamer", "Work", [], ["visit"], { adds: 1204, at: 0 }))).toEqual([
@@ -103,7 +119,10 @@ describe("galleryFacts", () => {
       ["Can", ["Can click and type"]],
       ["Kind of job", ["Work"]],
     ]);
-    expect(facts(entry("Reader", "Work", [], [])).find(([label]) => label === "Can")).toEqual(["Can", ["🔒 Can’t open pages by itself", "🔒 Can’t type or click"]]);
+    expect(facts(entry("Reader", "Work", [], [])).find(([label]) => label === "Can")).toEqual([
+      "Can",
+      ["🔒 Can’t open pages by itself", "🔒 Can’t type or click"],
+    ]);
   });
 });
 

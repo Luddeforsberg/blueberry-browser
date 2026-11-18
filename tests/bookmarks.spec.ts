@@ -10,7 +10,7 @@ import { chooseFromMenu, findView, launchApp } from "./app";
 let app: ElectronApplication;
 let chrome: Page;
 const server = createServer((request, response) =>
-  response.end(`<!doctype html><title>${request.url === "/second" ? "Second page" : "Saved page"}</title>Hello`)
+  response.end(`<!doctype html><title>${request.url === "/second" ? "Second page" : "Saved page"}</title>Hello`),
 );
 let url: string;
 
@@ -56,7 +56,9 @@ test.beforeEach(async () => {
   app = await launchApp();
   chrome = await findView(app, "view=chrome");
 });
-test.afterEach(async () => { await app?.close(); });
+test.afterEach(async () => {
+  await app?.close();
+});
 
 test("bookmarking a page saves it across restarts and both layouts, and the star removes it", async () => {
   const profile = mkdtempSync(join(tmpdir(), "blueberry-bookmarks-"));
@@ -78,7 +80,9 @@ test("bookmarking a page saves it across restarts and both layouts, and the star
   await saved.click();
   await expect.poll(async () => (await active()).url).toBe(url);
   await expect.poll(async () => (await active()).title).toBe("Saved page");
-  await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ layoutMode: "horizontal", appearance: "dark", keepBerryStill: true }));
+  await chrome.evaluate(() =>
+    window.chromeAPI.settings.updateSettings({ layoutMode: "horizontal", appearance: "dark", keepBerryStill: true }),
+  );
   await chrome.emulateMedia({ reducedMotion: "reduce" });
   await expect(saved).toBeVisible();
   await chrome.screenshot({ path: test.info().outputPath("blueberry-bookmarks-horizontal.png") });

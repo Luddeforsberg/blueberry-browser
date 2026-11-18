@@ -3,7 +3,15 @@ import { dirname } from "path";
 import type { MascotProfile, Routine, RoutineRun, Suggestion, SuggestionKind } from "../shared/library";
 import { buildDigest, type Digest, type DigestChat, type Feedback } from "./suggestionDigest";
 import { findPatterns, topPatterns, type Pattern, type PatternChat, type PatternVisit } from "./suggestionPatterns";
-import { SUGGESTION_PROMPT, alreadyThere, fallbackWords, feedbackOf, verifyProposals, type Existing, type Proposal } from "./suggestionProposals";
+import {
+  SUGGESTION_PROMPT,
+  alreadyThere,
+  fallbackWords,
+  feedbackOf,
+  verifyProposals,
+  type Existing,
+  type Proposal,
+} from "./suggestionProposals";
 
 const HOUR_MS = 3_600_000;
 // A failed call doesn't count, but being offline mustn't mean a model call on every new tab.
@@ -63,12 +71,14 @@ export class Suggestions {
 
   constructor(
     private readonly file: string,
-    private readonly sources: SuggestionSources
+    private readonly sources: SuggestionSources,
   ) {
     try {
       const raw = JSON.parse(readFileSync(file, "utf8")) as Partial<SavedSuggestions>;
       this.saved = {
-        proposals: asList<Proposal>(raw.proposals).filter((proposal) => proposal?.card && Array.isArray(proposal.sources) && Array.isArray(proposal.sites)),
+        proposals: asList<Proposal>(raw.proposals).filter(
+          (proposal) => proposal?.card && Array.isArray(proposal.sources) && Array.isArray(proposal.sites),
+        ),
         dismissed: asList<string>(raw.dismissed),
         feedback: asList<Feedback>(raw.feedback),
         askedAt: typeof raw.askedAt === "number" ? raw.askedAt : 0,
@@ -97,7 +107,9 @@ export class Suggestions {
         name,
         schedule,
         sites,
-        runs: this.sources.runs(id).flatMap(({ status, startedAt }) => (status === "running" || status === "needs-approval" ? [] : [{ status, startedAt }])),
+        runs: this.sources
+          .runs(id)
+          .flatMap(({ status, startedAt }) => (status === "running" || status === "needs-approval" ? [] : [{ status, startedAt }])),
       })),
       mascots: this.liveMascots.map(({ name, sites }) => ({ name, sites })),
       feedback: this.saved.feedback,
@@ -118,7 +130,7 @@ export class Suggestions {
     const present = new Set([...digest.evidence.values()].flatMap(({ sources }) => sources));
     const existing = this.existing;
     return this.saved.proposals.filter(
-      (proposal) => proposal.sources.every((source) => present.has(source)) && !alreadyThere(proposal, existing)
+      (proposal) => proposal.sources.every((source) => present.has(source)) && !alreadyThere(proposal, existing),
     );
   }
 
@@ -139,9 +151,12 @@ export class Suggestions {
     if (ids.some((id) => this.saved.dismissed.includes(id))) return false;
     const routines = this.sources.routines();
     const mascots = this.liveMascots;
-    return !sites.some(({ host, label }) =>
-      routines.some(({ name, instructions }) => `${name} ${instructions}`.toLowerCase().includes(host) || name.toLowerCase().includes(label.toLowerCase())) ||
-      mascots.some((mascot) => mascot.sites.includes(host))
+    return !sites.some(
+      ({ host, label }) =>
+        routines.some(
+          ({ name, instructions }) =>
+            `${name} ${instructions}`.toLowerCase().includes(host) || name.toLowerCase().includes(label.toLowerCase()),
+        ) || mascots.some((mascot) => mascot.sites.includes(host)),
     );
   }
 
@@ -172,7 +187,8 @@ export class Suggestions {
     const proposal = this.saved.proposals.find(({ card }) => card.id === id);
     if (proposal) {
       // Turning one down also keeps the old rules off what it was about.
-      const ruledOut = verdict === "dismissed" ? proposal.sources.filter((source) => source.startsWith("site:") || source.startsWith("chat:")) : [];
+      const ruledOut =
+        verdict === "dismissed" ? proposal.sources.filter((source) => source.startsWith("site:") || source.startsWith("chat:")) : [];
       this.save({
         ...this.saved,
         proposals: this.saved.proposals.filter(({ card }) => card.id !== id),
@@ -187,7 +203,9 @@ export class Suggestions {
     this.save({
       ...this.saved,
       dismissed: [...new Set([...this.saved.dismissed, ...ids])],
-      feedback: found ? feedback(feedbackOf({ card: found.card, sites: found.pattern.sites.map(({ host }) => host) }, verdict, this.now)) : this.saved.feedback,
+      feedback: found
+        ? feedback(feedbackOf({ card: found.card, sites: found.pattern.sites.map(({ host }) => host) }, verdict, this.now))
+        : this.saved.feedback,
     });
   }
 
@@ -203,7 +221,8 @@ export class Suggestions {
     const fresh = this.freshTry;
     this.freshTry = false;
     const { askedAt, seen } = this.saved;
-    const limited = (this.triedAt > 0 && this.now - this.triedAt < RETRY_MS) || (askedAt > 0 && (this.now - askedAt < HOUR_MS || digest.newest <= seen));
+    const limited =
+      (this.triedAt > 0 && this.now - this.triedAt < RETRY_MS) || (askedAt > 0 && (this.now - askedAt < HOUR_MS || digest.newest <= seen));
     if (limited && !fresh) return;
     if (digest.evidence.size === 0 || !this.sources.hasModel()) return;
 
@@ -214,7 +233,12 @@ export class Suggestions {
       const reply = await this.sources.write(SUGGESTION_PROMPT, `<browsing_digest>\n${JSON.stringify(digest.data)}\n</browsing_digest>`);
       const proposals = verifyProposals(reply, digest, this.existing);
       // An answer with nothing that checks out still counts for the hour, and the old cards or rules stay.
-      this.save({ ...this.saved, askedAt: this.now, seen: digest.newest, proposals: proposals.length > 0 ? proposals : this.saved.proposals });
+      this.save({
+        ...this.saved,
+        askedAt: this.now,
+        seen: digest.newest,
+        proposals: proposals.length > 0 ? proposals : this.saved.proposals,
+      });
       if (proposals.length > 0) this.sources.onChanged();
     } catch (error) {
       // There just aren't any new cards until the next try.

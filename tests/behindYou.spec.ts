@@ -10,7 +10,9 @@ import { startFakeModel } from "./fakeModel";
 test("Berry keeps a tab the user only looks at, and gives it up when they click or type in it", async () => {
   const server = createServer((_, response) => {
     response.setHeader("content-type", "text/html");
-    response.end(`<!doctype html><title>Ready</title><body style="margin:0"><button onclick="document.title='Pressed'">Press</button><p>Text on the page</p>`);
+    response.end(
+      `<!doctype html><title>Ready</title><body style="margin:0"><button onclick="document.title='Pressed'">Press</button><p>Text on the page</p>`,
+    );
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -25,7 +27,12 @@ test("Berry keeps a tab the user only looks at, and gives it up when they click 
       const sent = await chrome.evaluate(([chat, words]) => window.chromeAPI.chat.send(chat, words!, { seePage: false }), [chatId, text]);
       const replies = sent!.messages.filter(({ role }) => role === "user").length;
       await expect
-        .poll(async () => (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id))?.messages.filter(({ role }) => role === "assistant").length)
+        .poll(
+          async () =>
+            (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id))?.messages.filter(
+              ({ role }) => role === "assistant",
+            ).length,
+        )
         .toBe(replies);
       return sent!.id;
     };
@@ -69,9 +76,15 @@ test("Berry keeps a tab the user only looks at, and gives it up when they click 
     // Typing counts as well, but a keyboard shortcut doesn't.
     const { tab: second } = await openAndLook(chat, "/second");
     const press = (keyCode: string, modifiers: Array<"meta">) =>
-      app.evaluate(({ webContents }, { url, keyCode, modifiers }) => {
-        webContents.getAllWebContents().find((view) => view.getURL() === url)!.sendInputEvent({ type: "keyDown", keyCode, modifiers });
-      }, { url: second.url, keyCode, modifiers });
+      app.evaluate(
+        ({ webContents }, { url, keyCode, modifiers }) => {
+          webContents
+            .getAllWebContents()
+            .find((view) => view.getURL() === url)!
+            .sendInputEvent({ type: "keyDown", keyCode, modifiers });
+        },
+        { url: second.url, keyCode, modifiers },
+      );
     await press("l", ["meta"]);
     model.callTools({ name: "read_page", args: {} });
     await ask(chat, "Read the second");

@@ -74,7 +74,13 @@ const send = async (path, { method = "GET", body, token } = {}) => {
 const toSession = (body) => {
   const { access_token: accessToken, refresh_token: refreshToken, expires_in: expiresIn, user } = body ?? {};
   if (typeof accessToken !== "string" || typeof refreshToken !== "string" || typeof user?.id !== "string") return null;
-  return { accessToken, refreshToken, expiresAt: Date.now() + (typeof expiresIn === "number" ? expiresIn : 3600) * 1000, email: String(user.email ?? ""), userId: user.id };
+  return {
+    accessToken,
+    refreshToken,
+    expiresAt: Date.now() + (typeof expiresIn === "number" ? expiresIn : 3600) * 1000,
+    email: String(user.email ?? ""),
+    userId: user.id,
+  };
 };
 
 export const signIn = async (email, password) => {
@@ -134,7 +140,8 @@ const JOB_COLUMNS = "id,conversation_id,prompt,mascot,status,steps,reply,error,l
 // conversations. One run on the Mac is answered there, so it isn't here.
 export const jobs = async () => {
   const me = encodeURIComponent(session?.userId ?? "");
-  const rows = (await asUser(`/rest/v1/cloud_jobs?select=${JOB_COLUMNS}&owner=eq.${me}&target=eq.cloud&order=created_at.desc&limit=100`)) ?? [];
+  const rows =
+    (await asUser(`/rest/v1/cloud_jobs?select=${JOB_COLUMNS}&owner=eq.${me}&target=eq.cloud&order=created_at.desc&limit=100`)) ?? [];
   const waiting = rows.filter((row) => row.status === "waiting").map((row) => row.id);
   const asks = waiting.length ? ((await rpc("my_cloud_jobs", { p_ids: waiting })) ?? []) : [];
   return rows.map((row) => ({ ...row, ask: asks.find((ask) => ask.id === row.id && typeof ask.approval_id === "string") ?? null }));
@@ -143,10 +150,15 @@ export const jobs = async () => {
 // One job with the history it carried, which only a follow-up needs, so the list doesn't fetch it for every job.
 export const jobWithHistory = async (id) => {
   const me = encodeURIComponent(session?.userId ?? "");
-  const [row] = (await asUser(`/rest/v1/cloud_jobs?select=id,conversation_id,prompt,history,steps,reply,created_at&owner=eq.${me}&id=eq.${encodeURIComponent(id)}&limit=1`)) ?? [];
+  const [row] =
+    (await asUser(
+      `/rest/v1/cloud_jobs?select=id,conversation_id,prompt,history,steps,reply,created_at&owner=eq.${me}&id=eq.${encodeURIComponent(id)}&limit=1`,
+    )) ?? [];
   return row ?? null;
 };
 
-export const flock = async () => (await asUser("/rest/v1/cloud_flock?select=id,name,palette,accessory,instructions,sites,tools,from_gallery,updated_at&order=position")) ?? [];
+export const flock = async () =>
+  (await asUser("/rest/v1/cloud_flock?select=id,name,palette,accessory,instructions,sites,tools,from_gallery,updated_at&order=position")) ??
+  [];
 
 export const runner = async () => ((await rpc("my_cloud_runner")) ?? [])[0] ?? null;

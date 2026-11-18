@@ -12,14 +12,22 @@ export type Sniffed =
 const startsWith = (bytes: Uint8Array, signature: readonly number[], at = 0) =>
   bytes.length >= at + signature.length && signature.every((byte, index) => bytes[at + index] === byte);
 const ascii = (text: string) => [...text].map((char) => char.charCodeAt(0));
-const latin1 = (bytes: Uint8Array, from = 0, to = bytes.length) => Buffer.from(bytes.buffer, bytes.byteOffset + from, Math.max(0, Math.min(to, bytes.length) - from)).toString("latin1");
+const latin1 = (bytes: Uint8Array, from = 0, to = bytes.length) =>
+  Buffer.from(bytes.buffer, bytes.byteOffset + from, Math.max(0, Math.min(to, bytes.length) - from)).toString("latin1");
 
 const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const JPEG = [0xff, 0xd8, 0xff];
 const PDF = ascii("%PDF-");
 
 // Pictures a provider could take but main can't scale down, so they'd go at any size.
-const OTHER_PICTURES: ReadonlyArray<readonly number[]> = [ascii("GIF87a"), ascii("GIF89a"), [0x42, 0x4d], [0x49, 0x49, 0x2a, 0x00], [0x4d, 0x4d, 0x00, 0x2a], [0x00, 0x00, 0x01, 0x00]];
+const OTHER_PICTURES: ReadonlyArray<readonly number[]> = [
+  ascii("GIF87a"),
+  ascii("GIF89a"),
+  [0x42, 0x4d],
+  [0x49, 0x49, 0x2a, 0x00],
+  [0x4d, 0x4d, 0x00, 0x2a],
+  [0x00, 0x00, 0x01, 0x00],
+];
 const PICTURE_BRANDS = ["heic", "heix", "hevc", "mif1", "msf1", "avif"];
 const SOUNDS: ReadonlyArray<readonly number[]> = [ascii("ID3"), ascii("OggS"), ascii("fLaC"), [0xff, 0xfb], [0xff, 0xf3], [0xff, 0xf2]];
 const VIDEOS: ReadonlyArray<readonly number[]> = [[0x1a, 0x45, 0xdf, 0xa3]];
@@ -110,7 +118,12 @@ export const sniffFile = (bytes: Uint8Array): Sniffed => {
 
 // Control characters, and the ones that hide or reorder text, so a name reads as what it is.
 const hidden = (code: number) =>
-  code < 0x20 || code === 0x7f || (code >= 0x200b && code <= 0x200f) || (code >= 0x202a && code <= 0x202e) || (code >= 0x2066 && code <= 0x2069) || code === 0xfeff;
+  code < 0x20 ||
+  code === 0x7f ||
+  (code >= 0x200b && code <= 0x200f) ||
+  (code >= 0x202a && code <= 0x202e) ||
+  (code >= 0x2066 && code <= 0x2069) ||
+  code === 0xfeff;
 
 // What's left of a name once anything that could pass for a path, a line break or hidden text is taken out.
 export const cleanFileName = (name: unknown, maxLength: number): string => {

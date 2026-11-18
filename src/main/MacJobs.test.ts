@@ -27,12 +27,14 @@ const setUp = ({ enabled = true, mascot = SCOUT as unknown }: { enabled?: boolea
       if (row) rows.set(String(row.id), { status: "running", reply: "", error: null, steps: [], stopRequested: false });
       return row;
     }),
-    macUpdateJob: vi.fn(async (_token: string, id: string, update: { status?: string; steps?: unknown[]; reply?: string; error?: string }) => {
-      const row = rows.get(id);
-      if (!row || !["running", "waiting"].includes(row.status)) return true;
-      Object.assign(row, Object.fromEntries(Object.entries(update).filter(([, value]) => value !== undefined)));
-      return row.stopRequested;
-    }),
+    macUpdateJob: vi.fn(
+      async (_token: string, id: string, update: { status?: string; steps?: unknown[]; reply?: string; error?: string }) => {
+        const row = rows.get(id);
+        if (!row || !["running", "waiting"].includes(row.status)) return true;
+        Object.assign(row, Object.fromEntries(Object.entries(update).filter(([, value]) => value !== undefined)));
+        return row.stopRequested;
+      },
+    ),
   } as unknown as GalleryServer;
   const switchOn = { value: enabled };
   // Each chat's reply as it runs, and how to end it, which is what `Chats` tells `onEnd`.
@@ -40,20 +42,30 @@ const setUp = ({ enabled = true, mascot = SCOUT as unknown }: { enabled?: boolea
   const host = {
     enabled: () => switchOn.value,
     linked: () => true,
-    start: vi.fn((prompt: string, options: { bird: MascotProfile; askAtLeast: string; from: string }, onEnd: (ended: EndedReply) => void) => {
-      void prompt;
-      if (options.bird.id === "gone") return null;
-      const id = `chat-${chats.size + 1}`;
-      chats.set(id, { reply: "", steps: [], waiting: false, end: onEnd });
-      return id;
-    }),
+    start: vi.fn(
+      (prompt: string, options: { bird: MascotProfile; askAtLeast: string; from: string }, onEnd: (ended: EndedReply) => void) => {
+        void prompt;
+        if (options.bird.id === "gone") return null;
+        const id = `chat-${chats.size + 1}`;
+        chats.set(id, { reply: "", steps: [], waiting: false, end: onEnd });
+        return id;
+      },
+    ),
     progress: (chatId: string) => chats.get(chatId) ?? null,
     stop: vi.fn((chatId: string) => chats.get(chatId)?.end({ reply: "", steps: [], outcome: "stopped", error: null })),
   };
   let time = 0;
   const jobs = new MacJobs(server, { state: account.state, accessToken: async () => "token" } as never, host, 60_000, () => time);
   return {
-    jobs, server, host, chats, rows, queue, presence, switchOn, account,
+    jobs,
+    server,
+    host,
+    chats,
+    rows,
+    queue,
+    presence,
+    switchOn,
+    account,
     later: (ms: number) => (time += ms),
     holdClaims: () => {
       let release = () => {};
@@ -69,11 +81,19 @@ const setUp = ({ enabled = true, mascot = SCOUT as unknown }: { enabled?: boolea
 describe("MacJobs", () => {
   it("claims one job at a time, runs it as a chat from the relay, and writes its reply back", async () => {
     const { jobs, host, chats, rows, queue, presence } = setUp();
-    queue.push({ id: "job-2", prompt: "Then this", mascot: { id: "berry", name: "Berry", instructions: "", sites: [], tools: ["visit", "click", "type"] } });
+    queue.push({
+      id: "job-2",
+      prompt: "Then this",
+      mascot: { id: "berry", name: "Berry", instructions: "", sites: [], tools: ["visit", "click", "type"] },
+    });
     await jobs.tick();
     expect(presence).toEqual([true]);
     expect(host.start).toHaveBeenCalledTimes(1);
-    expect(host.start.mock.calls[0][1]).toMatchObject({ bird: { id: "scout", sites: ["tea.example"], tools: ["visit"] }, askAtLeast: "risky", from: RELAY_FROM });
+    expect(host.start.mock.calls[0][1]).toMatchObject({
+      bird: { id: "scout", sites: ["tea.example"], tools: ["visit"] },
+      askAtLeast: "risky",
+      from: RELAY_FROM,
+    });
     expect(jobs.running).toEqual({ jobId: "job-1", chatId: "chat-1" });
 
     // While it runs, its steps and words so far go up, and nothing else is claimed.
@@ -161,7 +181,10 @@ describe("MacJobs", () => {
     release();
     await round;
     expect(host.start).not.toHaveBeenCalled();
-    expect(rows.get("job-1")).toMatchObject({ status: "failed", error: expect.stringMatching(/turned off on the Mac before this one started/) });
+    expect(rows.get("job-1")).toMatchObject({
+      status: "failed",
+      error: expect.stringMatching(/turned off on the Mac before this one started/),
+    });
   });
 
   it("doesn't start a job whose claim comes back after the app quit, and nothing runs after it", async () => {

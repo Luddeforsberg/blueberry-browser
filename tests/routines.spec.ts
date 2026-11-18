@@ -49,8 +49,13 @@ const createRoutine = async (chrome: Page) => {
 
   await chrome.getByRole("radio", { name: "Weekly" }).click();
   const days = chrome.getByRole("group", { name: "Days" });
-  await days.getByRole("button", { name: "Saturday", pressed: false }).click().catch(() => undefined);
-  for (const label of await days.getByRole("button", { pressed: true }).evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label")))) {
+  await days
+    .getByRole("button", { name: "Saturday", pressed: false })
+    .click()
+    .catch(() => undefined);
+  for (const label of await days
+    .getByRole("button", { pressed: true })
+    .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label")))) {
     if (label !== "Saturday") await days.getByRole("button", { name: label! }).click();
   }
   await chrome.getByRole("radio", { name: "Other…" }).click();
@@ -96,9 +101,14 @@ test("a routine is created, runs behind the user, asks first, and doesn't act af
   const cards = chrome.getByRole("region", { name: "Approval needed" });
   await expect(cards.getByText(question)).toBeVisible();
   await expect(chrome.getByText("Needs you", { exact: true }).first()).toBeVisible();
-  await chrome.evaluate((id) => window.chromeAPI.browser.switchTab(id), (await tabs()).find((tab) => !tab.page || tab.page === "new-tab")!.id);
+  await chrome.evaluate(
+    (id) => window.chromeAPI.browser.switchTab(id),
+    (await tabs()).find((tab) => !tab.page || tab.page === "new-tab")!.id,
+  );
   await expect(chrome.getByRole("navigation", { name: "Sidebar" }).getByRole("tab", { name: /^Chats.*1 needs you/ })).toBeVisible();
-  await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).needsYou.map(({ approval }) => approval.text)).toEqual([question]);
+  await expect
+    .poll(async () => (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).needsYou.map(({ approval }) => approval.text))
+    .toEqual([question]);
   await chrome.evaluate((id) => window.chromeAPI.browser.switchTab(id!), routinesTab?.id);
   expect(requested).toEqual([]);
 
@@ -125,10 +135,7 @@ test("a routine is created, runs behind the user, asks first, and doesn't act af
   await expect(chrome.getByText("Three flights under €200.")).toBeVisible();
   await expect(chrome.getByText("Finished")).toBeVisible();
   await chrome.getByRole("button", { name: "2 steps on 127.0.0.1" }).click();
-  await expect(chrome.getByRole("list", { name: "Steps" }).getByRole("listitem")).toHaveText([
-    /Opened 127.0.0.1/,
-    /Read 127.0.0.1/,
-  ]);
+  await expect(chrome.getByRole("list", { name: "Steps" }).getByRole("listitem")).toHaveText([/Opened 127.0.0.1/, /Read 127.0.0.1/]);
   const after = await tabs();
   expect(after).toHaveLength(countBefore);
   expect(after.find((tab) => tab.isActive)?.id).toBe(routinesTab?.id);

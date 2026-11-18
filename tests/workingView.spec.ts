@@ -30,7 +30,10 @@ const startJob = async (chrome: Page, model: FakeModel, url: string, mascotId?: 
   model.callTools({ name: "open_tab", args: { url } });
   model.replyWith("All done");
   const finish = model.holdBeforeFirstToken();
-  const sent = await chrome.evaluate(([mascot, address]) => window.chromeAPI.chat.send(null, `Have a look at ${address}`, { seePage: false, mascotId: mascot }), [mascotId, url]);
+  const sent = await chrome.evaluate(
+    ([mascot, address]) => window.chromeAPI.chat.send(null, `Have a look at ${address}`, { seePage: false, mascotId: mascot }),
+    [mascotId, url],
+  );
   await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), sent!.id);
   await countFrames(chrome);
   return { chatId: sent!.id, finish };
@@ -75,12 +78,14 @@ test.describe("the working view", () => {
         app.evaluate(({ webContents }, url) => {
           const tab = webContents.getAllWebContents().find((contents) => contents.getURL() === url);
           return tab?.executeJavaScriptInIsolatedWorld(1000, [{ code: "!!globalThis.__berryActor" }], true);
-        }, `${site.origin}/job`)
+        }, `${site.origin}/job`),
       )
       .toBe(true);
 
     // Going to the tab to watch isn't taking it over, and the picture comes back.
-    await view().getByRole("button", { name: /Go to the tab/ }).click();
+    await view()
+      .getByRole("button", { name: /Go to the tab/ })
+      .click();
     await expect(view()).toHaveCount(0);
     const chatTab = await chrome.evaluate(async () => (await window.chromeAPI.browser.getTabs()).find(({ page }) => page === "chat")!.id);
     await chrome.evaluate((id) => window.chromeAPI.browser.switchTab(id), chatTab);
@@ -88,12 +93,17 @@ test.describe("the working view", () => {
 
     // Only the chrome may ask for this.
     const refused = await app.evaluate(async ({ ipcMain, webContents }) => {
-      const handler = (ipcMain as unknown as { _invokeHandlers: Map<string, (event: unknown, ...args: unknown[]) => Promise<unknown>> })._invokeHandlers.get("work:watch")!;
+      const handler = (
+        ipcMain as unknown as { _invokeHandlers: Map<string, (event: unknown, ...args: unknown[]) => Promise<unknown>> }
+      )._invokeHandlers.get("work:watch")!;
       const tryFrom = async (urlPart: string) => {
         const sender = webContents.getAllWebContents().find((contents) => contents.getURL().includes(urlPart))!;
         return Promise.resolve()
           .then(() => handler({ sender, senderFrame: sender.mainFrame }, null, 0))
-          .then(() => "allowed", (error: Error) => error.message);
+          .then(
+            () => "allowed",
+            (error: Error) => error.message,
+          );
       };
       return { overlay: await tryFrom("view=overlay"), page: await tryFrom("/job"), other: await tryFrom("/mine") };
     });
@@ -143,7 +153,10 @@ test.describe("the working view", () => {
     model.callTools({ name: "open_tab", args: { url: `${site.origin}/job` } });
     model.thinkFor(700);
     model.callTools({ name: "hand_to_user", args: { need: "sign-in" } });
-    const sent = await chrome.evaluate((origin) => window.chromeAPI.chat.send(null, `Sign me in on ${origin}`, { seePage: false }), site.origin);
+    const sent = await chrome.evaluate(
+      (origin) => window.chromeAPI.chat.send(null, `Sign me in on ${origin}`, { seePage: false }),
+      site.origin,
+    );
     await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), sent!.id);
     await countFrames(chrome);
     await expect(view().getByText("You have this tab")).toBeVisible({ timeout: 10_000 });
@@ -160,7 +173,10 @@ test.describe("the working view", () => {
     model.callTools({ name: "open_tab", args: { url: `${site.origin}/job` } });
     model.callTools({ name: "hand_to_user", args: { need: "sign-in" } });
     const finish = model.holdBeforeFirstToken();
-    const sent = await chrome.evaluate((origin) => window.chromeAPI.chat.send(null, `Sign me in on ${origin}`, { seePage: false }), site.origin);
+    const sent = await chrome.evaluate(
+      (origin) => window.chromeAPI.chat.send(null, `Sign me in on ${origin}`, { seePage: false }),
+      site.origin,
+    );
     const chatId = sent!.id;
     await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), chatId);
     await countFrames(chrome);
@@ -197,7 +213,13 @@ test.describe("the working view", () => {
 
   test("a page off the mascot's sites shows no picture, and nothing more is captured", async () => {
     const saved = await chrome.evaluate(() =>
-      window.chromeAPI.mascots.save(null, { name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "Stay here.", sites: ["127.0.0.1"], tools: ["visit"] })
+      window.chromeAPI.mascots.save(null, {
+        name: "Scout",
+        look: { palette: "robin", accessory: "cap" },
+        instructions: "Stay here.",
+        sites: ["127.0.0.1"],
+        tools: ["visit"],
+      }),
     );
     if (!saved.ok) throw new Error("The mascot wasn't saved");
     const { finish } = await startJob(chrome, model, `${site.origin}/job`, saved.id);
@@ -227,7 +249,9 @@ test.describe("the working view", () => {
     model.replyWith("All done");
     const finish = model.holdBeforeFirstToken();
     const sent = await chrome.evaluate(() => window.chromeAPI.chat.send(null, "What does this say?", { seePage: true }));
-    await expect.poll(() => chrome.evaluate(async () => (await window.chromeAPI.browser.getTabs()).some(({ berryWorking }) => berryWorking))).toBe(true);
+    await expect
+      .poll(() => chrome.evaluate(async () => (await window.chromeAPI.browser.getTabs()).some(({ berryWorking }) => berryWorking)))
+      .toBe(true);
     await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), sent!.id);
     await countFrames(chrome);
     await expect(picture()).toBeVisible();

@@ -71,13 +71,15 @@ test("a restart brings tabs back without loading them all, and history is kept",
   // Only the pages that exist in a view. A restored page can come from the cache, so the server can't tell.
   const loaded = () =>
     app.evaluate(({ webContents }) =>
-      webContents.getAllWebContents().map((contents) => contents.getURL()).filter((url) => url.startsWith("http")).sort()
+      webContents
+        .getAllWebContents()
+        .map((contents) => contents.getURL())
+        .filter((url) => url.startsWith("http"))
+        .sort(),
     );
-  await expect.poll(async () => (await tabs(chrome)).map((tab) => tab.title)).toEqual([
-    "Title of page-two",
-    "Title of page-four",
-    "Title of page-three",
-  ]);
+  await expect
+    .poll(async () => (await tabs(chrome)).map((tab) => tab.title))
+    .toEqual(["Title of page-two", "Title of page-four", "Title of page-three"]);
   expect((await tabs(chrome)).map((tab) => tab.isActive)).toEqual([false, false, true]);
   expect((await chrome.evaluate(() => window.chromeAPI.layout.getLayout())).sidebarOpen).toBe(false);
   await expect.poll(loaded).toEqual([`${origin}/page-three`]);
@@ -173,7 +175,10 @@ test("a crashed page stays in its tab, tells Berry so, and reloads; damaged data
 
   const crash = () =>
     app.evaluate(({ webContents }) =>
-      webContents.getAllWebContents().find((c) => c.getURL().endsWith("/page-doomed"))!.forcefullyCrashRenderer()
+      webContents
+        .getAllWebContents()
+        .find((c) => c.getURL().endsWith("/page-doomed"))!
+        .forcefullyCrashRenderer(),
     );
   await crash();
   const notice = chrome.getByRole("alert").filter({ hasText: "This page crashed" });
@@ -195,8 +200,11 @@ test("a crashed page stays in its tab, tells Berry so, and reloads; damaged data
   await expect
     .poll(() =>
       app.evaluate(({ webContents }) =>
-        webContents.getAllWebContents().find((c) => c.getURL().endsWith("/page-doomed"))!.isCrashed()
-      )
+        webContents
+          .getAllWebContents()
+          .find((c) => c.getURL().endsWith("/page-doomed"))!
+          .isCrashed(),
+      ),
     )
     .toBe(false);
   // A crash while the reload is still loading is only a load that goes on in a new process, so it has to have finished.

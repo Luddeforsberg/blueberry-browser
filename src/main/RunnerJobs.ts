@@ -4,7 +4,15 @@ import { dirname } from "path";
 import type { Account } from "./Account";
 import { isLiveView } from "./browserbase";
 import type { ChatRunner, RunnerJobInput, RunnerProgress } from "./Chats";
-import { approvalFromRow, FINISHED, historyFromRow, mascotSnapshot, stepsFromRow, type CloudJobStatus, type CloudRoutineRow } from "./cloudJobs";
+import {
+  approvalFromRow,
+  FINISHED,
+  historyFromRow,
+  mascotSnapshot,
+  stepsFromRow,
+  type CloudJobStatus,
+  type CloudRoutineRow,
+} from "./cloudJobs";
 import { ServerError, type GalleryServer } from "./galleryServer";
 import type { RunnerState } from "../shared/ipc";
 import type { ChatStep, MascotProfile } from "../shared/library";
@@ -30,7 +38,8 @@ const TOO_MANY = "Five jobs are already waiting or going in the cloud. Try again
 const FAILED = "The job failed in the cloud.";
 const BUSY = "This chat already has a job going in the cloud, maybe sent from your phone. Send this again once it's done.";
 const GONE = "This job isn't on your account any more.";
-const NO_SUCH_RUNNER = "There's no Blueberry account with that email that can run your jobs. Create it in Supabase first, and don't use your own.";
+const NO_SUCH_RUNNER =
+  "There's no Blueberry account with that email that can run your jobs. Create it in Supabase first, and don't use your own.";
 const LINK_FAILED = "That account couldn't be linked. Try again in a moment.";
 // The link is looked up again this often while the runner hasn't accepted, and less often once it has, in case it's
 // been unlinked elsewhere. Opening the composer looks too.
@@ -79,7 +88,20 @@ export interface RunnerJobsHooks {
   routinesSettled?: () => void;
 }
 
-const fresh = (account: string, conversationId: string, jobIds: string[], jobId: string | null, active: boolean): Entry => ({ account, conversationId, jobIds, jobId, cancel: null, active, status: "queued", steps: [], reply: "", error: null, liveView: null, approval: null });
+const fresh = (account: string, conversationId: string, jobIds: string[], jobId: string | null, active: boolean): Entry => ({
+  account,
+  conversationId,
+  jobIds,
+  jobId,
+  cancel: null,
+  active,
+  status: "queued",
+  steps: [],
+  reply: "",
+  error: null,
+  liveView: null,
+  approval: null,
+});
 
 type NewJob = Record<string, unknown> & { id: string; prompt: string };
 
@@ -88,7 +110,8 @@ const newJobs = (rows: Record<string, unknown>[], known: string[]): NewJob[] =>
   rows.filter((row): row is NewJob => typeof row.id === "string" && typeof row.prompt === "string" && !known.includes(row.id));
 
 // How a job that's over ended, as the chat says it.
-const endError = (status: CloudJobStatus, error: string | null): string | null => (status === "failed" ? (error ?? FAILED) : status === "stopped" ? error : null);
+const endError = (status: CloudJobStatus, error: string | null): string | null =>
+  status === "failed" ? (error ?? FAILED) : status === "stopped" ? error : null;
 
 export class RunnerJobs implements ChatRunner {
   private readonly entries = new Map<string, Entry>();
@@ -127,7 +150,7 @@ export class RunnerJobs implements ChatRunner {
     private readonly account: Pick<Account, "state" | "accessToken">,
     private readonly file: string,
     private readonly hooks: RunnerJobsHooks,
-    private readonly pollMs = POLL_MS
+    private readonly pollMs = POLL_MS,
   ) {
     this.seenAccount = this.signedIn;
     this.load();
@@ -157,7 +180,12 @@ export class RunnerJobs implements ChatRunner {
     if (!this.signedIn) return { status: "signed-out", email: null, problem: null, relayUrl: null };
     if (!this.link) return { status: "none", email: null, problem: this.linkProblem, relayUrl: null };
     const linked = this.link.accepted;
-    return { status: linked ? "linked" : "waiting", email: this.link.email, problem: this.linkProblem, relayUrl: linked ? this.link.relayUrl : null };
+    return {
+      status: linked ? "linked" : "waiting",
+      email: this.link.email,
+      problem: this.linkProblem,
+      relayUrl: linked ? this.link.relayUrl : null,
+    };
   }
 
   // Asks the server who the runner is, and again now and then while someone's signed in.
@@ -261,7 +289,11 @@ export class RunnerJobs implements ChatRunner {
     }
   }
 
-  private async reconcileRoutines(account: string, shared: NonNullable<RunnerJobs["sharedRoutines"]>, rows: CloudRoutineRow[]): Promise<void> {
+  private async reconcileRoutines(
+    account: string,
+    shared: NonNullable<RunnerJobs["sharedRoutines"]>,
+    rows: CloudRoutineRow[],
+  ): Promise<void> {
     // Anything there that this no longer has goes, checked against the server's own keys, so one deleted or turned off
     // while it couldn't be reached, or before a restart, still goes. Only when the keys here change, or until it's worked.
     const keys = rows.map(({ key }) => key);
@@ -382,10 +414,13 @@ export class RunnerJobs implements ChatRunner {
       entry.jobId = jobId;
       entry.jobIds.push(jobId);
       if (entry.cancel === "forget") {
-        void this.server.forgetCloudConversation(token, entry.conversationId).catch(() => console.error("Couldn't remove a job from the runner."));
+        void this.server
+          .forgetCloudConversation(token, entry.conversationId)
+          .catch(() => console.error("Couldn't remove a job from the runner."));
         return null;
       }
-      if (entry.cancel === "stop") void this.server.stopCloudJob(token, jobId).catch(() => console.error("Couldn't stop a job on the runner."));
+      if (entry.cancel === "stop")
+        void this.server.stopCloudJob(token, jobId).catch(() => console.error("Couldn't stop a job on the runner."));
     } catch (error) {
       // Another job of this conversation is going, sent from elsewhere, which the next look brings here.
       if (error instanceof ServerError && error.status === 409) {
@@ -408,10 +443,12 @@ export class RunnerJobs implements ChatRunner {
     entry.approval = null;
     this.answered.add(approvalId);
     this.hooks.changed(chatId);
-    void this.withToken(entry.account, (token) => this.server!.decideCloudApproval(token, approvalId, allow, answer ?? null)).then((written) => {
-      // Still waiting on it, so the next look brings the card back.
-      if (!written) this.answered.delete(approvalId);
-    });
+    void this.withToken(entry.account, (token) => this.server!.decideCloudApproval(token, approvalId, allow, answer ?? null)).then(
+      (written) => {
+        // Still waiting on it, so the next look brings the card back.
+        if (!written) this.answered.delete(approvalId);
+      },
+    );
     return true;
   }
 
@@ -432,7 +469,8 @@ export class RunnerJobs implements ChatRunner {
     this.forgotten.push(entry.conversationId);
     this.forgotten.splice(0, Math.max(0, this.forgotten.length - MAX_FORGOTTEN));
     this.save();
-    if (ours && entry.jobIds.length > 0) void this.withToken(entry.account, (token) => this.server!.forgetCloudConversation(token, entry.conversationId));
+    if (ours && entry.jobIds.length > 0)
+      void this.withToken(entry.account, (token) => this.server!.forgetCloudConversation(token, entry.conversationId));
   }
 
   // Signed in or out. Jobs carry on there either way. Nothing the last account saw stays here, not a card, a step or a
@@ -498,9 +536,21 @@ export class RunnerJobs implements ChatRunner {
     if (going.length === 0) return;
     this.polling = true;
     try {
-      const rows = await this.withToken(account, (token) => this.server!.cloudJobs(token, going.map(([, entry]) => entry.jobId!)));
+      const rows = await this.withToken(account, (token) =>
+        this.server!.cloudJobs(
+          token,
+          going.map(([, entry]) => entry.jobId!),
+        ),
+      );
       // Someone else signed in while it was asking, so none of this is theirs.
-      if (rows && this.signedIn === account) going.forEach(([chatId, entry]) => this.read(chatId, entry, rows.find((row) => row.id === entry.jobId)));
+      if (rows && this.signedIn === account)
+        going.forEach(([chatId, entry]) =>
+          this.read(
+            chatId,
+            entry,
+            rows.find((row) => row.id === entry.jobId),
+          ),
+        );
     } finally {
       this.polling = false;
     }
@@ -519,7 +569,16 @@ export class RunnerJobs implements ChatRunner {
       liveView: typeof row.live_view_url === "string" ? row.live_view_url : null,
       approval: approval && !this.answered.has(approval.id) ? approval : null,
     };
-    const same = JSON.stringify(next) === JSON.stringify({ status: entry.status, steps: entry.steps, reply: entry.reply, error: entry.error, liveView: entry.liveView, approval: entry.approval });
+    const same =
+      JSON.stringify(next) ===
+      JSON.stringify({
+        status: entry.status,
+        steps: entry.steps,
+        reply: entry.reply,
+        error: entry.error,
+        liveView: entry.liveView,
+        approval: entry.approval,
+      });
     Object.assign(entry, next);
     if (FINISHED.includes(status)) return this.finish(chatId, entry, endError(status, entry.error));
     if (!same) this.hooks.changed(chatId);
@@ -544,11 +603,14 @@ export class RunnerJobs implements ChatRunner {
       const listed = await this.withToken(account, (token) => this.server!.cloudConversationJobs(token));
       if (!listed) return;
       const conversations = new Map<string, string[]>();
-      listed.forEach(({ id, conversation_id: conversationId }) => conversations.set(conversationId, [...(conversations.get(conversationId) ?? []), id]));
+      listed.forEach(({ id, conversation_id: conversationId }) =>
+        conversations.set(conversationId, [...(conversations.get(conversationId) ?? []), id]),
+      );
       for (const [conversationId, jobIds] of conversations) {
         if (this.signedIn !== account) return;
         const known = this.chatOf(account, conversationId)?.[1];
-        if (this.forgotten.includes(conversationId) || known?.active || (known && jobIds.every((id) => known.jobIds.includes(id)))) continue;
+        if (this.forgotten.includes(conversationId) || known?.active || (known && jobIds.every((id) => known.jobIds.includes(id))))
+          continue;
         const rows = await this.withToken(account, (token) => this.server!.cloudConversation(token, conversationId));
         if (rows && this.signedIn === account) this.take(account, conversationId, rows);
       }
@@ -597,7 +659,11 @@ export class RunnerJobs implements ChatRunner {
       this.hooks.followedUp?.(chatId, row.prompt);
       const status = (typeof row.status === "string" ? row.status : "failed") as CloudJobStatus;
       if (FINISHED.includes(status)) {
-        this.hooks.finished(chatId, { reply: typeof row.reply === "string" ? row.reply : "", steps: stepsFromRow(row.steps), error: endError(status, typeof row.error === "string" ? row.error : null) });
+        this.hooks.finished(chatId, {
+          reply: typeof row.reply === "string" ? row.reply : "",
+          steps: stepsFromRow(row.steps),
+          error: endError(status, typeof row.error === "string" ? row.error : null),
+        });
         continue;
       }
       // Only one in a conversation goes at a time, and it's the newest.
@@ -619,10 +685,15 @@ export class RunnerJobs implements ChatRunner {
         const known = Array.isArray(jobIds) ? jobIds.filter(id) : id(jobId) ? [jobId] : [];
         // A chat saved before conversations is one under its job's id, which is what the server makes of it too.
         const conversation = id(conversationId) ? conversationId : id(jobId) ? jobId : null;
-        if (conversation) this.entries.set(chatId, fresh(account, conversation, known, id(jobId) ? jobId : null, id(jobId) && active === true));
+        if (conversation)
+          this.entries.set(chatId, fresh(account, conversation, known, id(jobId) ? jobId : null, id(jobId) && active === true));
       });
       if (Array.isArray(saved?.forgotten)) this.forgotten.push(...saved.forgotten.filter(id).slice(-MAX_FORGOTTEN));
-      if (Array.isArray(saved?.routinesInCloud)) saved.routinesInCloud.filter(id).slice(0, 100).forEach((key: string) => this.routinesThere.add(key));
+      if (Array.isArray(saved?.routinesInCloud))
+        saved.routinesInCloud
+          .filter(id)
+          .slice(0, 100)
+          .forEach((key: string) => this.routinesThere.add(key));
     } catch {
       // Nothing sent there yet.
     }
@@ -632,7 +703,12 @@ export class RunnerJobs implements ChatRunner {
     try {
       mkdirSync(dirname(this.file), { recursive: true });
       const chats = Object.fromEntries(
-        [...this.entries].filter(([, entry]) => entry.jobIds.length > 0).map(([chatId, { account, conversationId, jobIds, jobId, active }]) => [chatId, { account, conversationId, jobIds, jobId, active: active && !!jobId }])
+        [...this.entries]
+          .filter(([, entry]) => entry.jobIds.length > 0)
+          .map(([chatId, { account, conversationId, jobIds, jobId, active }]) => [
+            chatId,
+            { account, conversationId, jobIds, jobId, active: active && !!jobId },
+          ]),
       );
       const temp = `${this.file}.tmp`;
       writeFileSync(temp, JSON.stringify({ chats, forgotten: this.forgotten, routinesInCloud: [...this.routinesThere] }));

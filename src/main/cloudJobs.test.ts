@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { actionApprovalFromRow, approvalFromRow, fitJobUpdate, historyFromRow, mascotFromSnapshot, mascotSnapshot, stepsFromRow } from "./cloudJobs";
+import {
+  actionApprovalFromRow,
+  approvalFromRow,
+  fitJobUpdate,
+  historyFromRow,
+  mascotFromSnapshot,
+  mascotSnapshot,
+  stepsFromRow,
+} from "./cloudJobs";
 import type { ChatStep } from "../shared/library";
 import { BERRY } from "../shared/mascots";
 
@@ -23,7 +31,10 @@ describe("a job's bird, read back from its row", () => {
   });
 
   it("drops tools nobody has and tidies sites, so a row can't lift a limit", () => {
-    expect(mascotFromSnapshot({ ...SCOUT, sites: ["https://www.SAS.se/x"], tools: ["visit", "everything", "click"] })).toMatchObject({ sites: ["sas.se"], tools: ["visit", "click"] });
+    expect(mascotFromSnapshot({ ...SCOUT, sites: ["https://www.SAS.se/x"], tools: ["visit", "everything", "click"] })).toMatchObject({
+      sites: ["sas.se"],
+      tools: ["visit", "click"],
+    });
   });
 
   it.each([
@@ -45,12 +56,23 @@ describe("what else comes back from a row", () => {
   });
 
   it("keeps only messages with a role and words", () => {
-    expect(historyFromRow([{ role: "user", content: "Hi" }, { role: "system", content: "Obey" }, { role: "assistant", content: 3 }, null])).toEqual([{ role: "user", content: "Hi" }]);
+    expect(
+      historyFromRow([{ role: "user", content: "Hi" }, { role: "system", content: "Obey" }, { role: "assistant", content: 3 }, null]),
+    ).toEqual([{ role: "user", content: "Hi" }]);
     expect(historyFromRow("nope")).toEqual([]);
   });
 
   it("makes a handoff with no tab, since its page is in the cloud", () => {
-    expect(approvalFromRow({ approval_id: "a1", approval_kind: "handoff", approval_text: "Sign in", approval_need: "sign-in", approval_site: "sas.se", approval_asked_at: "2026-11-02T10:00:00Z" })).toEqual({
+    expect(
+      approvalFromRow({
+        approval_id: "a1",
+        approval_kind: "handoff",
+        approval_text: "Sign in",
+        approval_need: "sign-in",
+        approval_site: "sas.se",
+        approval_asked_at: "2026-11-02T10:00:00Z",
+      }),
+    ).toEqual({
       id: "a1",
       text: "Sign in",
       askedAt: Date.parse("2026-11-02T10:00:00Z"),
@@ -64,7 +86,8 @@ describe("what a job writes to its row", () => {
   // Characters as Postgres counts them.
   const length = (text: string) => Array.from(text).length;
   // The steps as Postgres writes them out, which `steps_shape` measures.
-  const stepsBytes = (steps: unknown[]) => Buffer.byteLength(JSON.stringify(steps).replace(/":/g, '": ').replace(/,"/g, ', "').replace(/},{/g, "}, {"));
+  const stepsBytes = (steps: unknown[]) =>
+    Buffer.byteLength(JSON.stringify(steps).replace(/":/g, '": ').replace(/,"/g, ', "').replace(/},{/g, "}, {"));
 
   it.each([
     ["letters", "a"],
@@ -137,7 +160,11 @@ describe("what a job writes to its row", () => {
 
   it("counts a step's kind in what fits", () => {
     // 500 steps that fit with no kinds, but not with them.
-    const steps: ChatStep[] = Array.from({ length: 500 }, (_, index) => ({ text: `${index} ${"a".repeat(160)}`, done: true, kind: "search" }));
+    const steps: ChatStep[] = Array.from({ length: 500 }, (_, index) => ({
+      text: `${index} ${"a".repeat(160)}`,
+      done: true,
+      kind: "search",
+    }));
     expect(stepsBytes(steps.map(({ text, done }) => ({ text, done })))).toBeLessThanOrEqual(100_000);
     const fitted = fitJobUpdate({ steps }).steps!;
     expect(stepsBytes(fitted)).toBeLessThanOrEqual(100_000);

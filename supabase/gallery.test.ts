@@ -37,7 +37,12 @@ describe("the Gallery's database rules", () => {
   };
   const publish = async (uid: string, values = VALUES) =>
     (await as<{ id: string }>(uid, `insert into public.mascots (${COLUMNS}) values (${values}) returning id`))[0].id;
-  const row = async (id: string) => (await db.query<{ add_count: number; hidden: boolean; owner: string; name: string }>("select * from public.mascots where id = $1", [id])).rows[0];
+  const row = async (id: string) =>
+    (
+      await db.query<{ add_count: number; hidden: boolean; owner: string; name: string }>("select * from public.mascots where id = $1", [
+        id,
+      ])
+    ).rows[0];
   const add = (uid: string | null, id: string, install = INSTALL) => as(uid, `select public.record_add('${id}', '${install}')`);
 
   beforeAll(async () => {
@@ -71,14 +76,20 @@ describe("the Gallery's database rules", () => {
   it("only lets the owner write, and only the columns that are theirs", async () => {
     const id = await publish(ALICE);
     await expect(as(null, `insert into public.mascots (${COLUMNS}) values (${VALUES})`)).rejects.toThrow(/permission denied/);
-    await expect(as(BOB, `insert into public.mascots (owner, ${COLUMNS}) values ('${ALICE}', ${VALUES})`)).rejects.toThrow(/permission denied/);
+    await expect(as(BOB, `insert into public.mascots (owner, ${COLUMNS}) values ('${ALICE}', ${VALUES})`)).rejects.toThrow(
+      /permission denied/,
+    );
     expect(await as(BOB, `update public.mascots set name = 'Stolen' where id = '${id}' returning id`)).toEqual([]);
     expect(await as(BOB, `delete from public.mascots where id = '${id}' returning id`)).toEqual([]);
     for (const set of ["hidden = true", "add_count = 999", `owner = '${BOB}'`, "created_at = now()"]) {
       await expect(as(ALICE, `update public.mascots set ${set} where id = '${id}'`)).rejects.toThrow(/permission denied/);
     }
-    await expect(as(ALICE, `insert into public.mascots (hidden, ${COLUMNS}) values (false, ${VALUES})`)).rejects.toThrow(/permission denied/);
-    await expect(as(ALICE, `insert into public.mascots (add_count, ${COLUMNS}) values (9, ${VALUES})`)).rejects.toThrow(/permission denied/);
+    await expect(as(ALICE, `insert into public.mascots (hidden, ${COLUMNS}) values (false, ${VALUES})`)).rejects.toThrow(
+      /permission denied/,
+    );
+    await expect(as(ALICE, `insert into public.mascots (add_count, ${COLUMNS}) values (9, ${VALUES})`)).rejects.toThrow(
+      /permission denied/,
+    );
     expect(await as(ALICE, `update public.mascots set name = 'Mine' where id = '${id}' returning id`)).toEqual([{ id }]);
     expect((await row(id)).name).toBe("Mine");
     expect((await row(id)).owner).toBe(ALICE);
@@ -103,8 +114,12 @@ describe("the Gallery's database rules", () => {
     const columns = `sites, ${COLUMNS}`;
     const sites = `array[${Array.from({ length: 21 }, (_, at) => `'s${at}.se'`).join(",")}]`;
     await expect(as(BOB, `insert into public.mascots (${columns}) values (${sites}, ${VALUES})`)).rejects.toThrow(/sites_shape/);
-    await expect(as(BOB, `insert into public.mascots (tools, ${COLUMNS}) values (array['everything'], ${VALUES})`)).rejects.toThrow(/tools_shape/);
-    await expect(as(BOB, `insert into public.mascots (example_prompt, ${COLUMNS}) values ('Hi', ${VALUES})`)).rejects.toThrow(/example_shape/);
+    await expect(as(BOB, `insert into public.mascots (tools, ${COLUMNS}) values (array['everything'], ${VALUES})`)).rejects.toThrow(
+      /tools_shape/,
+    );
+    await expect(as(BOB, `insert into public.mascots (example_prompt, ${COLUMNS}) values ('Hi', ${VALUES})`)).rejects.toThrow(
+      /example_shape/,
+    );
   });
 
   it("counts one add per install or account, never an author's own, and only through the function", async () => {

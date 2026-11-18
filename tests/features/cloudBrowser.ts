@@ -14,8 +14,20 @@ export async function startCloudBrowser(site: Site): Promise<{ env: Record<strin
   const profile = mkdtempSync(join(tmpdir(), "blueberry-drive-cloud-"));
   const child = spawn(
     chrome,
-    ["--headless=new", "--remote-debugging-port=0", "--remote-debugging-address=127.0.0.1", `--user-data-dir=${profile}`, "--no-first-run", "--no-default-browser-check", "--window-size=1280,800", "--force-device-scale-factor=1", "--hide-scrollbars", `--host-resolver-rules=${site.hostRules}`, "about:blank"],
-    { stdio: ["ignore", "ignore", "pipe"] }
+    [
+      "--headless=new",
+      "--remote-debugging-port=0",
+      "--remote-debugging-address=127.0.0.1",
+      `--user-data-dir=${profile}`,
+      "--no-first-run",
+      "--no-default-browser-check",
+      "--window-size=1280,800",
+      "--force-device-scale-factor=1",
+      "--hide-scrollbars",
+      `--host-resolver-rules=${site.hostRules}`,
+      "about:blank",
+    ],
+    { stdio: ["ignore", "ignore", "pipe"] },
   );
   // Its profile can only go once Chrome has let go of its files.
   const close = async () => {

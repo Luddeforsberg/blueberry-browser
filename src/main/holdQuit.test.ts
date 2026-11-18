@@ -83,9 +83,13 @@ describe("holdQuit", () => {
     await vi.waitFor(() => expect(failing.quits.done).toBe(1));
 
     const throwing = fakeApp();
-    holdQuit(throwing.app, () => {
-      throw new Error("no");
-    }, 60_000);
+    holdQuit(
+      throwing.app,
+      () => {
+        throw new Error("no");
+      },
+      60_000,
+    );
     throwing.app.quit();
     await vi.waitFor(() => expect(throwing.quits.done).toBe(1));
   });

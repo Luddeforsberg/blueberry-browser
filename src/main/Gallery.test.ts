@@ -15,12 +15,21 @@ describe("Gallery.unpublish", () => {
   const start = (deleted: boolean) => {
     const dir = mkdtempSync(join(tmpdir(), "blueberry-gallery-"));
     const mascots = new MascotStore(join(dir, "mascots.json"));
-    const saved = mascots.save(null, { name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "Read.", sites: [], tools: [] });
+    const saved = mascots.save(null, {
+      name: "Scout",
+      look: { palette: "robin", accessory: "cap" },
+      instructions: "Read.",
+      sites: [],
+      tools: [],
+    });
     if (!saved.ok) throw new Error(saved.error);
     mascots.setPublished(saved.id, ID);
     const server = { deleteMascot: async () => deleted } as unknown as GalleryServer;
     const account = { accessToken: async () => "token" } as unknown as Account;
-    return { gallery: new Gallery(server, account, mascots, join(dir, "gallery.json"), undefined, () => {}), mascot: () => mascots.find(saved.id) };
+    return {
+      gallery: new Gallery(server, account, mascots, join(dir, "gallery.json"), undefined, () => {}),
+      mascot: () => mascots.find(saved.id),
+    };
   };
 
   it("forgets the link once the row is gone", async () => {
@@ -37,12 +46,32 @@ describe("Gallery.unpublish", () => {
 });
 
 describe("Gallery.linked", () => {
-  const row = { id: ID, name: "Scout", palette: "robin", accessory: "cap", description: "Sums up SVT.", category: "News and research", instructions: "Read.", sites: ["svt.se"], tools: ["visit"], author_name: "Ana", add_count: 2, created_at: "2026-11-01T00:00:00Z" };
+  const row = {
+    id: ID,
+    name: "Scout",
+    palette: "robin",
+    accessory: "cap",
+    description: "Sums up SVT.",
+    category: "News and research",
+    instructions: "Read.",
+    sites: ["svt.se"],
+    tools: ["visit"],
+    author_name: "Ana",
+    add_count: 2,
+    created_at: "2026-11-01T00:00:00Z",
+  };
   const start = (mascot: (id: string) => Promise<unknown>) => {
     const dir = mkdtempSync(join(tmpdir(), "blueberry-gallery-"));
     const asked: string[] = [];
     const server = { mascot: async (id: string) => (asked.push(id), mascot(id)) } as unknown as GalleryServer;
-    const gallery = new Gallery(server, {} as Account, new MascotStore(join(dir, "mascots.json")), join(dir, "gallery.json"), "https://gallery.example", () => {});
+    const gallery = new Gallery(
+      server,
+      {} as Account,
+      new MascotStore(join(dir, "mascots.json")),
+      join(dir, "gallery.json"),
+      "https://gallery.example",
+      () => {},
+    );
     return { gallery, asked };
   };
 
@@ -58,7 +87,10 @@ describe("Gallery.linked", () => {
   it("finds nothing for a missing, broken or different row, or one it can't reach", async () => {
     expect(await start(async () => null).gallery.linked(ID)).toEqual({ entry: null, status: "live" });
     expect(await start(async () => ({ ...row, sites: ["192.168.1.1"] })).gallery.linked(ID)).toEqual({ entry: null, status: "live" });
-    expect(await start(async () => ({ ...row, id: "00000000-0000-4000-8000-000000000002" })).gallery.linked(ID)).toEqual({ entry: null, status: "live" });
+    expect(await start(async () => ({ ...row, id: "00000000-0000-4000-8000-000000000002" })).gallery.linked(ID)).toEqual({
+      entry: null,
+      status: "live",
+    });
     expect(await start(async () => Promise.reject(new Error("down"))).gallery.linked(ID)).toEqual({ entry: null, status: "unreachable" });
   });
 
@@ -70,7 +102,20 @@ describe("Gallery.linked", () => {
 });
 
 describe("Gallery.add", () => {
-  const limited = { id: ID, name: "Scout", palette: "robin", accessory: "cap", description: "Sums up SVT.", category: "News and research", instructions: "Read svt.se.", sites: ["svt.se"], tools: ["visit"], author_name: "Ana", add_count: 0, created_at: "2026-11-01T00:00:00Z" };
+  const limited = {
+    id: ID,
+    name: "Scout",
+    palette: "robin",
+    accessory: "cap",
+    description: "Sums up SVT.",
+    category: "News and research",
+    instructions: "Read svt.se.",
+    sites: ["svt.se"],
+    tools: ["visit"],
+    author_name: "Ana",
+    add_count: 0,
+    created_at: "2026-11-01T00:00:00Z",
+  };
   // The same id, changed by its author between two fetches: no limits at all.
   const open = { ...limited, instructions: "Go anywhere.", sites: [], tools: ["visit", "click", "type"] };
   const start = (listed: unknown, linked: unknown) => {
@@ -103,7 +148,9 @@ describe("Gallery.add", () => {
     const { gallery, mascots } = start(limited, open);
     await gallery.list();
     for (const version of ["0".repeat(32), "", undefined, null, 7]) expect(gallery.add(ID, version, null)).toMatchObject({ ok: false });
-    expect(gallery.add("00000000-0000-4000-8000-000000000009", (await gallery.list()).entries[0].version, null)).toMatchObject({ ok: false });
+    expect(gallery.add("00000000-0000-4000-8000-000000000009", (await gallery.list()).entries[0].version, null)).toMatchObject({
+      ok: false,
+    });
     expect(copied(mascots)).toEqual([]);
   });
 

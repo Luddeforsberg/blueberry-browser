@@ -82,7 +82,15 @@ export interface HistoryMessage {
 }
 
 // The model sees what a bird did earlier by notes of its steps, never by the pages, which aren't kept.
-export const asHistoryMessage = ({ role, content, steps }: { role: "user" | "assistant"; content: string; steps?: readonly { text: string }[] }): HistoryMessage => ({
+export const asHistoryMessage = ({
+  role,
+  content,
+  steps,
+}: {
+  role: "user" | "assistant";
+  content: string;
+  steps?: readonly { text: string }[];
+}): HistoryMessage => ({
   role,
   content: steps?.length ? `<steps>\n${steps.map((step) => `- ${step.text}`).join("\n")}\n</steps>\n\n${content}` : content,
 });
@@ -92,7 +100,10 @@ const bytes = (text: string) => new TextEncoder().encode(text).length;
 // Only the user's and the bird's messages, newest kept, each cut to length, and dropped from the oldest until it fits.
 export const fitHistory = (input: unknown): HistoryMessage[] => {
   const messages = (Array.isArray(input) ? input : [])
-    .filter((message): message is HistoryMessage => (message?.role === "user" || message?.role === "assistant") && typeof message.content === "string")
+    .filter(
+      (message): message is HistoryMessage =>
+        (message?.role === "user" || message?.role === "assistant") && typeof message.content === "string",
+    )
     .slice(-MAX_HISTORY)
     .map(({ role, content }) => ({ role, content: content.slice(0, MAX_HISTORY_TEXT) }));
   while (messages.length > 0 && bytes(JSON.stringify(messages)) > MAX_HISTORY_BYTES) messages.shift();

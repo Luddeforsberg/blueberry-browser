@@ -12,7 +12,10 @@ class FakeItem extends EventEmitter {
   paused = false;
   resumable = true;
   cancelled = false;
-  constructor(private readonly name = "report.pdf", private readonly url = "https://files.example.com/a?token=secret") {
+  constructor(
+    private readonly name = "report.pdf",
+    private readonly url = "https://files.example.com/a?token=secret",
+  ) {
     super();
   }
   getFilename = () => this.name;

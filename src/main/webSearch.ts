@@ -18,9 +18,7 @@ const TIMEOUT_MS = 20_000;
 export class WebSearchError extends Error {}
 
 // Null with no key, so the tool isn't offered at all.
-export const firecrawlSearch = (
-  env: Record<string, string | undefined> = process.env,
-): WebSearch | null => {
+export const firecrawlSearch = (env: Record<string, string | undefined> = process.env): WebSearch | null => {
   const key = env.FIRECRAWL_API_KEY?.trim();
   if (!key) return null;
   return async (query) => {
@@ -45,10 +43,7 @@ export const firecrawlSearch = (
     } catch {
       throw new WebSearchError("The search service couldn't be reached.");
     }
-    if (!response.ok)
-      throw new WebSearchError(
-        `The search service answered ${response.status}.`,
-      );
+    if (!response.ok) throw new WebSearchError(`The search service answered ${response.status}.`);
     const body = (await response.json().catch(() => null)) as {
       data?: { web?: unknown };
     } | null;
@@ -56,8 +51,7 @@ export const firecrawlSearch = (
   };
 };
 
-const text = (value: unknown, max: number) =>
-  typeof value === "string" ? value.trim().slice(0, max) : "";
+const text = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : "");
 
 // Only what's needed, and only web addresses, however much else the service sends.
 export const parseResults = (web: unknown): SearchResult[] =>

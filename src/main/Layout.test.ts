@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { computeLayout, MIN_PAGE_WIDTH, promptRect, PROMPT_WIDTH, suggestionsRect,
+import {
+  computeLayout,
+  MIN_PAGE_WIDTH,
+  promptRect,
+  PROMPT_WIDTH,
+  suggestionsRect,
   DESKTOP_DEFAULT_SPOT,
   desktopBoxPlace,
   desktopHit,
@@ -50,10 +55,7 @@ describe("computeLayout", () => {
   });
 
   it("keeps the gutter round the page when both panels are gone", () => {
-    const layout = computeLayout(
-      { width: 1280, height: 800 },
-      { sidebarOpen: false, chatOpen: false, ...mac }
-    );
+    const layout = computeLayout({ width: 1280, height: 800 }, { sidebarOpen: false, chatOpen: false, ...mac });
 
     expect(layout.sidebar.width).toBe(0);
     expect(layout.chat.width).toBe(0);
@@ -139,10 +141,7 @@ describe("computeLayout", () => {
   });
 
   it("puts a tab row and a toolbar above the page in horizontal mode, with no sidebar, and a bookmarks bar only with something saved", () => {
-    const layout = computeLayout(
-      { width: 1280, height: 800 },
-      { ...both, mode: "horizontal" }
-    );
+    const layout = computeLayout({ width: 1280, height: 800 }, { ...both, mode: "horizontal" });
 
     expect(layout.sidebarOpen).toBe(false);
     expect(layout.floatingSidebar.width).toBe(0);
@@ -171,18 +170,12 @@ describe("computeLayout", () => {
   });
 
   it("uses resized panel widths, kept within their limits", () => {
-    const resized = computeLayout(
-      { width: 1400, height: 800 },
-      { ...both, sidebarWidth: 300, chatWidth: 400 }
-    );
+    const resized = computeLayout({ width: 1400, height: 800 }, { ...both, sidebarWidth: 300, chatWidth: 400 });
     expect(resized.sidebar.width).toBe(300);
     expect(resized.chat).toEqual({ x: 992, y: 48, width: 400, height: 744 });
     expect(resized.page.width).toBe(684);
 
-    const extreme = computeLayout(
-      { width: 1400, height: 800 },
-      { ...both, sidebarWidth: 10, chatWidth: 9999 }
-    );
+    const extreme = computeLayout({ width: 1400, height: 800 }, { ...both, sidebarWidth: 10, chatWidth: 9999 });
     expect(extreme.sidebarWidth).toBe(200);
     expect(extreme.chatWidth).toBe(480);
   });
@@ -222,7 +215,10 @@ describe("the drop on the desktop", () => {
   const FRACTIONS = [0, 0.25, 0.5, 0.51, 1];
   type Box = { x: number; y: number; width: number; height: number };
   const inside = (rect: Box, within: Box) =>
-    rect.x >= within.x && rect.y >= within.y && rect.x + rect.width <= within.x + within.width && rect.y + rect.height <= within.y + within.height;
+    rect.x >= within.x &&
+    rect.y >= within.y &&
+    rect.x + rect.width <= within.x + within.width &&
+    rect.y + rect.height <= within.y + within.height;
   const overlaps = (a: Box, b: Box) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
   const onScreen = (window: Box, rect: Box): Box => ({ ...rect, x: window.x + rect.x, y: window.y + rect.y });
   const side = (edge: (typeof EDGES)[number]) => edge === "left" || edge === "right";
@@ -265,7 +261,7 @@ describe("the drop on the desktop", () => {
         if (edge === "top") expect(drop.y).toBe(0);
         if (edge === "left") expect(drop.x).toBe(0);
         if (edge === "right") expect(drop.x + drop.width).toBe(window.width);
-      })
+      }),
     );
   });
 
@@ -285,13 +281,16 @@ describe("the drop on the desktop", () => {
         const box = desktopBoxPlace(area, spot);
         expect(inside(box.window, area)).toBe(true);
         // The same point on the screen, so the box grows out of the drop.
-        expect({ x: box.window.x + box.anchor.x, y: box.window.y + box.anchor.y }).toEqual({ x: drop.window.x + drop.anchor.x, y: drop.window.y + drop.anchor.y });
+        expect({ x: box.window.x + box.anchor.x, y: box.window.y + box.anchor.y }).toEqual({
+          x: drop.window.x + drop.anchor.x,
+          y: drop.window.y + drop.anchor.y,
+        });
         if (edge === "right") expect(box.window.x + box.window.width).toBe(right);
         if (edge === "bottom") expect(box.window.y + box.window.height).toBe(bottom);
         // Long enough for the box, and its fillets along the top and bottom.
         const long = side(edge) ? box.window.width : box.window.width - 2 * DESKTOP_FILLET;
         expect(long).toBeGreaterThanOrEqual(DESKTOP_BOX.long);
-      })
+      }),
     );
     // Away from the corners, the box's window is centred on the drop, with as much room for the chips over it as for the
     // keys under it.
@@ -302,7 +301,9 @@ describe("the drop on the desktop", () => {
     });
     // Taller with more lines, and never past the screen.
     expect(inside(desktopBoxPlace(area, { edge: "right", fraction: 1 }, 2000).window, area)).toBe(true);
-    expect(desktopBoxPlace(area, { edge: "right", fraction: 0.5 }, 140).window.height).toBeGreaterThan(desktopBoxPlace(area, { edge: "right", fraction: 0.5 }).window.height);
+    expect(desktopBoxPlace(area, { edge: "right", fraction: 0.5 }, 140).window.height).toBeGreaterThan(
+      desktopBoxPlace(area, { edge: "right", fraction: 0.5 }).window.height,
+    );
   });
 
   it("puts the tray and the ask beside the drop, clear of it, and on screen at any size", () => {
@@ -313,7 +314,7 @@ describe("the drop on the desktop", () => {
         expect(inside(sheets.window, area)).toBe(true);
         const drop = desktopPlace(area, spot);
         expect(overlaps(sheets.window, onScreen(drop.window, desktopRestingDrop(drop, edge)))).toBe(false);
-      })
+      }),
     );
     const tiny = { x: 0, y: 0, width: 300, height: 200 };
     EDGES.forEach((edge) => {
@@ -420,8 +421,12 @@ describe("tabPreviewRect", () => {
 
   it("keeps the strip's size the same whatever the card holds, so following along the tabs never moves the view", () => {
     const row = { x: 300, y: 5, width: 196, height: 32 };
-    expect(tabPreviewRect(tabRow, row, { picture: false, working: false }, window).view).toEqual(tabPreviewRect(tabRow, row, { picture: true, working: true }, window).view);
-    expect(tabPreviewRect(sidebar, row, { picture: false, working: false }, window).view).toEqual(tabPreviewRect(sidebar, { ...row, y: 600 }, full, window).view);
+    expect(tabPreviewRect(tabRow, row, { picture: false, working: false }, window).view).toEqual(
+      tabPreviewRect(tabRow, row, { picture: true, working: true }, window).view,
+    );
+    expect(tabPreviewRect(sidebar, row, { picture: false, working: false }, window).view).toEqual(
+      tabPreviewRect(sidebar, { ...row, y: 600 }, full, window).view,
+    );
   });
 });
 

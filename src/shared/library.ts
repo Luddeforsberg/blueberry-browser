@@ -394,7 +394,20 @@ export type SuggestionWords = { id: string; title: string } & (
 export type Suggestion = SuggestionWords & { why: string };
 
 // One thing Berry saw the user do while it was being shown something. Only ever in memory, and only in main and the chrome.
-export type TrailKind = "went" | "searched" | "clicked" | "typed" | "secret" | "chose" | "ticked" | "pressed" | "switched" | "frame" | "file" | "copied" | "pasted";
+export type TrailKind =
+  | "went"
+  | "searched"
+  | "clicked"
+  | "typed"
+  | "secret"
+  | "chose"
+  | "ticked"
+  | "pressed"
+  | "switched"
+  | "frame"
+  | "file"
+  | "copied"
+  | "pasted";
 
 export interface TrailStep {
   id: string;

@@ -7,9 +7,7 @@ import { CHANNEL_REGIONS, chatSendOptions, isTrustedSender, type ChromeEndpoint 
 import { starterExamplePrompts } from "./mascotCatalog";
 import type { ChromeRegion, InvokeChannel, InvokeChannels } from "../shared/ipc";
 
-type Result<C extends InvokeChannel> =
-  | InvokeChannels[C]["result"]
-  | Promise<InvokeChannels[C]["result"]>;
+type Result<C extends InvokeChannel> = InvokeChannels[C]["result"] | Promise<InvokeChannels[C]["result"]>;
 
 export class EventManager {
   private mainWindow: Window;
@@ -48,17 +46,14 @@ export class EventManager {
     };
   }
 
-  private handle<C extends InvokeChannel>(
-    channel: C,
-    listener: (...args: InvokeChannels[C]["args"]) => Result<C>
-  ): void {
+  private handle<C extends InvokeChannel>(channel: C, listener: (...args: InvokeChannels[C]["args"]) => Result<C>): void {
     this.handleFrom(channel, (_, ...args) => listener(...args));
   }
 
   // The same, for a call that needs to know which of its views made it.
   private handleFrom<C extends InvokeChannel>(
     channel: C,
-    listener: (region: InvokeChannels[C]["region"], ...args: InvokeChannels[C]["args"]) => Result<C>
+    listener: (region: InvokeChannels[C]["region"], ...args: InvokeChannels[C]["args"]) => Result<C>,
   ): void {
     ipcMain.handle(channel, (event, ...args) => {
       const endpoints = this.endpoints;
@@ -89,9 +84,7 @@ export class EventManager {
   private handleTabEvents(): void {
     this.handle("tabs:list", () => this.mainWindow.tabInfos);
 
-    this.handle("tabs:create", (url) =>
-      this.mainWindow.tabInfo(this.mainWindow.createTab(url))
-    );
+    this.handle("tabs:create", (url) => this.mainWindow.tabInfo(this.mainWindow.createTab(url)));
 
     this.handle("tabs:close", (tabId) => this.mainWindow.closeTab(tabId));
 
@@ -101,9 +94,7 @@ export class EventManager {
 
     this.handle("tabs:move-by", (tabId, delta) => this.mainWindow.moveTabBy(tabId, delta));
 
-    this.handle("tabs:open-page", (page, options) =>
-      this.mainWindow.tabInfo(this.mainWindow.openPage(page, options))
-    );
+    this.handle("tabs:open-page", (page, options) => this.mainWindow.tabInfo(this.mainWindow.openPage(page, options)));
 
     this.handle("tab:navigate", (tabId, url) => this.mainWindow.navigateTab(tabId, url));
 
@@ -200,7 +191,9 @@ export class EventManager {
 
     // First jobs are done by what main sees happen, so a renderer can't say so.
     this.handle("settings:app-icon", (png, mascotId, ground) => this.mainWindow.appIcon.set(png, mascotId, ground));
-    this.handle("settings:update", (patch) => this.mainWindow.updateSettings({ ...patch, firstJobsDone: this.mainWindow.settings.firstJobsDone }));
+    this.handle("settings:update", (patch) =>
+      this.mainWindow.updateSettings({ ...patch, firstJobsDone: this.mainWindow.settings.firstJobsDone }),
+    );
     this.handle("settings:set-appearance", (appearance) => {
       if (appearance === "system" || appearance === "light" || appearance === "dark") this.mainWindow.updateSettings({ appearance });
     });
@@ -265,7 +258,7 @@ export class EventManager {
     this.handle("attachments:add-files", (files, kept) => this.mainWindow.attachments.addFiles(files, kept));
     this.handle("attachments:discard", (id) => this.mainWindow.attachments.discard(id));
     this.handle("attachments:tabs", (chatId, mascotId) =>
-      this.mainWindow.chats.attachableTabs(typeof chatId === "string" ? chatId : null, typeof mascotId === "string" ? mascotId : null)
+      this.mainWindow.chats.attachableTabs(typeof chatId === "string" ? chatId : null, typeof mascotId === "string" ? mascotId : null),
     );
 
     this.handle("work:watch", (chatId, pictureWidth) => this.mainWindow.workViews.watch(chatId, pictureWidth));
@@ -277,13 +270,9 @@ export class EventManager {
     this.handle("recording:draft", () => this.mainWindow.recordings.draft());
     this.handle("chat:stop", (chatId) => this.mainWindow.chats.stop(chatId));
     this.handle("chat:panel-shows", (chatId) => this.mainWindow.panelShows(typeof chatId === "string" ? chatId : null));
-    this.handle("chat:decide", (chatId, approvalId, allow, answer) =>
-      this.mainWindow.chats.decide(chatId, approvalId, allow, answer)
-    );
+    this.handle("chat:decide", (chatId, approvalId, allow, answer) => this.mainWindow.chats.decide(chatId, approvalId, allow, answer));
 
-    this.handle("chat:rename", (chatId, title) =>
-      typeof title === "string" ? this.mainWindow.chats.rename(chatId, title) : false
-    );
+    this.handle("chat:rename", (chatId, title) => (typeof title === "string" ? this.mainWindow.chats.rename(chatId, title) : false));
 
     this.handleFrom("chat:menu", (region, chatId, anchor) => this.mainWindow.showChatMenu(chatId, anchor, region));
 

@@ -62,7 +62,7 @@ export const suggestionsRect = (
   field: Rect,
   rows: number,
   ruled: boolean,
-  window: { width: number; height: number }
+  window: { width: number; height: number },
 ): { view: Rect; sheet: Rect } => {
   const { gap, row, padding, rule, side, below } = SUGGESTIONS;
   const sheetHeight = 2 * padding + rows * row + (ruled ? rule : 0);
@@ -71,7 +71,12 @@ export const suggestionsRect = (
   const width = Math.max(Math.min(Math.round(field.width) + 2 * side, window.width - x), 0);
   const height = Math.max(Math.min(sheetHeight + below, window.height - y), 0);
   const sheetX = Math.round(field.x) - x;
-  const sheet = { x: sheetX, y: 0, width: Math.max(Math.min(Math.round(field.width), width - sheetX), 0), height: Math.min(sheetHeight, height) };
+  const sheet = {
+    x: sheetX,
+    y: 0,
+    width: Math.max(Math.min(Math.round(field.width), width - sheetX), 0),
+    height: Math.min(sheetHeight, height),
+  };
   return { view: { x, y, width, height }, sheet };
 };
 
@@ -135,7 +140,14 @@ export const menuPlacement = (anchor: Rect, sheets: MenuSheetBox[], area: Rect):
     const { width, height } = fit(sheet);
     const toRight = parent.x + parent.width + gap;
     const toLeft = parent.x - gap - width;
-    const x = toRight + width <= right ? toRight : toLeft >= area.x + edge ? toLeft : right - toRight > toLeft - area.x ? clamp(toRight, area.x + edge, right - width) : area.x + edge;
+    const x =
+      toRight + width <= right
+        ? toRight
+        : toLeft >= area.x + edge
+          ? toLeft
+          : right - toRight > toLeft - area.x
+            ? clamp(toRight, area.x + edge, right - width)
+            : area.x + edge;
     const y = clamp(parent.y + sheet.rowTop - padding, area.y + edge, bottom - height);
     placed.set(sheet.path, { x: Math.round(x), y: Math.round(y), width, height });
   }
@@ -170,7 +182,7 @@ export const tabPreviewRect = (
   layout: Pick<Layout, "mode" | "sidebarOpen" | "sidebarWidth" | "tabStrip">,
   row: Rect,
   card: { picture: boolean; working: boolean },
-  window: { width: number; height: number }
+  window: { width: number; height: number },
 ): { view: Rect; card: Rect } => {
   const { edge } = TAB_PREVIEW_GAP;
   const height = tabPreviewHeight(card);
@@ -235,8 +247,18 @@ const dropMiddle = (area: Rect, { edge, fraction }: Spot): Point => {
 const againstEdge = (area: Rect, edge: DesktopEdge, middle: Point, out: number, along: number): Rect => {
   const width = Math.min(sideEdge(edge) ? out : along, area.width);
   const height = Math.min(sideEdge(edge) ? along : out, area.height);
-  const x = edge === "right" ? area.x + area.width - width : edge === "left" ? area.x : clamp(middle.x - width / 2, area.x, area.x + area.width - width);
-  const y = edge === "bottom" ? area.y + area.height - height : edge === "top" ? area.y : clamp(middle.y - height / 2, area.y, area.y + area.height - height);
+  const x =
+    edge === "right"
+      ? area.x + area.width - width
+      : edge === "left"
+        ? area.x
+        : clamp(middle.x - width / 2, area.x, area.x + area.width - width);
+  const y =
+    edge === "bottom"
+      ? area.y + area.height - height
+      : edge === "top"
+        ? area.y
+        : clamp(middle.y - height / 2, area.y, area.y + area.height - height);
   return { x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) };
 };
 
@@ -251,7 +273,7 @@ export const desktopPlace = (area: Rect, spot: Spot): DesktopPlace => {
     sideEdge(spot.edge)
       ? againstEdge(area, spot.edge, middle, long + DESKTOP_SHADOW, across)
       : againstEdge(area, spot.edge, middle, thick + DESKTOP_SHADOW, long + 2 * (DESKTOP_FILLET + DESKTOP_SHADOW)),
-    middle
+    middle,
   );
 };
 
@@ -271,7 +293,7 @@ export const desktopBoxPlace = (area: Rect, spot: Spot, thick: number = DESKTOP_
     sideEdge(spot.edge)
       ? againstEdge(area, spot.edge, middle, DESKTOP_BOX.long + DESKTOP_SHADOW, across)
       : againstEdge(area, spot.edge, middle, across, DESKTOP_BOX.long + 2 * (DESKTOP_FILLET + DESKTOP_SHADOW)),
-    middle
+    middle,
   );
 };
 
@@ -329,10 +351,7 @@ export const desktopHit = (point: Point, window: Rect, hits: Rect[]): boolean =>
   });
 
 // The only place that decides where the window's regions go.
-export function computeLayout(
-  window: { width: number; height: number },
-  options: LayoutOptions
-): Layout {
+export function computeLayout(window: { width: number; height: number }, options: LayoutOptions): Layout {
   const { mode, platform } = options;
   const sidebarWidth = clampWidth(options.sidebarWidth, SIDEBAR_WIDTH);
   const chatWidth = clampWidth(options.chatWidth, CHAT_WIDTH);
@@ -413,9 +432,8 @@ export function computeLayout(
     menuButton,
     sidebar: sidebar ? { x: 0, y: 0, width: left, height } : EMPTY,
     // The collapsed sidebar floats over the page, with room around its card for the shadow.
-    floatingSidebar: vertical && !sidebar
-      ? { x: 0, y: 0, width: Math.min(sidebarWidth + 2 * FLOATING_INSET, window.width), height }
-      : EMPTY,
+    floatingSidebar:
+      vertical && !sidebar ? { x: 0, y: 0, width: Math.min(sidebarWidth + 2 * FLOATING_INSET, window.width), height } : EMPTY,
     // In the page's top right corner.
     findBar: {
       x: cardX + cardWidth - findBarWidth,

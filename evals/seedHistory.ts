@@ -43,8 +43,15 @@ export const demoVisits = (now = Date.now()): Visit[] => {
     );
   });
   // A flat hunt, checked at odd hours, so it has no habit of time.
-  [[1, 21, 10], [2, 7, 45], [4, 12, 30], [5, 18, 20]].forEach(([daysAgo, hour, minute]) => {
-    visits.push(visit("https://www.hemnet.se/bostader", "Bostäder till salu i Södermalm, Stockholm | Hemnet", at(now, daysAgo, hour, minute)));
+  [
+    [1, 21, 10],
+    [2, 7, 45],
+    [4, 12, 30],
+    [5, 18, 20],
+  ].forEach(([daysAgo, hour, minute]) => {
+    visits.push(
+      visit("https://www.hemnet.se/bostader", "Bostäder till salu i Södermalm, Stockholm | Hemnet", at(now, daysAgo, hour, minute)),
+    );
   });
   // Noise that must never turn up on a card or reach a model. Older than the rest, so it isn't in Recent on film.
   [2, 3, 4, 5, 6].forEach((daysAgo) => {

@@ -14,7 +14,7 @@ describe("startingSites", () => {
   it("puts pinned sites first, as saved, then the most visited, at most three", () => {
     const found = startingSites(
       [pin("https://www.klm.com/trips")],
-      [visit("https://github.com/a"), visit("https://prisjakt.nu/x?q=1"), visit("https://prisjakt.nu/y"), visit("https://news.example/")]
+      [visit("https://github.com/a"), visit("https://prisjakt.nu/x?q=1"), visit("https://prisjakt.nu/y"), visit("https://news.example/")],
     );
     expect(sites(found)).toEqual(["klm.com", "prisjakt.nu", "github.com"]);
     expect(found[0].url).toBe("https://www.klm.com/trips");
@@ -25,7 +25,7 @@ describe("startingSites", () => {
   it("goes by site, once each, and leaves out anything that isn't a web page", () => {
     const found = startingSites(
       [pin("https://klm.com/"), pin("https://www.klm.com/other"), pin("file:///etc/hosts")],
-      [visit("https://www.klm.com/"), visit("chrome://settings"), visit("not an address"), visit("http://127.0.0.1:3000/shop")]
+      [visit("https://www.klm.com/"), visit("chrome://settings"), visit("not an address"), visit("http://127.0.0.1:3000/shop")],
     );
     expect(sites(found)).toEqual(["klm.com", "127.0.0.1"]);
     expect(found[1].url).toBe("http://127.0.0.1:3000/");

@@ -11,7 +11,8 @@ const LIST_LIMIT = 300;
 const CONVERSATION_PAGE = 100;
 const CONVERSATION_PAGES = 50;
 
-const PUBLIC_COLUMNS = "id,name,palette,accessory,description,category,instructions,sites,tools,author_name,example_prompt,example_answer,add_count,created_at";
+const PUBLIC_COLUMNS =
+  "id,name,palette,accessory,description,category,instructions,sites,tools,author_name,example_prompt,example_answer,add_count,created_at";
 
 export interface ServerConfig {
   url: string;
@@ -52,7 +53,9 @@ export const relayAddress = (input: unknown): string | null => {
   if (typeof input !== "string" || input.length > 300) return null;
   try {
     const url = new URL(input);
-    return url.protocol === "https:" && url.pathname === "/mcp" && !url.search && !url.hash && !url.username && !url.password ? url.href : null;
+    return url.protocol === "https:" && url.pathname === "/mcp" && !url.search && !url.hash && !url.username && !url.password
+      ? url.href
+      : null;
   } catch {
     return null;
   }
@@ -62,7 +65,7 @@ export class ServerError extends Error {
   constructor(
     readonly status: number,
     // Auth's `error_code`. Empty when it gave none.
-    readonly code: string
+    readonly code: string,
   ) {
     super(`The Gallery server answered ${status}`);
   }
@@ -82,7 +85,10 @@ export interface ServerSession {
   email: string;
 }
 
-const toSession = (body: { access_token?: unknown; refresh_token?: unknown; expires_in?: unknown; user?: { email?: unknown } }, email = ""): ServerSession | null => {
+const toSession = (
+  body: { access_token?: unknown; refresh_token?: unknown; expires_in?: unknown; user?: { email?: unknown } },
+  email = "",
+): ServerSession | null => {
   const { access_token: accessToken, refresh_token: refreshToken, expires_in: expiresIn, user } = body;
   if (typeof accessToken !== "string" || typeof refreshToken !== "string") return null;
   return {
@@ -96,7 +102,10 @@ const toSession = (body: { access_token?: unknown; refresh_token?: unknown; expi
 export class GalleryServer {
   constructor(private readonly config: ServerConfig) {}
 
-  private async request<T>(path: string, options: { method?: string; body?: unknown; token?: string | null; prefer?: string } = {}): Promise<T> {
+  private async request<T>(
+    path: string,
+    options: { method?: string; body?: unknown; token?: string | null; prefer?: string } = {},
+  ): Promise<T> {
     let response: Response;
     let text: string;
     try {
@@ -139,7 +148,10 @@ export class GalleryServer {
   }
 
   async refresh(refreshToken: string, email: string): Promise<ServerSession | null> {
-    return toSession(await this.request("/auth/v1/token?grant_type=refresh_token", { method: "POST", body: { refresh_token: refreshToken } }), email);
+    return toSession(
+      await this.request("/auth/v1/token?grant_type=refresh_token", { method: "POST", body: { refresh_token: refreshToken } }),
+      email,
+    );
   }
 
   async signOut(token: string): Promise<void> {
@@ -161,19 +173,33 @@ export class GalleryServer {
   }
 
   async insertMascot(token: string, row: object): Promise<string | null> {
-    const rows = await this.request<{ id?: unknown }[]>("/rest/v1/mascots?select=id", { method: "POST", body: row, token, prefer: "return=representation" });
+    const rows = await this.request<{ id?: unknown }[]>("/rest/v1/mascots?select=id", {
+      method: "POST",
+      body: row,
+      token,
+      prefer: "return=representation",
+    });
     const id = rows?.[0]?.id;
     return typeof id === "string" ? id : null;
   }
 
   // False if no row was changed, because it's gone or isn't this user's.
   async updateMascot(token: string, id: string, row: object): Promise<boolean> {
-    const rows = await this.request<unknown[]>(`/rest/v1/mascots?id=eq.${encodeURIComponent(id)}&select=id`, { method: "PATCH", body: row, token, prefer: "return=representation" });
+    const rows = await this.request<unknown[]>(`/rest/v1/mascots?id=eq.${encodeURIComponent(id)}&select=id`, {
+      method: "PATCH",
+      body: row,
+      token,
+      prefer: "return=representation",
+    });
     return (rows?.length ?? 0) > 0;
   }
 
   async deleteMascot(token: string, id: string): Promise<boolean> {
-    const rows = await this.request<unknown[]>(`/rest/v1/mascots?id=eq.${encodeURIComponent(id)}&select=id`, { method: "DELETE", token, prefer: "return=representation" });
+    const rows = await this.request<unknown[]>(`/rest/v1/mascots?id=eq.${encodeURIComponent(id)}&select=id`, {
+      method: "DELETE",
+      token,
+      prefer: "return=representation",
+    });
     return (rows?.length ?? 0) > 0;
   }
 
@@ -187,18 +213,36 @@ export class GalleryServer {
   // is going, or if it has gone on since that one.
   async startCloudJob(
     token: string,
-    job: { prompt: string; history: unknown[]; mascot: object; actionApproval: string; contextId: string | null; conversationId: string; afterJobId: string | null }
+    job: {
+      prompt: string;
+      history: unknown[];
+      mascot: object;
+      actionApproval: string;
+      contextId: string | null;
+      conversationId: string;
+      afterJobId: string | null;
+    },
   ): Promise<string | null> {
     const id = await this.request<unknown>("/rest/v1/rpc/start_cloud_job", {
       method: "POST",
       token,
-      body: { p_prompt: job.prompt, p_history: job.history, p_mascot: job.mascot, p_action_approval: job.actionApproval, p_context_id: job.contextId, p_conversation: job.conversationId, p_after_job: job.afterJobId },
+      body: {
+        p_prompt: job.prompt,
+        p_history: job.history,
+        p_mascot: job.mascot,
+        p_action_approval: job.actionApproval,
+        p_context_id: job.contextId,
+        p_conversation: job.conversationId,
+        p_after_job: job.afterJobId,
+      },
     });
     return typeof id === "string" ? id : null;
   }
 
   async cloudJobs(token: string, ids: string[]): Promise<Record<string, unknown>[]> {
-    return (await this.request<Record<string, unknown>[]>("/rest/v1/rpc/my_cloud_jobs", { method: "POST", token, body: { p_ids: ids } })) ?? [];
+    return (
+      (await this.request<Record<string, unknown>[]>("/rest/v1/rpc/my_cloud_jobs", { method: "POST", token, body: { p_ids: ids } })) ?? []
+    );
   }
 
   async stopCloudJob(token: string, id: string): Promise<void> {
@@ -207,7 +251,13 @@ export class GalleryServer {
 
   // The user's own answer, the only way one is ever written. False if it was already answered or no longer waiting.
   async decideCloudApproval(token: string, id: string, allow: boolean, answer: string | null): Promise<boolean> {
-    return (await this.request<unknown>("/rest/v1/rpc/decide_cloud_approval", { method: "POST", token, body: { p_approval: id, p_allow: allow, p_answer: answer } })) === true;
+    return (
+      (await this.request<unknown>("/rest/v1/rpc/decide_cloud_approval", {
+        method: "POST",
+        token,
+        body: { p_approval: id, p_allow: allow, p_answer: answer },
+      })) === true
+    );
   }
 
   // Every job of a conversation, so a chat deleted here doesn't come back as one started elsewhere.
@@ -218,8 +268,15 @@ export class GalleryServer {
   // The newest jobs that belong to a conversation, so one started or followed up elsewhere shows here. Ids only. A job
   // for this Mac is a chat of its own here already, so only the cloud's.
   async cloudConversationJobs(token: string): Promise<{ id: string; conversation_id: string; created_at: string }[]> {
-    const rows = (await this.request<Record<string, unknown>[]>("/rest/v1/cloud_jobs?select=id,conversation_id,created_at&conversation_id=not.is.null&target=eq.cloud&order=created_at.desc&limit=50", { token })) ?? [];
-    return rows.filter((row): row is { id: string; conversation_id: string; created_at: string } => typeof row.id === "string" && typeof row.conversation_id === "string" && typeof row.created_at === "string");
+    const rows =
+      (await this.request<Record<string, unknown>[]>(
+        "/rest/v1/cloud_jobs?select=id,conversation_id,created_at&conversation_id=not.is.null&target=eq.cloud&order=created_at.desc&limit=50",
+        { token },
+      )) ?? [];
+    return rows.filter(
+      (row): row is { id: string; conversation_id: string; created_at: string } =>
+        typeof row.id === "string" && typeof row.conversation_id === "string" && typeof row.created_at === "string",
+    );
   }
 
   // Every job of one conversation, oldest first, with what each asked and how it went, a page at a time.
@@ -246,11 +303,21 @@ export class GalleryServer {
   }
 
   // What happened so far on one it took. Null leaves a field as it is. Answers whether to stop.
-  async macUpdateJob(token: string, id: string, update: { status?: string; steps?: unknown[]; reply?: string; error?: string }): Promise<boolean> {
+  async macUpdateJob(
+    token: string,
+    id: string,
+    update: { status?: string; steps?: unknown[]; reply?: string; error?: string },
+  ): Promise<boolean> {
     const stop = await this.request<unknown>("/rest/v1/rpc/mac_update_job", {
       method: "POST",
       token,
-      body: { p_job: id, p_status: update.status ?? null, p_steps: update.steps ?? null, p_reply: update.reply ?? null, p_error: update.error ?? null },
+      body: {
+        p_job: id,
+        p_status: update.status ?? null,
+        p_steps: update.steps ?? null,
+        p_reply: update.reply ?? null,
+        p_error: update.error ?? null,
+      },
     });
     return stop !== false;
   }
@@ -274,7 +341,17 @@ export class GalleryServer {
     await this.request("/rest/v1/rpc/sync_cloud_routine", {
       method: "POST",
       token,
-      body: { p_key: row.key, p_prompt: row.prompt, p_mascot: row.mascot, p_action_approval: row.actionApproval, p_context_id: row.contextId, p_schedule: row.schedule, p_time_zone: row.timeZone, p_paused: row.paused, p_first_run_at: row.firstRunAt },
+      body: {
+        p_key: row.key,
+        p_prompt: row.prompt,
+        p_mascot: row.mascot,
+        p_action_approval: row.actionApproval,
+        p_context_id: row.contextId,
+        p_schedule: row.schedule,
+        p_time_zone: row.timeZone,
+        p_paused: row.paused,
+        p_first_run_at: row.firstRunAt,
+      },
     });
   }
 
@@ -302,7 +379,14 @@ export class GalleryServer {
 
   // `relayUrl` is where ChatGPT or Claude connect, which the runner gives once it has accepted. Only an https one.
   async myCloudRunner(token: string): Promise<{ email: string; accepted: boolean; relayUrl: string | null } | null> {
-    const [row] = (await this.request<{ email?: unknown; accepted?: unknown; relay_url?: unknown }[]>("/rest/v1/rpc/my_cloud_runner", { method: "POST", token, body: {} })) ?? [];
-    return row && typeof row.email === "string" ? { email: row.email, accepted: row.accepted === true, relayUrl: relayAddress(row.relay_url) } : null;
+    const [row] =
+      (await this.request<{ email?: unknown; accepted?: unknown; relay_url?: unknown }[]>("/rest/v1/rpc/my_cloud_runner", {
+        method: "POST",
+        token,
+        body: {},
+      })) ?? [];
+    return row && typeof row.email === "string"
+      ? { email: row.email, accepted: row.accepted === true, relayUrl: relayAddress(row.relay_url) }
+      : null;
   }
 }

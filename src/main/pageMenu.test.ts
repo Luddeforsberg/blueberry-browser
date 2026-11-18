@@ -51,12 +51,7 @@ describe("pageMenuTemplate", () => {
   });
 
   it("offers link actions on a link, but only opens web addresses", () => {
-    expect(labels(build({ linkURL: "https://example.com/" }))).toEqual([
-      "Open Link in New Tab",
-      "Copy Link",
-      "-",
-      "Inspect",
-    ]);
+    expect(labels(build({ linkURL: "https://example.com/" }))).toEqual(["Open Link in New Tab", "Copy Link", "-", "Inspect"]);
     expect(labels(build({ linkURL: "javascript:alert(1)" }))).toEqual(["Copy Link", "-", "Inspect"]);
     expect(labels(build({ linkURL: "file:///etc/passwd" }))).toEqual(["Copy Link", "-", "Inspect"]);
   });
@@ -90,10 +85,7 @@ describe("pageMenuTemplate", () => {
 
   it("offers spelling suggestions only for a misspelled word in a field", () => {
     const acting = actions();
-    const items = build(
-      { isEditable: true, misspelledWord: "jakdaw", dictionarySuggestions: ["jackdaw", "jackdaws"] },
-      acting
-    );
+    const items = build({ isEditable: true, misspelledWord: "jakdaw", dictionarySuggestions: ["jackdaw", "jackdaws"] }, acting);
     expect(labels(items).slice(0, 4)).toEqual(["jackdaw", "jackdaws", "Add to Dictionary", "-"]);
     click(items, "jackdaw");
     expect(acting.replaceWord).toHaveBeenCalledWith("jackdaw");

@@ -6,8 +6,23 @@ import { Suggestions } from "./Suggestions";
 
 const MINUTE = 60_000;
 const NOW = new Date(2026, 9, 31, 18, 0).getTime();
-const VISITS = [1, 2, 3].map((daysAgo) => ({ url: "https://news.ycombinator.com/", title: "Hacker News", visitedAt: NOW - daysAgo * 1440 * MINUTE }));
-const CARD = JSON.stringify({ cards: [{ kind: "prompt", line: "Shall I pick five stories for you?", why: "You read Hacker News most days", evidence: ["s1"], sites: ["news.ycombinator.com"], prompt: "Read the Hacker News front page and pick five stories for me." }] });
+const VISITS = [1, 2, 3].map((daysAgo) => ({
+  url: "https://news.ycombinator.com/",
+  title: "Hacker News",
+  visitedAt: NOW - daysAgo * 1440 * MINUTE,
+}));
+const CARD = JSON.stringify({
+  cards: [
+    {
+      kind: "prompt",
+      line: "Shall I pick five stories for you?",
+      why: "You read Hacker News most days",
+      evidence: ["s1"],
+      sites: ["news.ycombinator.com"],
+      prompt: "Read the Hacker News front page and pick five stories for me.",
+    },
+  ],
+});
 
 const setup = () => {
   const file = join(mkdtempSync(join(tmpdir(), "blueberry-suggestions-")), "suggestions.json");
@@ -48,12 +63,16 @@ describe("asking the model for suggestions", () => {
     const before = await newTabAt(0);
     expect(before).toEqual([expect.objectContaining({ kind: "routine", why: expect.stringContaining("Hacker News") })]);
     expect(write.mock.calls[0][1]).toMatch(/^<browsing_digest>\n\{.*\}\n<\/browsing_digest>$/s);
-    expect(await newTabAt(1)).toEqual([expect.objectContaining({ kind: "prompt", title: "Shall I pick five stories for you?", why: "You read Hacker News most days" })]);
+    expect(await newTabAt(1)).toEqual([
+      expect.objectContaining({ kind: "prompt", title: "Shall I pick five stories for you?", why: "You read Hacker News most days" }),
+    ]);
   });
 
   it("keeps the old rules' cards when the model gives nothing that checks out, and counts that for the hour", async () => {
     const { write, newTabAt } = setup();
-    write.mockResolvedValueOnce(JSON.stringify({ cards: [{ kind: "prompt", line: "Hi", why: "You", evidence: ["s42"], prompt: "Do it" }] }));
+    write.mockResolvedValueOnce(
+      JSON.stringify({ cards: [{ kind: "prompt", line: "Hi", why: "You", evidence: ["s42"], prompt: "Do it" }] }),
+    );
     await newTabAt(0);
     expect(await newTabAt(1)).toEqual([expect.objectContaining({ kind: "routine" })]);
     await newTabAt(59);

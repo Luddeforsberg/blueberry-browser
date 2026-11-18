@@ -50,7 +50,10 @@ test("only suggestions whose evidence checks out show, a row fills things in, an
     await row(words).click();
     await expect(composer).not.toHaveValue("");
     await expect(composer).toBeFocused();
-    const { caret, length } = await composer.evaluate((box: HTMLTextAreaElement) => ({ caret: box.selectionStart, length: box.value.length }));
+    const { caret, length } = await composer.evaluate((box: HTMLTextAreaElement) => ({
+      caret: box.selectionStart,
+      length: box.value.length,
+    }));
     expect(caret).toBe(length);
     expect(model.requests).toHaveLength(0);
 

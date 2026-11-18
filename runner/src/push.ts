@@ -24,7 +24,13 @@ export interface PushConfig {
 }
 
 // The browsers' own push services, so a subscription can't point the runner at anything else.
-const PUSH_HOSTS = [/^fcm\.googleapis\.com$/, /^updates\.push\.services\.mozilla\.com$/, /^push\.services\.mozilla\.com$/, /^web\.push\.apple\.com$/, /\.notify\.windows\.com$/];
+const PUSH_HOSTS = [
+  /^fcm\.googleapis\.com$/,
+  /^updates\.push\.services\.mozilla\.com$/,
+  /^push\.services\.mozilla\.com$/,
+  /^web\.push\.apple\.com$/,
+  /\.notify\.windows\.com$/,
+];
 
 export const isPushEndpoint = (endpoint: string): boolean => {
   try {
@@ -44,14 +50,20 @@ export const pushConfig = (env: Record<string, string | undefined>): PushConfig 
   const subject = env.VAPID_SUBJECT?.trim();
   if (!publicKey && !privateKey) return null;
   if (!publicKey || !privateKey) return "Set both VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY, or neither.";
-  if (!subject || !/^(mailto:|https:\/\/)/.test(subject)) return "Set VAPID_SUBJECT to mailto:you@example.com, so push services know who's sending.";
+  if (!subject || !/^(mailto:|https:\/\/)/.test(subject))
+    return "Set VAPID_SUBJECT to mailto:you@example.com, so push services know who's sending.";
   return { publicKey, privateKey, subject };
 };
 
-type Send = (subscription: { endpoint: string; keys: { p256dh: string; auth: string } }, payload: string, options: object) => Promise<unknown>;
+type Send = (
+  subscription: { endpoint: string; keys: { p256dh: string; auth: string } },
+  payload: string,
+  options: object,
+) => Promise<unknown>;
 
 // One push to each of the owner's devices. A device the push service says is gone is forgotten. Nothing here fails a job.
-export const pusher = (config: PushConfig, db: PushDb, send: Send = webpush.sendNotification, log: (line: string) => void = console.log) =>
+export const pusher =
+  (config: PushConfig, db: PushDb, send: Send = webpush.sendNotification, log: (line: string) => void = console.log) =>
   async (kind: PushKind): Promise<void> => {
     let rows: PushSubscriptionRow[];
     try {
@@ -60,19 +72,21 @@ export const pusher = (config: PushConfig, db: PushDb, send: Send = webpush.send
       return log("Couldn't look up where to send a notification.");
     }
     await Promise.all(
-      rows.filter((row) => isPushEndpoint(row.endpoint)).map(async ({ endpoint, p256dh, auth }) => {
-        try {
-          await send({ endpoint, keys: { p256dh, auth } }, pushPayload(kind), {
-            vapidDetails: config,
-            TTL: 60 * 60,
-            urgency: kind === "needs-you" ? "high" : "normal",
-            topic: kind,
-          });
-        } catch (error) {
-          const status = (error as { statusCode?: number }).statusCode;
-          if (status === 404 || status === 410) await db.forgetPushSubscription(endpoint).catch(() => {});
-          else log("A notification couldn't be sent.");
-        }
-      })
+      rows
+        .filter((row) => isPushEndpoint(row.endpoint))
+        .map(async ({ endpoint, p256dh, auth }) => {
+          try {
+            await send({ endpoint, keys: { p256dh, auth } }, pushPayload(kind), {
+              vapidDetails: config,
+              TTL: 60 * 60,
+              urgency: kind === "needs-you" ? "high" : "normal",
+              topic: kind,
+            });
+          } catch (error) {
+            const status = (error as { statusCode?: number }).statusCode;
+            if (status === 404 || status === 410) await db.forgetPushSubscription(endpoint).catch(() => {});
+            else log("A notification couldn't be sent.");
+          }
+        }),
     );
   };

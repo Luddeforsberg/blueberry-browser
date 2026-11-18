@@ -1,56 +1,64 @@
-import tseslint from '@electron-toolkit/eslint-config-ts'
-import eslintConfigPrettier from '@electron-toolkit/eslint-config-prettier'
-import eslintPluginReact from 'eslint-plugin-react'
-import eslintPluginReactHooks from 'eslint-plugin-react-hooks'
-import eslintPluginReactRefresh from 'eslint-plugin-react-refresh'
+import tseslint from "@electron-toolkit/eslint-config-ts";
+import eslintConfigPrettier from "@electron-toolkit/eslint-config-prettier";
+import eslintPluginReact from "eslint-plugin-react";
+import eslintPluginReactHooks from "eslint-plugin-react-hooks";
+import eslintPluginReactRefresh from "eslint-plugin-react-refresh";
 
 export default tseslint.config(
-  { ignores: ['**/node_modules', '**/dist', '**/out', 'site/**', 'src/main/pageActorArt.ts'] },
+  { ignores: ["**/node_modules", "**/dist", "**/out", "site/**", "src/main/pageActorArt.ts"] },
   tseslint.configs.recommended,
   eslintPluginReact.configs.flat.recommended,
-  eslintPluginReact.configs.flat['jsx-runtime'],
+  eslintPluginReact.configs.flat["jsx-runtime"],
   {
     settings: {
       react: {
-        version: 'detect'
-      }
-    }
+        version: "detect",
+      },
+    },
   },
   {
-    files: ['**/*.{ts,tsx}'],
+    files: ["**/*.{ts,tsx}"],
     plugins: {
-      'react-hooks': eslintPluginReactHooks,
-      'react-refresh': eslintPluginReactRefresh
+      "react-hooks": eslintPluginReactHooks,
+      "react-refresh": eslintPluginReactRefresh,
     },
     rules: {
       ...eslintPluginReactHooks.configs.recommended.rules,
       ...eslintPluginReactRefresh.configs.vite.rules,
       // Handlers and components infer their return types, so requiring them only adds noise.
-      '@typescript-eslint/explicit-function-return-type': 'off',
+      "@typescript-eslint/explicit-function-return-type": "off",
       // `node` is destructured out of react-markdown props so it isn't spread onto the DOM.
-      '@typescript-eslint/no-unused-vars': ['error', { ignoreRestSiblings: true }],
+      "@typescript-eslint/no-unused-vars": ["error", { ignoreRestSiblings: true }],
       // Contexts export a provider and its hook from one file on purpose.
-      'react-refresh/only-export-components': 'warn'
-    }
+      "react-refresh/only-export-components": "warn",
+    },
   },
   {
     // The chrome never uses the system's tooltip (DESIGN.md section 8): a control gets `Tooltip` instead.
-    files: ['src/renderer/**/*.tsx'],
+    files: ["src/renderer/**/*.tsx"],
     rules: {
-      'react/forbid-dom-props': [
-        'error',
-        { forbid: [{ propName: 'title', message: 'Use <Tooltip words="…"> from @common/components/Tooltip, not the system tooltip (DESIGN.md section 8). An iframe takes aria-label.' }] }
-      ]
-    }
+      "react/forbid-dom-props": [
+        "error",
+        {
+          forbid: [
+            {
+              propName: "title",
+              message:
+                'Use <Tooltip words="…"> from @common/components/Tooltip, not the system tooltip (DESIGN.md section 8). An iframe takes aria-label.',
+            },
+          ],
+        },
+      ],
+    },
   },
   {
     // Plain JavaScript can't write a return type, and a CommonJS file loads with `require`.
-    files: ['**/*.{js,cjs,mjs}'],
-    rules: { '@typescript-eslint/explicit-function-return-type': 'off' }
+    files: ["**/*.{js,cjs,mjs}"],
+    rules: { "@typescript-eslint/explicit-function-return-type": "off" },
   },
   {
-    files: ['**/*.cjs'],
-    rules: { '@typescript-eslint/no-require-imports': 'off' }
+    files: ["**/*.cjs"],
+    rules: { "@typescript-eslint/no-require-imports": "off" },
   },
-  eslintConfigPrettier
-)
+  eslintConfigPrettier,
+);

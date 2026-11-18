@@ -114,7 +114,15 @@ export interface RunJobOptions {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const runJob = async (job: ClaimedJob, options: RunJobOptions): Promise<"done" | "failed" | "stopped"> => {
-  const { db, streamReply = agentReply, signal, pollMs = POLL_MS, heartbeatMs = HEARTBEAT_MS, answerTimeoutMs = ANSWER_TIMEOUT_MS, log = console.log } = options;
+  const {
+    db,
+    streamReply = agentReply,
+    signal,
+    pollMs = POLL_MS,
+    heartbeatMs = HEARTBEAT_MS,
+    answerTimeoutMs = ANSWER_TIMEOUT_MS,
+    log = console.log,
+  } = options;
   const notify = (kind: PushKind) => void options.notify?.(kind).catch(() => {});
   const mascot = mascotFromSnapshot(job.mascot);
   if (!mascot) {
@@ -138,7 +146,7 @@ export const runJob = async (job: ClaimedJob, options: RunJobOptions): Promise<"
     { onChunk: () => {}, onThread: () => {}, onListChanged: () => {}, onWorkingTabs: () => {} },
     () => mascot,
     null,
-    browser.cloud
+    browser.cloud,
   );
 
   // Why it was stopped from here, if it was. A stop the user asked for needs no words.

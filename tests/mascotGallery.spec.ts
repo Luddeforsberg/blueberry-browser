@@ -9,7 +9,8 @@ import { answerAsk, findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
 
 // The mascots a group shows, by name, in order.
-const names = (group: Locator) => group.getByRole("button").evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label")));
+const names = (group: Locator) =>
+  group.getByRole("button").evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label")));
 
 test("a Gallery tile opens its page, which shows its moods, adds a limited copy, chats, and can come back after being deleted", async () => {
   const model = await startFakeModel();
@@ -17,7 +18,8 @@ test("a Gallery tile opens its page, which shows its moods, adds a limited copy,
   const app = await launchApp(profile, { modelEnv: model.env });
   try {
     const chrome = await findView(app, "view=chrome");
-    const param = () => chrome.evaluate(async () => (await window.chromeAPI.browser.getTabs()).find((tab) => tab.isActive)?.pageParam ?? null);
+    const param = () =>
+      chrome.evaluate(async () => (await window.chromeAPI.browser.getTabs()).find((tab) => tab.isActive)?.pageParam ?? null);
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock"));
     await chrome.getByRole("button", { name: "Gallery", exact: true }).click();
 
@@ -38,7 +40,13 @@ test("a Gallery tile opens its page, which shows its moods, adds a limited copy,
 
     // Its name is taken, so the page asks for another. Nothing is in the flock until Add is pressed.
     await chrome.evaluate(() =>
-      window.chromeAPI.mascots.save(null, { name: "Meeting Prep", look: { palette: "robin", accessory: "cap" }, instructions: "Mine.", sites: [], tools: [] })
+      window.chromeAPI.mascots.save(null, {
+        name: "Meeting Prep",
+        look: { palette: "robin", accessory: "cap" },
+        instructions: "Mine.",
+        sites: [],
+        tools: [],
+      }),
     );
     // A tile opens its page in the same tab, in place of the tiles.
     await blueberry.getByRole("button", { name: /^Meeting Prep/ }).click();
@@ -80,7 +88,9 @@ test("a Gallery tile opens its page, which shows its moods, adds a limited copy,
     // The toolbar's Back does the same.
     await blueberry.getByRole("button", { name: /^Follow-up/ }).click();
     await expect(chrome.getByRole("article", { name: "Follow-up" })).toBeVisible();
-    await chrome.evaluate(async () => window.chromeAPI.browser.goBack((await window.chromeAPI.browser.getTabs()).find((tab) => tab.isActive)!.id));
+    await chrome.evaluate(async () =>
+      window.chromeAPI.browser.goBack((await window.chromeAPI.browser.getTabs()).find((tab) => tab.isActive)!.id),
+    );
     await expect(blueberry).toBeVisible();
     expect(await param()).toBe("all");
     await expect(blueberry.getByRole("button", { name: /^Follow-up/ })).toBeFocused();

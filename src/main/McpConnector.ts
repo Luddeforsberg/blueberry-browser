@@ -89,7 +89,8 @@ export const tokenMatches = (header: string | undefined, token: string): boolean
 };
 
 // Only addresses on this computer, so a web page can't reach the server through a name that points here.
-export const hostAllowed = (host: string | undefined, port: number): boolean => host === `127.0.0.1:${port}` || host === `localhost:${port}`;
+export const hostAllowed = (host: string | undefined, port: number): boolean =>
+  host === `127.0.0.1:${port}` || host === `localhost:${port}`;
 
 export const snippets = (url: string, token: string, bridge: string, binary: string): McpSnippet[] => [
   {
@@ -111,7 +112,7 @@ export const snippets = (url: string, token: string, bridge: string, binary: str
         },
       },
       null,
-      2
+      2,
     ),
   },
 ];
@@ -130,7 +131,7 @@ export class McpConnector {
     private readonly tools: () => McpTool[],
     private readonly onChange: () => void,
     // Only an app we're developing or testing may take any free port, which tests need.
-    private readonly anyPort = !app.isPackaged && process.env.BLUEBERRY_MCP_PORT === "0"
+    private readonly anyPort = !app.isPackaged && process.env.BLUEBERRY_MCP_PORT === "0",
   ) {}
 
   private get bridgeFile(): string {
@@ -187,7 +188,10 @@ export class McpConnector {
   // The token leaves main only this way, straight to the clipboard, when the user asks for it.
   async copy(appName: string): Promise<boolean> {
     const { url } = this;
-    const snippet = url && this.saved.token ? snippets(url, this.saved.token, this.bridgeFile, process.execPath).find((one) => one.app === appName) : undefined;
+    const snippet =
+      url && this.saved.token
+        ? snippets(url, this.saved.token, this.bridgeFile, process.execPath).find((one) => one.app === appName)
+        : undefined;
     if (!snippet) return false;
     await clipboard.writeText(snippet.text);
     return true;
@@ -256,7 +260,8 @@ export class McpConnector {
       return refuse(400, "Bad request.");
     }
     if (path !== "/mcp") return refuse(404, "Not found.");
-    if (!token || !tokenMatches(request.headers.authorization, token)) return refuse(401, "Blueberry didn't recognise this app. Copy the snippet again from Settings > Claude.");
+    if (!token || !tokenMatches(request.headers.authorization, token))
+      return refuse(401, "Blueberry didn't recognise this app. Copy the snippet again from Settings > Claude.");
     // Stateless, so there's no stream to open and no session to end.
     if (request.method !== "POST") return refuse(405, "Only POST is supported.");
     if (Number(request.headers["content-length"] ?? 0) > MAX_BODY_BYTES) return refuse(413, "Too large.");
@@ -266,7 +271,12 @@ export class McpConnector {
     this.tools().forEach((tool) => {
       server.registerTool(
         tool.name,
-        { title: tool.title, description: tool.description, inputSchema: tool.shape, annotations: { readOnlyHint: tool.readOnly, openWorldHint: true } },
+        {
+          title: tool.title,
+          description: tool.description,
+          inputSchema: tool.shape,
+          annotations: { readOnlyHint: tool.readOnly, openWorldHint: true },
+        },
         async (args: Record<string, unknown>) => {
           let result;
           try {
@@ -277,7 +287,7 @@ export class McpConnector {
           }
           this.log({ client, tool: tool.name, summary: result.summary, failed: result.isError === true });
           return { content: [{ type: "text" as const, text: result.text }], ...(result.isError ? { isError: true } : {}) };
-        }
+        },
       );
     });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
@@ -311,8 +321,13 @@ export class McpConnector {
   private load(): Saved {
     try {
       const { on, token, port } = JSON.parse(readFileSync(this.file, "utf8"));
-      const plain = typeof token === "string" && safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(Buffer.from(token, "base64")) : null;
-      return { on: on === true && plain !== null, token: plain, port: Number.isInteger(port) && port > 0 && port < 65_536 ? port : DEFAULT_PORT };
+      const plain =
+        typeof token === "string" && safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(Buffer.from(token, "base64")) : null;
+      return {
+        on: on === true && plain !== null,
+        token: plain,
+        port: Number.isInteger(port) && port > 0 && port < 65_536 ? port : DEFAULT_PORT,
+      };
     } catch {
       return { on: false, token: null, port: DEFAULT_PORT };
     }

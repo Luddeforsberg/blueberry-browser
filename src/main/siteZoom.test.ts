@@ -48,9 +48,7 @@ describe("site zoom levels", () => {
   });
 
   it("keeps only real levels from disk or a renderer", () => {
-    expect(
-      sanitizeSiteZoom({ good: 125, off: 101, full: 100, text: "125", none: null, nan: Number.NaN })
-    ).toEqual({ good: 125 });
+    expect(sanitizeSiteZoom({ good: 125, off: 101, full: 100, text: "125", none: null, nan: Number.NaN })).toEqual({ good: 125 });
     expect(sanitizeSiteZoom([125], { kept: 110 })).toEqual({ kept: 110 });
     expect(sanitizeSiteZoom("loud", { kept: 110 })).toEqual({ kept: 110 });
     expect(sanitizeSiteZoom(undefined, { kept: 110 })).toEqual({ kept: 110 });

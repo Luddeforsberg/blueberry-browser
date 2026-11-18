@@ -13,7 +13,10 @@ import { NO_KEY, type AiService } from "../shared/aiKey";
 dotenv.config({ path: join(__dirname, "../../.env") });
 
 // A PDF is said the same way here whoever the provider is, and `forProvider` turns it into that provider's own block.
-export type ReplyBlock = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } } | { type: "pdf"; name: string; data: string };
+export type ReplyBlock =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } }
+  | { type: "pdf"; name: string; data: string };
 export type ReplyContent = string | ReplyBlock[];
 
 export interface ReplyMessage {
@@ -43,11 +46,7 @@ export interface ReplyOptions {
 // use tools: everything written so far was on the way, not the answer, and the newest of these says what it's doing.
 export type ReplyPart = string | { statusLine: string };
 
-export type StreamReply = (
-  messages: ReplyMessage[],
-  signal: AbortSignal,
-  options: ReplyOptions
-) => AsyncIterable<ReplyPart>;
+export type StreamReply = (messages: ReplyMessage[], signal: AbortSignal, options: ReplyOptions) => AsyncIterable<ReplyPart>;
 
 export type GenerateTitle = (messages: ChatThreadMessage[]) => Promise<string | null>;
 
@@ -112,8 +111,7 @@ const ASK_FIRST_PROMPT =
   "Never do any of this for a simple lookup or to ask what you can find out yourself, and before you start, ask two questions at most or give one plan.";
 
 const DECLINED = "The user said no. Nothing happened. Don't try this another way unless they ask.";
-const CHANGED =
-  "Nothing happened, because the page changed after the user allowed this. Look at the page again before trying again.";
+const CHANGED = "Nothing happened, because the page changed after the user allowed this. Look at the page again before trying again.";
 
 const TITLE_PROMPT =
   "You name chats for a sidebar. Reply with a title of 2 to 5 words, in the language of the conversation, " +
@@ -192,7 +190,7 @@ export const modelsFor = (provider: AiService, env: Record<string, string | unde
 export const modelConfig = (
   env: Record<string, string | undefined> = process.env,
   saved: SavedKey | null = savedKey(),
-  ownAddressOnly = savedKeyStaysHome
+  ownAddressOnly = savedKeyStaysHome,
 ) => {
   if (saved) return { provider: saved.service, apiKey: saved.key, ownAddressOnly, ...modelsFor(saved.service, env) };
   const provider = env.LLM_PROVIDER?.toLowerCase() || "openai";
@@ -210,7 +208,12 @@ const createModel = async (use: "model" | "titleModel" = "model"): Promise<BaseC
   // An address given here comes before any the client would take from the environment.
   if (provider === "anthropic") {
     const { ChatAnthropic } = await import("@langchain/anthropic");
-    return new ChatAnthropic({ apiKey, model, maxRetries: MAX_RETRIES, ...(ownAddressOnly && { anthropicApiUrl: SERVICE_ADDRESS.anthropic }) });
+    return new ChatAnthropic({
+      apiKey,
+      model,
+      maxRetries: MAX_RETRIES,
+      ...(ownAddressOnly && { anthropicApiUrl: SERVICE_ADDRESS.anthropic }),
+    });
   }
   const { ChatOpenAI } = await import("@langchain/openai");
   // Newer models only take tools through the Responses API. A custom address, such as the tests' fake model,
@@ -272,14 +275,13 @@ export async function* streamReply(
   messages: ReplyMessage[],
   signal: AbortSignal,
   { tools, actionApproval, approve, onStep, onUsage, mascotNote = "", userPresent = false }: ReplyOptions,
-  model?: BaseChatModel
+  model?: BaseChatModel,
 ): AsyncGenerator<ReplyPart> {
   const [
     { createAgent, createMiddleware, humanInTheLoopMiddleware, isToolApprovalInterrupt, tool },
     { Command, MemorySaver },
     { AIMessage, HumanMessage },
-  ] =
-    await Promise.all([import("langchain"), import("@langchain/langgraph"), import("@langchain/core/messages")]);
+  ] = await Promise.all([import("langchain"), import("@langchain/langgraph"), import("@langchain/core/messages")]);
   let modelCalls = 0;
   // Shortens what goes to the model, and makes its last call one that can only write.
   const stepLimit = createMiddleware({
@@ -332,18 +334,15 @@ export async function* streamReply(
               },
             ],
           ]
-        : []
-    )
+        : [],
+    ),
   );
   const chatModel = model ?? (await createModel());
   const agent = createAgent({
     model: chatModel,
     // A reply's state lasts as long as the reply, so a paused action doesn't survive a restart.
     checkpointer: new MemorySaver(),
-    middleware: [
-      stepLimit,
-      humanInTheLoopMiddleware({ interruptOn, interruptMode: "per_call" }),
-    ],
+    middleware: [stepLimit, humanInTheLoopMiddleware({ interruptOn, interruptMode: "per_call" })],
     tools: tools.map((pageTool) => {
       const { name, description, schema, label, run, describe, returnsImage, kind } = pageTool;
       return tool(
@@ -372,7 +371,7 @@ export async function* streamReply(
             finish();
           }
         },
-        { name, description, schema }
+        { name, description, schema },
       );
     }),
     systemPrompt: systemPrompt(tools.length > 0, userPresent) + todayNote(new Date()) + mascotNote,
@@ -400,7 +399,10 @@ export async function* streamReply(
         if (usage) onUsage?.(usage.total_tokens);
       } else {
         // LangGraph adds this key to its updates, which the agent's types don't show.
-        const { __interrupt__: interrupts = [], model_request: request } = part[1] as unknown as { __interrupt__?: Interrupt[]; model_request?: { messages?: BaseMessage[] } };
+        const { __interrupt__: interrupts = [], model_request: request } = part[1] as unknown as {
+          __interrupt__?: Interrupt[];
+          model_request?: { messages?: BaseMessage[] };
+        };
         paused.push(...interrupts.filter(isToolApprovalInterrupt));
         // The model's message is whole now, and whether it calls tools is settled.
         const written = request?.messages?.findLast((message) => message.type === "ai");
@@ -445,10 +447,7 @@ export const writeWithCheapModel = async (system: string, data: string, model?: 
 };
 
 // Null until the conversation has a topic worth naming.
-export const generateTitle = async (
-  messages: ChatThreadMessage[],
-  model?: BaseChatModel
-): Promise<string | null> => {
+export const generateTitle = async (messages: ChatThreadMessage[], model?: BaseChatModel): Promise<string | null> => {
   const transcript = messages
     .slice(0, MAX_TITLE_MESSAGES)
     .map(({ role, content }) => `${role}: ${content.slice(0, MAX_TITLE_MESSAGE_LENGTH)}`)
@@ -458,7 +457,10 @@ export const generateTitle = async (
     ["system", TITLE_PROMPT],
     ["human", transcript],
   ]);
-  const title = reply.text.trim().replace(/^["'“”]+|["'“”.!?]+$/g, "").trim();
+  const title = reply.text
+    .trim()
+    .replace(/^["'“”]+|["'“”.!?]+$/g, "")
+    .trim();
   if (!title || title.toUpperCase() === "NONE") return null;
   return title.length > MAX_TITLE_LENGTH ? `${title.slice(0, MAX_TITLE_LENGTH - 1).trimEnd()}…` : title;
 };

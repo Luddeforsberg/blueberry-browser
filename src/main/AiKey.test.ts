@@ -85,7 +85,11 @@ describe("AiKey", () => {
     expect(existsSync(file)).toBe(false);
 
     let answer: (outcome: "works") => void = () => {};
-    const slow = new AiKey(fileIn(), () => {}, () => new Promise((resolve) => (answer = resolve)));
+    const slow = new AiKey(
+      fileIn(),
+      () => {},
+      () => new Promise((resolve) => (answer = resolve)),
+    );
     const trying = slow.try("openai", KEY);
     slow.remove();
     answer("works");
@@ -96,7 +100,8 @@ describe("AiKey", () => {
 
 describe("tryAiKey", () => {
   const ANSWERS = { openai: { choices: [{ message: { content: "Hello." } }] }, anthropic: { content: [{ type: "text", text: "Hello." }] } };
-  const answering = (status: number, body: unknown = {}) => vi.fn<typeof fetch>(async () => new Response(status === 204 ? null : JSON.stringify(body), { status }));
+  const answering = (status: number, body: unknown = {}) =>
+    vi.fn<typeof fetch>(async () => new Response(status === 204 ? null : JSON.stringify(body), { status }));
 
   it("sends one short message to the service's cheap model with the key", async () => {
     const fetch = answering(200, ANSWERS.openai);
@@ -136,6 +141,8 @@ describe("tryAiKey", () => {
     expect(await tryAiKey("openai", KEY, { fetch: answering(401), env: {} })).toBe("refused");
     expect(await tryAiKey("openai", KEY, { fetch: answering(429), env: {} })).toBe("refused");
     expect(await tryAiKey("openai", KEY, { fetch: answering(503), env: {} })).toBe("unreachable");
-    expect(await tryAiKey("openai", KEY, { fetch: vi.fn(async () => Promise.reject(new TypeError("fetch failed"))), env: {} })).toBe("unreachable");
+    expect(await tryAiKey("openai", KEY, { fetch: vi.fn(async () => Promise.reject(new TypeError("fetch failed"))), env: {} })).toBe(
+      "unreachable",
+    );
   });
 });

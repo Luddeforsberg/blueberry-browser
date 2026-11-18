@@ -16,7 +16,7 @@ export class PermissionPromptView {
   constructor(
     private readonly parent: BaseWindow,
     private readonly permissions: SitePermissions,
-    private readonly host: { activeContents: () => WebContents | null; page: () => Rect }
+    private readonly host: { activeContents: () => WebContents | null; page: () => Rect },
   ) {
     this.chrome.view.setVisible(false);
     this.parent.contentView.addChildView(this.chrome.view);

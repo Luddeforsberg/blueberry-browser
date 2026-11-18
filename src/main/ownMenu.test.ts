@@ -22,7 +22,7 @@ describe("buildMenu", () => {
         { label: "Reload", click: () => {} },
         { type: "separator" },
       ],
-      { mac: false }
+      { mac: false },
     );
     expect(rows(entries)).toEqual(["Back", "-", "Reload"]);
   });
@@ -41,17 +41,17 @@ describe("buildMenu", () => {
     expect(row(buildMenu(items, { mac: false }).entries, "Copy").shortcut).toBe("Ctrl C");
     expect(row(buildMenu(items, { mac: true }).entries, "Copy").shortcut).toBe("⌘C");
     const { entries } = buildMenu(items, { mac: false });
-    expect([row(entries, "Copy").checked, row(entries, "Hide Berry").checked, row(entries, "Keep Berry Still").checked]).toEqual([null, true, false]);
+    expect([row(entries, "Copy").checked, row(entries, "Hide Berry").checked, row(entries, "Keep Berry Still").checked]).toEqual([
+      null,
+      true,
+      false,
+    ]);
   });
 
   it("keeps an action only for rows that can be used, so an id for anything else does nothing", () => {
     const { entries, actions } = buildMenu(
-      [
-        { label: "Forward", enabled: false, click: () => {} },
-        { label: "No Spelling Suggestions" },
-        { label: "Reload", click: () => {} },
-      ],
-      { mac: false }
+      [{ label: "Forward", enabled: false, click: () => {} }, { label: "No Spelling Suggestions" }, { label: "Reload", click: () => {} }],
+      { mac: false },
     );
     expect(row(entries, "Forward").enabled).toBe(false);
     expect(row(entries, "No Spelling Suggestions").enabled).toBe(false);
@@ -67,7 +67,7 @@ describe("buildMenu", () => {
         { label: "File", submenu: [{ label: "Save", click: save }] },
         { label: "Empty", submenu: [{ label: "Gone", visible: false }] },
       ],
-      { mac: false }
+      { mac: false },
     );
     expect(rows(entries)).toEqual(["File"]);
     const file = row(entries, "File");

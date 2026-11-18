@@ -24,11 +24,20 @@ describe("mascotFromLink", () => {
       `blueberry://user@mascot/${ID}`,
       `https://blueberry-flock.netlify.app/m/?id=${ID}`,
       ` blueberry://mascot/${ID}`,
-    ]) expect(mascotFromLink(link), link).toBeNull();
+    ])
+      expect(mascotFromLink(link), link).toBeNull();
   });
 
   it("ignores anything that isn't a uuid", () => {
-    for (const id of ["", "berry", "starter-meeting-prep", ID.slice(0, -1), `${ID.slice(0, -1)}g`, ID.replaceAll("-", ""), "../../etc/passwd"]) {
+    for (const id of [
+      "",
+      "berry",
+      "starter-meeting-prep",
+      ID.slice(0, -1),
+      `${ID.slice(0, -1)}g`,
+      ID.replaceAll("-", ""),
+      "../../etc/passwd",
+    ]) {
       expect(mascotFromLink(`blueberry://mascot/${id}`), id).toBeNull();
     }
   });

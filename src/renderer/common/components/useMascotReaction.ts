@@ -15,7 +15,14 @@ const MOVES: Partial<Record<Reaction, { frames: string[]; offsets?: number[]; ms
     ms: MS.hop,
   },
   ruffle: {
-    frames: ["none", "rotate(-5deg) scale(1.05, 0.97)", "rotate(5deg) scale(1.07, 0.96)", "rotate(-4deg) scale(1.05, 0.97)", "rotate(3deg) scale(1.02, 0.99)", "none"],
+    frames: [
+      "none",
+      "rotate(-5deg) scale(1.05, 0.97)",
+      "rotate(5deg) scale(1.07, 0.96)",
+      "rotate(-4deg) scale(1.05, 0.97)",
+      "rotate(3deg) scale(1.02, 0.99)",
+      "none",
+    ],
     ms: 460,
   },
   // Round to face away, a moment with its back to you, and back again.
@@ -76,7 +83,11 @@ export const useMascotReaction = (element: React.RefObject<SVGSVGElement | null>
       if (planned) {
         move.current =
           element.current?.animate(
-            planned.frames.map((transform, index) => ({ transform, transformOrigin: FEET, ...(planned.offsets && { offset: planned.offsets[index] }) })),
+            planned.frames.map((transform, index) => ({
+              transform,
+              transformOrigin: FEET,
+              ...(planned.offsets && { offset: planned.offsets[index] }),
+            })),
             { duration: planned.ms, easing: "ease-out" },
           ) ?? null;
       }

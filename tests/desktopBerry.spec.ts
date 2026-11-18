@@ -22,13 +22,18 @@ const registered = (app: ElectronApplication) => app.evaluate(() => [...globalTh
 const windowCount = (app: ElectronApplication) => app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows().length);
 const showing = (app: ElectronApplication, view: "desktop" | "composer") =>
   app.evaluate(
-    ({ BaseWindow }, view) => !!BaseWindow.getAllWindows().find((window) => (window.contentView.children[0] as WebContentsView)?.webContents?.getURL().includes(`view=${view}`))?.isVisible(),
-    view
+    ({ BaseWindow }, view) =>
+      !!BaseWindow.getAllWindows()
+        .find((window) => (window.contentView.children[0] as WebContentsView)?.webContents?.getURL().includes(`view=${view}`))
+        ?.isVisible(),
+    view,
   );
 // The real pointer stays where it is. This tells the app it's somewhere in the drop's window, as the window sees it.
 const pointAt = (app: ElectronApplication, spot: { x: number; y: number }) =>
   app.evaluate(({ BaseWindow, screen }, { x, y }) => {
-    const drop = BaseWindow.getAllWindows().find((window) => (window.contentView.children[0] as WebContentsView)?.webContents?.getURL().includes("view=desktop"))!;
+    const drop = BaseWindow.getAllWindows().find((window) =>
+      (window.contentView.children[0] as WebContentsView)?.webContents?.getURL().includes("view=desktop"),
+    )!;
     screen.getCursorScreenPoint = () => {
       const bounds = drop.getBounds();
       // tests/background.cjs moves it off-screen by this much, and the app doesn't know.
@@ -74,7 +79,9 @@ test("the drop takes a job from any app, comes out when it asks without saying w
 
     // Nothing that happens to a job moves or resizes the drop's window, which is what makes a window judder.
     await app.evaluate(({ BaseWindow }) => {
-      const window = BaseWindow.getAllWindows().find((candidate) => (candidate.contentView.children[0] as WebContentsView)?.webContents?.getURL().includes("view=desktop"))!;
+      const window = BaseWindow.getAllWindows().find((candidate) =>
+        (candidate.contentView.children[0] as WebContentsView)?.webContents?.getURL().includes("view=desktop"),
+      )!;
       const set = window.setBounds.bind(window);
       const seen = globalThis as unknown as { dropWindowMoves: number };
       seen.dropWindowMoves = 0;
@@ -129,10 +136,13 @@ test("the drop takes a job from any app, comes out when it asks without saying w
     const showingKey = async () => (await panel.evaluate(() => window.chromeAPI.desktop.panelState())).ask!.key;
     expect(await panel.evaluate(() => window.chromeAPI.desktop.decide({ key: "a0", allow: true }))).toBe("gone");
     await expect(ask).toBeVisible();
-    const goingAway = await panel.evaluate((key) => {
-      void window.chromeAPI.desktop.closePanel();
-      return window.chromeAPI.desktop.decide({ key, allow: true });
-    }, await showingKey());
+    const goingAway = await panel.evaluate(
+      (key) => {
+        void window.chromeAPI.desktop.closePanel();
+        return window.chromeAPI.desktop.decide({ key, allow: true });
+      },
+      await showingKey(),
+    );
     expect(goingAway).toBe("gone");
     await expect.poll(() => showing(app, "composer")).toBe(false);
     await expect(drop).toHaveAttribute("data-says", "asking");
@@ -191,9 +201,13 @@ test("closing Blueberry's window takes the drop, the panel, its menu and the sho
     const left = await app.evaluate(
       ({ app, BaseWindow }) =>
         new Promise<{ windows: number; shortcuts: string[] }>((resolve) => {
-          app.once("window-all-closed", () => resolve({ windows: BaseWindow.getAllWindows().length, shortcuts: [...globalThis.fakeShortcuts.keys()] }));
-          BaseWindow.getAllWindows().find((window) => window.contentView.children.length > 1)?.close();
-        })
+          app.once("window-all-closed", () =>
+            resolve({ windows: BaseWindow.getAllWindows().length, shortcuts: [...globalThis.fakeShortcuts.keys()] }),
+          );
+          BaseWindow.getAllWindows()
+            .find((window) => window.contentView.children.length > 1)
+            ?.close();
+        }),
     );
     expect(left).toEqual({ windows: 0, shortcuts: [] });
   } finally {
@@ -212,7 +226,9 @@ test("only the drop takes the pointer, pointed at it says what a press does, and
 
     const passing = () => app.evaluate(() => (globalThis as unknown as { passing?: boolean }).passing ?? true);
     await app.evaluate(({ BaseWindow }) => {
-      const window = BaseWindow.getAllWindows().find((candidate) => (candidate.contentView.children[0] as WebContentsView)?.webContents?.getURL().includes("view=desktop"))!;
+      const window = BaseWindow.getAllWindows().find((candidate) =>
+        (candidate.contentView.children[0] as WebContentsView)?.webContents?.getURL().includes("view=desktop"),
+      )!;
       const set = window.setIgnoreMouseEvents.bind(window);
       window.setIgnoreMouseEvents = (ignore, options) => {
         (globalThis as unknown as { passing: boolean }).passing = ignore;
@@ -277,7 +293,9 @@ test("dragging the drop takes it to the nearest edge, and it's saved there", asy
       screen.getCursorScreenPoint = () => ({ x: workArea.x + workArea.width / 2, y: workArea.y + 5 });
     });
     await desktop.mouse.up();
-    await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.settings.getSettings())).desktopBerrySpot?.edge).toBe("top");
+    await expect
+      .poll(async () => (await chrome.evaluate(() => window.chromeAPI.settings.getSettings())).desktopBerrySpot?.edge)
+      .toBe("top");
     await expect(drop).toHaveAttribute("data-edge", "top");
     // Back in a window of its own size, and a press after a drag opens nothing.
     expect(await showing(app, "composer")).toBe(false);

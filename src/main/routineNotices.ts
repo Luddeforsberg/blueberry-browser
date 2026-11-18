@@ -50,8 +50,16 @@ export const clearMemoryWords = (name: string, count: number): AskWords => ({
   mascot: null,
 });
 
-export const deleteMascotWords = (mascot: { name: string; look: MascotLook }, routines: number, published: boolean, hidden: boolean): AskWords => {
-  const paused = routines === 0 ? "" : ` ${routines === 1 ? "The routine it runs pauses" : `The ${routines} routines it runs pause`}, and stay${routines === 1 ? "s" : ""} limited to what it could do.`;
+export const deleteMascotWords = (
+  mascot: { name: string; look: MascotLook },
+  routines: number,
+  published: boolean,
+  hidden: boolean,
+): AskWords => {
+  const paused =
+    routines === 0
+      ? ""
+      : ` ${routines === 1 ? "The routine it runs pauses" : `The ${routines} routines it runs pause`}, and stay${routines === 1 ? "s" : ""} limited to what it could do.`;
   return {
     question: `Delete “${mascot.name}”?`,
     detail: `It leaves your mascots, and what it remembers is forgotten. Chats it had keep it, with the same limits.${paused}${published ? " It stays in the Gallery until you unpublish it, in Settings under Account." : ""}`,

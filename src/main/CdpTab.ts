@@ -100,7 +100,7 @@ export class CdpTab implements PageTarget {
     private readonly session: CDPSession,
     private readonly mainFrameId: string,
     readonly targetId: string,
-    private readonly events: CdpTabEvents
+    private readonly events: CdpTabEvents,
   ) {}
 
   // Takes charge of a page Playwright already has open.
@@ -154,7 +154,9 @@ export class CdpTab implements PageTarget {
       const refused = resourceType === "Document" && isMain(frameId) && this.refusesNavigation(request.url);
       if (refused) this.refusalListeners.forEach((listener) => listener.add(request.url));
       // Aborted, so the page stays where it was, as a refused navigation does in the window's own tabs.
-      const answer = refused ? session.send("Fetch.failRequest", { requestId, errorReason: "Aborted" }) : session.send("Fetch.continueRequest", { requestId });
+      const answer = refused
+        ? session.send("Fetch.failRequest", { requestId, errorReason: "Aborted" })
+        : session.send("Fetch.continueRequest", { requestId });
       void answer.catch(() => {});
     });
     page.on("crash", () => {
@@ -240,7 +242,13 @@ export class CdpTab implements PageTarget {
     return this.fromPage(async () => {
       const evaluate = async () => {
         const contextId = await this.worldId();
-        return this.session.send("Runtime.evaluate", { expression: code, contextId, returnByValue: true, awaitPromise: true, userGesture: true });
+        return this.session.send("Runtime.evaluate", {
+          expression: code,
+          contextId,
+          returnByValue: true,
+          awaitPromise: true,
+          userGesture: true,
+        });
       };
       // A world made just before the page moved on is gone already, so it gets one more try in the new document.
       const answer = await evaluate().catch((error) => {
@@ -256,7 +264,13 @@ export class CdpTab implements PageTarget {
   private frameOf(frame: Frame): PageFrame {
     let known = this.frames.get(frame);
     if (!known) {
-      known = { frame, get origin() { return originOf(frame); }, isDestroyed: () => frame.isDetached() } as PageFrame & { frame: Frame };
+      known = {
+        frame,
+        get origin() {
+          return originOf(frame);
+        },
+        isDestroyed: () => frame.isDetached(),
+      } as PageFrame & { frame: Frame };
       this.frames.set(frame, known);
     }
     return known;
@@ -291,7 +305,7 @@ export class CdpTab implements PageTarget {
       frames.map(async (frame) => {
         const found = await withTimeout(frame.evaluate(FRAME_TEXT), FRAME_ANSWER_MS, "late").catch(() => null);
         return typeof found === "string" && found.trim() ? `\n\n[Frame from ${originOf(frame)}]\n${found}` : "";
-      })
+      }),
     );
     return (text ?? "") + parts.join("");
   }
@@ -404,11 +418,13 @@ export class CdpTab implements PageTarget {
 
   private setFetching(): Promise<unknown> {
     const on = this.navigationLimits.size > 0;
-    this.fetching = this.fetching.then(() =>
-      on
-        ? this.session.send("Fetch.enable", { patterns: [{ urlPattern: "*", resourceType: "Document", requestStage: "Request" }] })
-        : this.session.send("Fetch.disable")
-    ).catch(() => {});
+    this.fetching = this.fetching
+      .then(() =>
+        on
+          ? this.session.send("Fetch.enable", { patterns: [{ urlPattern: "*", resourceType: "Document", requestStage: "Request" }] })
+          : this.session.send("Fetch.disable"),
+      )
+      .catch(() => {});
     return this.fetching;
   }
 
@@ -425,9 +441,15 @@ export class CdpTab implements PageTarget {
     const was = this.screencast;
     this.screencast = onFrame;
     if (this.closed || !!was === !!onFrame) return;
-    await (onFrame
-      ? this.session.send("Page.startScreencast", { format: "jpeg", quality: SCREENCAST_QUALITY, maxWidth: SCREENCAST_WIDTH, everyNthFrame: 1 })
-      : this.session.send("Page.stopScreencast")
+    await (
+      onFrame
+        ? this.session.send("Page.startScreencast", {
+            format: "jpeg",
+            quality: SCREENCAST_QUALITY,
+            maxWidth: SCREENCAST_WIDTH,
+            everyNthFrame: 1,
+          })
+        : this.session.send("Page.stopScreencast")
     ).catch(() => {});
   }
 

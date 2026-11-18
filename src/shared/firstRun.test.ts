@@ -10,7 +10,8 @@ describe("the first run", () => {
 
   it("starts again at the first step that isn't done", () => {
     const steps = firstRunSteps({ accounts: true, browsers: true });
-    const at = (passed: Parameters<typeof firstRunStart>[1]["passed"], signedIn = false, hasKey = false) => steps[firstRunStart(steps, { passed, signedIn, hasKey })];
+    const at = (passed: Parameters<typeof firstRunStart>[1]["passed"], signedIn = false, hasKey = false) =>
+      steps[firstRunStart(steps, { passed, signedIn, hasKey })];
     expect(at([])).toBe("meet");
     expect(at(["meet"])).toBe("account");
     expect(at(["meet"], true)).toBe("yours");
@@ -40,7 +41,11 @@ describe("First jobs", () => {
   });
 
   it("keeps only known rows and steps in Settings, once each and in order", () => {
-    const settings = sanitizeSettings({ firstJobs: ["meet", "nonsense", "try", "meet"], firstJobsDone: "try", firstRun: ["yours", "meet", 3] });
+    const settings = sanitizeSettings({
+      firstJobs: ["meet", "nonsense", "try", "meet"],
+      firstJobsDone: "try",
+      firstRun: ["yours", "meet", 3],
+    });
     expect(settings.firstJobs).toEqual(["try", "meet"]);
     expect(settings.firstJobsDone).toEqual([]);
     expect(settings.firstRun).toEqual(["meet", "yours"]);

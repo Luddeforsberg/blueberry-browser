@@ -73,7 +73,9 @@ export class ChatStore {
 
   summaries(): ChatThreadSummary[] {
     const rows = this.db
-      .prepare("SELECT id, title, updated_at AS updatedAt, mascot_id AS mascotId, source AS \"from\", seen FROM chats ORDER BY updated_at DESC, rowid DESC")
+      .prepare(
+        'SELECT id, title, updated_at AS updatedAt, mascot_id AS mascotId, source AS "from", seen FROM chats ORDER BY updated_at DESC, rowid DESC',
+      )
       .all() as unknown as Array<ChatThreadSummary & { seen: number }>;
     return rows.map(({ seen, ...chat }) => ({ ...chat, unseen: seen === 0 }));
   }
@@ -87,31 +89,44 @@ export class ChatStore {
            source AS "from",
            (SELECT content FROM messages WHERE chat_id = chats.id AND role = 'user' ORDER BY id LIMIT 1) AS firstMessage,
            EXISTS (SELECT 1 FROM messages WHERE chat_id = chats.id AND role = 'assistant' AND content <> '') AS replied
-         FROM chats WHERE source IS NULL ORDER BY updated_at DESC, rowid DESC LIMIT ?`
+         FROM chats WHERE source IS NULL ORDER BY updated_at DESC, rowid DESC LIMIT ?`,
       )
       .all(limit)
       .flatMap((row) => {
-        const { firstMessage, replied, ...summary } = row as unknown as ChatThreadSummary & { firstMessage: string | null; replied: number };
+        const { firstMessage, replied, ...summary } = row as unknown as ChatThreadSummary & {
+          firstMessage: string | null;
+          replied: number;
+        };
         return firstMessage ? [{ ...summary, firstMessage, replied: replied === 1 }] : [];
       });
   }
 
   chat(id: string): StoredChat | null {
     const summary = this.db
-      .prepare("SELECT id, title, updated_at AS updatedAt, mascot_id AS mascotId, source AS \"from\" FROM chats WHERE id = ?")
+      .prepare('SELECT id, title, updated_at AS updatedAt, mascot_id AS mascotId, source AS "from" FROM chats WHERE id = ?')
       .get(id) as unknown as ChatThreadSummary | undefined;
     if (!summary) return null;
     const rows = this.db
       .prepare("SELECT role, content, steps, memory, pages, attached, work FROM messages WHERE chat_id = ? ORDER BY id")
-      .all(id) as unknown as Array<Pick<ChatThreadMessage, "role" | "content"> & { steps: string | null; memory: string | null; pages: string | null; attached: string | null; work: string | null }>;
-    const messages = rows.map(({ steps, memory, pages, attached, work, ...message }): ChatThreadMessage => ({
-      ...message,
-      ...(steps ? { steps: JSON.parse(steps) } : {}),
-      ...(memory ? { memoryIds: JSON.parse(memory) } : {}),
-      ...(pages ? { pages: JSON.parse(pages) } : {}),
-      ...(attached ? { attached: JSON.parse(attached) } : {}),
-      ...(work ? JSON.parse(work) : {}),
-    }));
+      .all(id) as unknown as Array<
+      Pick<ChatThreadMessage, "role" | "content"> & {
+        steps: string | null;
+        memory: string | null;
+        pages: string | null;
+        attached: string | null;
+        work: string | null;
+      }
+    >;
+    const messages = rows.map(
+      ({ steps, memory, pages, attached, work, ...message }): ChatThreadMessage => ({
+        ...message,
+        ...(steps ? { steps: JSON.parse(steps) } : {}),
+        ...(memory ? { memoryIds: JSON.parse(memory) } : {}),
+        ...(pages ? { pages: JSON.parse(pages) } : {}),
+        ...(attached ? { attached: JSON.parse(attached) } : {}),
+        ...(work ? JSON.parse(work) : {}),
+      }),
+    );
     return { ...summary, messages };
   }
 
@@ -129,17 +144,13 @@ export class ChatStore {
 
   // The user's choice, which a generated title never replaces.
   renameChat(id: string, title: string): boolean {
-    const { changes } = this.db
-      .prepare("UPDATE chats SET title = ?, title_settled = 1 WHERE id = ?")
-      .run(title, id);
+    const { changes } = this.db.prepare("UPDATE chats SET title = ?, title_settled = 1 WHERE id = ?").run(title, id);
     return changes > 0;
   }
 
   // False if the chat was renamed or deleted while the title was being generated.
   setGeneratedTitle(id: string, title: string): boolean {
-    const { changes } = this.db
-      .prepare("UPDATE chats SET title = ?, title_settled = 1 WHERE id = ? AND title_settled = 0")
-      .run(title, id);
+    const { changes } = this.db.prepare("UPDATE chats SET title = ?, title_settled = 1 WHERE id = ? AND title_settled = 0").run(title, id);
     return changes > 0;
   }
 
@@ -166,9 +177,13 @@ export class ChatStore {
           message.memoryIds?.length ? JSON.stringify(message.memoryIds) : null,
           message.pages?.length ? JSON.stringify(message.pages) : null,
           message.attached?.length ? JSON.stringify(message.attached) : null,
-          message.startedAt !== undefined ? JSON.stringify({ said: message.said ?? [], startedAt: message.startedAt, took: message.took }) : null
+          message.startedAt !== undefined
+            ? JSON.stringify({ said: message.said ?? [], startedAt: message.startedAt, took: message.took })
+            : null,
         );
-      const insert = this.db.prepare("INSERT INTO message_files (chat_id, message_id, kind, name, fact, mime, data, text) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+      const insert = this.db.prepare(
+        "INSERT INTO message_files (chat_id, message_id, kind, name, fact, mime, data, text) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      );
       files.forEach((file) => insert.run(chatId, messageId, file.kind, file.name, file.fact, file.mime, file.data, file.text));
       this.db.prepare("UPDATE chats SET updated_at = ? WHERE id = ?").run(Date.now(), chatId);
       this.db.exec("COMMIT");
@@ -180,12 +195,26 @@ export class ChatStore {
 
   // The files that went with each of a chat's messages, in the order of its messages, for the model and nothing else.
   filesOf(chatId: string): StoredFile[][] {
-    const messages = this.db.prepare("SELECT id FROM messages WHERE chat_id = ? ORDER BY id").all(chatId) as unknown as Array<{ id: number }>;
+    const messages = this.db.prepare("SELECT id FROM messages WHERE chat_id = ? ORDER BY id").all(chatId) as unknown as Array<{
+      id: number;
+    }>;
     const rows = this.db
-      .prepare("SELECT message_id AS messageId, kind, name, fact, mime, data, text FROM message_files WHERE chat_id = ? ORDER BY message_id, id")
-      .all(chatId) as unknown as Array<{ messageId: number; kind: FileKind; name: string; fact: string | null; mime: string | null; data: Uint8Array | null; text: string | null }>;
+      .prepare(
+        "SELECT message_id AS messageId, kind, name, fact, mime, data, text FROM message_files WHERE chat_id = ? ORDER BY message_id, id",
+      )
+      .all(chatId) as unknown as Array<{
+      messageId: number;
+      kind: FileKind;
+      name: string;
+      fact: string | null;
+      mime: string | null;
+      data: Uint8Array | null;
+      text: string | null;
+    }>;
     return messages.map(({ id }) =>
-      rows.filter(({ messageId }) => messageId === id).map(({ kind, name, fact, mime, data, text }) => ({ kind, name, fact, mime, data: data && Buffer.from(data), text }))
+      rows
+        .filter(({ messageId }) => messageId === id)
+        .map(({ kind, name, fact, mime, data, text }) => ({ kind, name, fact, mime, data: data && Buffer.from(data), text })),
     );
   }
 }

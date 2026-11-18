@@ -83,7 +83,10 @@ export const NOWHERE = "nowhere.invalid";
 export const narrowSites = (first: readonly string[], second: readonly string[]): string[] => {
   if (first.length === 0) return [...second];
   if (second.length === 0) return [...first];
-  const both = [...first.filter((site) => siteAllowed(`https://${site}`, second)), ...second.filter((site) => siteAllowed(`https://${site}`, first))];
+  const both = [
+    ...first.filter((site) => siteAllowed(`https://${site}`, second)),
+    ...second.filter((site) => siteAllowed(`https://${site}`, first)),
+  ];
   return both.length > 0 ? [...new Set(both)] : [NOWHERE];
 };
 

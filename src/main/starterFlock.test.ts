@@ -16,7 +16,11 @@ const settingsOf = (start: Partial<Settings> = {}) => {
     update: (patch: Partial<Settings>) => (settings = sanitizeSettings({ ...settings, ...patch }, settings)),
   };
 };
-const names = (mascots: MascotStore) => mascots.all().filter((mascot) => mascot.deletedAt === null).map(({ name }) => name);
+const names = (mascots: MascotStore) =>
+  mascots
+    .all()
+    .filter((mascot) => mascot.deletedAt === null)
+    .map(({ name }) => name);
 
 describe("addStarterFlock", () => {
   it("gives a profile with only Berry four mascots of other berries, as Gallery copies, and marks it done", () => {
@@ -50,7 +54,13 @@ describe("addStarterFlock", () => {
 
   it("adds nothing to a profile with mascots of its own, and marks it done", () => {
     const mascots = store();
-    mascots.save(null, { name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "News.", sites: ["svt.se"], tools: ["visit"] });
+    mascots.save(null, {
+      name: "Scout",
+      look: { palette: "robin", accessory: "cap" },
+      instructions: "News.",
+      sites: ["svt.se"],
+      tools: ["visit"],
+    });
     const settings = settingsOf();
     addStarterFlock(mascots, settings);
     expect(names(mascots)).toEqual(["Berry", "Scout"]);
@@ -65,7 +75,13 @@ describe("addStarterFlock", () => {
 
   it("counts a flock whose own mascots were all deleted as only Berry", () => {
     const mascots = store();
-    const saved = mascots.save(null, { name: "Plain Words", look: { palette: "canary", accessory: "bow" }, instructions: "Mine.", sites: [], tools: [] });
+    const saved = mascots.save(null, {
+      name: "Plain Words",
+      look: { palette: "canary", accessory: "bow" },
+      instructions: "Mine.",
+      sites: [],
+      tools: [],
+    });
     if (!saved.ok) throw new Error(saved.error);
     mascots.delete(saved.id);
     addStarterFlock(mascots, settingsOf());

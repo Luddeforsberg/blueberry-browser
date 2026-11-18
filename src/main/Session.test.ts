@@ -33,8 +33,8 @@ describe("savedEntries", () => {
           { url: "about:blank", title: "" },
           { url: "https://b.example/", title: "B" },
         ],
-        3
-      )
+        3,
+      ),
     ).toEqual({
       entries: [
         { url: "https://a.example/", title: "A" },
@@ -86,7 +86,7 @@ describe("sanitizeSession", () => {
 
   it("falls back to the first tab and the usual layout for bad values", () => {
     expect(
-      sanitizeSession({ tabs: [web("https://a.example/")], active: 9, sidebarOpen: "no", chatOpen: 1, width: "wide", height: -5 })
+      sanitizeSession({ tabs: [web("https://a.example/")], active: 9, sidebarOpen: "no", chatOpen: 1, width: "wide", height: -5 }),
     ).toMatchObject({ active: 0, sidebarOpen: true, chatOpen: false, width: 0, height: 0 });
   });
 

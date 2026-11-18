@@ -35,7 +35,12 @@ interface Staged extends PreparedFile {
 // it can't be opened. Electron's in the app, a stand-in in tests.
 export type PreparePicture = (bytes: Buffer) => { data: Buffer; mime: string; thumbnail: string } | null;
 
-export const sentAttachment = (file: PreparedFile): SentAttachment => ({ kind: file.kind, name: file.name, fact: file.fact, thumbnail: file.thumbnail });
+export const sentAttachment = (file: PreparedFile): SentAttachment => ({
+  kind: file.kind,
+  name: file.name,
+  fact: file.fact,
+  thumbnail: file.thumbnail,
+});
 
 // Only the first byte past the limit is ever read, which is enough to say it's too big.
 const readUpToLimit = async (path: string): Promise<Buffer | null> => {
@@ -68,7 +73,7 @@ export class Attachments {
     // The system's own dialog, opened by main. Answers with what the user chose, which never leaves main.
     private readonly pickFiles: () => Promise<string[]>,
     private readonly preparePicture: PreparePicture,
-    private readonly now: () => number = Date.now
+    private readonly now: () => number = Date.now,
   ) {}
 
   // What was read, judged. Refused files get a chip with the reason and are never kept.
@@ -77,10 +82,26 @@ export class Attachments {
     const sniffed = sniffFile(bytes);
     if ("refused" in sniffed) return { name: clean, problem: sniffed.refused };
     if (sniffed.kind === "text") {
-      return { kind: "text", name: clean, data: null, mime: null, text: sniffed.text, fact: sniffed.cut ? ATTACHMENT_WORDS.cutShort : null, thumbnail: null };
+      return {
+        kind: "text",
+        name: clean,
+        data: null,
+        mime: null,
+        text: sniffed.text,
+        fact: sniffed.cut ? ATTACHMENT_WORDS.cutShort : null,
+        thumbnail: null,
+      };
     }
     if (sniffed.kind === "pdf") {
-      return { kind: "pdf", name: clean, data: bytes, mime: "application/pdf", text: null, fact: sniffed.pages === null ? null : pages(sniffed.pages), thumbnail: null };
+      return {
+        kind: "pdf",
+        name: clean,
+        data: bytes,
+        mime: "application/pdf",
+        text: null,
+        fact: sniffed.pages === null ? null : pages(sniffed.pages),
+        thumbnail: null,
+      };
     }
     const picture = this.preparePicture(bytes);
     if (!picture) return { name: clean, problem: ATTACHMENT_WORDS.brokenPicture };
@@ -102,7 +123,7 @@ export class Attachments {
         const { name, bytes } = (file ?? {}) as { name?: unknown; bytes?: unknown };
         return { name, bytes: bytes instanceof Uint8Array ? Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength) : null };
       }),
-      kept
+      kept,
     );
   }
 
@@ -112,13 +133,33 @@ export class Attachments {
     let room = MAX_FILES - new Set(already).size;
     return files.map(({ name, bytes }) => {
       const id = randomUUID();
-      const prepared = bytes ? this.prepare(name, bytes) : { name: cleanFileName(name, MAX_FILE_NAME_LENGTH), problem: ATTACHMENT_WORDS.unreadable };
-      if ("problem" in prepared) return { id, kind: null, name: prepared.name, fact: null, factInFull: null, thumbnail: null, problem: prepared.problem };
-      if (room <= 0) return { id, kind: prepared.kind, name: prepared.name, fact: null, factInFull: null, thumbnail: prepared.thumbnail, problem: ATTACHMENT_WORDS.tooMany };
+      const prepared = bytes
+        ? this.prepare(name, bytes)
+        : { name: cleanFileName(name, MAX_FILE_NAME_LENGTH), problem: ATTACHMENT_WORDS.unreadable };
+      if ("problem" in prepared)
+        return { id, kind: null, name: prepared.name, fact: null, factInFull: null, thumbnail: null, problem: prepared.problem };
+      if (room <= 0)
+        return {
+          id,
+          kind: prepared.kind,
+          name: prepared.name,
+          fact: null,
+          factInFull: null,
+          thumbnail: prepared.thumbnail,
+          problem: ATTACHMENT_WORDS.tooMany,
+        };
       room--;
       this.staged.set(id, { ...prepared, stagedAt: this.now() });
       const factInFull = prepared.fact === ATTACHMENT_WORDS.cutShort ? ATTACHMENT_WORDS.cutShortInFull : prepared.fact;
-      return { id, kind: prepared.kind, name: prepared.name, fact: prepared.fact, factInFull, thumbnail: prepared.thumbnail, problem: null };
+      return {
+        id,
+        kind: prepared.kind,
+        name: prepared.name,
+        fact: prepared.fact,
+        factInFull,
+        thumbnail: prepared.thumbnail,
+        problem: null,
+      };
     });
   }
 

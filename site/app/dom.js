@@ -10,7 +10,11 @@ export const el = (tag, props = {}, ...children) => {
   const node = document.createElement(tag);
   for (const [key, value] of Object.entries(props)) {
     if (value === undefined || value === null) continue;
-    if (key.startsWith("aria") || key.startsWith("data")) node.setAttribute(key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`), value);
+    if (key.startsWith("aria") || key.startsWith("data"))
+      node.setAttribute(
+        key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`),
+        value,
+      );
     else node[key] = value;
   }
   node.append(...children.flat().filter((child) => child !== null && child !== false && child !== undefined));
@@ -37,15 +41,29 @@ const ICONS = {
   tick: ["M20 6 9 17l-5-5"],
   bell: ["M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9", "M10.3 21a1.9 1.9 0 0 0 3.4 0"],
   eye: ["M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z", "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"],
-  eyeOff: ["M10.7 5.1A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-2.2 3.2", "M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6", "M2 2l20 20", "M9.9 9.9a3 3 0 0 0 4.2 4.2"],
+  eyeOff: [
+    "M10.7 5.1A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-2.2 3.2",
+    "M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6",
+    "M2 2l20 20",
+    "M9.9 9.9a3 3 0 0 0 4.2 4.2",
+  ],
   again: ["M21 12a9 9 0 1 1-3-6.7L21 8", "M21 3v5h-5"],
   grow: ["M15 3h6v6", "M9 21H3v-6", "M21 3l-7 7", "M3 21l7-7"],
   shrink: ["M4 14h6v6", "M20 10h-6V4", "M14 10l7-7", "M3 21l7-7"],
   copy: ["M11 9h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-8a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z", "M5 15V5a2 2 0 0 1 2-2h10"],
   computer: ["M6 5h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z", "M2 20h20"],
-  mascots: ["M8 21a5 5 0 0 1-5-5c0-3 2-6 5-6s5 3 5 6a5 5 0 0 1-5 5Z", "M16 17a4 4 0 0 1-1.4-.3", "M14 9.6c.6-.4 1.3-.6 2-.6 2.4 0 4 2.4 4 4.8 0 .5-.1 1-.2 1.4"],
+  mascots: [
+    "M8 21a5 5 0 0 1-5-5c0-3 2-6 5-6s5 3 5 6a5 5 0 0 1-5 5Z",
+    "M16 17a4 4 0 0 1-1.4-.3",
+    "M14 9.6c.6-.4 1.3-.6 2-.6 2.4 0 4 2.4 4 4.8 0 .5-.1 1-.2 1.4",
+  ],
 };
-export const icon = (name, className = "") => svg("svg", { viewBox: "0 0 24 24", class: `icon ${className}`.trim(), "aria-hidden": "true" }, ...ICONS[name].map((d) => svg("path", { d })));
+export const icon = (name, className = "") =>
+  svg(
+    "svg",
+    { viewBox: "0 0 24 24", class: `icon ${className}`.trim(), "aria-hidden": "true" },
+    ...ICONS[name].map((d) => svg("path", { d })),
+  );
 
 // The square inside Stop.
 export const stopSquare = () => el("i", { className: "stop-square", ariaHidden: "true" });
@@ -72,7 +90,8 @@ export const bird = (mascot, mood, size, { named = true } = {}) => {
 };
 
 // The pips (DESIGN.md section 6), from pips.css, which comes from the app's own. Always beside words that say the same.
-export const pips = (pattern, className = "") => el("span", { className: `pips ${className}`.trim(), dataPips: pattern, ariaHidden: "true" }, ...Array.from({ length: 9 }, () => el("i")));
+export const pips = (pattern, className = "") =>
+  el("span", { className: `pips ${className}`.trim(), dataPips: pattern, ariaHidden: "true" }, ...Array.from({ length: 9 }, () => el("i")));
 
 // Which pips a step has. Its kind comes from the server, so anything but a kind there is takes the plain ones.
 export const stepPips = (step) => STEP_PIPS[typeof step?.kind === "string" && Object.hasOwn(STEP_PIPS, step.kind) ? step.kind : "plain"];
@@ -137,22 +156,27 @@ export const grow = (box) => {
 export const copyButton = (text) => {
   const words = el("span", { textContent: "Copy" });
   const mark = el("span", { className: "swap" }, icon("copy"));
-  const button = el("button", {
-    type: "button",
-    className: "ghost",
-    onclick: async () => {
-      try {
-        await navigator.clipboard.writeText(text);
-        mark.replaceChildren(icon("tick"));
-        words.textContent = "Copied";
-        setTimeout(() => {
-          mark.replaceChildren(icon("copy"));
-          words.textContent = "Copy";
-        }, 1500);
-      } catch {
-        words.textContent = "Couldn’t copy";
-      }
+  const button = el(
+    "button",
+    {
+      type: "button",
+      className: "ghost",
+      onclick: async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          mark.replaceChildren(icon("tick"));
+          words.textContent = "Copied";
+          setTimeout(() => {
+            mark.replaceChildren(icon("copy"));
+            words.textContent = "Copy";
+          }, 1500);
+        } catch {
+          words.textContent = "Couldn’t copy";
+        }
+      },
     },
-  }, mark, words);
+    mark,
+    words,
+  );
   return button;
 };

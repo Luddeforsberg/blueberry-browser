@@ -44,10 +44,8 @@ const listVisible = () =>
   app.evaluate(({ BaseWindow }) =>
     BaseWindow.getAllWindows()[0].contentView.children.some(
       (view) =>
-        "webContents" in view &&
-        (view as Electron.WebContentsView).webContents.getURL().includes("view=suggestions") &&
-        view.getVisible()
-    )
+        "webContents" in view && (view as Electron.WebContentsView).webContents.getURL().includes("view=suggestions") && view.getVisible(),
+    ),
   );
 
 const editAddress = async () => {

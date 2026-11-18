@@ -39,7 +39,16 @@ describe("pngOfSize and pngFromDataUrl", () => {
   });
 
   it("refuse anything that isn't a PNG data address", () => {
-    for (const value of [null, 42, {}, "", dataUrl(png(256)).replace("image/png", "image/svg+xml"), `${dataUrl(png(256))}!`, "https://example.com/icon.png", "file:///C:/icon.png"]) {
+    for (const value of [
+      null,
+      42,
+      {},
+      "",
+      dataUrl(png(256)).replace("image/png", "image/svg+xml"),
+      `${dataUrl(png(256))}!`,
+      "https://example.com/icon.png",
+      "file:///C:/icon.png",
+    ]) {
       expect(pngFromDataUrl(value, 256)).toBeNull();
     }
   });

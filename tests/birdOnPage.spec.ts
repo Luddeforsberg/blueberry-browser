@@ -10,7 +10,9 @@ import { startFakeModel, type FakeModel } from "./fakeModel";
 const BUTTON = `<button id="go" style="position:absolute;left:300px;top:300px;width:160px;height:44px" onclick="document.title='Pressed by '+event.isTrusted">Press me now</button>`;
 const PAGES: Record<string, { body: string; csp?: string }> = {
   "/plain": { body: `<title>Plain</title><body style="margin:0">${BUTTON}<p>The words on this page</p>` },
-  "/green": { body: `<title>Green</title><body style="margin:0;background:rgb(0,200,0);height:100vh">${BUTTON.replace(/style="[^"]*"/, 'style="position:absolute;left:300px;top:300px;width:160px;height:44px;background:rgb(0,200,0);color:rgb(0,200,0);border:0"').replace("Press me now", "go")}` },
+  "/green": {
+    body: `<title>Green</title><body style="margin:0;background:rgb(0,200,0);height:100vh">${BUTTON.replace(/style="[^"]*"/, 'style="position:absolute;left:300px;top:300px;width:160px;height:44px;background:rgb(0,200,0);color:rgb(0,200,0);border:0"').replace("Press me now", "go")}`,
+  },
   // Puts something over the button the moment real input arrives, which must not get the click.
   "/trap": {
     body: `<title>Trap</title><body style="margin:0">${BUTTON}<script>
@@ -30,14 +32,22 @@ const PAGES: Record<string, { body: string; csp?: string }> = {
     body: `<!doctype html><title>Strict</title><body><p>Locked down</p><button id="go">Press</button><input id="field" aria-label="Name">`,
     csp: "default-src 'none'; require-trusted-types-for 'script'",
   },
-  "/form": { body: `<title>Form</title><body style="margin:0;height:3000px"><input id="field" aria-label="Your name" style="position:absolute;left:100px;top:300px;width:300px"><input id="pass" type="password" aria-label="Password" style="position:absolute;left:100px;top:400px;width:300px">` },
-  "/inner": { body: `<title>Inner</title><body><button onclick="parent.postMessage('pressed','*');document.title='Pressed'">In the frame</button>` },
+  "/form": {
+    body: `<title>Form</title><body style="margin:0;height:3000px"><input id="field" aria-label="Your name" style="position:absolute;left:100px;top:300px;width:300px"><input id="pass" type="password" aria-label="Password" style="position:absolute;left:100px;top:400px;width:300px">`,
+  },
+  "/inner": {
+    body: `<title>Inner</title><body><button onclick="parent.postMessage('pressed','*');document.title='Pressed'">In the frame</button>`,
+  },
   // A button with words right up against it, and clear space below.
   "/crowded": {
     body: `<title>Crowded</title><body style="margin:0;font:16px/22px sans-serif"><p id="words" style="position:absolute;left:150px;top:190px;width:460px;margin:0">Words someone might be reading, a good few of them, set out over several lines so they fill all of the space directly above the button and around where the bird will stand. They carry on for a while yet, so that nothing above it is clear.</p><button id="go" style="position:absolute;left:300px;top:300px;width:160px;height:44px" onclick="document.title='Pressed'">Press me now</button>`,
   },
-  "/two": { body: `<title>Two</title><body style="margin:0"><button id="a" style="position:absolute;left:60px;top:80px;width:120px;height:40px">First</button><button id="b" style="position:absolute;left:500px;top:420px;width:160px;height:44px" onclick="document.title='Placed'">Place order</button>` },
-  "/submit": { body: `<title>Submit</title><body style="margin:0"><form onsubmit="event.preventDefault();document.title='Submitted'"><input id="field" aria-label="Name" style="position:absolute;left:100px;top:300px;width:300px"></form>` },
+  "/two": {
+    body: `<title>Two</title><body style="margin:0"><button id="a" style="position:absolute;left:60px;top:80px;width:120px;height:40px">First</button><button id="b" style="position:absolute;left:500px;top:420px;width:160px;height:44px" onclick="document.title='Placed'">Place order</button>`,
+  },
+  "/submit": {
+    body: `<title>Submit</title><body style="margin:0"><form onsubmit="event.preventDefault();document.title='Submitted'"><input id="field" aria-label="Name" style="position:absolute;left:100px;top:300px;width:300px"></form>`,
+  },
   "/next": { body: `<title>Next</title><body>The next page` },
 };
 
@@ -55,7 +65,8 @@ interface ActorState {
 const stateIn = (app: ElectronApplication, urlPart: string) =>
   app.evaluate(async ({ webContents }, part) => {
     const contents = webContents.getAllWebContents().find((candidate) => candidate.getURL().includes(part));
-    return ((await contents?.executeJavaScriptInIsolatedWorld(1000, [{ code: "globalThis.__berryActor?.state() ?? null" }], true)) ?? null) as ActorState | null;
+    return ((await contents?.executeJavaScriptInIsolatedWorld(1000, [{ code: "globalThis.__berryActor?.state() ?? null" }], true)) ??
+      null) as ActorState | null;
   }, urlPart);
 
 const hostInPage = (page: Page) => page.evaluate(() => !!document.querySelector("blueberry-actor"));
@@ -64,7 +75,10 @@ const setup = async (settings: object = {}) => {
   const server = createServer((request, response) => {
     const port = (server.address() as AddressInfo).port;
     // Another origin, by name, on the same server.
-    if (request.url === "/framed") PAGES["/framed"] = { body: `<title>Framed</title><body style="margin:0"><iframe src="http://localhost:${port}/inner" style="position:absolute;left:200px;top:250px;width:400px;height:200px;border:0"></iframe>` };
+    if (request.url === "/framed")
+      PAGES["/framed"] = {
+        body: `<title>Framed</title><body style="margin:0"><iframe src="http://localhost:${port}/inner" style="position:absolute;left:200px;top:250px;width:400px;height:200px;border:0"></iframe>`,
+      };
     const found = PAGES[request.url ?? ""] ?? { body: "Nothing" };
     response.setHeader("content-type", "text/html");
     if (found.csp) response.setHeader("content-security-policy", found.csp);
@@ -91,11 +105,23 @@ const setup = async (settings: object = {}) => {
     const toolResults = () => JSON.stringify(model.requests.at(-1)?.messages.filter(({ role }) => role === "tool") ?? []);
     const finished = async () => {
       release();
-      await expect.poll(() => chrome.evaluate((id) => window.chromeAPI.library.getChat(id).then((chat) => chat?.messages.some(({ role }) => role === "assistant")), chatId)).toBe(true);
+      await expect
+        .poll(() =>
+          chrome.evaluate(
+            (id) => window.chromeAPI.library.getChat(id).then((chat) => chat?.messages.some(({ role }) => role === "assistant")),
+            chatId,
+          ),
+        )
+        .toBe(true);
     };
     // The first message loads LangChain and sends the page, about 3s before the model is first asked, and then the bird
     // flies to each step, so these jobs take 4 to 6s alone: past the default 5s, and more under load.
-    return { chatId, toolResults, finished, allAsked: () => expect.poll(() => model.requests.length, { timeout: 15_000 }).toBeGreaterThan(calls.length) };
+    return {
+      chatId,
+      toolResults,
+      finished,
+      allAsked: () => expect.poll(() => model.requests.length, { timeout: 15_000 }).toBeGreaterThan(calls.length),
+    };
   };
   const close = async () => {
     await app.close();
@@ -228,7 +254,12 @@ test("while a card waits it stands on what the card is about, and stays put if i
       { name: "click", args: { ref: "e99" } },
     ]);
     const approval = () => chrome.evaluate((id) => window.chromeAPI.library.getChat(id).then((chat) => chat?.approval?.id), chatId);
-    const answer = (asked: string | undefined, allow: boolean) => chrome.evaluate(([id, one, yes]) => window.chromeAPI.chat.decide(id as string, one as string, yes as boolean), [chatId, asked, allow] as const);
+    const answer = (asked: string | undefined, allow: boolean) =>
+      chrome.evaluate(([id, one, yes]) => window.chromeAPI.chat.decide(id as string, one as string, yes as boolean), [
+        chatId,
+        asked,
+        allow,
+      ] as const);
     await expect.poll(approval).toBeTruthy();
     await expect.poll(() => stateIn(app, "/two")).toMatchObject({ pose: "asking", words: "Waiting for you", flying: false });
     const { x, y } = (await stateIn(app, "/two"))!.spot!;
@@ -242,7 +273,12 @@ test("while a card waits it stands on what the card is about, and stays put if i
     await expect(page).toHaveTitle("Placed");
 
     // Nothing there to stand on: asked about all the same, from where it was.
-    await expect.poll(async () => { const next = await approval(); return next && next !== first; }).toBeTruthy();
+    await expect
+      .poll(async () => {
+        const next = await approval();
+        return next && next !== first;
+      })
+      .toBeTruthy();
     await expect.poll(async () => (await stateIn(app, "/two"))?.pose).toBe("asking");
     const stayed = (await stateIn(app, "/two"))!.spot!;
     expect(stayed.x).toBe(x);
@@ -272,7 +308,9 @@ test("coming back to the tab while a card waits, it stands on what the card is a
     await expect.poll(async () => (await stateIn(app, "/two"))?.attached ?? false).toBe(false);
     await chrome.evaluate((id) => window.chromeAPI.browser.switchTab(id), two.id);
 
-    await expect.poll(() => stateIn(app, "/two")).toMatchObject({ pose: "asking", words: "Waiting for you", attached: true, flying: false });
+    await expect
+      .poll(() => stateIn(app, "/two"))
+      .toMatchObject({ pose: "asking", words: "Waiting for you", attached: true, flying: false });
     const { x, y } = (await stateIn(app, "/two"))!.spot!;
     expect(x).toBeGreaterThan(500);
     expect(x).toBeLessThan(660);
@@ -295,11 +333,16 @@ test("its words stay off the target and the text beside it, and on screen", asyn
     ]);
     // Once landed, and before it goes back to thinking.
     let line: ActorState["line"] | undefined;
-    await expect.poll(async () => {
-      const state = await stateIn(app, "/crowded");
-      if (state?.words.includes("Pointing at") && !state.flying) line = state.line;
-      return !!line;
-    }, { intervals: [15] }).toBe(true);
+    await expect
+      .poll(
+        async () => {
+          const state = await stateIn(app, "/crowded");
+          if (state?.words.includes("Pointing at") && !state.flying) line = state.line;
+          return !!line;
+        },
+        { intervals: [15] },
+      )
+      .toBe(true);
     line = line!;
     const boxes = await page.evaluate(() => ["words", "go"].map((id) => document.getElementById(id)!.getBoundingClientRect().toJSON()));
     for (const box of boxes) {
@@ -339,7 +382,7 @@ test("the user stepping into a field stops the typing, and what's in it stays th
     // The job hears why, twice, and goes on: the second try at that field does nothing.
     expect(toolResults().match(/typing stopped/g)).toHaveLength(2);
     expect(model.requests.length).toBeGreaterThan(3);
-    expect((await stateIn(app, "/form"))).toBeNull();
+    expect(await stateIn(app, "/form")).toBeNull();
     await finished();
   } finally {
     await close();
@@ -395,7 +438,10 @@ test("on a zoomed page it stands in the right place and the click lands, and bet
   try {
     const page = await open("/plain");
     await app.evaluate(({ webContents }) => {
-      webContents.getAllWebContents().find((contents) => contents.getURL().includes("/plain"))!.setZoomFactor(1.5);
+      webContents
+        .getAllWebContents()
+        .find((contents) => contents.getURL().includes("/plain"))!
+        .setZoomFactor(1.5);
     });
     model.thinkFor(1200);
     const { finished } = await job([
@@ -431,7 +477,9 @@ test("Stop ends the job while the bird is on its way, so the click never happens
     await expect.poll(() => hostInPage(page)).toBe(false);
     await new Promise((resolve) => setTimeout(resolve, 900));
     await expect(page).toHaveTitle("Plain");
-    expect(await chrome.evaluate(() => window.chromeAPI.browser.getTabs().then((tabs) => tabs.some(({ berryWorking }) => berryWorking)))).toBe(false);
+    expect(
+      await chrome.evaluate(() => window.chromeAPI.browser.getTabs().then((tabs) => tabs.some(({ berryWorking }) => berryWorking))),
+    ).toBe(false);
   } finally {
     await close();
   }
@@ -470,7 +518,11 @@ test("a page's change listener clearing the field gets the text typed again, not
   const { open, job, close } = await setup();
   try {
     const form = await open("/form");
-    await form.evaluate(() => document.querySelector("#field")!.addEventListener("change", (event) => ((event.target as HTMLInputElement).value = ""), { once: true }));
+    await form.evaluate(() =>
+      document
+        .querySelector("#field")!
+        .addEventListener("change", (event) => ((event.target as HTMLInputElement).value = ""), { once: true }),
+    );
     const current = await job([
       { name: "list_elements", args: {} },
       { name: "type_text", args: { ref: "e1", text: "Ada Lovelace" } },
@@ -553,7 +605,10 @@ test("a background tab pays nothing, and the bird appears when the user goes the
     expect(await hostInPage(behind)).toBe(false);
     expect(model.requests.length).toBeGreaterThan(3);
 
-    const id = await chrome.evaluate((url) => window.chromeAPI.browser.getTabs().then((tabs) => tabs.find((tab) => tab.url === url)!.id), `${origin}/form`);
+    const id = await chrome.evaluate(
+      (url) => window.chromeAPI.browser.getTabs().then((tabs) => tabs.find((tab) => tab.url === url)!.id),
+      `${origin}/form`,
+    );
     await chrome.evaluate((tab) => window.chromeAPI.browser.switchTab(tab), id);
     await expect.poll(() => hostInPage(behind)).toBe(true);
     await finished();
@@ -619,7 +674,9 @@ test("mid-job navigation brings it back on the new page, and a handed-over tab h
     await expect.poll(() => hostInPage(page)).toBe(false);
 
     current = await job([{ name: "hand_to_user", args: { need: "sign-in" } }]);
-    await expect.poll(() => chrome.evaluate(() => window.chromeAPI.library.getLibrary().then((library) => library.needsYou.length))).toBeGreaterThan(0);
+    await expect
+      .poll(() => chrome.evaluate(() => window.chromeAPI.library.getLibrary().then((library) => library.needsYou.length)))
+      .toBeGreaterThan(0);
     expect(await hostInPage(page)).toBe(false);
   } finally {
     await close();

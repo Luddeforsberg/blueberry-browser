@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { ACTOR_ART, type ArtNode } from "./pageActorArt";
 import { artFor } from "./pageActorScript";
 
-const berriesIn = (node: ArtNode): string[] => [...new Set([...JSON.stringify(node).matchAll(/"data-berry":"([a-z]+)"/g)].map(([, berry]) => berry))];
+const berriesIn = (node: ArtNode): string[] => [
+  ...new Set([...JSON.stringify(node).matchAll(/"data-berry":"([a-z]+)"/g)].map(([, berry]) => berry)),
+];
 
 describe("artFor", () => {
   it("keeps only the berry the palette draws as, with its own clip", () => {

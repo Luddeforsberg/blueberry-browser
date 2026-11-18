@@ -39,7 +39,7 @@ export class TabPreviews {
 
   constructor(
     private readonly parent: View,
-    private readonly deps: TabPreviewDeps
+    private readonly deps: TabPreviewDeps,
   ) {
     this.chromeView.view.setVisible(false);
     parent.addChildView(this.chromeView.view);

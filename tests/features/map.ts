@@ -105,7 +105,12 @@ const switchTo = async (drive: Drive, find: (tab: Awaited<ReturnType<typeof tabs
 
 // Three pages open, ending on the news, so the tabs and the history have something in them.
 const threeTabs = async (drive: Drive) => {
-  for (const [host, path] of [["shop.example", "/"], ["travel.example", "/flights"], ["news.example", "/news"]]) await createTab(drive, drive.site.url(host, path));
+  for (const [host, path] of [
+    ["shop.example", "/"],
+    ["travel.example", "/flights"],
+    ["news.example", "/news"],
+  ])
+    await createTab(drive, drive.site.url(host, path));
   await seen(drive.chrome, "Morning News");
 };
 
@@ -116,7 +121,10 @@ const THINK_MS = 1000;
 const startChat = async (drive: Drive, text: string, { title = "NONE", cloud = false }: { title?: string; cloud?: boolean } = {}) => {
   drive.model.titleWith(title);
   drive.model.thinkFor(THINK_MS);
-  const sent = await drive.chrome.evaluate(([text, cloud]) => window.chromeAPI.chat.send(null, text, { seePage: false, cloud }), [text, cloud] as const);
+  const sent = await drive.chrome.evaluate(([text, cloud]) => window.chromeAPI.chat.send(null, text, { seePage: false, cloud }), [
+    text,
+    cloud,
+  ] as const);
   if (!sent) throw new Error("The chat wasn't sent");
   await openPage(drive, "chat", sent.id);
   return sent.id;
@@ -164,7 +172,10 @@ const viewShows = async (drive: Drive, urlPart: string, timeout = 10_000) => {
     !(await drive.app.evaluate(({ BaseWindow }, urlPart) => {
       const view = BaseWindow.getAllWindows()
         .flatMap((window) => window.contentView.children)
-        .find((child): child is Electron.WebContentsView => "webContents" in child && (child as Electron.WebContentsView).webContents.getURL().includes(urlPart));
+        .find(
+          (child): child is Electron.WebContentsView =>
+            "webContents" in child && (child as Electron.WebContentsView).webContents.getURL().includes(urlPart),
+        );
       return !!view && view.getVisible() && view.getBounds().width > 1;
     }, urlPart))
   ) {
@@ -182,8 +193,12 @@ const saved = (result: { ok: true; id: string } | { ok: false; error: string }):
 const saveRoutine = async (drive: Drive) =>
   saved(
     await drive.chrome.evaluate(() =>
-      window.chromeAPI.routines.save(null, { name: "Morning stories", instructions: "Read the news page and list five stories worth my time.", schedule: { kind: "daily", time: "08:15" } })
-    )
+      window.chromeAPI.routines.save(null, {
+        name: "Morning stories",
+        instructions: "Read the news page and list five stories worth my time.",
+        schedule: { kind: "daily", time: "08:15" },
+      }),
+    ),
   );
 
 // A mascot of the user's own, with limits.
@@ -196,8 +211,8 @@ const saveScout = async (drive: Drive) =>
         instructions: "Find the cheapest one that's in stock.",
         sites: ["shop.example"],
         tools: ["visit", "click"],
-      })
-    )
+      }),
+    ),
   );
 
 const makingStep = async (drive: Drive, steps: number) => {
@@ -247,7 +262,10 @@ const ACCOUNT = { email: "alex@example.com", password: "correct horse battery" }
 
 // The account menu's button: a person with a server, Settings and more without one, in the sidebar or the toolbar.
 const openAccountMenu = async (drive: Drive) => {
-  await drive.chrome.getByRole("button", { name: /^(Settings and more|Account, )/ }).first().click();
+  await drive.chrome
+    .getByRole("button", { name: /^(Settings and more|Account, )/ })
+    .first()
+    .click();
   const where = drive.look.layout === "horizontal" ? await findView(drive.app, "view=overlay") : drive.chrome;
   await where.getByRole("dialog", { name: "Account" }).waitFor();
   if (drive.look.layout === "horizontal") await viewShows(drive, "view=overlay");
@@ -274,12 +292,32 @@ const PROMPT = "Find the cheapest USB-C cable on shop.example and put it in my c
 
 const jobOnRunner = async (phone: PhoneDrive, end: "asks" | "done") => {
   await phone.owner("sync_cloud_flock", { p_birds: flockRows([SCOUT]) });
-  const job = await phone.owner("start_cloud_job", { p_prompt: PROMPT, p_history: [], p_mascot: mascotSnapshot(SCOUT), p_action_approval: "risky", p_context_id: "ctx-ana" });
+  const job = await phone.owner("start_cloud_job", {
+    p_prompt: PROMPT,
+    p_history: [],
+    p_mascot: mascotSnapshot(SCOUT),
+    p_action_approval: "risky",
+    p_context_id: "ctx-ana",
+  });
   await phone.runner("runner_claim_job");
-  const steps = [{ text: "Opened shop.example", done: true, kind: "open" }, { text: "Compared 14 cables by price", done: true, kind: "read" }];
+  const steps = [
+    { text: "Opened shop.example", done: true, kind: "open" },
+    { text: "Compared 14 cables by price", done: true, kind: "read" },
+  ];
   await phone.runner("runner_update_job", { p_job: job, p_steps: steps, p_live_view: LIVE });
-  if (end === "asks") await phone.runner("runner_ask", { p_job: job, p_kind: "approval", p_text: "Click the button “Place order” on https://shop.example/cart" });
-  else await phone.runner("runner_update_job", { p_job: job, p_status: "done", p_steps: steps, p_reply: "The cheapest is a 1 m cable for 49 kr. It's in your cart." });
+  if (end === "asks")
+    await phone.runner("runner_ask", {
+      p_job: job,
+      p_kind: "approval",
+      p_text: "Click the button “Place order” on https://shop.example/cart",
+    });
+  else
+    await phone.runner("runner_update_job", {
+      p_job: job,
+      p_status: "done",
+      p_steps: steps,
+      p_reply: "The cheapest is a 1 m cable for 49 kr. It's in your cart.",
+    });
   await phone.settleTimes();
 };
 
@@ -351,7 +389,11 @@ export const FEATURES: Feature[] = [
           drive.model.callTools({ name: "open_tab", args: { url: drive.site.url("shop.example") } });
           drive.model.holdBeforeFirstToken();
           await startChat(drive, "Find the cheapest USB-C cable on shop.example");
-          await drive.chrome.getByRole("complementary", { name: /working on/ }).locator("img").first().waitFor();
+          await drive.chrome
+            .getByRole("complementary", { name: /working on/ })
+            .locator("img")
+            .first()
+            .waitFor();
         },
       },
       approval: {
@@ -397,7 +439,10 @@ export const FEATURES: Feature[] = [
         open: async (drive) => {
           await createTab(drive, drive.site.url("shop.example"));
           await drive.chrome.evaluate(() => window.chromeAPI.layout.toggleChat());
-          await drive.chrome.getByRole("textbox", { name: /ask|Message/i }).first().waitFor();
+          await drive.chrome
+            .getByRole("textbox", { name: /ask|Message/i })
+            .first()
+            .waitFor();
         },
       },
       reply: {
@@ -498,7 +543,11 @@ export const FEATURES: Feature[] = [
           await drive.chrome.getByRole("textbox", { name: "Address" }).pressSequentially("lis");
           const list = await findView(drive.app, "view=suggestions");
           await list.getByRole("option").first().waitFor();
-          await list.getByRole("option").last().getByText(/Ask Berry/).waitFor();
+          await list
+            .getByRole("option")
+            .last()
+            .getByText(/Ask Berry/)
+            .waitFor();
           await viewShows(drive, "view=suggestions");
         },
       },
@@ -512,7 +561,9 @@ export const FEATURES: Feature[] = [
       card: {
         open: async (drive) => {
           await threeTabs(drive);
-          const tab = drive.chrome.getByRole("list", { name: "Tabs", exact: true }).getByRole("button", { name: "Lisbon fares", exact: true });
+          const tab = drive.chrome
+            .getByRole("list", { name: "Tabs", exact: true })
+            .getByRole("button", { name: "Lisbon fares", exact: true });
           await tab.hover();
           const preview = await findView(drive.app, "view=preview");
           await preview.locator("[data-tab-preview]").getByText("Lisbon fares").waitFor();
@@ -533,7 +584,10 @@ export const FEATURES: Feature[] = [
           await drive.app.evaluate(({ Menu }) => {
             const search = (items: Electron.MenuItem[]): Electron.MenuItem | undefined =>
               items.flatMap((item) => (item.submenu ? [search(item.submenu.items)] : item.label === "Find…" ? [item] : []))[0];
-            (Menu.getApplicationMenu()?.items ?? []).map((top) => search(top.submenu?.items ?? [])).find(Boolean)?.click();
+            (Menu.getApplicationMenu()?.items ?? [])
+              .map((top) => search(top.submenu?.items ?? []))
+              .find(Boolean)
+              ?.click();
           });
           const find = await findView(drive.app, "view=find");
           await find.getByRole("textbox", { name: "Find in page" }).fill("jackdaw");
@@ -584,7 +638,10 @@ export const FEATURES: Feature[] = [
           // A right-click as the page is still settling in can be lost, so it's tried again, as a person would.
           for (let tries = 0; ; tries++) {
             await page.mouse.click(300, 300, { button: "right" });
-            const shown = await menuShows(drive, 2_000).then(() => true, () => false);
+            const shown = await menuShows(drive, 2_000).then(
+              () => true,
+              () => false,
+            );
             if (shown) break;
             if (tries === 3) throw new Error("The page's menu didn't open");
           }
@@ -604,10 +661,14 @@ export const FEATURES: Feature[] = [
           open: async (drive: Drive) => {
             await openPage(drive, "settings", place);
             // A section has the sections' tabs, and a page one step in has its way back instead.
-            await drive.chrome.getByRole("tab", { name: "General" }).or(drive.chrome.getByRole("button", { name: /^Back to / })).first().waitFor();
+            await drive.chrome
+              .getByRole("tab", { name: "General" })
+              .or(drive.chrome.getByRole("button", { name: /^Back to / }))
+              .first()
+              .waitFor();
           },
         },
-      ])
+      ]),
     ),
   },
   {
@@ -758,7 +819,10 @@ export const FEATURES: Feature[] = [
       },
       one: {
         open: async (drive) => {
-          await drive.chrome.evaluate((address) => window.chromeAPI.browser.createTab(address), drive.site.url("shop.example", "/report.pdf"));
+          await drive.chrome.evaluate(
+            (address) => window.chromeAPI.browser.createTab(address),
+            drive.site.url("shop.example", "/report.pdf"),
+          );
           await until(drive, async () => (await window.chromeAPI.downloads.list()).some((item) => item.state === "completed"));
           await openPage(drive, "downloads");
           await seen(drive.chrome, "report.pdf");
@@ -857,7 +921,11 @@ export const FEATURES: Feature[] = [
           drive.model.callTools({ name: "open_tab", args: { url: drive.site.url("shop.example") } });
           drive.model.holdBeforeFirstToken();
           await startChat(drive, "Find the cheapest USB-C cable on shop.example");
-          await drive.chrome.getByRole("complementary", { name: /working on/ }).locator("img").first().waitFor();
+          await drive.chrome
+            .getByRole("complementary", { name: /working on/ })
+            .locator("img")
+            .first()
+            .waitFor();
           await switchTo(drive, (tab) => tab.url === drive.site.url("shop.example"));
           await drive.app.evaluate(async ({ webContents }) => {
             for (let tries = 0; tries < 40; tries++) {
@@ -881,7 +949,9 @@ export const FEATURES: Feature[] = [
         window: "composer",
         open: async (drive) => {
           await desktopOn(drive);
-          await drive.app.evaluate(() => (globalThis as unknown as { fakeShortcuts: Map<string, () => void> }).fakeShortcuts.get("Alt+Space")?.());
+          await drive.app.evaluate(() =>
+            (globalThis as unknown as { fakeShortcuts: Map<string, () => void> }).fakeShortcuts.get("Alt+Space")?.(),
+          );
           const composer = await findView(drive.app, "view=composer");
           await composer.getByRole("textbox").first().waitFor();
         },
@@ -901,7 +971,14 @@ export const FEATURES: Feature[] = [
           drive.model.holdBeforeFirstToken();
           await startChat(drive, "Open shop.example", { cloud: true });
           // Loaded, and shown under its chat as the job's.
-          await until(drive, async () => (await window.chromeAPI.browser.getTabs()).some((tab) => tab.page === "cloud" && tab.title === "Cheap Cables" && !!tab.jobChatId), 30_000);
+          await until(
+            drive,
+            async () =>
+              (await window.chromeAPI.browser.getTabs()).some(
+                (tab) => tab.page === "cloud" && tab.title === "Cheap Cables" && !!tab.jobChatId,
+              ),
+            30_000,
+          );
           await switchTo(drive, (tab) => tab.page === "cloud");
           await seen(drive.chrome, "In the cloud");
           await drive.chrome.locator("img").last().waitFor();
@@ -947,4 +1024,5 @@ export const FEATURES: Feature[] = [
 export const featureNamed = (name: string): Feature | undefined => FEATURES.find((feature) => feature.name === name);
 
 // The layouts a feature is pictured in by `baseline`.
-export const layoutsOf = (feature: Feature): LayoutMode[] => (feature.layouts === "both" ? ["vertical", "horizontal"] : feature.layouts === "none" ? ["vertical"] : [feature.layouts]);
+export const layoutsOf = (feature: Feature): LayoutMode[] =>
+  feature.layouts === "both" ? ["vertical", "horizontal"] : feature.layouts === "none" ? ["vertical"] : [feature.layouts];

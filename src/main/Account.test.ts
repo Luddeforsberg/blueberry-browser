@@ -13,7 +13,12 @@ vi.mock("electron", () => ({
   },
 }));
 
-const session = (name: string, expiresIn = 3_600_000): ServerSession => ({ accessToken: `access-${name}`, refreshToken: `refresh-${name}`, expiresAt: Date.now() + expiresIn, email: "ana@example.com" });
+const session = (name: string, expiresIn = 3_600_000): ServerSession => ({
+  accessToken: `access-${name}`,
+  refreshToken: `refresh-${name}`,
+  expiresAt: Date.now() + expiresIn,
+  email: "ana@example.com",
+});
 const fileIn = () => join(mkdtempSync(join(tmpdir(), "blueberry-account-")), "account.json");
 
 const start = (server: Partial<GalleryServer>, file = fileIn()) => {
@@ -47,16 +52,28 @@ describe("Account", () => {
     [new ServerError(500, ""), "said no"],
     [new Unreachable(), "Couldn’t reach"],
   ])("puts a failed sign-in into words", async (error, words) => {
-    const { account } = start({ signIn: async () => { throw error; } });
+    const { account } = start({
+      signIn: async () => {
+        throw error;
+      },
+    });
     const state = await account.signIn("a@b.se", "pw");
     expect(state.status).toBe("signed-out");
     expect(state.problem).toContain(words);
   });
 
   it("says which field a problem is about", async () => {
-    const { account } = start({ signUp: async () => { throw new ServerError(422, "user_already_exists"); } });
+    const { account } = start({
+      signUp: async () => {
+        throw new ServerError(422, "user_already_exists");
+      },
+    });
     expect((await account.signUp("a@b.se", "a-long-password")).problemAbout).toBe("email");
-    const offline = start({ signIn: async () => { throw new Unreachable(); } }).account;
+    const offline = start({
+      signIn: async () => {
+        throw new Unreachable();
+      },
+    }).account;
     expect((await offline.signIn("a@b.se", "pw")).problemAbout).toBeNull();
   });
 
@@ -81,12 +98,22 @@ describe("Account", () => {
   });
 
   it("signs out when the server has ended the session, but not when it can't be reached", async () => {
-    const down = start({ signIn: async () => session("one", 30_000), refresh: async () => { throw new Unreachable(); } });
+    const down = start({
+      signIn: async () => session("one", 30_000),
+      refresh: async () => {
+        throw new Unreachable();
+      },
+    });
     await down.account.signIn("a@b.se", "pw");
     await expect(down.account.accessToken()).rejects.toBeInstanceOf(Unreachable);
     expect(down.account.state.status).toBe("signed-in");
 
-    const ended = start({ signIn: async () => session("one", 30_000), refresh: async () => { throw new ServerError(400, "refresh_token_not_found"); } });
+    const ended = start({
+      signIn: async () => session("one", 30_000),
+      refresh: async () => {
+        throw new ServerError(400, "refresh_token_not_found");
+      },
+    });
     await ended.account.signIn("a@b.se", "pw");
     expect(await ended.account.accessToken()).toBeNull();
     expect(ended.account.state).toMatchObject({ status: "signed-out", problem: expect.stringContaining("sign in again") });
@@ -95,7 +122,12 @@ describe("Account", () => {
   // Each call waits for its own answer, which the test gives in whatever order it likes.
   const deferredSignIns = () => {
     const answers: ((session: ServerSession | Error) => void)[] = [];
-    const signIn = vi.fn(() => new Promise<ServerSession>((resolve, reject) => answers.push((answer) => (answer instanceof Error ? reject(answer) : resolve(answer)))));
+    const signIn = vi.fn(
+      () =>
+        new Promise<ServerSession>((resolve, reject) =>
+          answers.push((answer) => (answer instanceof Error ? reject(answer) : resolve(answer))),
+        ),
+    );
     return { signIn, answer: (index: number, session: ServerSession | Error) => answers[index](session) };
   };
 
@@ -137,7 +169,12 @@ describe("Account", () => {
   });
 
   it("forgets the session here even if the server can't be told", async () => {
-    const { account, file } = start({ signIn: async () => session("one"), signOut: async () => { throw new Unreachable(); } });
+    const { account, file } = start({
+      signIn: async () => session("one"),
+      signOut: async () => {
+        throw new Unreachable();
+      },
+    });
     await account.signIn("a@b.se", "pw");
     expect((await account.signOut()).status).toBe("signed-out");
     expect(() => readFileSync(file)).toThrow();

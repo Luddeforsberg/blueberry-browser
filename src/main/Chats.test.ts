@@ -28,7 +28,7 @@ const setup = (
   streamReply: StreamReply,
   activeTab: Tab | null = tab(),
   generateTitle: GenerateTitle = async () => null,
-  openBackgroundTab: (url: string) => Tab = () => tab()
+  openBackgroundTab: (url: string) => Tab = () => tab(),
 ) => {
   const store = new ChatStore(":memory:");
   const threads: ChatThread[] = [];
@@ -36,21 +36,27 @@ const setup = (
   const working: Tab[][] = [];
   let listChanges = 0;
   let onEnd = () => {};
-  const chats = new Chats(store, streamReply, generateTitle, {
-    activeTab: () => activeTab,
-    allTabs: () => (activeTab ? [activeTab] : []),
-    openBackgroundTab,
-    closeTab: () => true,
-    actionApproval: () => "always",
-  }, {
-    onChunk: (_, content) => chunks.push(content),
-    onThread: (thread) => {
-      threads.push(thread);
-      if (thread.partial === null) onEnd();
+  const chats = new Chats(
+    store,
+    streamReply,
+    generateTitle,
+    {
+      activeTab: () => activeTab,
+      allTabs: () => (activeTab ? [activeTab] : []),
+      openBackgroundTab,
+      closeTab: () => true,
+      actionApproval: () => "always",
     },
-    onListChanged: () => listChanges++,
-    onWorkingTabs: (tabs) => working.push([...tabs]),
-  });
+    {
+      onChunk: (_, content) => chunks.push(content),
+      onThread: (thread) => {
+        threads.push(thread);
+        if (thread.partial === null) onEnd();
+      },
+      onListChanged: () => listChanges++,
+      onWorkingTabs: (tabs) => working.push([...tabs]),
+    },
+  );
   const replyEnded = () => new Promise<void>((resolve) => (onEnd = resolve));
   return { chats, store, threads, chunks, working, replyEnded, listChanges: () => listChanges };
 };
@@ -66,8 +72,7 @@ const recording: StreamReply = async function* (messages) {
   yield "ok";
 };
 
-const send = (chats: Chats, chatId: string | null, text: string, seePage = true) =>
-  chats.send(chatId, text, { seePage });
+const send = (chats: Chats, chatId: string | null, text: string, seePage = true) => chats.send(chatId, text, { seePage });
 
 beforeEach(() => {
   sent = [];
@@ -83,17 +88,25 @@ describe("Chats", () => {
       const propose = vi.fn(async () => {});
       const dropOffers = vi.fn();
       const open = pages.at(0) ?? ({ ...tab(), id: "tab-own", settled: async () => {} } as unknown as Tab);
-      const chats = new Chats(new ChatStore(":memory:"), stream, async () => null, {
-        activeTab: () => null,
-        allTabs: () => [open],
-        openBackgroundTab: () => open,
-        closeTab: () => true,
-        actionApproval: () => "never",
-      }, { onChunk: () => {}, onThread: () => {}, onListChanged: () => {}, onWorkingTabs: () => {} }, mascotOf, {
-        factsOf: () => [{ id: "fact", mascotId: "berry", text: "You want it cheap.", site: "example.com", savedAt: 1 }],
-        propose,
-        dropOffers,
-      });
+      const chats = new Chats(
+        new ChatStore(":memory:"),
+        stream,
+        async () => null,
+        {
+          activeTab: () => null,
+          allTabs: () => [open],
+          openBackgroundTab: () => open,
+          closeTab: () => true,
+          actionApproval: () => "never",
+        },
+        { onChunk: () => {}, onThread: () => {}, onListChanged: () => {}, onWorkingTabs: () => {} },
+        mascotOf,
+        {
+          factsOf: () => [{ id: "fact", mascotId: "berry", text: "You want it cheap.", site: "example.com", savedAt: 1 }],
+          propose,
+          dropOffers,
+        },
+      );
       return { chats, propose, dropOffers };
     };
     const job = (extra: (tools: PageTool[]) => Promise<unknown> = async () => {}): StreamReply =>
@@ -138,7 +151,9 @@ describe("Chats", () => {
         if (approval) told.chats.decide("run-2", approval.id, true, "Always 2 metres");
       });
       expect(told.propose).toHaveBeenCalledTimes(1);
-      expect(told.propose.mock.calls[0]).toMatchObject([{ sourceId: "run-2", said: [], routine: "The routine", answers: [{ question: "Which size?", answer: "Always 2 metres" }] }]);
+      expect(told.propose.mock.calls[0]).toMatchObject([
+        { sourceId: "run-2", said: [], routine: "The routine", answers: [{ question: "Which size?", answer: "Always 2 metres" }] },
+      ]);
     });
 
     it("offers nothing after a job that handed a tab to the user, even with what they answered", async () => {
@@ -175,7 +190,9 @@ describe("Chats", () => {
       const { chats, propose, dropOffers } = remembering(job());
       const thread = chats.send(null, "Find it, I always want the cheapest", { seePage: false })!;
       await vi.waitFor(() => expect(propose).toHaveBeenCalled());
-      expect(propose.mock.calls[0]).toMatchObject([{ sourceId: thread.id, mascotId: "berry", said: ["Find it, I always want the cheapest"], routine: null, sites: ["example.com"] }]);
+      expect(propose.mock.calls[0]).toMatchObject([
+        { sourceId: thread.id, mascotId: "berry", said: ["Find it, I always want the cheapest"], routine: null, sites: ["example.com"] },
+      ]);
       expect(JSON.stringify(propose.mock.calls[0])).not.toContain("report");
 
       // Asks once: a new message takes the last offer away.
@@ -199,13 +216,19 @@ describe("Chats", () => {
         yield "report";
       };
       const store = new ChatStore(":memory:");
-      const chats = new Chats(store, stream, async () => null, {
-        activeTab: () => users,
-        allTabs: () => [users, own],
-        openBackgroundTab: () => own,
-        closeTab: () => true,
-        actionApproval: () => "risky",
-      }, { onChunk: () => {}, onThread: () => {}, onListChanged: () => {}, onWorkingTabs: () => {} });
+      const chats = new Chats(
+        store,
+        stream,
+        async () => null,
+        {
+          activeTab: () => users,
+          allTabs: () => [users, own],
+          openBackgroundTab: () => own,
+          closeTab: () => true,
+          actionApproval: () => "risky",
+        },
+        { onChunk: () => {}, onThread: () => {}, onListChanged: () => {}, onWorkingTabs: () => {} },
+      );
 
       const result = await chats.runTask("run-1", "Look", () => {});
 
@@ -223,7 +246,12 @@ describe("Chats", () => {
         chats.releaseTab("tab-own");
         yield "report";
       };
-      const { chats } = setup(stream, tab(), async () => null, () => own);
+      const { chats } = setup(
+        stream,
+        tab(),
+        async () => null,
+        () => own,
+      );
 
       expect((await chats.runTask("run-1", "Look", () => {})).tabIds).toEqual([]);
     });
@@ -242,13 +270,19 @@ describe("Chats", () => {
         listed = await tools.find((tool) => tool.name === "list_tabs")!.run({});
         yield "report";
       };
-      const chats = new Chats(new ChatStore(":memory:"), stream, async () => null, {
-        activeTab: () => null,
-        allTabs: () => [own, popup, gone],
-        openBackgroundTab: () => own,
-        closeTab: () => true,
-        actionApproval: () => "risky",
-      }, { onChunk: () => {}, onThread: () => {}, onListChanged: () => {}, onWorkingTabs: () => {} });
+      const chats = new Chats(
+        new ChatStore(":memory:"),
+        stream,
+        async () => null,
+        {
+          activeTab: () => null,
+          allTabs: () => [own, popup, gone],
+          openBackgroundTab: () => own,
+          closeTab: () => true,
+          actionApproval: () => "risky",
+        },
+        { onChunk: () => {}, onThread: () => {}, onListChanged: () => {}, onWorkingTabs: () => {} },
+      );
 
       const { tabIds } = await chats.runTask("run-1", "Look", () => {});
 
@@ -282,8 +316,7 @@ describe("Chats", () => {
 
     it("ends a stopped run with the step that says so, even before it did anything", async () => {
       let started = 0;
-      const waiting =
-        (step: string | null): StreamReply =>
+      const waiting = (step: string | null): StreamReply =>
         async function* (_, signal, { onStep }) {
           if (step) onStep(step)();
           started++;
@@ -299,7 +332,10 @@ describe("Chats", () => {
         return ended;
       };
 
-      expect((await stopped(waiting("Read a.com"))).steps).toEqual([{ text: "Read a.com", done: true }, { text: "Stopped here", done: true }]);
+      expect((await stopped(waiting("Read a.com"))).steps).toEqual([
+        { text: "Read a.com", done: true },
+        { text: "Stopped here", done: true },
+      ]);
       expect(await stopped(waiting(null))).toMatchObject({ stopped: true, text: "", steps: [{ text: "Stopped here", done: true }] });
     });
 
@@ -413,7 +449,7 @@ describe("Chats", () => {
             chats?.setPageAccess(false);
             return reader === "screenshot" ? { toDataURL: () => SCREENSHOT } : "page text";
           },
-        })
+        }),
       );
       chats = context.chats;
       const ended = context.replyEnded();
@@ -424,20 +460,36 @@ describe("Chats", () => {
   });
 
   describe("the page sent with a message, for a bird with sites", () => {
-    const SCOUT: MascotProfile = { ...BERRY, id: "scout", name: "Scout", instructions: "", sites: ["shop.example"], tools: ["visit"], deletedAt: null };
+    const SCOUT: MascotProfile = {
+      ...BERRY,
+      id: "scout",
+      name: "Scout",
+      instructions: "",
+      sites: ["shop.example"],
+      tools: ["visit"],
+      deletedAt: null,
+    };
     const BANK = { origin: "https://bank.example", isDestroyed: () => false };
     // A shop page with a frame from the user's bank, which Scout isn't allowed on, whether or not it looks on screen.
-    const framed = () => ({ ...tab(), url: "https://shop.example/", foreignFrames: [BANK], runInPage: async () => false }) as unknown as Tab;
+    const framed = () =>
+      ({ ...tab(), url: "https://shop.example/", foreignFrames: [BANK], runInPage: async () => false }) as unknown as Tab;
     const sentWith = async (mascotId: string | null, page: Tab) => {
       sent = [];
       let onEnd = () => {};
-      const chats = new Chats(new ChatStore(":memory:"), recording, async () => null, {
-        activeTab: () => page,
-        allTabs: () => [page],
-        openBackgroundTab: () => page,
-        closeTab: () => true,
-        actionApproval: () => "always",
-      }, { onChunk: () => {}, onThread: (thread) => thread.partial === null && onEnd(), onListChanged: () => {}, onWorkingTabs: () => {} }, (id) => (id === "scout" ? SCOUT : BERRY));
+      const chats = new Chats(
+        new ChatStore(":memory:"),
+        recording,
+        async () => null,
+        {
+          activeTab: () => page,
+          allTabs: () => [page],
+          openBackgroundTab: () => page,
+          closeTab: () => true,
+          actionApproval: () => "always",
+        },
+        { onChunk: () => {}, onThread: (thread) => thread.partial === null && onEnd(), onListChanged: () => {}, onWorkingTabs: () => {} },
+        (id) => (id === "scout" ? SCOUT : BERRY),
+      );
       const ended = new Promise<void>((resolve) => (onEnd = () => resolve()));
       chats.send(null, "What's this?", { seePage: true, mascotId });
       await ended;
@@ -469,7 +521,9 @@ describe("Chats", () => {
     });
 
     it("has its picture with no frame from another site, and always for Berry", async () => {
-      expect(await sentWith("scout", { ...tab(), url: "https://shop.example/", foreignFrames: [] } as unknown as Tab)).toContain("image_url");
+      expect(await sentWith("scout", { ...tab(), url: "https://shop.example/", foreignFrames: [] } as unknown as Tab)).toContain(
+        "image_url",
+      );
       expect(await sentWith(null, framed())).toContain("image_url");
     });
   });
@@ -478,14 +532,19 @@ describe("Chats", () => {
     const risky: boolean[] = [];
     const stream: StreamReply = async function* (_, __, { tools }) {
       const open = tools.find(({ name }) => name === "open_tab")!;
-      risky.push((await open.whyRisky!({ url: "https://en.wikipedia.org/wiki/Jet_engine" })) !== null, (await open.whyRisky!({ url: "https://elsewhere.example/" })) !== null);
+      risky.push(
+        (await open.whyRisky!({ url: "https://en.wikipedia.org/wiki/Jet_engine" })) !== null,
+        (await open.whyRisky!({ url: "https://elsewhere.example/" })) !== null,
+      );
       yield "ok";
     };
     const { chats, replyEnded } = setup(stream, null);
     const ended = replyEnded();
     send(chats, null, "Find jet engines on wikipedia.org", false);
     await ended;
-    await chats.runTask("task-1", "Then the same", () => {}, null, [], { earlier: [{ role: "user", content: "Find jet engines on wikipedia.org" }] });
+    await chats.runTask("task-1", "Then the same", () => {}, null, [], {
+      earlier: [{ role: "user", content: "Find jet engines on wikipedia.org" }],
+    });
     expect(risky).toEqual([false, true, false, true]);
   });
 
@@ -499,7 +558,7 @@ describe("Chats", () => {
         getTabText: async () => {
           throw new Error("no script");
         },
-      })
+      }),
     );
 
     const ended = replyEnded();
@@ -526,7 +585,12 @@ describe("Chats", () => {
 
     const thread = chats.thread(id);
     expect(thread).toMatchObject({ partial: null, error: null });
-    expect(thread?.messages.at(-1)).toEqual({ role: "assistant", content: "partial", steps: [{ text: "Stopped here", done: true }], ...timed() });
+    expect(thread?.messages.at(-1)).toEqual({
+      role: "assistant",
+      content: "partial",
+      steps: [{ text: "Stopped here", done: true }],
+      ...timed(),
+    });
   });
 
   it("says it was stopped when stopped before anything was written or done", async () => {
@@ -544,7 +608,12 @@ describe("Chats", () => {
     chats.stop(id);
     await ended;
 
-    expect(chats.thread(id)?.messages.at(-1)).toEqual({ role: "assistant", content: "", steps: [{ text: "Stopped here", done: true }], ...timed() });
+    expect(chats.thread(id)?.messages.at(-1)).toEqual({
+      role: "assistant",
+      content: "",
+      steps: [{ text: "Stopped here", done: true }],
+      ...timed(),
+    });
   });
 
   it("counts a reply as new only when it ended, not stopped, with its tab behind, until the tab comes to the front", async () => {
@@ -556,19 +625,25 @@ describe("Chats", () => {
       await new Promise((_, reject) => signal.addEventListener("abort", () => reject(new Error("aborted"))));
     };
     let stream: StreamReply = replying("done");
-    const chats = new Chats(store, (...args) => stream(...args), async () => null, {
-      activeTab: () => null,
-      allTabs: () => [],
-      openBackgroundTab: () => tab(),
-      closeTab: () => true,
-      actionApproval: () => "always",
-      chatInFront: () => inFront,
-    }, {
-      onChunk: () => {},
-      onThread: (thread) => thread.partial === null && ended(),
-      onListChanged: () => {},
-      onWorkingTabs: () => {},
-    });
+    const chats = new Chats(
+      store,
+      (...args) => stream(...args),
+      async () => null,
+      {
+        activeTab: () => null,
+        allTabs: () => [],
+        openBackgroundTab: () => tab(),
+        closeTab: () => true,
+        actionApproval: () => "always",
+        chatInFront: () => inFront,
+      },
+      {
+        onChunk: () => {},
+        onThread: (thread) => thread.partial === null && ended(),
+        onListChanged: () => {},
+        onWorkingTabs: () => {},
+      },
+    );
     const reply = async (chatId: string | null, stop = false) => {
       const end = new Promise<void>((resolve) => (ended = resolve));
       const { id } = chats.send(chatId, "go", { seePage: false })!;
@@ -675,24 +750,30 @@ describe("Chats", () => {
       const allTabs = [{ ...tab(), id: "tab-user" } as unknown as Tab];
       const store = new ChatStore(":memory:");
       let finished = false;
-      const chats = new Chats(store, reply, async () => null, {
-        activeTab: () => allTabs[0],
-        allTabs: () => allTabs,
-        openBackgroundTab: () => {
-          allTabs.push(opened);
-          return opened;
+      const chats = new Chats(
+        store,
+        reply,
+        async () => null,
+        {
+          activeTab: () => allTabs[0],
+          allTabs: () => allTabs,
+          openBackgroundTab: () => {
+            allTabs.push(opened);
+            return opened;
+          },
+          // Refused, as for the tab the user is looking at, so it's still the chat's once the reply is over.
+          closeTab: () => false,
+          actionApproval: () => "always",
         },
-        // Refused, as for the tab the user is looking at, so it's still the chat's once the reply is over.
-        closeTab: () => false,
-        actionApproval: () => "always",
-      }, {
-        onChunk: () => {},
-        onThread: (thread) => {
-          if (thread.partial === null) finished = true;
+        {
+          onChunk: () => {},
+          onThread: (thread) => {
+            if (thread.partial === null) finished = true;
+          },
+          onListChanged: () => {},
+          onWorkingTabs: () => {},
         },
-        onListChanged: () => {},
-        onWorkingTabs: () => {},
-      });
+      );
 
       send(chats, null, "first", false);
       await vi.waitFor(() => expect(finished).toBe(true));
@@ -724,22 +805,36 @@ describe("Chats", () => {
       };
       const store = new ChatStore(":memory:");
       let finished = false;
-      chats = new Chats(store, reply, async () => null, {
-        activeTab: () => null,
-        allTabs: () => open,
-        openBackgroundTab: (url) => {
-          const opened = make(`tab-${open.length}`, url);
-          open.push(opened);
-          return opened;
+      chats = new Chats(
+        store,
+        reply,
+        async () => null,
+        {
+          activeTab: () => null,
+          allTabs: () => open,
+          openBackgroundTab: (url) => {
+            const opened = make(`tab-${open.length}`, url);
+            open.push(opened);
+            return opened;
+          },
+          closeTab: (id) => {
+            closed.push(id);
+            open.splice(
+              open.findIndex((one) => one.id === id),
+              1,
+            );
+            return true;
+          },
+          giveToUser: (id) => given.push(id),
+          actionApproval: () => "always",
         },
-        closeTab: (id) => {
-          closed.push(id);
-          open.splice(open.findIndex((one) => one.id === id), 1);
-          return true;
+        {
+          onChunk: () => {},
+          onThread: (thread) => (finished ||= thread.partial === null),
+          onListChanged: () => {},
+          onWorkingTabs: () => {},
         },
-        giveToUser: (id) => given.push(id),
-        actionApproval: () => "always",
-      }, { onChunk: () => {}, onThread: (thread) => (finished ||= thread.partial === null), onListChanged: () => {}, onWorkingTabs: () => {} });
+      );
       const thread = send(chats, null, "Add it to my cart", false)!;
       await vi.waitFor(() => expect(finished).toBe(true));
 
@@ -756,7 +851,12 @@ describe("Chats", () => {
 
     it("leave a tab another chat is still reading for its message, even when the job that opened it ends", async () => {
       let capture: (image: unknown) => void = () => {};
-      const own = { ...tab({ screenshot: () => new Promise((resolve) => (capture = resolve)) }), id: "tab-own", title: "Own", settled: async () => {} } as unknown as Tab;
+      const own = {
+        ...tab({ screenshot: () => new Promise((resolve) => (capture = resolve)) }),
+        id: "tab-own",
+        title: "Own",
+        settled: async () => {},
+      } as unknown as Tab;
       const open: Tab[] = [];
       const closed: string[] = [];
       let release = () => {};
@@ -770,19 +870,30 @@ describe("Chats", () => {
       };
       const store = new ChatStore(":memory:");
       const ended: string[] = [];
-      const chats = new Chats(store, stream, async () => null, {
-        activeTab: () => open[0] ?? null,
-        allTabs: () => open,
-        openBackgroundTab: () => {
-          open.push(own);
-          return own;
+      const chats = new Chats(
+        store,
+        stream,
+        async () => null,
+        {
+          activeTab: () => open[0] ?? null,
+          allTabs: () => open,
+          openBackgroundTab: () => {
+            open.push(own);
+            return own;
+          },
+          closeTab: (id) => {
+            closed.push(id);
+            return true;
+          },
+          actionApproval: () => "always",
         },
-        closeTab: (id) => {
-          closed.push(id);
-          return true;
+        {
+          onChunk: () => {},
+          onThread: (thread) => thread.partial === null && ended.push(thread.id),
+          onListChanged: () => {},
+          onWorkingTabs: () => {},
         },
-        actionApproval: () => "always",
-      }, { onChunk: () => {}, onThread: (thread) => thread.partial === null && ended.push(thread.id), onListChanged: () => {}, onWorkingTabs: () => {} });
+      );
       const opener = send(chats, null, "Open it", false)!;
       await vi.waitFor(() => expect(open).toHaveLength(1));
       // Another chat is sent with that page, and is still taking its picture when the first job ends.
@@ -799,7 +910,13 @@ describe("Chats", () => {
       const handedOver = async (need: "code" | "sign-in") => {
         const typed = vi.fn();
         const looked = vi.fn(async () => ({ fields: [], hasPasswordField: false }));
-        const own = { ...tab(), id: "tab-own", settled: async () => {}, sendInputWhileHeld: typed, runInPageWhileHeld: looked } as unknown as Tab;
+        const own = {
+          ...tab(),
+          id: "tab-own",
+          settled: async () => {},
+          sendInputWhileHeld: typed,
+          runInPageWhileHeld: looked,
+        } as unknown as Tab;
         const open = [own];
         const heard: string[] = [];
         let reached: PageTool[] = [];
@@ -811,18 +928,36 @@ describe("Chats", () => {
           yield "ok";
         };
         const store = new ChatStore(":memory:");
-        const chats = new Chats(store, stream, async () => null, {
-          activeTab: () => null,
-          allTabs: () => open,
-          openBackgroundTab: () => own,
-          // Refused, so the tab outlasts the reply and what's said about it later can be checked.
-          closeTab: () => false,
-          actionApproval: () => "always",
-        }, { onChunk: () => {}, onThread: () => {}, onListChanged: () => {}, onWorkingTabs: () => {} });
+        const chats = new Chats(
+          store,
+          stream,
+          async () => null,
+          {
+            activeTab: () => null,
+            allTabs: () => open,
+            openBackgroundTab: () => own,
+            // Refused, so the tab outlasts the reply and what's said about it later can be checked.
+            closeTab: () => false,
+            actionApproval: () => "always",
+          },
+          { onChunk: () => {}, onThread: () => {}, onListChanged: () => {}, onWorkingTabs: () => {} },
+        );
         send(chats, null, "Check my orders", false);
         await vi.waitFor(() => expect(chats.waiting()).toHaveLength(1));
         const [{ id, approval }] = chats.waiting();
-        return { chats, store, own, open, typed, looked, enter: () => chats.enterCode(id, approval.id, "123456"), id, approvalId: approval.id, heard, tools: () => reached };
+        return {
+          chats,
+          store,
+          own,
+          open,
+          typed,
+          looked,
+          enter: () => chats.enterCode(id, approval.id, "123456"),
+          id,
+          approvalId: approval.id,
+          heard,
+          tools: () => reached,
+        };
       };
 
       it("keeps only the site and path of a page it handed over, even once that tab has closed", async () => {
@@ -848,7 +983,11 @@ describe("Chats", () => {
         expect(chats.withoutCodes("https://example.com/search?q=shoes")).toContain("?q=shoes");
 
         // A screenshot that fails says the address in words, and a tab the user takes after that is refused by address.
-        expect(await tools().find((tool) => tool.name === "screenshot")!.run({})).not.toMatch(/s3cret|t0ken/);
+        expect(
+          await tools()
+            .find((tool) => tool.name === "screenshot")!
+            .run({}),
+        ).not.toMatch(/s3cret|t0ken/);
         chats.releaseTab(own.id);
         (own as unknown as { url: string }).url = "https://example.com/later";
         const refused = await tools().find((tool) => tool.name === "read_page")!.refuses!({ tabId: own.id });
@@ -879,7 +1018,8 @@ describe("Chats", () => {
       it("takes a code out however a page says it back, even in text that looks like a picture", async () => {
         const { chats, enter } = await handedOver("code");
         await enter();
-        for (const said of ["123456", "123-456", "123 456", "1\n2\n3\n4\n5\n6", "data:image/png;base64,123456"]) expect(chats.withoutCodes(said)).not.toMatch(/1\s*-?2\s*3\s*-?4\s*5\s*6/);
+        for (const said of ["123456", "123-456", "123 456", "1\n2\n3\n4\n5\n6", "data:image/png;base64,123456"])
+          expect(chats.withoutCodes(said)).not.toMatch(/1\s*-?2\s*3\s*-?4\s*5\s*6/);
       });
 
       it("only goes to the open request for a code", async () => {
@@ -934,16 +1074,22 @@ describe("Chats", () => {
         other = tools;
         yield "ok";
       };
-      const chats = new Chats(new ChatStore(":memory:"), stream, async () => null, {
-        activeTab: () => active,
-        allTabs: () => open,
-        openBackgroundTab: () => {
-          open.push(own);
-          return own;
+      const chats = new Chats(
+        new ChatStore(":memory:"),
+        stream,
+        async () => null,
+        {
+          activeTab: () => active,
+          allTabs: () => open,
+          openBackgroundTab: () => {
+            open.push(own);
+            return own;
+          },
+          closeTab: () => true,
+          actionApproval: () => "always",
         },
-        closeTab: () => true,
-        actionApproval: () => "always",
-      }, { onChunk: () => {}, onThread: () => {}, onListChanged: () => {}, onWorkingTabs: () => {} });
+        { onChunk: () => {}, onThread: () => {}, onListChanged: () => {}, onWorkingTabs: () => {} },
+      );
 
       send(chats, null, "sign in for me", false);
       await vi.waitFor(() => expect(chats.waiting()).toHaveLength(1));
@@ -967,7 +1113,12 @@ describe("Chats", () => {
     it("stay on the job's tab when the user goes to another, with no tab named", async () => {
       const sentFrom = { ...tab(), id: "tab-sent", getTextWithFrames: async () => "the page it was sent from" } as unknown as Tab;
       const other = { ...tab(), id: "tab-other", getTextWithFrames: async () => "the user's next page" } as unknown as Tab;
-      const own = { ...tab(), id: "tab-own", settled: async () => {}, getTextWithFrames: async () => "the job's own tab" } as unknown as Tab;
+      const own = {
+        ...tab(),
+        id: "tab-own",
+        settled: async () => {},
+        getTextWithFrames: async () => "the job's own tab",
+      } as unknown as Tab;
       let active = sentFrom;
       const open = [sentFrom, other];
       const results: string[] = [];
@@ -980,23 +1131,29 @@ describe("Chats", () => {
         results.push(await call("read_page", {}));
         yield "done";
       };
-      const chats = new Chats(new ChatStore(":memory:"), stream, async () => null, {
-        activeTab: () => active,
-        allTabs: () => open,
-        openBackgroundTab: () => {
-          open.push(own);
-          return own;
+      const chats = new Chats(
+        new ChatStore(":memory:"),
+        stream,
+        async () => null,
+        {
+          activeTab: () => active,
+          allTabs: () => open,
+          openBackgroundTab: () => {
+            open.push(own);
+            return own;
+          },
+          closeTab: () => true,
+          actionApproval: () => "risky",
         },
-        closeTab: () => true,
-        actionApproval: () => "risky",
-      }, {
-        onChunk: () => {},
-        onThread: (thread) => {
-          if (thread.partial === null) onEnd();
+        {
+          onChunk: () => {},
+          onThread: (thread) => {
+            if (thread.partial === null) onEnd();
+          },
+          onListChanged: () => {},
+          onWorkingTabs: () => {},
         },
-        onListChanged: () => {},
-        onWorkingTabs: () => {},
-      });
+      );
 
       const ended = new Promise<void>((resolve) => (onEnd = resolve));
       send(chats, null, "first");
@@ -1015,20 +1172,26 @@ describe("Chats", () => {
         results = [await tools.find((tool) => tool.name === "read_page")!.run({})];
         yield "done";
       };
-      const chats = new Chats(new ChatStore(":memory:"), stream, async () => null, {
-        activeTab: () => users,
-        allTabs: () => [users],
-        openBackgroundTab: () => users,
-        closeTab: () => true,
-        actionApproval: () => "risky",
-      }, {
-        onChunk: () => {},
-        onThread: (thread) => {
-          if (thread.partial === null) onEnd();
+      const chats = new Chats(
+        new ChatStore(":memory:"),
+        stream,
+        async () => null,
+        {
+          activeTab: () => users,
+          allTabs: () => [users],
+          openBackgroundTab: () => users,
+          closeTab: () => true,
+          actionApproval: () => "risky",
         },
-        onListChanged: () => {},
-        onWorkingTabs: () => {},
-      });
+        {
+          onChunk: () => {},
+          onThread: (thread) => {
+            if (thread.partial === null) onEnd();
+          },
+          onListChanged: () => {},
+          onWorkingTabs: () => {},
+        },
+      );
       const reply = (chatId: string | null, seePage: boolean) => {
         const ended = new Promise<void>((resolve) => (onEnd = resolve));
         const thread = send(chats, chatId, "go on", seePage);
@@ -1084,7 +1247,7 @@ describe("Chats", () => {
           settled: async () => {
             chats?.setPageAccess(false);
           },
-        } as unknown as Tab
+        } as unknown as Tab,
       );
       chats = context.chats;
 
@@ -1132,7 +1295,7 @@ describe("Chats", () => {
             if (++reads === 2) chats?.setPageAccess(false);
             return "page text";
           },
-        })
+        }),
       );
       chats = context.chats;
 
@@ -1143,8 +1306,7 @@ describe("Chats", () => {
       expect(chats.thread(id)?.messages.at(-1)?.content).not.toContain("page text");
     });
 
-    const stepping =
-      (texts: string[], words: string[]): StreamReply =>
+    const stepping = (texts: string[], words: string[]): StreamReply =>
       async function* (_, __, { onStep }) {
         yield words[0];
         for (const text of texts) onStep(text)();
@@ -1222,7 +1384,9 @@ describe("Chats", () => {
       const { chats } = setup(working);
       const texts: string[] = [];
       const lines: (string | null | undefined)[] = [];
-      const result = await chats.runTask("run-1", "The routine", ({ statusLine }) => lines.push(statusLine), null, [], { onText: (text) => texts.push(text) });
+      const result = await chats.runTask("run-1", "The routine", ({ statusLine }) => lines.push(statusLine), null, [], {
+        onText: (text) => texts.push(text),
+      });
       expect(result.text).toBe("Found it.");
       expect(texts).toEqual(["I'll check ", "I'll check their careers page.", "", "Found ", "Found it."]);
       expect(lines).toContain("I'll check their careers page.");
@@ -1284,15 +1448,17 @@ describe("Chats", () => {
       expect(chats.thread(id)?.messages.at(-1)).toEqual({
         role: "assistant",
         content: "",
-        steps: [{ text: "Read a.com", done: true }, { text: "Stopped here", done: true }],
+        steps: [
+          { text: "Read a.com", done: true },
+          { text: "Stopped here", done: true },
+        ],
         ...timed(),
       });
     });
   });
 
   describe("approvals", () => {
-    const asking =
-      (answers: boolean[]): StreamReply =>
+    const asking = (answers: boolean[]): StreamReply =>
       async function* (_, __, { approve }) {
         answers.push(await approve("Click “Buy” on a.com"));
         yield "done";
@@ -1389,7 +1555,7 @@ describe("Chats", () => {
           throw new Error("boom");
         },
         null,
-        generate
+        generate,
       );
       await turn(failing, null, "first");
       expect(generate).not.toHaveBeenCalled();
@@ -1487,7 +1653,15 @@ describe("Chats", () => {
   });
 
   describe("a reply that only narrows", () => {
-    const SCOUT: MascotProfile = { ...BERRY, id: "scout", name: "Scout", instructions: "Finds prices.", sites: ["shop.example"], tools: ["visit", "click", "type"], deletedAt: null };
+    const SCOUT: MascotProfile = {
+      ...BERRY,
+      id: "scout",
+      name: "Scout",
+      instructions: "Finds prices.",
+      sites: ["shop.example"],
+      tools: ["visit", "click", "type"],
+      deletedAt: null,
+    };
     const narrowing = () => {
       const seen: { tools: string[]; asks: string }[] = [];
       let release = () => {};
@@ -1497,19 +1671,32 @@ describe("Chats", () => {
         yield `reply ${seen.length}`;
       };
       const store = new ChatStore(":memory:");
-      const chats = new Chats(store, stream, async () => null, {
-        activeTab: () => null,
-        allTabs: () => [],
-        openBackgroundTab: () => tab(),
-        closeTab: () => true,
-        actionApproval: () => "never",
-      }, { onChunk: () => {}, onThread: () => {}, onListChanged: () => {}, onWorkingTabs: () => {} }, (id) => (id === "scout" ? SCOUT : id === null ? BERRY : { ...SCOUT, id, deletedAt: 1 }));
+      const chats = new Chats(
+        store,
+        stream,
+        async () => null,
+        {
+          activeTab: () => null,
+          allTabs: () => [],
+          openBackgroundTab: () => tab(),
+          closeTab: () => true,
+          actionApproval: () => "never",
+        },
+        { onChunk: () => {}, onThread: () => {}, onListChanged: () => {}, onWorkingTabs: () => {} },
+        (id) => (id === "scout" ? SCOUT : id === null ? BERRY : { ...SCOUT, id, deletedAt: 1 }),
+      );
       return { chats, seen, release: () => release() };
     };
 
     it("never gets a tool or a laxer ask than both the bird here and what it was sent with allow", async () => {
       const { chats, seen, release } = narrowing();
-      chats.send(null, "Look", { seePage: false, mascotId: "scout", tools: ["visit", "read"], askAtLeast: "risky", from: "ChatGPT or Claude" });
+      chats.send(null, "Look", {
+        seePage: false,
+        mascotId: "scout",
+        tools: ["visit", "read"],
+        askAtLeast: "risky",
+        from: "ChatGPT or Claude",
+      });
       await vi.waitFor(() => expect(seen).toHaveLength(1));
       release();
       expect(seen[0].tools).toEqual(expect.arrayContaining(["open_tab", "read_page"]));

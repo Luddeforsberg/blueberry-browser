@@ -3,8 +3,7 @@ import { nameFromWords, nextRun, parseDraft, scheduleLabel } from "./routineSche
 
 const local = (...parts: [number, number, number, number, number]) => new Date(...parts).getTime();
 // Months count from 0 here, as they do in Date.
-const after = (year: number, month: number, day: number, hour = 0, minute = 0) =>
-  local(year, month, day, hour, minute);
+const after = (year: number, month: number, day: number, hour = 0, minute = 0) => local(year, month, day, hour, minute);
 
 const originalTz = process.env.TZ;
 
@@ -122,6 +121,8 @@ describe("nameFromWords", () => {
     expect(nameFromWords("  Read SVT.\nThen sum up the five biggest stories")).toBe("Read SVT");
     expect(nameFromWords("a".repeat(40))).toBe("a".repeat(40));
     expect(nameFromWords("a".repeat(41))).toBe(`${"a".repeat(40)}…`);
-    expect(nameFromWords("Check the fares from Stockholm to Lisbon for the first week of May")).toBe("Check the fares from Stockholm to Lisbon…");
+    expect(nameFromWords("Check the fares from Stockholm to Lisbon for the first week of May")).toBe(
+      "Check the fares from Stockholm to Lisbon…",
+    );
   });
 });

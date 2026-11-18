@@ -30,7 +30,11 @@ export const hooks = { show: () => {}, load: async () => {}, refresh: async () =
 export const mascotOf = (job) => {
   const snapshot = job.mascot ?? {};
   const known = state.flock.find((mascot) => mascot.id === snapshot.id) ?? (snapshot.id === BERRY_ID ? state.flock[0] : null);
-  return { id: String(snapshot.id ?? ""), name: typeof snapshot.name === "string" && snapshot.name ? snapshot.name : "Berry", look: known?.look ?? state.flock[0].look };
+  return {
+    id: String(snapshot.id ?? ""),
+    name: typeof snapshot.name === "string" && snapshot.name ? snapshot.name : "Berry",
+    look: known?.look ?? state.flock[0].look,
+  };
 };
 
 // The flock member a job may go on as: only one still in the flock, with its limits as they are now.

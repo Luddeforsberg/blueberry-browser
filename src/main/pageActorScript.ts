@@ -57,7 +57,20 @@ const SHEET = `
 `;
 
 // A plain arrow, for Show Berry off, in the page's two most likely contrasts at once.
-const POINTER_ART: ArtNode = ["svg", { viewBox: "0 0 24 24" }, ["path", { d: "M3 2 L3 20 L8 15.5 L11.5 22.5 L15 21 L11.5 14 L18 14 Z", fill: "#191b33", stroke: "#ffffff", "stroke-width": "1.5", "stroke-linejoin": "round" }]];
+const POINTER_ART: ArtNode = [
+  "svg",
+  { viewBox: "0 0 24 24" },
+  [
+    "path",
+    {
+      d: "M3 2 L3 20 L8 15.5 L11.5 22.5 L15 21 L11.5 14 L18 14 Z",
+      fill: "#191b33",
+      stroke: "#ffffff",
+      "stroke-width": "1.5",
+      "stroke-linejoin": "round",
+    },
+  ],
+];
 
 export interface ActorLook {
   palette: string;
@@ -79,7 +92,8 @@ export const artFor = (node: ArtNode, palette: string): ArtNode => {
   if (!berry) return node;
   const others = Object.values(ACTOR_BERRY).filter((each) => each !== berry);
   const keep = ([tag, attributes]: ArtNode): boolean =>
-    !(attributes["data-berry"] && attributes["data-berry"] !== berry) && !(tag === "clipPath" && others.some((each) => attributes.id?.endsWith(`clip-${each}`)));
+    !(attributes["data-berry"] && attributes["data-berry"] !== berry) &&
+    !(tag === "clipPath" && others.some((each) => attributes.id?.endsWith(`clip-${each}`)));
   const prune = ([tag, attributes, ...children]: ArtNode): ArtNode => [tag, attributes, ...children.filter(keep).map(prune)];
   return prune(node);
 };

@@ -23,7 +23,9 @@ export interface JobWork {
   endedAt: number | null;
   outcome: WorkOutcome | null;
   // A cloud page is never captured here: the chrome shows the cloud tab's own live view or pictures.
-  tabs: Array<{ tab: Tab; cloud?: false; state: WorkTabState; site: string } | { tab: CdpTab; cloud: true; state: WorkTabState; site: string }>;
+  tabs: Array<
+    { tab: Tab; cloud?: false; state: WorkTabState; site: string } | { tab: CdpTab; cloud: true; state: WorkTabState; site: string }
+  >;
   // The tab it used last, which is where it's working now.
   currentId: string | null;
   sites: string[];
@@ -76,7 +78,8 @@ export const stepInPresentTense = (step: string): string => {
   return found ? found[1] + step.slice(found[0].length) : step;
 };
 
-const clampWidth = (width: unknown): number => (typeof width === "number" && Number.isFinite(width) ? Math.max(0, Math.min(width, MAX_PICTURE_WIDTH / SHARPNESS)) : 0);
+const clampWidth = (width: unknown): number =>
+  typeof width === "number" && Number.isFinite(width) ? Math.max(0, Math.min(width, MAX_PICTURE_WIDTH / SHARPNESS)) : 0;
 
 // The working view on the main chat: what a job is doing in its tabs, with small pictures of them. Pictures exist only
 // here for a moment, and in the chrome renderer while they're on screen. Nothing else gets them, and they never touch a
@@ -166,7 +169,11 @@ export class WorkViews {
     const pageWidth = this.deps.pageWidth();
     const scale = width > 0 && pageWidth > 0 ? width / pageWidth : null;
     const live = new Set(
-      job && scale !== null ? localTabs(job).filter(({ state, tab }) => state === "picture" && (job.outcome === null ? tab.id === job.currentId : tab.isLeaving)).map(({ tab }) => tab) : []
+      job && scale !== null
+        ? localTabs(job)
+            .filter(({ state, tab }) => state === "picture" && (job.outcome === null ? tab.id === job.currentId : tab.isLeaving))
+            .map(({ tab }) => tab)
+        : [],
     );
     this.pictured.forEach((tab) => {
       if (!live.has(tab)) {
@@ -185,7 +192,8 @@ export class WorkViews {
     this.timer = null;
     const job = this.job;
     // Words with no pictures still need to keep up with what the job is doing.
-    if (job && (job.outcome === null || localTabs(job).some(({ tab }) => tab.isLeaving))) this.timer = setTimeout(() => void this.tick(), this.nextDelay(job));
+    if (job && (job.outcome === null || localTabs(job).some(({ tab }) => tab.isLeaving)))
+      this.timer = setTimeout(() => void this.tick(), this.nextDelay(job));
   }
 
   private widthFor(current: boolean): number {
@@ -221,7 +229,11 @@ export class WorkViews {
     if (job && this.watching?.width) {
       this.capturing = true;
       try {
-        await Promise.all(this.due(job).filter(({ wait }) => wait <= 0).map(({ tab, current }) => this.capture(tab, current)));
+        await Promise.all(
+          this.due(job)
+            .filter(({ wait }) => wait <= 0)
+            .map(({ tab, current }) => this.capture(tab, current)),
+        );
       } finally {
         this.capturing = false;
       }

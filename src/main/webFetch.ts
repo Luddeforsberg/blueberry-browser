@@ -10,10 +10,7 @@ export interface FetchedPage {
 }
 
 // `stopped` says whether the job has ended, so nothing goes out again after it.
-export type WebFetch = (
-  url: string,
-  stopped?: () => boolean,
-) => Promise<FetchedPage>;
+export type WebFetch = (url: string, stopped?: () => boolean) => Promise<FetchedPage>;
 
 // docs.firecrawl.dev/api-reference/endpoint/scrape, checked on 2026-11-06. A page costs 1 credit, and a PDF 1 more for
 // each page of it, so a PDF is read only as far as `PDF_PAGES`.
@@ -32,9 +29,7 @@ const BUSY_WAITS_MS = [20_000, 40_000];
 export class WebFetchError extends Error {}
 
 // Null with no key, so the tool isn't offered at all.
-export const firecrawlFetch = (
-  env: Record<string, string | undefined> = process.env,
-): WebFetch | null => {
+export const firecrawlFetch = (env: Record<string, string | undefined> = process.env): WebFetch | null => {
   const key = env.FIRECRAWL_API_KEY?.trim();
   if (!key) return null;
   const scrape = async (url: string) => {
@@ -69,8 +64,7 @@ export const firecrawlFetch = (
       if (stopped()) break;
       response = await scrape(url);
     }
-    if (!response.ok)
-      throw new WebFetchError(`The page service answered ${response.status}.`);
+    if (!response.ok) throw new WebFetchError(`The page service answered ${response.status}.`);
     const body = (await response.json().catch(() => null)) as {
       data?: unknown;
     } | null;
@@ -90,14 +84,8 @@ export const parsePage = (data: unknown, asked: string): FetchedPage => {
   const status = metadata?.statusCode;
   return {
     // As the browser reads it, so nothing like a line break stays in it.
-    url:
-      parsed && ["http:", "https:"].includes(parsed.protocol)
-        ? parsed.href
-        : asked,
+    url: parsed && ["http:", "https:"].includes(parsed.protocol) ? parsed.href : asked,
     status: Number.isInteger(status) ? (status as number) : null,
-    markdown:
-      typeof markdown === "string"
-        ? markdown.trim().slice(0, MAX_MARKDOWN)
-        : "",
+    markdown: typeof markdown === "string" ? markdown.trim().slice(0, MAX_MARKDOWN) : "",
   };
 };

@@ -17,9 +17,11 @@ test("a mascot is made in four steps, its limits are changed from its page, and 
   let app = await launchApp(profile, { modelEnv: model.env });
   try {
     let chrome = await findView(app, "view=chrome");
-    const param = () => chrome.evaluate(async () => (await window.chromeAPI.browser.getTabs()).find((tab) => tab.page === "flock")?.pageParam);
+    const param = () =>
+      chrome.evaluate(async () => (await window.chromeAPI.browser.getTabs()).find((tab) => tab.page === "flock")?.pageParam);
     const back = () => chrome.getByRole("button", { name: "Back", exact: true }).click();
-    const page = () => chrome.getByRole("list", { name: "Your mascots" }).filter({ has: chrome.getByRole("button", { name: /^Chat with/ }) });
+    const page = () =>
+      chrome.getByRole("list", { name: "Your mascots" }).filter({ has: chrome.getByRole("button", { name: /^Chat with/ }) });
 
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock"));
     await expect(page().getByRole("listitem")).toHaveCount(1);
@@ -66,7 +68,12 @@ test("a mascot is made in four steps, its limits are changed from its page, and 
     await expect(made).toContainText("Only visits 127.0.0.1.nip.io");
     await made.getByRole("button", { name: "Done" }).click();
     const scout = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).mascots.find((mascot) => mascot.name === "Scout")!;
-    expect(scout).toMatchObject({ look: { palette: "robin", accessory: "crown" }, instructions: "Find the cheapest cable.", sites: ["127.0.0.1.nip.io"], tools: ["visit", "click"] });
+    expect(scout).toMatchObject({
+      look: { palette: "robin", accessory: "crown" },
+      instructions: "Find the cheapest cable.",
+      sites: ["127.0.0.1.nip.io"],
+      tools: ["visit", "click"],
+    });
     await expect.poll(param).toBe(scout.id);
 
     // It's in the list, which the toolbar's Back goes to.

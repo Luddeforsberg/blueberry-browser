@@ -61,20 +61,26 @@ export interface CodeField {
 
 export type CodeTarget = { kind: "one"; index: number } | { kind: "boxes"; indexes: number[] } | null;
 
-const NAMED_FOR_A_CODE = /one.?time|\botp\b|2fa|mfa|two.?factor|verif|security.?code|auth\w*.?code|\bcode\b|\bpin\b|\btoken\b|\bkod(en)?\b|engångskod/i;
-const OTHER_THINGS = /promo|coupon|discount|gift|voucher|zip|postal|post.?code|country|area.?code|search|sök|\bquery\b|\bq\b|e-?mail|user|login|phone|address|name/i;
+const NAMED_FOR_A_CODE =
+  /one.?time|\botp\b|2fa|mfa|two.?factor|verif|security.?code|auth\w*.?code|\bcode\b|\bpin\b|\btoken\b|\bkod(en)?\b|engångskod/i;
+const OTHER_THINGS =
+  /promo|coupon|discount|gift|voucher|zip|postal|post.?code|country|area.?code|search|sök|\bquery\b|\bq\b|e-?mail|user|login|phone|address|name/i;
 const OTHER_AUTOCOMPLETE = /username|email|name|tel|address|postal|country|cc-/i;
 
 // Exactly one place the code goes, or null, and then nothing is typed. In order: the field marked for one-time codes,
 // a field named for one, a row of one-character boxes as long as the code, or the only field a page with no password
 // on it has.
 export const chooseCodeField = (fields: readonly CodeField[], code: string, hasPasswordField: boolean): CodeTarget => {
-  const canHold = ({ type, maxLength }: CodeField) => (maxLength < 0 || maxLength >= code.length) && (type !== "number" || /^\d+$/.test(code));
+  const canHold = ({ type, maxLength }: CodeField) =>
+    (maxLength < 0 || maxLength >= code.length) && (type !== "number" || /^\d+$/.test(code));
   const box = ({ maxLength }: CodeField) => maxLength === 1;
   const indexed = fields.map((field, index) => ({ field, index }));
   const boxesIn = (tier: typeof indexed): CodeTarget =>
-    tier.length === code.length && tier.every(({ field }) => box(field)) ? { kind: "boxes", indexes: tier.map(({ index }) => index) } : null;
-  const oneOf = (tier: typeof indexed): CodeTarget => (tier.length === 1 && canHold(tier[0].field) ? { kind: "one", index: tier[0].index } : null);
+    tier.length === code.length && tier.every(({ field }) => box(field))
+      ? { kind: "boxes", indexes: tier.map(({ index }) => index) }
+      : null;
+  const oneOf = (tier: typeof indexed): CodeTarget =>
+    tier.length === 1 && canHold(tier[0].field) ? { kind: "one", index: tier[0].index } : null;
 
   const otherThing = ({ field }: (typeof indexed)[number]) => OTHER_THINGS.test(field.words) || OTHER_AUTOCOMPLETE.test(field.autocomplete);
   const marked = indexed.filter(({ field }) => field.autocomplete.split(/\s+/).includes("one-time-code"));

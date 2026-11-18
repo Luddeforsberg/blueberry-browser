@@ -15,7 +15,12 @@ export const MAX_EXAMPLE_ANSWER = 6000;
 // the review screen has to be what the mascot is told. Newlines and tabs stay.
 const INVISIBLE = /[\p{Cc}\p{Cf}\p{Co}\p{Default_Ignorable_Code_Point}]/gu;
 export const withoutInvisible = (text: unknown): string =>
-  typeof text === "string" ? text.replace(/\r\n?/g, "\n").replace(INVISIBLE, (found) => (found === "\n" || found === "\t" ? found : "")).trim() : "";
+  typeof text === "string"
+    ? text
+        .replace(/\r\n?/g, "\n")
+        .replace(INVISIBLE, (found) => (found === "\n" || found === "\t" ? found : ""))
+        .trim()
+    : "";
 export const cleanLine = (text: unknown): string => withoutInvisible(text).replace(/\s+/g, " ");
 
 const SAFE_NAME = /^[\p{L}\p{N}][\p{L}\p{N} '’.&-]*$/u;
@@ -31,7 +36,8 @@ export const parsePublicDraft = (input: unknown): { draft: MascotDraft } | { err
   if ("error" in parsed) return parsed;
   const { draft } = parsed;
   if (!SAFE_NAME.test(draft.name)) return { error: "To publish it, its name can only have letters, numbers, spaces and ' . & -." };
-  if (["berry", "blueberry"].includes(draft.name.toLowerCase())) return { error: "That name is taken by Blueberry itself. Give it its own." };
+  if (["berry", "blueberry"].includes(draft.name.toLowerCase()))
+    return { error: "That name is taken by Blueberry itself. Give it its own." };
   const local = draft.sites.find((site) => !isPublicSite(site));
   if (local) return { error: `${local} is only reachable from your own computer or network, so it can’t be published.` };
   return { draft };
@@ -43,7 +49,8 @@ const parseExample = (input: unknown): { example: MascotExample | null } | { err
   const clean = { prompt: withoutInvisible(prompt), answer: withoutInvisible(answer) };
   if (!clean.prompt || !clean.answer) return { error: "An example needs both what was asked and what it gave. Or choose no example." };
   if (clean.prompt.length > MAX_EXAMPLE_PROMPT) return { error: `Keep what was asked under ${MAX_EXAMPLE_PROMPT} characters.` };
-  if (clean.answer.length > MAX_EXAMPLE_ANSWER) return { error: `Keep the answer under ${MAX_EXAMPLE_ANSWER} characters. Cut it down to what shows the mascot best.` };
+  if (clean.answer.length > MAX_EXAMPLE_ANSWER)
+    return { error: `Keep the answer under ${MAX_EXAMPLE_ANSWER} characters. Cut it down to what shows the mascot best.` };
   return { example: clean };
 };
 
@@ -71,7 +78,10 @@ export const parsePublishChoices = (input: unknown): { choices: PublishChoices }
 };
 
 // The exact row that goes to the server. Nothing else leaves the computer when publishing, and the preview reads this.
-export const publicRow = ({ name, look, instructions, sites, tools }: MascotDraft, { author, description, category, example }: PublishChoices) => ({
+export const publicRow = (
+  { name, look, instructions, sites, tools }: MascotDraft,
+  { author, description, category, example }: PublishChoices,
+) => ({
   name,
   palette: look.palette,
   accessory: look.accessory,
@@ -93,12 +103,20 @@ export const isUuid = (value: unknown): value is string => typeof value === "str
 export const parsePublishedRow = (input: unknown): GalleryMascot | null => {
   const row = (input ?? {}) as Record<string, unknown>;
   if (!isUuid(row.id)) return null;
-  const parsed = parsePublicDraft({ name: row.name, look: { palette: row.palette, accessory: row.accessory }, instructions: row.instructions, sites: row.sites, tools: row.tools });
+  const parsed = parsePublicDraft({
+    name: row.name,
+    look: { palette: row.palette, accessory: row.accessory },
+    instructions: row.instructions,
+    sites: row.sites,
+    tools: row.tools,
+  });
   if ("error" in parsed) return null;
   const author = cleanLine(row.author_name);
   const description = cleanLine(row.description);
   if (authorProblem(author) || !description || description.length > MAX_DESCRIPTION) return null;
-  const example = parseExample(row.example_prompt === null && row.example_answer === null ? null : { prompt: row.example_prompt, answer: row.example_answer });
+  const example = parseExample(
+    row.example_prompt === null && row.example_answer === null ? null : { prompt: row.example_prompt, answer: row.example_answer },
+  );
   const publishedAt = Date.parse(String(row.created_at));
   return {
     id: row.id,
@@ -114,7 +132,11 @@ export const parsePublishedRow = (input: unknown): GalleryMascot | null => {
 
 export const SECRET_SHAPES: { name: string; shape: RegExp }[] = [
   { name: "an email address", shape: /[^\s@<>()]+@[^\s@<>()]+\.[a-z]{2,}/i },
-  { name: "an API key or token", shape: /\b(?:sk|pk|rk|sb)[-_][a-z0-9_-]{16,}|\bgh[pousr]_[a-z0-9]{20,}|\bgithub_pat_\w{20,}|\bAKIA[0-9A-Z]{16}\b|\bxox[a-z]-[a-z0-9-]{10,}|\bBearer\s+[\w.-]{16,}|\beyJ[\w-]{10,}\.[\w-]{10,}\.[\w-]{5,}/i },
+  {
+    name: "an API key or token",
+    shape:
+      /\b(?:sk|pk|rk|sb)[-_][a-z0-9_-]{16,}|\bgh[pousr]_[a-z0-9]{20,}|\bgithub_pat_\w{20,}|\bAKIA[0-9A-Z]{16}\b|\bxox[a-z]-[a-z0-9-]{10,}|\bBearer\s+[\w.-]{16,}|\beyJ[\w-]{10,}\.[\w-]{10,}\.[\w-]{5,}/i,
+  },
   { name: "a password", shape: /\b(?:password|passwd|lösenord|pwd|secret|api[ _-]?key)\b\s*(?:is|är|[:=])\s*\S+/i },
   { name: "a long string that could be a key", shape: /\b(?=[a-z0-9_-]*\d)(?=[a-z0-9_-]*[a-z])[a-z0-9_-]{32,}\b/i },
   { name: "a card number", shape: /\b\d(?:[ -]?\d){12,18}\b/ },
@@ -129,9 +151,10 @@ export const publishWarnings = (draft: Pick<MascotProfile, "instructions">, { au
     ["the example’s question", example?.prompt ?? ""],
     ["the example’s answer", example?.answer ?? ""],
   ];
-  return fields.flatMap(([where, text]) => SECRET_SHAPES.filter(({ shape }) => shape.test(text)).map(({ name }) => `There may be ${name} in ${where}.`));
+  return fields.flatMap(([where, text]) =>
+    SECRET_SHAPES.filter(({ shape }) => shape.test(text)).map(({ name }) => `There may be ${name} in ${where}.`),
+  );
 };
-
 
 // Where a stranger's link goes, as a site name, so it reads as words and not a long address. Null for anything that isn't
 // a web address.

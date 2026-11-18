@@ -19,10 +19,9 @@ const MAX_SITES = 20;
 
 const MAC_OFF =
   "Blueberry isn't open on the user's Mac right now, or they haven't allowed jobs from here to run there (Settings > " +
-  "Cloud in Blueberry). Ask them to open it, or start the job with where: \"cloud\" or \"auto\".";
+  'Cloud in Blueberry). Ask them to open it, or start the job with where: "cloud" or "auto".';
 
-const ON_MAC =
-  "It's waiting for the user in Blueberry on their Mac, where only they can answer. Tell them, then check again with get_job.";
+const ON_MAC = "It's waiting for the user in Blueberry on their Mac, where only they can answer. Tell them, then check again with get_job.";
 
 const NOT_YOURS =
   "Only the user can answer this, in Blueberry or on their phone, and nothing you send can. Tell the user it's waiting " +
@@ -57,7 +56,12 @@ const waitingFor = (row: Record<string, unknown>) => {
   const approval = approvalFromRow(row);
   if (!approval) return null;
   if (approval.question) return { kind: "question", question: approval.text, note: NOT_YOURS };
-  if (approval.handoff) return { kind: "user_in_page", needs: approval.text, note: "The user has to do this in the page themselves, from Blueberry or their phone. No password or code goes through you." };
+  if (approval.handoff)
+    return {
+      kind: "user_in_page",
+      needs: approval.text,
+      note: "The user has to do this in the page themselves, from Blueberry or their phone. No password or code goes through you.",
+    };
   return { kind: "approval", wouldLike: approval.text, note: NOT_YOURS };
 };
 
@@ -90,7 +94,8 @@ export const createRelayTools = (host: RelayHost): McpTool[] => {
     {
       name: "list_agents",
       title: "List the flock",
-      description: "The user's birds (agents) in Blueberry, as their Mac last shared them: each one's name, what it's for, and the sites it may use and what it may do, in words. Berry is always first and has no limits.",
+      description:
+        "The user's birds (agents) in Blueberry, as their Mac last shared them: each one's name, what it's for, and the sites it may use and what it may do, in words. Berry is always first and has no limits.",
       shape: {},
       readOnly: true,
       run: async () => {
@@ -102,16 +107,27 @@ export const createRelayTools = (host: RelayHost): McpTool[] => {
       name: "start_job",
       title: "Give a bird a job",
       description:
-        "Start a job for one of the user's birds, by name or id from list_agents, or Berry if you leave it out. `where` says where it runs. \"cloud\": in a browser in the cloud, signed in only to the sites the user brought there, and it keeps going with their computer off. \"mac\": in Blueberry on the user's own Mac, with their real tabs and sign-ins, only while it's open and they've allowed it, and otherwise you get an error saying so. \"auto\", the default: the Mac if it's available, and the cloud if not. Either way it asks the user before anything risky. `sites` keeps it to those sites, and can only narrow what the bird may do. Returns a job id at once, and where it went: check on it with get_job.",
+        'Start a job for one of the user\'s birds, by name or id from list_agents, or Berry if you leave it out. `where` says where it runs. "cloud": in a browser in the cloud, signed in only to the sites the user brought there, and it keeps going with their computer off. "mac": in Blueberry on the user\'s own Mac, with their real tabs and sign-ins, only while it\'s open and they\'ve allowed it, and otherwise you get an error saying so. "auto", the default: the Mac if it\'s available, and the cloud if not. Either way it asks the user before anything risky. `sites` keeps it to those sites, and can only narrow what the bird may do. Returns a job id at once, and where it went: check on it with get_job.',
       shape: {
         task: z.string().min(1).max(MAX_TASK_LENGTH).describe("What to do, in plain words, as you'd ask a person."),
         agent: z.string().max(100).optional().describe("The bird's name or id. Leave out for Berry."),
-        sites: z.array(z.string().max(200)).max(MAX_SITES).optional().describe("Only these sites, such as example.com. Leave out for the bird's own."),
-        where: z.enum(["auto", "mac", "cloud"]).optional().describe("auto (the default): the user's Mac if Blueberry is open there and allowed, otherwise the cloud. mac: only the Mac. cloud: only the cloud."),
+        sites: z
+          .array(z.string().max(200))
+          .max(MAX_SITES)
+          .optional()
+          .describe("Only these sites, such as example.com. Leave out for the bird's own."),
+        where: z
+          .enum(["auto", "mac", "cloud"])
+          .optional()
+          .describe(
+            "auto (the default): the user's Mac if Blueberry is open there and allowed, otherwise the cloud. mac: only the Mac. cloud: only the cloud.",
+          ),
       },
       readOnly: false,
       run: async ({ task, agent, sites, where }) => {
-        const prompt = String(task ?? "").trim().slice(0, MAX_TASK_LENGTH);
+        const prompt = String(task ?? "")
+          .trim()
+          .slice(0, MAX_TASK_LENGTH);
         if (!prompt) return failed("Say what the job is.", "Empty task");
         const bird = findBird(await host.flock(), typeof agent === "string" ? agent : undefined);
         if (!bird) return failed(`There's no bird called ${String(agent)}. list_agents names them.`, "No such bird");
@@ -119,7 +135,11 @@ export const createRelayTools = (host: RelayHost): McpTool[] => {
         if ("bad" in parsed) return failed(`“${parsed.bad}” doesn't look like a site. Try something like example.com.`, "Bad site");
         // Only ever narrower: a bird kept to some sites can't be sent anywhere else.
         const narrowed = narrowSites(bird.sites, parsed.sites);
-        if (narrowed.includes(NOWHERE)) return failed(`${bird.name} may only use ${bird.sites.join(", ")}, and none of those sites are among them.`, "Sites outside its limits");
+        if (narrowed.includes(NOWHERE))
+          return failed(
+            `${bird.name} may only use ${bird.sites.join(", ")}, and none of those sites are among them.`,
+            "Sites outside its limits",
+          );
         const wanted: RelayWhere = where === "mac" || where === "cloud" ? where : "auto";
         const id = await host.startJob(prompt, { ...mascotSnapshot(bird), sites: narrowed }, wanted);
         if (!id) return failed(MAC_OFF, "Mac not available");
@@ -142,7 +162,8 @@ export const createRelayTools = (host: RelayHost): McpTool[] => {
     {
       name: "get_job",
       title: "Check on a job",
-      description: "How a job from start_job is going: its status, its steps in words, its reply, and anything it's waiting for. Whatever it waits for, only the user can answer.",
+      description:
+        "How a job from start_job is going: its status, its steps in words, its reply, and anything it's waiting for. Whatever it waits for, only the user can answer.",
       shape: { jobId: z.string().min(1).max(100) },
       readOnly: true,
       run: async ({ jobId }) => {
@@ -158,7 +179,11 @@ export const createRelayTools = (host: RelayHost): McpTool[] => {
       shape: {},
       readOnly: true,
       run: async () => {
-        const listed = (await host.jobs(null)).map((row) => ({ jobId: String(row.id), where: onMac(row) ? "mac" : "cloud", status: statusOf(row.status, waitingFor(row) !== null) }));
+        const listed = (await host.jobs(null)).map((row) => ({
+          jobId: String(row.id),
+          where: onMac(row) ? "mac" : "cloud",
+          status: statusOf(row.status, waitingFor(row) !== null),
+        }));
         return { text: json(listed), summary: `${listed.length} jobs` };
       },
     },

@@ -148,7 +148,7 @@ export class PageActor {
     private readonly tab: ActorTab,
     private readonly options: () => ActorOptions,
     // Read each time, because it changes with the site.
-    private readonly zoom: () => number
+    private readonly zoom: () => number,
   ) {}
 
   get enabled(): boolean {
@@ -172,7 +172,14 @@ export class PageActor {
   // Whether anything should be drawn right now.
   get showing(): boolean {
     const { on, windowShowing } = this.options();
-    return on && windowShowing && (this.tab.isVisible || this.pictured) && this.tab.berryWorking && !this.tab.heldForUser && Date.now() >= this.quietUntil;
+    return (
+      on &&
+      windowShowing &&
+      (this.tab.isVisible || this.pictured) &&
+      this.tab.berryWorking &&
+      !this.tab.heldForUser &&
+      Date.now() >= this.quietUntil
+    );
   }
 
   // Whether letters are paced and the page scrolled smoothly: not with a marker, and not where nobody's looking.
@@ -205,7 +212,9 @@ export class PageActor {
       timer = setTimeout(() => resolve(null), PAGE_ANSWER_MS);
     });
     // The page's own world is never involved, so a page can't answer for this.
-    return Promise.race([contents.executeJavaScriptInIsolatedWorld(1000, [{ code }], true).catch(() => null), late]).finally(() => clearTimeout(timer));
+    return Promise.race([contents.executeJavaScriptInIsolatedWorld(1000, [{ code }], true).catch(() => null), late]).finally(() =>
+      clearTimeout(timer),
+    );
   }
 
   // Whether the user clicked or typed in this tab since then. The tools ask this whether or not any bird is showing.
@@ -271,7 +280,8 @@ export class PageActor {
     if (!this.showing) return false;
     const asking = kind === "ask";
     // Asking never scrolls anything, so what isn't in view leaves it where it is.
-    if (asking && (spot.top + spot.height < 0 || spot.top > spot.viewHeight || spot.left + spot.width < 0 || spot.left > spot.viewWidth)) return false;
+    if (asking && (spot.top + spot.height < 0 || spot.top > spot.viewHeight || spot.left + spot.width < 0 || spot.left > spot.viewWidth))
+      return false;
     const { still, plain } = this.options();
     const unit = 1 / this.drawZoom;
     const size = (still ? 28 : BIRD_SIZE) * unit;

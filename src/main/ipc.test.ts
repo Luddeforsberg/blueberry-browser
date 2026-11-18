@@ -52,8 +52,24 @@ describe("isTrustedSender", () => {
 
 describe("chatSendOptions", () => {
   it("passes on only what a renderer may set, of the right type", () => {
-    expect(chatSendOptions({ seePage: true, mascotId: "m-1", cloud: true, runner: true, files: ["f-1"], tabs: ["tab-2"] })).toEqual({ seePage: true, mascotId: "m-1", cloud: true, runner: true, files: ["f-1"], tabs: ["tab-2"] });
-    const sneaky = { seePage: "yes", mascotId: 7, cloud: 1, from: "ChatGPT or Claude", sites: ["bank.example"], tools: [], askAtLeast: "never", onEnd: () => {} };
+    expect(chatSendOptions({ seePage: true, mascotId: "m-1", cloud: true, runner: true, files: ["f-1"], tabs: ["tab-2"] })).toEqual({
+      seePage: true,
+      mascotId: "m-1",
+      cloud: true,
+      runner: true,
+      files: ["f-1"],
+      tabs: ["tab-2"],
+    });
+    const sneaky = {
+      seePage: "yes",
+      mascotId: 7,
+      cloud: 1,
+      from: "ChatGPT or Claude",
+      sites: ["bank.example"],
+      tools: [],
+      askAtLeast: "never",
+      onEnd: () => {},
+    };
     const none = { seePage: false, mascotId: null, cloud: false, runner: false, files: [], tabs: [] };
     expect(chatSendOptions(sneaky)).toEqual(none);
     expect(chatSendOptions(null)).toEqual(none);

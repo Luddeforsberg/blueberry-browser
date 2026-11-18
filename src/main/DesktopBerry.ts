@@ -35,7 +35,16 @@ import {
   type ShownAsk,
   type TrayTarget,
 } from "./desktopBerryState";
-import type { DesktopBerrySpot, DesktopBox, DesktopDecided, DesktopDropPart, DesktopDropState, DesktopPanelState, Settings, ThemeState } from "../shared/ipc";
+import type {
+  DesktopBerrySpot,
+  DesktopBox,
+  DesktopDecided,
+  DesktopDropPart,
+  DesktopDropState,
+  DesktopPanelState,
+  Settings,
+  ThemeState,
+} from "../shared/ipc";
 import type { LibrarySnapshot, MascotProfile, NeedsYouItem } from "../shared/library";
 import { DESKTOP_SHADOW, DESKTOP_SHEET } from "../shared/desktopSizes";
 import { BERRY } from "../shared/mascots";
@@ -64,7 +73,21 @@ const MAX_FINISHED = 30;
 const RESULT_LENGTH = 64;
 // In the panel these go to the text box, for selecting, copying and moving around in it. Anything else would reach the
 // browser's menu, behind the user's back.
-const PANEL_MENU_KEYS = new Set(["a", "c", "v", "x", "z", "arrowleft", "arrowright", "arrowup", "arrowdown", "backspace", "delete", "home", "end"]);
+const PANEL_MENU_KEYS = new Set([
+  "a",
+  "c",
+  "v",
+  "x",
+  "z",
+  "arrowleft",
+  "arrowright",
+  "arrowup",
+  "arrowdown",
+  "backspace",
+  "delete",
+  "home",
+  "end",
+]);
 const DROP_PARTS: readonly DesktopDropPart[] = ["drop", "answer", "open", "dismiss"];
 
 export interface DesktopBerryHost {
@@ -244,9 +267,18 @@ export class DesktopBerry {
   }
 
   private stopTimers(): void {
-    [this.hideTimer, this.panelHideTimer, this.leavingTimer, this.announceTimer, this.expiryTimer, this.saidTimer].forEach((timer) => timer && clearTimeout(timer));
+    [this.hideTimer, this.panelHideTimer, this.leavingTimer, this.announceTimer, this.expiryTimer, this.saidTimer].forEach(
+      (timer) => timer && clearTimeout(timer),
+    );
     if (this.pointerTimer) clearInterval(this.pointerTimer);
-    this.hideTimer = this.panelHideTimer = this.leavingTimer = this.announceTimer = this.expiryTimer = this.saidTimer = this.pointerTimer = null;
+    this.hideTimer =
+      this.panelHideTimer =
+      this.leavingTimer =
+      this.announceTimer =
+      this.expiryTimer =
+      this.saidTimer =
+      this.pointerTimer =
+        null;
   }
 
   // A panel never brings its app forward, and floats over full-screen apps.
@@ -306,7 +338,8 @@ export class DesktopBerry {
     const chrome = createChromeView("composer");
     chrome.view.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     chrome.view.webContents.on("before-input-event", (event, input) => {
-      if (input.type === "keyDown" && (input.meta || input.control) && !PANEL_MENU_KEYS.has(input.key.toLowerCase())) event.preventDefault();
+      if (input.type === "keyDown" && (input.meta || input.control) && !PANEL_MENU_KEYS.has(input.key.toLowerCase()))
+        event.preventDefault();
     });
     window.contentView.addChildView(chrome.view);
     window.on("blur", () => this.closePanel());
@@ -335,7 +368,7 @@ export class DesktopBerry {
           hide: () => window.hide(),
         };
       },
-      { mascotsHidden: () => !this.host.settings().showBerry, refocus: false }
+      { mascotsHidden: () => !this.host.settings().showBerry, refocus: false },
     );
     window.on("blur", () => this.menus?.closeMenu());
     this.menuWindow = window;
@@ -415,11 +448,14 @@ export class DesktopBerry {
     this.dragging = false;
     this.publish();
     this.stopWatchingPointer();
-    this.hideTimer = setTimeout(() => {
-      this.hideTimer = null;
-      if (this.outside || !this.window || this.window.isDestroyed()) return;
-      this.window.hide();
-    }, this.still ? 0 : SIZE_MS);
+    this.hideTimer = setTimeout(
+      () => {
+        this.hideTimer = null;
+        if (this.outside || !this.window || this.window.isDestroyed()) return;
+        this.window.hide();
+      },
+      this.still ? 0 : SIZE_MS,
+    );
   }
 
   // Blueberry's window has gone away, so the drop comes out.
@@ -469,7 +505,10 @@ export class DesktopBerry {
   // The drop's place in the window as it is now, which covers the work area during a drag.
   private get anchored(): DesktopPlace {
     const here = this.here;
-    return { window: this.bounds, anchor: { x: here.anchor.x + here.window.x - this.bounds.x, y: here.anchor.y + here.window.y - this.bounds.y } };
+    return {
+      window: this.bounds,
+      anchor: { x: here.anchor.x + here.window.x - this.bounds.x, y: here.anchor.y + here.window.y - this.bounds.y },
+    };
   }
 
   private checkPointer(): void {
@@ -575,7 +614,12 @@ export class DesktopBerry {
         : []),
       { label: "Open Blueberry", icon: "open", click: () => this.host.showBlueberry() },
       { type: "separator" },
-      { label: "Keep Mascots Still", type: "checkbox", checked: keepBerryStill, click: () => this.host.update({ keepBerryStill: !keepBerryStill }) },
+      {
+        label: "Keep Mascots Still",
+        type: "checkbox",
+        checked: keepBerryStill,
+        click: () => this.host.update({ keepBerryStill: !keepBerryStill }),
+      },
       { label: "Hide Mascots", type: "checkbox", checked: !showBerry, click: () => this.host.update({ showBerry: !showBerry }) },
       { label: "Take Off the Desktop", click: () => this.host.update({ desktopBerry: false }) },
     ];
@@ -839,10 +883,16 @@ export class DesktopBerry {
       const chat = this.host.ended(chatId);
       if (!chat) return;
       const endedAt = Date.now();
-      this.finished = [...this.finished.filter((each) => each.chatId !== chatId), { chatId, mascotId: chat.mascotId, title: chat.title, problem: chat.error, endedAt }].slice(-MAX_FINISHED);
+      this.finished = [
+        ...this.finished.filter((each) => each.chatId !== chatId),
+        { chatId, mascotId: chat.mascotId, title: chat.title, problem: chat.error, endedAt },
+      ].slice(-MAX_FINISHED);
       if (!away) return;
       const text = chat.error ?? (firstLine(chat.text, RESULT_LENGTH) || "Done.");
-      this.results = [...this.results.filter((result) => result.chatId !== chatId), { chatId, mascotId: chat.mascotId, failed: chat.error !== null, text, endedAt }].slice(-MAX_RESULTS);
+      this.results = [
+        ...this.results.filter((result) => result.chatId !== chatId),
+        { chatId, mascotId: chat.mascotId, failed: chat.error !== null, text, endedAt },
+      ].slice(-MAX_RESULTS);
       this.announce(chatId, text);
       if (this.expiryTimer) clearTimeout(this.expiryTimer);
       this.expiryTimer = setTimeout(() => {
@@ -864,7 +914,9 @@ export class DesktopBerry {
     const library = this.host.library();
     const now = Date.now();
     const running: DesktopRunning[] = [
-      ...library.chats.filter(({ running }) => running).map(({ id, mascotId, title }) => ({ chatId: id, routineId: null, mascotId: mascotId ?? BERRY.id, title })),
+      ...library.chats
+        .filter(({ running }) => running)
+        .map(({ id, mascotId, title }) => ({ chatId: id, routineId: null, mascotId: mascotId ?? BERRY.id, title })),
       ...library.routines
         .filter(({ latestRun }) => latestRun?.status === "running")
         .map(({ id, mascotId, name, latestRun }) => ({
@@ -945,7 +997,11 @@ export class DesktopBerry {
       });
     }
     const shown = this.asking;
-    const askFace = shown && { name: this.host.nameOf(shown.item.mascotId), look: this.host.mascot(shown.item.mascotId).look, mood: "asking" as const };
+    const askFace = shown && {
+      name: this.host.nameOf(shown.item.mascotId),
+      look: this.host.mascot(shown.item.mascotId).look,
+      mood: "asking" as const,
+    };
     const place = this.panelBounds;
     return {
       open: this.panelOpen,

@@ -70,7 +70,7 @@ describe("SitePermissions", () => {
       expect(await permissions.request(tab, permission, asked())).toBe(false);
       expect(permissions.promptFor(tab)).toBeNull();
       expect(permissions.check(tab, permission, SITE, {})).toBe(false);
-    }
+    },
   );
 
   it.each(["geolocation", "notifications", "midi", "midiSysex", "display-capture", "clipboard-read", "openExternal"])(
@@ -80,7 +80,7 @@ describe("SitePermissions", () => {
       void permissions.request(tab, permission, asked());
       expect(permissions.promptFor(tab)).not.toBeNull();
       expect(permissions.check(tab, permission, SITE, {})).toBe(false);
-    }
+    },
   );
 
   it("lets ordinary web features through in both handlers, for any page", async () => {

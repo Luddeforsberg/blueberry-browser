@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { bindReply, chooseCodeField, plausibleCode, type CodeField, type OpenRequest } from "./phoneReplies";
 
-const field = (overrides: Partial<CodeField> = {}): CodeField => ({ autocomplete: "", words: "", type: "text", maxLength: -1, ...overrides });
+const field = (overrides: Partial<CodeField> = {}): CodeField => ({
+  autocomplete: "",
+  words: "",
+  type: "text",
+  maxLength: -1,
+  ...overrides,
+});
 
 describe("plausibleCode", () => {
   it.each([
@@ -14,10 +20,20 @@ describe("plausibleCode", () => {
     ["123456789012", "123456789012"],
   ])("takes %j", (text, code) => expect(plausibleCode(text)).toBe(code));
 
-  it.each(["", "   ", "123", "1234567890123", "1 2 3 4", "12--34", "thanks", "hunter two", "123456!", "correct horse", "https://a.b/123456", "123456\n789"])(
-    "refuses %j",
-    (text) => expect(plausibleCode(text)).toBeNull()
-  );
+  it.each([
+    "",
+    "   ",
+    "123",
+    "1234567890123",
+    "1 2 3 4",
+    "12--34",
+    "thanks",
+    "hunter two",
+    "123456!",
+    "correct horse",
+    "https://a.b/123456",
+    "123456\n789",
+  ])("refuses %j", (text) => expect(plausibleCode(text)).toBeNull());
 });
 
 describe("bindReply", () => {
@@ -64,7 +80,10 @@ describe("chooseCodeField", () => {
   });
 
   it("goes by an obvious name, and not by one that means something else", () => {
-    expect(chooseCodeField([field({ words: "email" }), field({ words: "Verification code" })], "123456", false)).toEqual({ kind: "one", index: 1 });
+    expect(chooseCodeField([field({ words: "email" }), field({ words: "Verification code" })], "123456", false)).toEqual({
+      kind: "one",
+      index: 1,
+    });
     expect(chooseCodeField([field({ words: "postal code" })], "123456", false)).toBeNull();
   });
 
@@ -79,7 +98,9 @@ describe("chooseCodeField", () => {
   it("types nothing when two fields could be it", () => {
     expect(chooseCodeField([field({ words: "code" }), field({ words: "pin" })], "123456", false)).toBeNull();
     expect(chooseCodeField([field(), field()], "123456", false)).toBeNull();
-    expect(chooseCodeField([field({ autocomplete: "one-time-code" }), field({ autocomplete: "one-time-code" })], "123456", false)).toBeNull();
+    expect(
+      chooseCodeField([field({ autocomplete: "one-time-code" }), field({ autocomplete: "one-time-code" })], "123456", false),
+    ).toBeNull();
   });
 
   it("fills boxes only when there's one for every character", () => {

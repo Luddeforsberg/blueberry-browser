@@ -16,9 +16,7 @@ describe("sanitizeSettings", () => {
 
   it("falls back to the defaults for anything missing or invalid", () => {
     expect(sanitizeSettings(null)).toEqual(DEFAULT_SETTINGS);
-    expect(
-      sanitizeSettings({ layoutMode: "diagonal", appearance: 3, showBerry: "yes", chatWidth: "wide" })
-    ).toEqual(DEFAULT_SETTINGS);
+    expect(sanitizeSettings({ layoutMode: "diagonal", appearance: 3, showBerry: "yes", chatWidth: "wide" })).toEqual(DEFAULT_SETTINGS);
   });
 
   it("only accepts the two startup choices", () => {
@@ -28,9 +26,12 @@ describe("sanitizeSettings", () => {
   });
 
   it("keeps valid values and clamps panel widths to their limits", () => {
-    expect(
-      sanitizeSettings({ layoutMode: "horizontal", appearance: "dark", sidebarWidth: 9999, chatWidth: 1 })
-    ).toMatchObject({ layoutMode: "horizontal", appearance: "dark", sidebarWidth: 360, chatWidth: 320 });
+    expect(sanitizeSettings({ layoutMode: "horizontal", appearance: "dark", sidebarWidth: 9999, chatWidth: 1 })).toMatchObject({
+      layoutMode: "horizontal",
+      appearance: "dark",
+      sidebarWidth: 360,
+      chatWidth: 320,
+    });
   });
 });
 
@@ -79,8 +80,12 @@ describe("the app icon", () => {
 
   it("starts as Berry on Paper, and keeps a mascot's id and any of the four grounds", () => {
     expect(DEFAULT_SETTINGS).toMatchObject({ appIconMascotId: null, appIconGround: "paper" });
-    expect(sanitizeSettings({ appIconMascotId: chosen.appIconMascotId, appIconGround: "night" })).toMatchObject({ appIconMascotId: chosen.appIconMascotId, appIconGround: "night" });
-    for (const ground of ["paper", "night", "colour", "glow"]) expect(sanitizeSettings({ appIconGround: ground }).appIconGround).toBe(ground);
+    expect(sanitizeSettings({ appIconMascotId: chosen.appIconMascotId, appIconGround: "night" })).toMatchObject({
+      appIconMascotId: chosen.appIconMascotId,
+      appIconGround: "night",
+    });
+    for (const ground of ["paper", "night", "colour", "glow"])
+      expect(sanitizeSettings({ appIconGround: ground }).appIconGround).toBe(ground);
   });
 
   it("takes Berry's own id, or null, as Berry", () => {

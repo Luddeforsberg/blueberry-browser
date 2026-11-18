@@ -40,7 +40,14 @@ const SCOUT: MascotProfile = {
   tools: ["visit", "click", "type"],
   deletedAt: null,
 };
-const PENNY: MascotProfile = { ...SCOUT, id: "m-penny", name: "Penny", look: { palette: "canary", accessory: "glasses" }, sites: ["news.example"], tools: ["visit"] };
+const PENNY: MascotProfile = {
+  ...SCOUT,
+  id: "m-penny",
+  name: "Penny",
+  look: { palette: "canary", accessory: "glasses" },
+  sites: ["news.example"],
+  tools: ["visit"],
+};
 
 // Someone else's page, as it would show in the live view.
 const SHOP = `<!doctype html><title>Shop</title><style>body{font:16px system-ui;margin:24px;color:#222;background:#fff}input{display:block;margin:8px 0;padding:8px;width:80%}</style>
@@ -66,13 +73,22 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     }
     if (path === "/config.js") {
       response.setHeader("content-type", "text/javascript");
-      response.end(`export const SUPABASE_URL = ${JSON.stringify(base)}; export const SUPABASE_PUBLISHABLE_KEY = ${JSON.stringify(FAKE_KEY)}; export const GET_BLUEBERRY_URL = "/"; export const VAPID_PUBLIC_KEY = ${JSON.stringify(publicKey)};`);
+      response.end(
+        `export const SUPABASE_URL = ${JSON.stringify(base)}; export const SUPABASE_PUBLISHABLE_KEY = ${JSON.stringify(FAKE_KEY)}; export const GET_BLUEBERRY_URL = "/"; export const VAPID_PUBLIC_KEY = ${JSON.stringify(publicKey)};`,
+      );
       return;
     }
     try {
       let body: Buffer | string = await readFile(join(SITE, path));
       if (path === "/app/index.html") body = body.toString().replace("connect-src https:", `connect-src https: ${base}`);
-      const types: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".png": "image/png", ".webmanifest": "application/manifest+json", ".woff2": "font/woff2" };
+      const types: Record<string, string> = {
+        ".html": "text/html",
+        ".js": "text/javascript",
+        ".css": "text/css",
+        ".png": "image/png",
+        ".webmanifest": "application/manifest+json",
+        ".woff2": "font/woff2",
+      };
       response.setHeader("content-type", types[extname(path)] ?? "application/octet-stream");
       response.end(body);
     } catch {
@@ -84,18 +100,33 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
 
   // The REST API as one user, the way the app and the runner call it.
   const signIn = async (email: string, password: string) => {
-    const response = await fetch(`${base}/auth/v1/token?grant_type=password`, { method: "POST", headers: { apikey: FAKE_KEY, "content-type": "application/json" }, body: JSON.stringify({ email, password }) });
+    const response = await fetch(`${base}/auth/v1/token?grant_type=password`, {
+      method: "POST",
+      headers: { apikey: FAKE_KEY, "content-type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
     return ((await response.json()) as { access_token: string }).access_token;
   };
   const rpc = async (token: string, name: string, body: object = {}) => {
-    const response = await fetch(`${base}/rest/v1/rpc/${name}`, { method: "POST", headers: { apikey: FAKE_KEY, authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify(body) });
+    const response = await fetch(`${base}/rest/v1/rpc/${name}`, {
+      method: "POST",
+      headers: { apikey: FAKE_KEY, authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
     expect(response.status, name).toBe(200);
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   };
 
   const browser = await chromium.launch(BROWSER);
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, colorScheme: "light", reducedMotion: "reduce" });
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 2,
+    isMobile: true,
+    hasTouch: true,
+    colorScheme: "light",
+    reducedMotion: "reduce",
+  });
   await context.route("https://www.browserbase.com/**", (route) => route.fulfill({ contentType: "text/html", body: SHOP }));
   const page = await context.newPage();
   const problems: string[] = [];
@@ -125,9 +156,18 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     await rpc(owner, "sync_cloud_flock", { p_birds: flockRows([SCOUT, PENNY]) });
 
     // A job sent from the Mac, which the runner has started and is now asking about.
-    const first = await rpc(owner, "start_cloud_job", { p_prompt: FIRST_PROMPT, p_history: [], p_mascot: mascotSnapshot(SCOUT), p_action_approval: "risky", p_context_id: "ctx-ana" });
+    const first = await rpc(owner, "start_cloud_job", {
+      p_prompt: FIRST_PROMPT,
+      p_history: [],
+      p_mascot: mascotSnapshot(SCOUT),
+      p_action_approval: "risky",
+      p_context_id: "ctx-ana",
+    });
     expect((await rpc(runner, "runner_claim_job"))[0].id).toBe(first);
-    const steps = [{ text: "Opened shop.example", done: true, kind: "open" }, { text: "Compared 14 cables by price", done: true, kind: "read" }];
+    const steps = [
+      { text: "Opened shop.example", done: true, kind: "open" },
+      { text: "Compared 14 cables by price", done: true, kind: "read" },
+    ];
     await rpc(runner, "runner_update_job", { p_job: first, p_steps: steps, p_live_view: LIVE });
     const approval = await rpc(runner, "runner_ask", { p_job: first, p_kind: "approval", p_text: ASKED });
 
@@ -171,12 +211,18 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     });
     await expect(page.getByText("Allowed. Scout carries on.")).toBeVisible();
     expect(decisions).toBe(1);
-    expect(await supabase.cloudRows(`select decision from public.cloud_approvals where id = '${approval}'`)).toEqual([{ decision: "allow" }]);
+    expect(await supabase.cloudRows(`select decision from public.cloud_approvals where id = '${approval}'`)).toEqual([
+      { decision: "allow" },
+    ]);
     expect(await rpc(runner, "runner_decision", { p_approval: approval })).toEqual([{ decision: "allow", answer: null }]);
     await expect(page.getByRole("dialog")).toHaveCount(0);
 
     // Running again, its steps as they're written, and the live page locked at the top of the job.
-    await rpc(runner, "runner_update_job", { p_job: first, p_status: "running", p_steps: [...steps, { text: "Adding it to the cart", done: false, kind: "click" }] });
+    await rpc(runner, "runner_update_job", {
+      p_job: first,
+      p_status: "running",
+      p_steps: [...steps, { text: "Adding it to the cart", done: false, kind: "click" }],
+    });
     await page.getByRole("link", { name: new RegExp(FIRST_PROMPT) }).click();
     await expect(page.getByText("Adding it to the cart")).toBeVisible();
     await expect(page.getByText("Locked while Scout works")).toBeVisible();
@@ -186,7 +232,13 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     // 5. A sign-in handed to the user: taken over full screen, where the code goes into the page, and nothing here can
     // take it. The page is the same frame all the way, never reloaded.
     const frameBefore = await page.locator("#live iframe").elementHandle();
-    const handoff = await rpc(runner, "runner_ask", { p_job: first, p_kind: "handoff", p_text: "Sign in on shop.example", p_need: "sign-in", p_site: "shop.example" });
+    const handoff = await rpc(runner, "runner_ask", {
+      p_job: first,
+      p_kind: "handoff",
+      p_text: "Sign in on shop.example",
+      p_need: "sign-in",
+      p_site: "shop.example",
+    });
     await expect(page.getByRole("dialog", { name: "Scout needs you to sign in on shop.example" })).toBeVisible();
     await page.getByRole("button", { name: "Take over" }).click();
     await expect(page.locator(".addr").getByText("It’s yours")).toBeVisible();
@@ -199,7 +251,9 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     await shoot(page, "handoff");
     await page.getByRole("button", { name: "I’m done" }).click();
     await expect(page.getByText("Scout has the page back.")).toBeVisible();
-    expect(await supabase.cloudRows(`select decision from public.cloud_approvals where id = '${handoff}'`)).toEqual([{ decision: "allow" }]);
+    expect(await supabase.cloudRows(`select decision from public.cloud_approvals where id = '${handoff}'`)).toEqual([
+      { decision: "allow" },
+    ]);
 
     // A question can be answered here, but nothing shaped like a code is sent.
     await rpc(runner, "runner_update_job", { p_job: first, p_status: "running" });
@@ -208,11 +262,15 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     await answer.fill(CODE);
     await page.getByRole("button", { name: "Answer", exact: true }).click();
     await expect(page.getByText("That looks like a code, so it wasn’t sent.")).toBeVisible();
-    expect(await supabase.cloudRows(`select decision, answer from public.cloud_approvals where id = '${question}'`)).toEqual([{ decision: null, answer: null }]);
+    expect(await supabase.cloudRows(`select decision, answer from public.cloud_approvals where id = '${question}'`)).toEqual([
+      { decision: null, answer: null },
+    ]);
     await answer.fill("Black, please");
     await page.getByRole("button", { name: "Answer", exact: true }).click();
     await expect(page.getByText("Answered. Scout carries on.")).toBeVisible();
-    expect(await supabase.cloudRows(`select decision, answer from public.cloud_approvals where id = '${question}'`)).toEqual([{ decision: "allow", answer: "Black, please" }]);
+    expect(await supabase.cloudRows(`select decision, answer from public.cloud_approvals where id = '${question}'`)).toEqual([
+      { decision: "allow", answer: "Black, please" },
+    ]);
 
     // Done, and then followed up from here: a new job in the same conversation, as the same mascot, carrying the first
     // exchange as its history.
@@ -224,8 +282,12 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     await shoot(page, "follow-up");
     await page.getByRole("button", { name: "Send", exact: true }).click();
     await expect(page.locator(".bubble")).toHaveText([FIRST_PROMPT, FOLLOW_UP]);
-    const [before] = await supabase.cloudRows(`select id, conversation_id, created_at::text, history, prompt, reply, steps from public.cloud_jobs where id = '${first}'`);
-    const [second] = await supabase.cloudRows(`select id, conversation_id, history, mascot, status from public.cloud_jobs where prompt = '${FOLLOW_UP}'`);
+    const [before] = await supabase.cloudRows(
+      `select id, conversation_id, created_at::text, history, prompt, reply, steps from public.cloud_jobs where id = '${first}'`,
+    );
+    const [second] = await supabase.cloudRows(
+      `select id, conversation_id, history, mascot, status from public.cloud_jobs where prompt = '${FOLLOW_UP}'`,
+    );
     expect(second).toMatchObject({ conversation_id: first, status: "queued" });
     expect(second.history).toEqual(followUpHistory(before as unknown as ConversationJob));
     expect(second.history).toEqual([
@@ -234,11 +296,31 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     ]);
     expect(mascotFromSnapshot(second.mascot)).toMatchObject({ id: "m-scout", sites: ["shop.example", "prices.example"] });
     // One at a time in a conversation.
-    await expect(fetch(`${base}/rest/v1/rpc/start_cloud_job`, { method: "POST", headers: { apikey: FAKE_KEY, authorization: `Bearer ${owner}`, "content-type": "application/json" }, body: JSON.stringify({ p_prompt: "Again", p_history: [], p_mascot: mascotSnapshot(SCOUT), p_action_approval: "risky", p_context_id: null, p_conversation: first, p_after_job: second.id }) }).then((response) => response.status)).resolves.toBe(409);
+    await expect(
+      fetch(`${base}/rest/v1/rpc/start_cloud_job`, {
+        method: "POST",
+        headers: { apikey: FAKE_KEY, authorization: `Bearer ${owner}`, "content-type": "application/json" },
+        body: JSON.stringify({
+          p_prompt: "Again",
+          p_history: [],
+          p_mascot: mascotSnapshot(SCOUT),
+          p_action_approval: "risky",
+          p_context_id: null,
+          p_conversation: first,
+          p_after_job: second.id,
+        }),
+      }).then((response) => response.status),
+    ).resolves.toBe(409);
 
     // The runner takes it, and the conversation reads as one chat.
     expect((await rpc(runner, "runner_claim_job"))[0].id).toBe(second.id);
-    await rpc(runner, "runner_update_job", { p_job: second.id, p_status: "done", p_steps: [{ text: "Compared 2 m cables", done: true }], p_reply: "Yes, one for **69 kr** on [the shop](https://shop.example/cable), see https://shop.example/2m. Not [this](javascript:alert(1))." });
+    await rpc(runner, "runner_update_job", {
+      p_job: second.id,
+      p_status: "done",
+      p_steps: [{ text: "Compared 2 m cables", done: true }],
+      p_reply:
+        "Yes, one for **69 kr** on [the shop](https://shop.example/cable), see https://shop.example/2m. Not [this](javascript:alert(1)).",
+    });
     await expect(page.getByText("69 kr", { exact: true })).toBeVisible();
     // Sources are links that open outside the page, a full stop isn't part of a bare address, and nothing but the web is.
     await expect(page.getByRole("link", { name: "the shop" })).toHaveAttribute("href", "https://shop.example/cable");
@@ -270,7 +352,15 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
       await route.fulfill({ response });
     });
     await page.waitForResponse(/cloud_jobs\?select=id,conversation_id,prompt/);
-    const fromMac = await rpc(owner, "start_cloud_job", { p_prompt: FROM_MAC, p_history: [], p_mascot: mascotSnapshot(SCOUT), p_action_approval: "risky", p_context_id: null, p_conversation: first, p_after_job: second.id });
+    const fromMac = await rpc(owner, "start_cloud_job", {
+      p_prompt: FROM_MAC,
+      p_history: [],
+      p_mascot: mascotSnapshot(SCOUT),
+      p_action_approval: "risky",
+      p_context_id: null,
+      p_conversation: first,
+      p_after_job: second.id,
+    });
     expect((await rpc(runner, "runner_claim_job"))[0].id).toBe(fromMac);
     await rpc(runner, "runner_update_job", { p_job: fromMac, p_status: "done", p_reply: "Yes, 12 left." });
     await page.waitForResponse(/cloud_jobs\?select=id,conversation_id,prompt/);
@@ -283,10 +373,17 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     expect(problems.splice(0)).toEqual(["Failed to load resource: the server responded with a status of 409 (Conflict)"]);
     const [third] = await supabase.cloudRows(`select conversation_id, history from public.cloud_jobs where prompt = '${THIRD}'`);
     expect(third.conversation_id).toBe(first);
-    expect((third.history as unknown[]).slice(-2)).toEqual([{ role: "user", content: FROM_MAC }, { role: "assistant", content: "Yes, 12 left." }]);
+    expect((third.history as unknown[]).slice(-2)).toEqual([
+      { role: "user", content: FROM_MAC },
+      { role: "assistant", content: "Yes, 12 left." },
+    ]);
     await page.unrouteAll();
     expect((await rpc(runner, "runner_claim_job"))[0].prompt).toBe(THIRD);
-    await rpc(runner, "runner_update_job", { p_job: (await supabase.cloudRows(`select id from public.cloud_jobs where prompt = '${THIRD}'`))[0].id, p_status: "done", p_reply: "Ordered." });
+    await rpc(runner, "runner_update_job", {
+      p_job: (await supabase.cloudRows(`select id from public.cloud_jobs where prompt = '${THIRD}'`))[0].id,
+      p_status: "done",
+      p_reply: "Ordered.",
+    });
     await expect(page.getByText("Ordered.", { exact: true })).toBeVisible();
     await page.getByRole("link", { name: "Back to home" }).click();
     await expect(page.locator("a.row")).toHaveCount(1);
@@ -309,13 +406,20 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     await shoot(page, "start");
     await start.getByRole("button", { name: "Send", exact: true }).click();
     await expect(page.locator(".bubble")).toHaveText("What changed on news.example today?");
-    const [sent] = await supabase.cloudRows("select mascot, context_id, status from public.cloud_jobs where prompt = 'What changed on news.example today?'");
+    const [sent] = await supabase.cloudRows(
+      "select mascot, context_id, status from public.cloud_jobs where prompt = 'What changed on news.example today?'",
+    );
     expect(sent).toMatchObject({ context_id: "ctx-ana", status: "queued" });
     expect(mascotFromSnapshot(sent.mascot)).toMatchObject({ id: "m-penny", sites: ["news.example"], tools: ["visit"] });
 
     // Stop it from here.
     await page.getByRole("button", { name: "Stop" }).click();
-    await expect.poll(async () => (await supabase.cloudRows("select status from public.cloud_jobs where prompt = 'What changed on news.example today?'"))[0].status).toBe("stopped");
+    await expect
+      .poll(
+        async () =>
+          (await supabase.cloudRows("select status from public.cloud_jobs where prompt = 'What changed on news.example today?'"))[0].status,
+      )
+      .toBe("stopped");
 
     // Settings: the look, notifications, the cloud and the account. A choice of Dark holds over the system's light, after
     // a reload.

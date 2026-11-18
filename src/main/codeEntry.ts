@@ -1,6 +1,15 @@
 import type { Tab } from "./Tab";
 import { chooseCodeField, type CodeField, type CodeTarget } from "./phoneReplies";
-import { clearCodeFields, codeFieldFocus, codeFieldsChanged, codeFieldsFilled, focusCodeField, listCodeFields, pressCodeSubmit, watchCodeSubmit } from "./pageScripts";
+import {
+  clearCodeFields,
+  codeFieldFocus,
+  codeFieldsChanged,
+  codeFieldsFilled,
+  focusCodeField,
+  listCodeFields,
+  pressCodeSubmit,
+  watchCodeSubmit,
+} from "./pageScripts";
 import { pause, pressKey } from "./pageInput";
 
 // Types a code from the user's phone into a tab they've been handed. Nothing the model can call leads here, and this
@@ -12,7 +21,12 @@ const AFTER_ENTER_MS = 300;
 
 export type EntryResult = "entered" | "no-field" | "interrupted";
 
-export const enterCodeInTab = async (tab: Tab, code: string, stillOurs: () => boolean, userIsThere: () => boolean): Promise<EntryResult> => {
+export const enterCodeInTab = async (
+  tab: Tab,
+  code: string,
+  stillOurs: () => boolean,
+  userIsThere: () => boolean,
+): Promise<EntryResult> => {
   const keys = { sendAgentInput: (event: Parameters<Tab["sendInputWhileHeld"]>[0]) => tab.sendInputWhileHeld(event) };
   const run = <T>(script: string) => tab.runInPageWhileHeld<T>(script);
   const { fields, hasPasswordField } = await run<{ fields: CodeField[]; hasPasswordField: boolean }>(listCodeFields);
@@ -35,7 +49,8 @@ export const enterCodeInTab = async (tab: Tab, code: string, stillOurs: () => bo
       const box = target.kind === "one" ? indexes[0] : indexes[at];
       // A row of boxes usually moves along by itself. If not, or a page took the focus anywhere else, it's put right
       // first, because a real key goes wherever the focus is.
-      if ((await run<number>(codeFieldFocus)) !== box && !(await run<boolean>(focusCodeField(box, target.kind === "boxes")))) throw new Error("The focus moved");
+      if ((await run<number>(codeFieldFocus)) !== box && !(await run<boolean>(focusCodeField(box, target.kind === "boxes"))))
+        throw new Error("The focus moved");
       await pressKey(keys, character, false);
     }
     if (!(await run<boolean>(codeFieldsFilled(indexes, code.length)))) throw new Error("The field didn't take it");

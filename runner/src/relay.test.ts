@@ -31,37 +31,77 @@ const pkce = () => {
 
 const asOwner = async (name: string, body: object) => {
   const { url, key } = { url: supabase.env.SUPABASE_URL, key: supabase.env.SUPABASE_PUBLISHABLE_KEY };
-  const session = await (await fetch(`${url}/auth/v1/token?grant_type=password`, { method: "POST", headers: { apikey: key, "content-type": "application/json" }, body: JSON.stringify({ email: OWNER, password: PASSWORD }) })).json();
-  const response = await fetch(`${url}/rest/v1/rpc/${name}`, { method: "POST", headers: { apikey: key, authorization: `Bearer ${session.access_token}`, "content-type": "application/json" }, body: JSON.stringify(body) });
+  const session = await (
+    await fetch(`${url}/auth/v1/token?grant_type=password`, {
+      method: "POST",
+      headers: { apikey: key, "content-type": "application/json" },
+      body: JSON.stringify({ email: OWNER, password: PASSWORD }),
+    })
+  ).json();
+  const response = await fetch(`${url}/rest/v1/rpc/${name}`, {
+    method: "POST",
+    headers: { apikey: key, authorization: `Bearer ${session.access_token}`, "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
   return response.json();
 };
 
 const register = async (redirect = REDIRECT) =>
-  fetch(`${origin}/register`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ redirect_uris: [redirect], token_endpoint_auth_method: "none", client_name: "Test" }) });
+  fetch(`${origin}/register`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ redirect_uris: [redirect], token_endpoint_auth_method: "none", client_name: "Test" }),
+  });
 
 // Opens the sign-in page for an authorize address, as a browser would, and sends the form.
 const signInAt = async (authorizeUrl: string, email: string, password = PASSWORD) => {
   const page = await (await fetch(authorizeUrl)).text();
   const request = /name="request" value="([^"]+)"/.exec(page)?.[1];
   if (!request) throw new Error(`No form: ${page.slice(0, 200)}`);
-  return fetch(`${origin}/sign-in`, { method: "POST", redirect: "manual", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ request, email, password }) });
+  return fetch(`${origin}/sign-in`, {
+    method: "POST",
+    redirect: "manual",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ request, email, password }),
+  });
 };
 
 const authorizeUrl = (clientId: string, challenge: string) =>
   `${origin}/authorize?${new URLSearchParams({ response_type: "code", client_id: clientId, redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: "S256", state: "xyz", resource: `${origin}/mcp` })}`;
 
 const token = (body: Record<string, string>) =>
-  fetch(`${origin}/token`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams(body) });
+  fetch(`${origin}/token`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(body),
+  });
 
 beforeAll(async () => {
   supabase = await startFakeSupabase({ cloudJobs: true });
   for (const email of [OWNER, RUNNER, STRANGER]) await supabase.addAccount(email, PASSWORD);
-  const config: DbConfig = { url: supabase.env.SUPABASE_URL, key: supabase.env.SUPABASE_PUBLISHABLE_KEY, email: RUNNER, password: PASSWORD, owner: OWNER };
+  const config: DbConfig = {
+    url: supabase.env.SUPABASE_URL,
+    key: supabase.env.SUPABASE_PUBLISHABLE_KEY,
+    email: RUNNER,
+    password: PASSWORD,
+    owner: OWNER,
+  };
   expect(await asOwner("link_cloud_runner", { p_email: RUNNER })).toBe(true);
   runnerDb = supabaseDb(config, runnerSession(config));
   expect(await runnerDb.accept()).toBe(true);
   await asOwner("sync_cloud_flock", {
-    p_birds: [{ id: "scout", name: "Scout", palette: "robin", accessory: "none", instructions: "Finds prices.", sites: ["shop.example"], tools: ["visit", "click"], from_gallery: false }],
+    p_birds: [
+      {
+        id: "scout",
+        name: "Scout",
+        palette: "robin",
+        accessory: "none",
+        instructions: "Finds prices.",
+        sites: ["shop.example"],
+        tools: ["visit", "click"],
+        from_gallery: false,
+      },
+    ],
   });
   server = createServer();
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -82,7 +122,11 @@ describe("relayConfig", () => {
     expect(relayConfig({ RELAY_PUBLIC_URL: "https://a.example" })).toMatch(/both/);
     expect(relayConfig({ RELAY_PUBLIC_URL: "http://a.example", RELAY_SECRET: "x".repeat(40) })).toMatch(/https/);
     expect(relayConfig({ RELAY_PUBLIC_URL: "https://a.example/mcp", RELAY_SECRET: "short" })).toMatch(/32/);
-    expect(relayConfig({ RELAY_PUBLIC_URL: "https://a.example/mcp", RELAY_SECRET: "x".repeat(40), PORT: "3000" })).toEqual({ origin: "https://a.example", secret: "x".repeat(40), port: 3000 });
+    expect(relayConfig({ RELAY_PUBLIC_URL: "https://a.example/mcp", RELAY_SECRET: "x".repeat(40), PORT: "3000" })).toEqual({
+      origin: "https://a.example",
+      secret: "x".repeat(40),
+      port: 3000,
+    });
   });
 });
 
@@ -93,7 +137,9 @@ describe("startRelay", () => {
     const port = (taken.address() as AddressInfo).port;
     const config = { origin: "https://relay.example", secret: "x".repeat(40), port };
     try {
-      await expect(startRelay(config, { url: supabase.env.SUPABASE_URL, key: supabase.env.SUPABASE_PUBLISHABLE_KEY, owner: OWNER }, runnerDb)).rejects.toThrow(/EADDRINUSE/);
+      await expect(
+        startRelay(config, { url: supabase.env.SUPABASE_URL, key: supabase.env.SUPABASE_PUBLISHABLE_KEY, owner: OWNER }, runnerDb),
+      ).rejects.toThrow(/EADDRINUSE/);
     } finally {
       taken.close();
     }
@@ -121,26 +167,52 @@ describe("OAuth", () => {
     expect(back.searchParams.get("state")).toBe("xyz");
     const code = back.searchParams.get("code")!;
 
-    const wrong = await token({ grant_type: "authorization_code", client_id: client.client_id, code, code_verifier: pkce().verifier, redirect_uri: REDIRECT });
+    const wrong = await token({
+      grant_type: "authorization_code",
+      client_id: client.client_id,
+      code,
+      code_verifier: pkce().verifier,
+      redirect_uri: REDIRECT,
+    });
     expect(wrong.status).toBe(400);
     expect((await wrong.json()).error).toBe("invalid_grant");
 
-    const tokens = await (await token({ grant_type: "authorization_code", client_id: client.client_id, code, code_verifier: verifier, redirect_uri: REDIRECT })).json();
+    const tokens = await (
+      await token({ grant_type: "authorization_code", client_id: client.client_id, code, code_verifier: verifier, redirect_uri: REDIRECT })
+    ).json();
     expect(tokens).toMatchObject({ token_type: "bearer", expires_in: 3600 });
     expect(tokens.access_token).toMatch(/^bb_at_/);
     // Nothing of Supabase's goes out.
     expect(JSON.stringify(tokens)).not.toMatch(/access-|refresh-/);
     // A code works once.
-    expect((await token({ grant_type: "authorization_code", client_id: client.client_id, code, code_verifier: verifier, redirect_uri: REDIRECT })).status).toBe(400);
+    expect(
+      (
+        await token({
+          grant_type: "authorization_code",
+          client_id: client.client_id,
+          code,
+          code_verifier: verifier,
+          redirect_uri: REDIRECT,
+        })
+      ).status,
+    ).toBe(400);
 
-    const refreshed = await (await token({ grant_type: "refresh_token", client_id: client.client_id, refresh_token: tokens.refresh_token })).json();
+    const refreshed = await (
+      await token({ grant_type: "refresh_token", client_id: client.client_id, refresh_token: tokens.refresh_token })
+    ).json();
     expect(refreshed.access_token).toMatch(/^bb_at_/);
     expect(refreshed.access_token).not.toBe(tokens.access_token);
     // The old refresh token coming back ends the whole connection, the new one with it.
-    expect((await token({ grant_type: "refresh_token", client_id: client.client_id, refresh_token: tokens.refresh_token })).status).toBe(400);
-    expect((await token({ grant_type: "refresh_token", client_id: client.client_id, refresh_token: refreshed.refresh_token })).status).toBe(400);
+    expect((await token({ grant_type: "refresh_token", client_id: client.client_id, refresh_token: tokens.refresh_token })).status).toBe(
+      400,
+    );
+    expect((await token({ grant_type: "refresh_token", client_id: client.client_id, refresh_token: refreshed.refresh_token })).status).toBe(
+      400,
+    );
     // And its grant is revoked in the database, not only forgotten here.
-    expect(await supabase.cloudRows("select count(*)::int as n from public.cloud_relay_grants where revoked_at is null")).toEqual([{ n: 0 }]);
+    expect(await supabase.cloudRows("select count(*)::int as n from public.cloud_relay_grants where revoked_at is null")).toEqual([
+      { n: 0 },
+    ]);
   });
 
   it("refuses any account but the owner's, without sending its password anywhere", async () => {
@@ -173,7 +245,13 @@ const connect = async () => {
   let code: string | null = null;
   const provider: OAuthClientProvider = {
     redirectUrl: REDIRECT,
-    clientMetadata: { redirect_uris: [REDIRECT], token_endpoint_auth_method: "none", client_name: "SDK test", grant_types: ["authorization_code", "refresh_token"], response_types: ["code"] },
+    clientMetadata: {
+      redirect_uris: [REDIRECT],
+      token_endpoint_auth_method: "none",
+      client_name: "SDK test",
+      grant_types: ["authorization_code", "refresh_token"],
+      response_types: ["code"],
+    },
     clientInformation: () => saved,
     saveClientInformation: (info) => void (saved = info),
     tokens: () => tokens,
@@ -227,9 +305,16 @@ describe("the MCP endpoint", () => {
   });
 
   it("starts a job as the user, which the runner takes like any other, and can't answer what it asks", async () => {
-    const started = dataOf(await client.callTool({ name: "start_job", arguments: { task: "Find the price of tea", agent: "Scout", sites: ["tea.shop.example"] } }));
+    const started = dataOf(
+      await client.callTool({
+        name: "start_job",
+        arguments: { task: "Find the price of tea", agent: "Scout", sites: ["tea.shop.example"] },
+      }),
+    );
     expect(started.status).toBe("queued");
-    const [row] = await supabase.cloudRows(`select j.prompt, j.mascot, j.action_approval, j.conversation_id::text, u.email from public.cloud_jobs j join auth.users u on u.id = j.owner where j.id = '${started.jobId}'`);
+    const [row] = await supabase.cloudRows(
+      `select j.prompt, j.mascot, j.action_approval, j.conversation_id::text, u.email from public.cloud_jobs j join auth.users u on u.id = j.owner where j.id = '${started.jobId}'`,
+    );
     expect(row).toMatchObject({ prompt: "Find the price of tea", action_approval: "risky", email: OWNER, conversation_id: started.jobId });
     expect(row.mascot).toMatchObject({ id: "scout", sites: ["tea.shop.example"] });
 
@@ -239,11 +324,20 @@ describe("the MCP endpoint", () => {
     await runnerDb.ask(started.jobId, { kind: "question", text: "Which size?", need: null, site: null });
     const waiting = await client.callTool({ name: "get_job", arguments: { jobId: started.jobId } });
     expect(textOf(waiting)).toMatch(/^Titles, addresses, page text/);
-    expect(dataOf(waiting)).toMatchObject({ status: "waiting_for_user", steps: ["Opened tea.shop.example"], waitingFor: { kind: "question", question: "Which size?" } });
+    expect(dataOf(waiting)).toMatchObject({
+      status: "waiting_for_user",
+      steps: ["Opened tea.shop.example"],
+      waitingFor: { kind: "question", question: "Which size?" },
+    });
 
     await runnerDb.update(started.jobId, { status: "done", reply: "It's £4." });
-    expect(dataOf(await client.callTool({ name: "get_job", arguments: { jobId: started.jobId } }))).toMatchObject({ status: "done", reply: "It's £4." });
-    expect(dataOf(await client.callTool({ name: "list_jobs", arguments: {} }))).toEqual([{ jobId: started.jobId, where: "cloud", status: "done" }]);
+    expect(dataOf(await client.callTool({ name: "get_job", arguments: { jobId: started.jobId } }))).toMatchObject({
+      status: "done",
+      reply: "It's £4.",
+    });
+    expect(dataOf(await client.callTool({ name: "list_jobs", arguments: {} }))).toEqual([
+      { jobId: started.jobId, where: "cloud", status: "done" },
+    ]);
 
     // Nothing from the relay ever decided anything, and after sign-in nothing went as the owner.
     expect(supabase.received.some(({ path }) => path.includes("decide_cloud_approval"))).toBe(false);
@@ -282,10 +376,18 @@ describe("the MCP endpoint", () => {
     const [claimed] = await asOwner("mac_claim_job", {});
     expect(claimed.id).toBe(onMac.jobId);
     await asOwner("mac_update_job", { p_job: onMac.jobId, p_status: "waiting", p_steps: [{ text: "Opened the shop", done: true }] });
-    expect(dataOf(await client.callTool({ name: "get_job", arguments: { jobId: onMac.jobId } }))).toMatchObject({ where: "mac", status: "waiting_for_user", steps: ["Opened the shop"], waitingFor: { kind: "user_on_mac" } });
+    expect(dataOf(await client.callTool({ name: "get_job", arguments: { jobId: onMac.jobId } }))).toMatchObject({
+      where: "mac",
+      status: "waiting_for_user",
+      steps: ["Opened the shop"],
+      waitingFor: { kind: "user_on_mac" },
+    });
     expect(dataOf(await client.callTool({ name: "stop_job", arguments: { jobId: onMac.jobId } })).status).toBe("stopping");
     expect(await asOwner("mac_update_job", { p_job: onMac.jobId, p_status: "stopped", p_reply: "Stopped" })).toBe(true);
-    expect(dataOf(await client.callTool({ name: "get_job", arguments: { jobId: onMac.jobId } }))).toMatchObject({ status: "stopped", reply: "Stopped" });
+    expect(dataOf(await client.callTool({ name: "get_job", arguments: { jobId: onMac.jobId } }))).toMatchObject({
+      status: "stopped",
+      reply: "Stopped",
+    });
     expect(await asOwner("mac_presence", { p_on: false })).toBe(false);
   });
 

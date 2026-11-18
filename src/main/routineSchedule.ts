@@ -68,8 +68,7 @@ export const scheduleLabel = (schedule: RoutineSchedule): string => {
   }
 };
 
-const isTime = (value: unknown): value is string =>
-  typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+const isTime = (value: unknown): value is string => typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 
 const isWhole = (value: unknown, min: number, max: number): value is number =>
   Number.isInteger(value) && (value as number) >= min && (value as number) <= max;
@@ -97,7 +96,11 @@ export const parseSchedule = (input: unknown): RoutineSchedule | null => {
 // with no model. Its first line, cut at a word.
 const MAX_WORDS_NAME = 40;
 export const nameFromWords = (instructions: string): string => {
-  const line = instructions.trim().split("\n")[0].trim().replace(/[.:;,!?]+$/, "");
+  const line = instructions
+    .trim()
+    .split("\n")[0]
+    .trim()
+    .replace(/[.:;,!?]+$/, "");
   if (line.length <= MAX_WORDS_NAME) return line;
   const cut = line.slice(0, MAX_WORDS_NAME);
   // A word that ends right at the limit is whole.
@@ -127,5 +130,14 @@ export const parseDraft = (input: unknown): { draft: RoutineDraft } | { error: s
   if (cleanSites.length > MAX_SITES) return { error: `Keep it to ${MAX_SITES} sites.` };
   // Only a scheduled routine has anything for the cloud to run.
   const inCloud = (input as { inCloud?: unknown } | null)?.inCloud === true && schedule.kind !== "manual";
-  return { draft: { name: cleanName, instructions: cleanInstructions, schedule, sites: cleanSites, ...(typeof mascotId === "string" ? { mascotId } : {}), ...(inCloud ? { inCloud } : {}) } };
+  return {
+    draft: {
+      name: cleanName,
+      instructions: cleanInstructions,
+      schedule,
+      sites: cleanSites,
+      ...(typeof mascotId === "string" ? { mascotId } : {}),
+      ...(inCloud ? { inCloud } : {}),
+    },
+  };
 };

@@ -6,7 +6,13 @@ import { MascotStore } from "./MascotStore";
 import { BERRY, BERRY_ID } from "../shared/mascots";
 
 const file = () => join(mkdtempSync(join(tmpdir(), "blueberry-mascots-")), "mascots.json");
-const draft = { name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "Read things.", sites: ["https://www.GitHub.com/x"], tools: ["visit"] };
+const draft = {
+  name: "Scout",
+  look: { palette: "robin", accessory: "cap" },
+  instructions: "Read things.",
+  sites: ["https://www.GitHub.com/x"],
+  tools: ["visit"],
+};
 
 describe("MascotStore", () => {
   it("always has Berry, which can't be changed or deleted", () => {
@@ -36,7 +42,13 @@ describe("MascotStore", () => {
     const [mascot] = new MascotStore(path).all().slice(1);
     expect(mascot).toEqual({ ...draft, sites: ["github.com"], id: saved.id, deletedAt: null });
 
-    writeFileSync(path, JSON.stringify([{ ...draft, id: BERRY_ID }, { ...draft, id: "bad", sites: ["not a site"] }]));
+    writeFileSync(
+      path,
+      JSON.stringify([
+        { ...draft, id: BERRY_ID },
+        { ...draft, id: "bad", sites: ["not a site"] },
+      ]),
+    );
     expect(new MascotStore(path).all()).toEqual([BERRY]);
   });
 
@@ -77,7 +89,14 @@ describe("MascotStore", () => {
     expect(store.addFromGallery("a", { ...draft, sites: ["com"] }).ok).toBe(false);
     expect(store.addFromGallery("a", { ...draft, instructions: "x".repeat(2001) }).ok).toBe(false);
 
-    const added = store.addFromGallery("a", { ...draft, id: BERRY_ID, deletedAt: 1, galleryId: "b", skipApprovals: true, tools: ["visit", "everything"] });
+    const added = store.addFromGallery("a", {
+      ...draft,
+      id: BERRY_ID,
+      deletedAt: 1,
+      galleryId: "b",
+      skipApprovals: true,
+      tools: ["visit", "everything"],
+    });
     if (!added.ok) throw new Error(added.error);
     expect(store.find(added.id)).toEqual({ ...draft, sites: ["github.com"], id: added.id, deletedAt: null, galleryId: "a" });
     expect(store.addFromGallery("b", draft)).toMatchObject({ ok: false, error: expect.stringContaining("already have a Scout") });

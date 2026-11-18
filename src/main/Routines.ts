@@ -19,7 +19,13 @@ const START_DELAY_MS = 5_000;
 const MAX_RESULT_PREVIEW = 80;
 
 export interface RoutineRunner {
-  runTask: (id: string, message: string, onProgress: (progress: TaskProgress) => void, mascotId?: string | null, sites?: string[]) => Promise<TaskResult>;
+  runTask: (
+    id: string,
+    message: string,
+    onProgress: (progress: TaskProgress) => void,
+    mascotId?: string | null,
+    sites?: string[],
+  ) => Promise<TaskResult>;
   stop: (id: string) => void;
 }
 
@@ -47,7 +53,10 @@ interface ActiveRun {
 const prompt = (routine: StoredRoutine, now: number): string => routinePrompt(routine, `at ${new Date(now).toString()}`);
 
 // What a run is told. A run in the cloud is written before it's due, so it says where rather than when.
-export const routinePrompt = ({ name, instructions, sites }: Pick<StoredRoutine, "name" | "instructions" | "sites">, when: string): string =>
+export const routinePrompt = (
+  { name, instructions, sites }: Pick<StoredRoutine, "name" | "instructions" | "sites">,
+  when: string,
+): string =>
   `This is a routine the user set up earlier, running by itself ${when}. ` +
   "Nobody is watching right now, so don't ask questions in words: anything you need from the user goes through ask_user or hand_to_user, which wait for them. Do what it says in your own tabs, " +
   "then end with a short report of what you found and did, and anything you couldn't do.\n\n" +
@@ -56,9 +65,7 @@ export const routinePrompt = ({ name, instructions, sites }: Pick<StoredRoutine,
 
 const dayOf = (at: number, now: number): string => {
   const date = new Date(at);
-  const days = Math.round(
-    (new Date(now).setHours(0, 0, 0, 0) - new Date(at).setHours(0, 0, 0, 0)) / 86_400_000
-  );
+  const days = Math.round((new Date(now).setHours(0, 0, 0, 0) - new Date(at).setHours(0, 0, 0, 0)) / 86_400_000);
   if (days === 0) return "Today";
   if (days === 1) return "Yesterday";
   return date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
@@ -101,7 +108,7 @@ export class Routines {
   constructor(
     private readonly store: RoutineStore,
     private readonly runner: RoutineRunner,
-    private readonly events: RoutineEvents
+    private readonly events: RoutineEvents,
   ) {}
 
   start(): void {
@@ -243,22 +250,28 @@ export class Routines {
   // The routines that run in the cloud, as rows for it. Each bird's limits are narrowed by the routine's own sites. The
   // first time is only when this would run it next, which the server takes for a new or changed one. Null when the saved
   // routines couldn't be read, so the cloud's are left as they are rather than taken for deleted.
-  cloudRows(mascotOf: (id: string | null) => MascotProfile, { actionApproval, contextId, timeZone }: { actionApproval: ActionApproval; contextId: string | null; timeZone: string }): CloudRoutineRow[] | null {
+  cloudRows(
+    mascotOf: (id: string | null) => MascotProfile,
+    { actionApproval, contextId, timeZone }: { actionApproval: ActionApproval; contextId: string | null; timeZone: string },
+  ): CloudRoutineRow[] | null {
     if (this.store.recovered) return null;
-    return this.store.routines().filter(({ inCloud }) => inCloud).map((routine) => {
-      const mascot = mascotOf(routine.mascotId);
-      return {
-        key: routine.id,
-        prompt: routinePrompt(routine, "in the cloud, maybe with the user's computer off"),
-        mascot: mascotSnapshot({ ...mascot, sites: narrowSites(mascot.sites, routine.sites) }),
-        actionApproval,
-        contextId,
-        schedule: routine.schedule,
-        timeZone,
-        paused: routine.paused,
-        firstRunAt: this.cloudNext(routine, Date.now()),
-      };
-    });
+    return this.store
+      .routines()
+      .filter(({ inCloud }) => inCloud)
+      .map((routine) => {
+        const mascot = mascotOf(routine.mascotId);
+        return {
+          key: routine.id,
+          prompt: routinePrompt(routine, "in the cloud, maybe with the user's computer off"),
+          mascot: mascotSnapshot({ ...mascot, sites: narrowSites(mascot.sites, routine.sites) }),
+          actionApproval,
+          contextId,
+          schedule: routine.schedule,
+          timeZone,
+          paused: routine.paused,
+          firstRunAt: this.cloudNext(routine, Date.now()),
+        };
+      });
   }
 
   private cloudNote({ id, inCloud }: StoredRoutine): string | null {
@@ -285,7 +298,9 @@ export class Routines {
   // As the Routines page shows them, with what a running one says it's doing. That line is for the screen only.
   runsShown(routineId: string): RoutineRun[] {
     const active = this.active.get(routineId);
-    return this.runs(routineId).map((run) => (run.id === active?.runId && active.statusLine ? { ...run, statusLine: active.statusLine } : run));
+    return this.runs(routineId).map((run) =>
+      run.id === active?.runId && active.statusLine ? { ...run, statusLine: active.statusLine } : run,
+    );
   }
 
   save(id: string | null, input: unknown): { ok: true; id: string } | { ok: false; error: string } {
@@ -298,7 +313,8 @@ export class Routines {
 
     // A changed time counts from now. Anything else leaves a time that's already set alone. One coming back from the
     // cloud counts from now too, since its time here was never moved on.
-    const sameSchedule = JSON.stringify(existing?.schedule) === JSON.stringify(draft.schedule) && existing?.inCloud === (draft.inCloud === true);
+    const sameSchedule =
+      JSON.stringify(existing?.schedule) === JSON.stringify(draft.schedule) && existing?.inCloud === (draft.inCloud === true);
     const next = nextRun(draft.schedule, now);
     if (draft.schedule.kind === "once" && next === null && !sameSchedule) {
       return { ok: false, error: "Choose a time that hasn’t passed." };

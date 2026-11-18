@@ -59,7 +59,9 @@ describe("firstLine", () => {
 
   it("doesn't end a sentence early or leave markup behind", () => {
     expect(firstLine("Use e.g. the red one, which costs 2.50. Then stop.")).toBe("Use e.g. the red one, which costs 2.50.");
-    expect(firstLine("See `snake_case` and __this__ on https://www.example.com/a/b?c=d today")).toBe("See snake_case and this on example.com today");
+    expect(firstLine("See `snake_case` and __this__ on https://www.example.com/a/b?c=d today")).toBe(
+      "See snake_case and this on example.com today",
+    );
     expect(firstLine("*One* thing<br>and **two**")).toBe("One thing and two");
     expect(firstLine("~~Old~~ price")).toBe("Old price");
   });
@@ -79,19 +81,33 @@ describe("readingTime", () => {
 });
 
 describe("desktopDrop", () => {
-  const working = (chatId: string, mascotId = SCOUT.id, title = "Flights"): DesktopRunning => ({ chatId, routineId: null, mascotId, title, since: 1000 });
+  const working = (chatId: string, mascotId = SCOUT.id, title = "Flights"): DesktopRunning => ({
+    chatId,
+    routineId: null,
+    mascotId,
+    title,
+    since: 1000,
+  });
   const result = (chatId: string, mascotId = BERRY.id, failed = false) => ({ chatId, mascotId, text: `Reply from ${chatId}.`, failed });
   const drop = (over: Partial<DesktopFacts>, how: Partial<{ pointed: boolean; announcing: string | null; shortcut: boolean }> = {}) =>
     desktopDrop(facts(over), { pointed: false, announcing: null, shortcut: true, ...how });
 
   it("rests small as whoever the next job goes to, and says nothing until pointed at", () => {
-    expect(drop({ chosen: SCOUT })).toEqual({ faces: [{ name: "Scout", look: SCOUT.look, mood: "rest" }], working: false, says: { kind: "rest" } });
+    expect(drop({ chosen: SCOUT })).toEqual({
+      faces: [{ name: "Scout", look: SCOUT.look, mood: "rest" }],
+      working: false,
+      says: { kind: "rest" },
+    });
     expect(drop({ chosen: SCOUT }, { pointed: true }).says).toEqual({ kind: "job", shortcut: true });
     expect(drop({}, { pointed: true, shortcut: false }).says).toEqual({ kind: "job", shortcut: false });
   });
 
   it("works with its pips and says nothing more by itself, and pointed at, only the job's name and how long", () => {
-    expect(drop({ running: [working("c")] })).toMatchObject({ faces: [{ name: "Scout", mood: "fetching" }], working: true, says: { kind: "rest" } });
+    expect(drop({ running: [working("c")] })).toMatchObject({
+      faces: [{ name: "Scout", mood: "fetching" }],
+      working: true,
+      says: { kind: "rest" },
+    });
     expect(drop({ running: [working("c")] }, { pointed: true }).says).toEqual({ kind: "working", title: "Flights", since: 1000 });
   });
 
@@ -112,7 +128,9 @@ describe("desktopDrop", () => {
     expect(view.faces.map(({ mood }) => mood)).toEqual(["asking"]);
     expect(view.working).toBe(false);
     const routine = { ...asking("y"), id: "run-1", routineId: "routine-1" } as NeedsYouItem;
-    expect(drop({ needsYou: [routine], running: [{ chatId: null, routineId: "routine-1", mascotId: SCOUT.id, title: "Morning" }] }).faces).toHaveLength(1);
+    expect(
+      drop({ needsYou: [routine], running: [{ chatId: null, routineId: "routine-1", mascotId: SCOUT.id, title: "Morning" }] }).faces,
+    ).toHaveLength(1);
     expect(desktopTray(facts({ needsYou: [waiting], running: [working(waiting.id)] }), [SCOUT], () => "k").working).toEqual([]);
   });
 
@@ -147,19 +165,28 @@ describe("desktopTray", () => {
     const tray = desktopTray(
       facts({
         needsYou: [{ ...asking("approval-1"), id: "chat-1", askedAt: 5 }],
-        running: [{ chatId: "chat-2", routineId: null, mascotId: BERRY.id, title: "Flights", step: "Read klm.com", since: 9 }, { chatId: null, routineId: "routine-1", mascotId: BERRY.id, title: "Morning" }],
+        running: [
+          { chatId: "chat-2", routineId: null, mascotId: BERRY.id, title: "Flights", step: "Read klm.com", since: 9 },
+          { chatId: null, routineId: "routine-1", mascotId: BERRY.id, title: "Morning" },
+        ],
         finishedToday: [
           { chatId: "chat-3", mascotId: BERRY.id, title: "Older", problem: null, endedAt: 1 },
           { chatId: "chat-4", mascotId: SCOUT.id, title: "Newer", problem: "A site didn’t load", endedAt: 2 },
         ],
       }),
       [BERRY, SCOUT],
-      keyFor
+      keyFor,
     );
     expect(JSON.stringify(tray)).not.toMatch(/chat-\d|approval-1|routine-1/);
     expect(tray.asks).toEqual([{ name: "Scout", look: SCOUT.look, mood: "asking", key: "k1", words: "Scout needs your OK", since: 5 }]);
-    expect(tray.working.map(({ title, step }) => [title, step])).toEqual([["Flights", "Read klm.com"], ["Morning", null]]);
-    expect(tray.finished.map(({ title, mood }) => [title, mood])).toEqual([["Newer", "oops"], ["Older", "delivered"]]);
+    expect(tray.working.map(({ title, step }) => [title, step])).toEqual([
+      ["Flights", "Read klm.com"],
+      ["Morning", null],
+    ]);
+    expect(tray.finished.map(({ title, mood }) => [title, mood])).toEqual([
+      ["Newer", "oops"],
+      ["Older", "delivered"],
+    ]);
     expect(keys).toEqual([
       { kind: "ask", chatId: "chat-1", approvalId: "approval-1" },
       { kind: "open", target: { page: "chat", chatId: "chat-2" } },
@@ -176,10 +203,31 @@ describe("desktopTray", () => {
 
 describe("desktopAsk", () => {
   it("shows the exact words in full, and a handoff's site, only once it's asked for", () => {
-    const item = { ...asking("x", { text: "Click the button “Place order” on https://shop.example/cart" }), job: "Find a cable" } as NeedsYouItem;
-    expect(desktopAsk(item, { name: "Scout", look: SCOUT.look, mood: "asking" })).toMatchObject({ kind: "approval", text: "Click the button “Place order” on https://shop.example/cart", answers: [], handoff: null, job: "Find a cable" });
-    expect(desktopAsk(asking("x", { question: true, text: "Which size?", answers: ["S", "M"] }), { name: "Scout", look: SCOUT.look, mood: "asking" })).toMatchObject({ kind: "question", answers: ["S", "M"] });
-    expect(desktopAsk(asking("x", { handoff: { need: "code", tabId: "t", site: "bank.example" } }), { name: "Scout", look: SCOUT.look, mood: "asking" })).toMatchObject({ kind: "handoff", handoff: { need: "code", site: "bank.example" } });
+    const item = {
+      ...asking("x", { text: "Click the button “Place order” on https://shop.example/cart" }),
+      job: "Find a cable",
+    } as NeedsYouItem;
+    expect(desktopAsk(item, { name: "Scout", look: SCOUT.look, mood: "asking" })).toMatchObject({
+      kind: "approval",
+      text: "Click the button “Place order” on https://shop.example/cart",
+      answers: [],
+      handoff: null,
+      job: "Find a cable",
+    });
+    expect(
+      desktopAsk(asking("x", { question: true, text: "Which size?", answers: ["S", "M"] }), {
+        name: "Scout",
+        look: SCOUT.look,
+        mood: "asking",
+      }),
+    ).toMatchObject({ kind: "question", answers: ["S", "M"] });
+    expect(
+      desktopAsk(asking("x", { handoff: { need: "code", tabId: "t", site: "bank.example" } }), {
+        name: "Scout",
+        look: SCOUT.look,
+        mood: "asking",
+      }),
+    ).toMatchObject({ kind: "handoff", handoff: { need: "code", site: "bank.example" } });
   });
 });
 
@@ -194,12 +242,32 @@ describe("checkDecision", () => {
   });
 
   it("sends a decision to the ask that was shown, and only that one", () => {
-    expect(checkDecision(shown(approval), [approval], { key: "k1", allow: true })).toEqual({ ok: true, chatId: "chat", approvalId: "a1", allow: true });
-    expect(checkDecision(shown(approval), [approval], { key: "k1", allow: false })).toEqual({ ok: true, chatId: "chat", approvalId: "a1", allow: false });
+    expect(checkDecision(shown(approval), [approval], { key: "k1", allow: true })).toEqual({
+      ok: true,
+      chatId: "chat",
+      approvalId: "a1",
+      allow: true,
+    });
+    expect(checkDecision(shown(approval), [approval], { key: "k1", allow: false })).toEqual({
+      ok: true,
+      chatId: "chat",
+      approvalId: "a1",
+      allow: false,
+    });
     // Whatever else is waiting, older or newer.
     const other = { ...asking("b1"), id: "other-chat" } as NeedsYouItem;
-    expect(checkDecision(shown(approval), [other, approval], { key: "k1", allow: true })).toEqual({ ok: true, chatId: "chat", approvalId: "a1", allow: true });
-    expect(checkDecision(shown(other), [approval, other], { key: "k1", allow: false })).toEqual({ ok: true, chatId: "other-chat", approvalId: "b1", allow: false });
+    expect(checkDecision(shown(approval), [other, approval], { key: "k1", allow: true })).toEqual({
+      ok: true,
+      chatId: "chat",
+      approvalId: "a1",
+      allow: true,
+    });
+    expect(checkDecision(shown(other), [approval, other], { key: "k1", allow: false })).toEqual({
+      ok: true,
+      chatId: "other-chat",
+      approvalId: "b1",
+      allow: false,
+    });
   });
 
   it("sends nothing twice, nothing with no ask shown, and nothing once it's gone or another is waiting in its place", () => {
@@ -210,8 +278,19 @@ describe("checkDecision", () => {
   });
 
   it("sends nothing if the ask has changed since it was shown", () => {
-    expect(checkDecision(shown(approval), [{ ...approval, approval: { ...approval.approval, text: "Click Delete account" } }], { key: "k1", allow: true })).toEqual({ ok: false, why: "gone" });
-    expect(checkDecision(shown(question), [{ ...question, approval: { ...question.approval, answers: ["S", "M", "Delete"] } }], { key: "k1", allow: true, answer: "S" })).toEqual({ ok: false, why: "gone" });
+    expect(
+      checkDecision(shown(approval), [{ ...approval, approval: { ...approval.approval, text: "Click Delete account" } }], {
+        key: "k1",
+        allow: true,
+      }),
+    ).toEqual({ ok: false, why: "gone" });
+    expect(
+      checkDecision(shown(question), [{ ...question, approval: { ...question.approval, answers: ["S", "M", "Delete"] } }], {
+        key: "k1",
+        allow: true,
+        answer: "S",
+      }),
+    ).toEqual({ ok: false, why: "gone" });
   });
 
   it("never answers a handoff from here", () => {
@@ -221,8 +300,19 @@ describe("checkDecision", () => {
   });
 
   it("answers a question in words, skips it with none, and sends nothing shaped like a code", () => {
-    expect(checkDecision(shown(question), [question], { key: "k1", allow: true, answer: "Medium, please" })).toEqual({ ok: true, chatId: "chat", approvalId: "q1", allow: true, answer: "Medium, please" });
-    expect(checkDecision(shown(question), [question], { key: "k1", allow: false })).toEqual({ ok: true, chatId: "chat", approvalId: "q1", allow: false });
+    expect(checkDecision(shown(question), [question], { key: "k1", allow: true, answer: "Medium, please" })).toEqual({
+      ok: true,
+      chatId: "chat",
+      approvalId: "q1",
+      allow: true,
+      answer: "Medium, please",
+    });
+    expect(checkDecision(shown(question), [question], { key: "k1", allow: false })).toEqual({
+      ok: true,
+      chatId: "chat",
+      approvalId: "q1",
+      allow: false,
+    });
     expect(checkDecision(shown(question), [question], { key: "k1", allow: true, answer: "482 913" })).toEqual({ ok: false, why: "code" });
     expect(checkDecision(shown(question), [question], { key: "k1", allow: true, answer: "AB12CD" })).toEqual({ ok: false, why: "code" });
     expect(checkDecision(shown(question), [question], { key: "k1", allow: true })).toEqual({ ok: false, why: "invalid" });

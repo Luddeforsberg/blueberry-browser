@@ -1,7 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 import { flightMs, landingFor, PageActor, typingChunks, WAITING_WORDS, type ActorOptions, type Spot } from "./PageActor";
 
-const spot = (over: Partial<Spot> = {}): Spot => ({ left: 300, top: 300, width: 100, height: 40, x: 350, y: 320, viewWidth: 1000, viewHeight: 800, ...over });
+const spot = (over: Partial<Spot> = {}): Spot => ({
+  left: 300,
+  top: 300,
+  width: 100,
+  height: 40,
+  x: 350,
+  y: 320,
+  viewWidth: 1000,
+  viewHeight: 800,
+  ...over,
+});
 
 describe("where the bird lands", () => {
   it("stands on a short target's top edge, beside the point", () => {
@@ -83,8 +93,19 @@ describe("when the tab is taken away mid-draw", () => {
         },
       },
     };
-    const options: ActorOptions = { on: true, plain: false, still: false, look: { palette: "jackdaw", accessory: "none" }, dark: false, windowShowing: true };
-    const actor = new PageActor(tab as never, () => options, () => 1);
+    const options: ActorOptions = {
+      on: true,
+      plain: false,
+      still: false,
+      look: { palette: "jackdaw", accessory: "none" },
+      dark: false,
+      windowShowing: true,
+    };
+    const actor = new PageActor(
+      tab as never,
+      () => options,
+      () => 1,
+    );
     await actor.hop("Looking");
     expect(sent).toHaveLength(1);
     expect(sent[0]).not.toContain("attachShadow");
@@ -106,8 +127,19 @@ describe("when the tab is taken away mid-draw", () => {
         },
       },
     };
-    const options: ActorOptions = { on: true, plain: false, still: false, look: { palette: "jackdaw", accessory: "none" }, dark: false, windowShowing: true };
-    const actor = new PageActor(tab as never, () => options, () => 1);
+    const options: ActorOptions = {
+      on: true,
+      plain: false,
+      still: false,
+      look: { palette: "jackdaw", accessory: "none" },
+      dark: false,
+      windowShowing: true,
+    };
+    const actor = new PageActor(
+      tab as never,
+      () => options,
+      () => 1,
+    );
     actor.waitingForUser();
     tab.isVisible = false;
     actor.hidden();
@@ -133,8 +165,19 @@ describe("when the tab is taken away mid-draw", () => {
         },
       },
     };
-    const options: ActorOptions = { on: true, plain: false, still: false, look: { palette: "jackdaw", accessory: "none" }, dark: false, windowShowing: true };
-    const actor = new PageActor(tab as never, () => options, () => 1);
+    const options: ActorOptions = {
+      on: true,
+      plain: false,
+      still: false,
+      look: { palette: "jackdaw", accessory: "none" },
+      dark: false,
+      windowShowing: true,
+    };
+    const actor = new PageActor(
+      tab as never,
+      () => options,
+      () => 1,
+    );
     const below = { left: 100, top: 2000, width: 120, height: 40, x: 160, y: 2020, viewWidth: 1200, viewHeight: 800 };
     const find = vi.fn(async () => ({ spot: below }));
     actor.askAbout(find);

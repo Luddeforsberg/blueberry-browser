@@ -27,7 +27,17 @@ const TOKEN_SEGMENT = /^(?=.*\d)[A-Za-z0-9_-]{24,}$/;
 const SECOND_LEVEL = /^(co|com|org|net|ac|gov|edu|or|ne)$/;
 // One company runs many unrelated products on these, so docs.google.com is a site of its own, and a routine on it can't
 // reach mail.google.com.
-const MANY_PRODUCTS = ["google.com", "microsoft.com", "live.com", "office.com", "sharepoint.com", "apple.com", "amazon.com", "yahoo.com", "zoho.com"];
+const MANY_PRODUCTS = [
+  "google.com",
+  "microsoft.com",
+  "live.com",
+  "office.com",
+  "sharepoint.com",
+  "apple.com",
+  "amazon.com",
+  "yahoo.com",
+  "zoho.com",
+];
 
 const clean = (text: unknown, max: number): string => {
   const plain = withoutInvisible(text).replace(/\s+/g, " ").trim();
@@ -65,7 +75,11 @@ export const trailAddress = (url: string): TrailAddress | null => {
       .join("/")
       .replace(/\/$/, "");
     const scheme = protocol === "http:" ? "http://" : "";
-    return { site: siteOfHost(hostname), host: hostname.replace(/^www\./, ""), place: clean(`${scheme}${host.replace(/^www\./, "")}${path}`, MAX_PATH) };
+    return {
+      site: siteOfHost(hostname),
+      host: hostname.replace(/^www\./, ""),
+      place: clean(`${scheme}${host.replace(/^www\./, "")}${path}`, MAX_PATH),
+    };
   } catch {
     return null;
   }
@@ -101,7 +115,12 @@ export type PageNote =
   | { type: "file"; label: string }
   | { type: "frame"; host: string };
 
-const SECRET_WORDS: Record<string, string> = { password: "password field", card: "card field", code: "code field", "sign-in": "sign-in form" };
+const SECRET_WORDS: Record<string, string> = {
+  password: "password field",
+  card: "card field",
+  code: "code field",
+  "sign-in": "sign-in form",
+};
 const secretWord = (kind: unknown): string => (typeof kind === "string" && SECRET_WORDS[kind]) || "private field";
 
 export class Trail {
@@ -152,7 +171,8 @@ export class Trail {
         if (!value) return;
         // Clicking twice or three times to select something leaves the first click behind, on the very text copied.
         const last = this.list.at(-1);
-        if (last?.kind === "clicked" && !last.path && last.site === site && normal(last.label).includes(normal(value))) this.remove(last.id);
+        if (last?.kind === "clicked" && !last.path && last.site === site && normal(last.label).includes(normal(value)))
+          this.remove(last.id);
         this.push("copied", `Copied “${value}”`, site, { value });
         return;
       }
@@ -166,7 +186,10 @@ export class Trail {
         if (value) this.push("chose", `Chose “${value}”${label ? ` in ${label}` : ""}`, site, { label, value });
         return;
       case "ticked":
-        this.push("ticked", `${note.checked === false ? "Unticked" : "Ticked"} ${label || "a box"}`, site, { label, value: note.checked === false ? "off" : "on" });
+        this.push("ticked", `${note.checked === false ? "Unticked" : "Ticked"} ${label || "a box"}`, site, {
+          label,
+          value: note.checked === false ? "off" : "on",
+        });
         return;
       case "file":
         this.push("file", `Chose a file${label ? ` for ${label}` : ""}`, site, { label });
@@ -192,7 +215,12 @@ export class Trail {
 
   // Whatever the user typed last, for telling a search from any other query.
   private get lastTyped(): TrailStep | null {
-    return this.list.slice(-2).reverse().find(({ kind }) => kind === "typed") ?? null;
+    return (
+      this.list
+        .slice(-2)
+        .reverse()
+        .find(({ kind }) => kind === "typed") ?? null
+    );
   }
 
   went(url: string, { fromAddressBar = false, newTab = false, now }: { fromAddressBar?: boolean; newTab?: boolean; now: number }): void {
@@ -273,14 +301,17 @@ const fromCopy = (steps: readonly TrailStep[]): Set<string> => {
   const copies: RegExp[] = [];
   const typed = new Set<string>();
   for (const { id, kind, value } of steps) {
-    if (kind === "copied") copies.push(new RegExp(`(?<![\\p{L}\\p{N}])${normal(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "u"));
+    if (kind === "copied")
+      copies.push(new RegExp(`(?<![\\p{L}\\p{N}])${normal(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "u"));
     else if ((kind === "typed" || kind === "searched") && copies.some((copy) => copy.test(normal(value)))) typed.add(id);
   }
   return typed;
 };
 
 const secretDid = (text: string): string =>
-  text.startsWith("Copied from the ") ? `copied from a secret field: ${text.replace("Copied from the ", "")}` : `typed in a secret field: ${text.replace("Typed in the ", "")}`;
+  text.startsWith("Copied from the ")
+    ? `copied from a secret field: ${text.replace("Copied from the ", "")}`
+    : `typed in a secret field: ${text.replace("Typed in the ", "")}`;
 
 // Exactly what leaves this computer.
 export const trailForModel = (steps: readonly TrailStep[]) => {
@@ -320,9 +351,16 @@ export const plainDraft = (steps: readonly TrailStep[]): RecordedDraft => {
   const entered = enteredIn(steps);
   return {
     name: sites[0] ? `Job on ${sites[0]}` : "Something you showed me",
-    instructions: `${start ? `Start at ${start} and do this again, in this order:` : "Do this again, in this order:"}\n${lines}\n\nThen say how it went.`.slice(0, MAX_DRAFT_INSTRUCTIONS),
+    instructions:
+      `${start ? `Start at ${start} and do this again, in this order:` : "Do this again, in this order:"}\n${lines}\n\nThen say how it went.`.slice(
+        0,
+        MAX_DRAFT_INSTRUCTIONS,
+      ),
     sites,
-    changes: entered.slice(0, MAX_CHANGES).map(({ kind, label, value }) => ({ label: clean(kind === "searched" ? "Search" : label, MAX_CHANGE_LABEL) || "What you entered", value })),
+    changes: entered.slice(0, MAX_CHANGES).map(({ kind, label, value }) => ({
+      label: clean(kind === "searched" ? "Search" : label, MAX_CHANGE_LABEL) || "What you entered",
+      value,
+    })),
   };
 };
 
@@ -338,15 +376,19 @@ export const draftFromReply = (reply: string, steps: readonly TrailStep[]): Reco
   }
   const sites = sitesOf(steps);
   const name = clean(parsed.name, MAX_DRAFT_NAME);
-  const written = withoutInvisible(parsed.instructions).replace(/[^\S\n]+/g, " ").slice(0, MAX_DRAFT_INSTRUCTIONS);
+  const written = withoutInvisible(parsed.instructions)
+    .replace(/[^\S\n]+/g, " ")
+    .slice(0, MAX_DRAFT_INSTRUCTIONS);
   if (!name || !written || !namesOnly(`${name} ${written}`, sites)) return fallback;
 
   const entered = enteredIn(steps).map(({ value }) => normal(value));
-  const changes: RecordedChange[] = (Array.isArray(parsed.changes) ? parsed.changes : []).flatMap((change: Record<string, unknown> | null) => {
-    const value = clean(change?.value, MAX_VALUE);
-    const label = clean(change?.label, MAX_CHANGE_LABEL);
-    return label && value && written.includes(value) && entered.includes(normal(value)) ? [{ label, value }] : [];
-  });
+  const changes: RecordedChange[] = (Array.isArray(parsed.changes) ? parsed.changes : []).flatMap(
+    (change: Record<string, unknown> | null) => {
+      const value = clean(change?.value, MAX_VALUE);
+      const label = clean(change?.label, MAX_CHANGE_LABEL);
+      return label && value && written.includes(value) && entered.includes(normal(value)) ? [{ label, value }] : [];
+    },
+  );
   const start = startOf(steps);
   const firstSite = sites[0];
   return {

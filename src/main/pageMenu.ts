@@ -42,11 +42,7 @@ const OPENABLE_LINK = /^https?:/i;
 const SAVEABLE_IMAGE = /^(https?|data|blob):/i;
 
 // What a normal browser offers for whatever was right-clicked, in groups split by separators.
-export function pageMenuTemplate(
-  params: PageMenuParams,
-  state: PageMenuState,
-  actions: PageMenuActions
-): OwnMenuItem[] {
+export function pageMenuTemplate(params: PageMenuParams, state: PageMenuState, actions: PageMenuActions): OwnMenuItem[] {
   const { linkURL, srcURL, editFlags, misspelledWord, dictionarySuggestions } = params;
   const selection = params.selectionText.trim();
   const image = params.mediaType === "image" && srcURL !== "";
@@ -63,7 +59,9 @@ export function pageMenuTemplate(
 
   if (linkURL) {
     groups.push([
-      ...(OPENABLE_LINK.test(linkURL) ? [{ label: "Open Link in New Tab", icon: "new-tab" as const, click: () => actions.openLink(linkURL) }] : []),
+      ...(OPENABLE_LINK.test(linkURL)
+        ? [{ label: "Open Link in New Tab", icon: "new-tab" as const, click: () => actions.openLink(linkURL) }]
+        : []),
       { label: "Copy Link", icon: "link", click: () => actions.copyText(linkURL) },
     ]);
   }
@@ -101,11 +99,19 @@ export function pageMenuTemplate(
       { label: "Reload", icon: "reload", accelerator: SHORTCUTS.reload, click: actions.reload },
     ]);
     groups.push([{ label: "Select All", icon: "select-all", accelerator: "CmdOrCtrl+A", click: actions.selectAll }]);
-    groups.push([{ label: state.recording ? `Stop Showing ${state.assistantName}` : `Show ${state.assistantName} How`, icon: "show-how", click: actions.showHow }]);
+    groups.push([
+      {
+        label: state.recording ? `Stop Showing ${state.assistantName}` : `Show ${state.assistantName} How`,
+        icon: "show-how",
+        click: actions.showHow,
+      },
+    ]);
   }
 
   groups.push([
-    ...(plainPage || (selection && !params.isEditable) ? [{ label: "Print…", icon: "print" as const, accelerator: "CmdOrCtrl+P", click: actions.print }] : []),
+    ...(plainPage || (selection && !params.isEditable)
+      ? [{ label: "Print…", icon: "print" as const, accelerator: "CmdOrCtrl+P", click: actions.print }]
+      : []),
     { label: "Inspect", icon: "inspect", click: actions.inspect },
   ]);
 
@@ -130,7 +136,7 @@ export function attachPageMenu(
     recording: () => boolean;
     startRecording: () => void;
     stopRecording: () => void;
-  }
+  },
 ): void {
   const contents = tab.webContents;
   const live = (action: () => void) => () => {
@@ -159,7 +165,12 @@ export function attachPageMenu(
       print: live(() => printPage(contents)),
       inspect: live(() => contents.inspectElement(params.x, params.y)),
     };
-    const state = { canGoBack: tab.canGoBack, canGoForward: tab.canGoForward, assistantName: app.assistantName(), recording: app.recording() };
+    const state = {
+      canGoBack: tab.canGoBack,
+      canGoForward: tab.canGoForward,
+      assistantName: app.assistantName(),
+      recording: app.recording(),
+    };
     app.openMenu(pageMenuTemplate(params, state, actions), { x: params.x, y: params.y }, contents);
   });
 }

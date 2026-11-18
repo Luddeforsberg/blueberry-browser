@@ -2,12 +2,23 @@ import { describe, expect, it, vi } from "vitest";
 import type { GalleryServer, ServerSession } from "../../src/main/galleryServer";
 import { runnerSession, supabaseDb, type DbConfig } from "./db";
 
-const CONFIG: DbConfig = { url: "https://abc.supabase.co", key: "sb_publishable_x", email: "runner@example.com", password: "pw", owner: "ana@example.com" };
+const CONFIG: DbConfig = {
+  url: "https://abc.supabase.co",
+  key: "sb_publishable_x",
+  email: "runner@example.com",
+  password: "pw",
+  owner: "ana@example.com",
+};
 
 // Sign-ins and refreshes as Supabase's Auth answers them, each with a new token.
 const fakeAuth = ({ refreshWorks = true, expiresInMs = 3_600_000 } = {}) => {
   let made = 0;
-  const session = (): ServerSession => ({ accessToken: `token-${++made}`, refreshToken: `refresh-${made}`, expiresAt: Date.now() + expiresInMs, email: CONFIG.email });
+  const session = (): ServerSession => ({
+    accessToken: `token-${++made}`,
+    refreshToken: `refresh-${made}`,
+    expiresAt: Date.now() + expiresInMs,
+    email: CONFIG.email,
+  });
   return {
     signIn: vi.fn(async () => session()),
     refresh: vi.fn(async () => {

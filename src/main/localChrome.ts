@@ -31,8 +31,17 @@ const launch = (executable: string): Promise<{ endpoint: string; process: ChildP
   const profile = mkdtempSync(join(tmpdir(), "blueberry-cloud-"));
   const child = spawn(
     executable,
-    ["--headless=new", "--remote-debugging-port=0", "--remote-debugging-address=127.0.0.1", `--user-data-dir=${profile}`, "--no-first-run", "--no-default-browser-check", "--window-size=1280,800", "about:blank"],
-    { stdio: ["ignore", "ignore", "pipe"] }
+    [
+      "--headless=new",
+      "--remote-debugging-port=0",
+      "--remote-debugging-address=127.0.0.1",
+      `--user-data-dir=${profile}`,
+      "--no-first-run",
+      "--no-default-browser-check",
+      "--window-size=1280,800",
+      "about:blank",
+    ],
+    { stdio: ["ignore", "ignore", "pipe"] },
   );
   return new Promise((resolve, reject) => {
     let said = "";

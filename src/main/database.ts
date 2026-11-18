@@ -16,8 +16,7 @@ const LOWEST_BYTE = 0xff;
 class DamagedFile extends Error {}
 
 const isDamage = (error: unknown): boolean =>
-  error instanceof DamagedFile ||
-  CORRUPT_CODES.includes(((error as { errcode?: number }).errcode ?? 0) & LOWEST_BYTE);
+  error instanceof DamagedFile || CORRUPT_CODES.includes(((error as { errcode?: number }).errcode ?? 0) & LOWEST_BYTE);
 
 // Opening a damaged file often works, and only reading the damaged part fails, so this reads it all once.
 // Read-only, because closing a writable connection can delete the write-ahead log that's beside the file.
@@ -47,7 +46,11 @@ export interface StoreProblem {
 
 // A database must never stop the app from starting. Only real damage moves the file, and it's never deleted. `open` is
 // told `recovered` when what it opens isn't what was saved: a new file in place of a damaged one, or memory.
-export const openStore = <T>(file: string, open: (file: string, recovered: boolean) => T, onProblem: (problem: StoreProblem) => void): T => {
+export const openStore = <T>(
+  file: string,
+  open: (file: string, recovered: boolean) => T,
+  onProblem: (problem: StoreProblem) => void,
+): T => {
   try {
     if (existsSync(file)) checkFile(file);
     return open(file, false);

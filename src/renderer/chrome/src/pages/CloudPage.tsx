@@ -1,117 +1,137 @@
-import React, { useEffect, useRef, useState } from 'react'
-import type { TabInfo } from '@shared/ipc'
-import { Cloud } from 'lucide-react'
-import { Button } from '@common/components/Button'
-import { cn } from '@common/lib/utils'
-import { Berry, useAssistantName } from '../components/Berry'
-import { useFlock, useLibrary } from '../contexts/LibraryContext'
-import { liveFrameLock, useCloudView } from '../cloudView'
+import React, { useEffect, useRef, useState } from "react";
+import type { TabInfo } from "@shared/ipc";
+import { Cloud } from "lucide-react";
+import { Button } from "@common/components/Button";
+import { cn } from "@common/lib/utils";
+import { Berry, useAssistantName } from "../components/Berry";
+import { useFlock, useLibrary } from "../contexts/LibraryContext";
+import { liveFrameLock, useCloudView } from "../cloudView";
 
-const api = () => window.chromeAPI.cloud
+const api = () => window.chromeAPI.cloud;
 // A resize sends one size once it settles, rather than resizing the page in the cloud on every frame.
-const FIT_SETTLE_MS = 150
+const FIT_SETTLE_MS = 150;
 
 // The page's viewport follows the area it's shown in, so its picture or live view fills that area.
 const useFitPage = (tabId: string, showing: boolean): React.RefObject<HTMLDivElement | null> => {
-    const area = useRef<HTMLDivElement>(null)
-    useEffect(() => {
-        const element = area.current
-        if (!showing || !element) return undefined
-        let timer: ReturnType<typeof setTimeout> | undefined
-        const observer = new ResizeObserver(([entry]) => {
-            const { width, height } = entry.contentRect
-            clearTimeout(timer)
-            timer = setTimeout(() => void api().fit(tabId, Math.round(width), Math.round(height)), FIT_SETTLE_MS)
-        })
-        observer.observe(element)
-        return () => {
-            clearTimeout(timer)
-            observer.disconnect()
-        }
-    }, [tabId, showing])
-    return area
-}
+  const area = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const element = area.current;
+    if (!showing || !element) return undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      clearTimeout(timer);
+      timer = setTimeout(() => void api().fit(tabId, Math.round(width), Math.round(height)), FIT_SETTLE_MS);
+    });
+    observer.observe(element);
+    return () => {
+      clearTimeout(timer);
+      observer.disconnect();
+    };
+  }, [tabId, showing]);
+  return area;
+};
 
 // A page in the cloud browser. Browserbase's live view sits in a frame, which only takes the pointer or the keyboard
 // once the user has taken the tab over, so nothing they do lands in the middle of a job. A local test browser sends pictures instead.
 // None of what's shown here goes anywhere but this screen.
 export const CloudPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
-    const { view, frame, refresh } = useCloudView(tab.id)
-    const [answered, setAnswered] = useState(false)
-    // A job handed this page to the user, who signs in through the live view and presses I'm done in the toolbar.
-    const handoff = useLibrary().needsYou.find(({ approval }) => approval.handoff?.tabId === tab.id)
-    const asker = useAssistantName(useFlock().find(handoff?.mascotId ?? null))
+  const { view, frame, refresh } = useCloudView(tab.id);
+  const [answered, setAnswered] = useState(false);
+  // A job handed this page to the user, who signs in through the live view and presses I'm done in the toolbar.
+  const handoff = useLibrary().needsYou.find(({ approval }) => approval.handoff?.tabId === tab.id);
+  const asker = useAssistantName(useFlock().find(handoff?.mascotId ?? null));
 
-    const pictures = view?.kind === 'frames'
-    const area = useFitPage(tab.id, pictures || view?.kind === 'live')
+  const pictures = view?.kind === "frames";
+  const area = useFitPage(tab.id, pictures || view?.kind === "live");
 
-    if (view?.kind === 'gone') {
-        return (
-            <div role="alert" className="h-full flex flex-col items-center justify-center gap-4 px-8 text-center">
-                <Berry mood="oops" size={88} />
-                <div>
-                    <h1 className="text-20 font-semibold">This cloud tab has closed</h1>
-                    <p className="mt-1 max-w-md text-14 text-ink-2">Its page went when the cloud session ended. Nothing of it was kept on this computer.</p>
-                </div>
-            </div>
-        )
-    }
-
-    const takenOver = view?.takenOver ?? false
-    const lock = liveFrameLock(takenOver)
-    const takeOver = () => void api().takeOver(tab.id).then(refresh)
-    const checking = view?.checking ?? null
-    const mark = (signedIn: boolean) => {
-        if (!checking) return
-        setAnswered(true)
-        void api().markLogin(checking, signedIn)
-    }
-    const line = checking
-        ? answered ? 'Saved in Settings > Cloud.' : `Are you signed in to ${checking} here? Look at the page, then say.`
-        : handoff
-          ? takenOver ? `Yours now. When you’ve finished, press I’m done and ${asker} carries on.` : `${asker} needs you here. Take over to do it in the page. ${asker} can’t see it meanwhile.`
-          : takenOver
-            ? pictures ? 'Yours now. The local test browser only shows pictures here.' : 'Yours now.'
-            : 'Take over to use it yourself. That stops the job here.'
-
+  if (view?.kind === "gone") {
     return (
-        <div className="h-full flex flex-col">
-            <div className="flex items-center gap-3 px-4 py-2 border-b">
-                <Cloud className="size-4 shrink-0 text-ink-2" aria-hidden strokeWidth={1.75} />
-                <p className="flex-1 min-w-0 truncate text-14">
-                    <span className="font-medium">In the cloud</span>
-                    <span className="text-ink-2">
-                        {' · '}
-                        {line}
-                    </span>
-                </p>
-                {checking && !answered && (
-                    <>
-                        <Button size="sm" onClick={() => mark(true)}>Yes, I’m signed in</Button>
-                        <Button variant="raised" size="sm" onClick={() => mark(false)}>No, I’m signed out</Button>
-                    </>
-                )}
-                {!takenOver && view && (
-                    <Button variant="raised" size="sm" onClick={takeOver}>Take over</Button>
-                )}
-            </div>
-            <div ref={area} className="relative flex-1 min-h-0">
-                {view?.kind === 'live' && (
-                    <iframe
-                        aria-label={`Live view of ${tab.title}`}
-                        src={view.url}
-                        sandbox="allow-same-origin allow-scripts"
-                        allow="clipboard-read; clipboard-write"
-                        inert={lock.inert}
-                        tabIndex={lock.tabIndex}
-                        className={cn('absolute inset-0 size-full border-0', lock.className)}
-                    />
-                )}
-                {pictures && (frame
-                    ? <img alt={`Picture of ${tab.title}`} src={`data:image/jpeg;base64,${frame}`} className="absolute inset-0 size-full object-contain object-top" />
-                    : <p className="absolute inset-0 flex items-center justify-center text-14 text-ink-2">Waiting for the first picture…</p>
-                )}
-            </div>
+      <div role="alert" className="h-full flex flex-col items-center justify-center gap-4 px-8 text-center">
+        <Berry mood="oops" size={88} />
+        <div>
+          <h1 className="text-20 font-semibold">This cloud tab has closed</h1>
+          <p className="mt-1 max-w-md text-14 text-ink-2">
+            Its page went when the cloud session ended. Nothing of it was kept on this computer.
+          </p>
         </div>
-    )
-}
+      </div>
+    );
+  }
+
+  const takenOver = view?.takenOver ?? false;
+  const lock = liveFrameLock(takenOver);
+  const takeOver = () => void api().takeOver(tab.id).then(refresh);
+  const checking = view?.checking ?? null;
+  const mark = (signedIn: boolean) => {
+    if (!checking) return;
+    setAnswered(true);
+    void api().markLogin(checking, signedIn);
+  };
+  const line = checking
+    ? answered
+      ? "Saved in Settings > Cloud."
+      : `Are you signed in to ${checking} here? Look at the page, then say.`
+    : handoff
+      ? takenOver
+        ? `Yours now. When you’ve finished, press I’m done and ${asker} carries on.`
+        : `${asker} needs you here. Take over to do it in the page. ${asker} can’t see it meanwhile.`
+      : takenOver
+        ? pictures
+          ? "Yours now. The local test browser only shows pictures here."
+          : "Yours now."
+        : "Take over to use it yourself. That stops the job here.";
+
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex items-center gap-3 px-4 py-2 border-b">
+        <Cloud className="size-4 shrink-0 text-ink-2" aria-hidden strokeWidth={1.75} />
+        <p className="flex-1 min-w-0 truncate text-14">
+          <span className="font-medium">In the cloud</span>
+          <span className="text-ink-2">
+            {" · "}
+            {line}
+          </span>
+        </p>
+        {checking && !answered && (
+          <>
+            <Button size="sm" onClick={() => mark(true)}>
+              Yes, I’m signed in
+            </Button>
+            <Button variant="raised" size="sm" onClick={() => mark(false)}>
+              No, I’m signed out
+            </Button>
+          </>
+        )}
+        {!takenOver && view && (
+          <Button variant="raised" size="sm" onClick={takeOver}>
+            Take over
+          </Button>
+        )}
+      </div>
+      <div ref={area} className="relative flex-1 min-h-0">
+        {view?.kind === "live" && (
+          <iframe
+            aria-label={`Live view of ${tab.title}`}
+            src={view.url}
+            sandbox="allow-same-origin allow-scripts"
+            allow="clipboard-read; clipboard-write"
+            inert={lock.inert}
+            tabIndex={lock.tabIndex}
+            className={cn("absolute inset-0 size-full border-0", lock.className)}
+          />
+        )}
+        {pictures &&
+          (frame ? (
+            <img
+              alt={`Picture of ${tab.title}`}
+              src={`data:image/jpeg;base64,${frame}`}
+              className="absolute inset-0 size-full object-contain object-top"
+            />
+          ) : (
+            <p className="absolute inset-0 flex items-center justify-center text-14 text-ink-2">Waiting for the first picture…</p>
+          ))}
+      </div>
+    </div>
+  );
+};

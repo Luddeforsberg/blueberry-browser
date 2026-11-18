@@ -29,7 +29,12 @@ export class AddressSuggestions {
     const valid = validRequest(request);
     if (!valid || valid.rows.length === 0) return this.close();
     const { rows, selected, field } = valid;
-    const { view, sheet } = suggestionsRect(field, rows.length, rows.some(({ kind }) => kind === "ask"), window);
+    const { view, sheet } = suggestionsRect(
+      field,
+      rows.length,
+      rows.some(({ kind }) => kind === "ask"),
+      window,
+    );
     this.rows = rows;
     // Adding a view again moves it to the top, above tabs opened since.
     this.parent.addChildView(this.chromeView.view);
@@ -82,16 +87,22 @@ const validRow = (value: unknown): AddressSuggestion | null => {
         ? { kind: "tab", tabId: row.tabId, title: row.title, url: row.url, favicon: icon(row.favicon) }
         : null;
     case "bookmark":
-      return text(row.title) && webOrEmpty(row.url) && row.url ? { kind: "bookmark", title: row.title, url: row.url, favicon: icon(row.favicon) } : null;
+      return text(row.title) && webOrEmpty(row.url) && row.url
+        ? { kind: "bookmark", title: row.title, url: row.url, favicon: icon(row.favicon) }
+        : null;
     case "history":
       return text(row.title) && webOrEmpty(row.url) && row.url && text(row.when)
         ? { kind: "history", title: row.title, url: row.url, favicon: icon(row.favicon), when: row.when }
         : null;
     case "search":
-      return text(row.text) && webOrEmpty(row.url) && row.url ? { kind: "search", text: row.text, url: row.url, opens: row.opens === true } : null;
+      return text(row.text) && webOrEmpty(row.url) && row.url
+        ? { kind: "search", text: row.text, url: row.url, opens: row.opens === true }
+        : null;
     case "ask": {
       const look = validLook(row.look);
-      return text(row.text) && text(row.name) && look ? { kind: "ask", text: row.text, name: row.name, look, hidden: row.hidden === true } : null;
+      return text(row.text) && text(row.name) && look
+        ? { kind: "ask", text: row.text, name: row.name, look, hidden: row.hidden === true }
+        : null;
     }
     default:
       return null;

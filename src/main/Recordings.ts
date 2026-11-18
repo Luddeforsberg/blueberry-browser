@@ -114,7 +114,8 @@ export class Recordings {
       if (!isMainFrame) return;
       const fromAddressBar = this.fromAddressBar === tab.id;
       this.fromAddressBar = null;
-      if (this.counts(tab) && !this.stopping) this.trail.went(url, { fromAddressBar, newTab: opening && this.trail.steps.length > 0, now: Date.now() });
+      if (this.counts(tab) && !this.stopping)
+        this.trail.went(url, { fromAddressBar, newTab: opening && this.trail.steps.length > 0, now: Date.now() });
       opening = false;
       this.publish();
       this.limitReached();
@@ -197,9 +198,12 @@ export class Recordings {
     await Promise.all(
       tabs.map(async ([tab, entry]) => {
         entry.stopListening();
-        const left = await Promise.race([tab.listenInPage(finishWatching).catch(() => []), new Promise((resolve) => setTimeout(() => resolve([]), FINISH_MS))]);
+        const left = await Promise.race([
+          tab.listenInPage(finishWatching).catch(() => []),
+          new Promise((resolve) => setTimeout(() => resolve([]), FINISH_MS)),
+        ]);
         this.take(tab, Array.isArray(left) ? left : []);
-      })
+      }),
     );
     this.watched.clear();
     this.current = null;

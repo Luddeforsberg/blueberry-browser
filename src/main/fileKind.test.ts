@@ -2,14 +2,18 @@ import { describe, expect, it } from "vitest";
 import { ATTACHMENT_WORDS, MAX_FILE_BYTES, MAX_PDF_PAGES, MAX_TEXT_CHARACTERS } from "../shared/attachments";
 import { cleanFileName, sniffFile } from "./fileKind";
 
-const bytes = (...parts: Array<string | number[]>) => Buffer.concat(parts.map((part) => (typeof part === "string" ? Buffer.from(part, "latin1") : Buffer.from(part))));
+const bytes = (...parts: Array<string | number[]>) =>
+  Buffer.concat(parts.map((part) => (typeof part === "string" ? Buffer.from(part, "latin1") : Buffer.from(part))));
 const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
 describe("sniffFile", () => {
   it("tells each kind it reads from its contents", () => {
     expect(sniffFile(bytes(PNG, "rest"))).toEqual({ kind: "picture", format: "png" });
     expect(sniffFile(bytes([0xff, 0xd8, 0xff, 0xe0], "JFIF"))).toEqual({ kind: "picture", format: "jpeg" });
-    expect(sniffFile(bytes("%PDF-1.7\n1 0 obj << /Type /Page >> endobj 2 0 obj << /Type /Pages /Count 1 >>"))).toEqual({ kind: "pdf", pages: 1 });
+    expect(sniffFile(bytes("%PDF-1.7\n1 0 obj << /Type /Page >> endobj 2 0 obj << /Type /Pages /Count 1 >>"))).toEqual({
+      kind: "pdf",
+      pages: 1,
+    });
     expect(sniffFile(bytes("Flight KL1234, 12 December\n"))).toEqual({ kind: "text", text: "Flight KL1234, 12 December\n", cut: false });
   });
 
@@ -27,7 +31,9 @@ describe("sniffFile", () => {
     expect(sniffFile(bytes([0, 0, 0, 0x14], "ftypqt  ", [0, 0, 0, 0]))).toEqual({ refused: ATTACHMENT_WORDS.video });
     expect(sniffFile(bytes([0x1a, 0x45, 0xdf, 0xa3], "webm"))).toEqual({ refused: ATTACHMENT_WORDS.video });
     expect(sniffFile(bytes("ID3", [4, 0, 0]))).toEqual({ refused: ATTACHMENT_WORDS.sound });
-    expect(sniffFile(bytes('<?xml version="1.0"?>\n<svg xmlns="http://www.w3.org/2000/svg"></svg>'))).toEqual({ refused: ATTACHMENT_WORDS.svg });
+    expect(sniffFile(bytes('<?xml version="1.0"?>\n<svg xmlns="http://www.w3.org/2000/svg"></svg>'))).toEqual({
+      refused: ATTACHMENT_WORDS.svg,
+    });
   });
 
   it("refuses an empty file, and one past the size limit, but not one at it", () => {
@@ -41,7 +47,11 @@ describe("sniffFile", () => {
   it("reads text only if it decodes as text, and cuts it at the limit at a whole character", () => {
     expect(sniffFile(bytes([0xc3, 0x28, 0x41]))).toEqual({ refused: ATTACHMENT_WORDS.notAKind });
     expect(sniffFile(bytes("a", [0, 0, 0], "b"))).toEqual({ refused: ATTACHMENT_WORDS.notAKind });
-    expect(sniffFile(Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("Hej då", "utf16le")]))).toEqual({ kind: "text", text: "Hej då", cut: false });
+    expect(sniffFile(Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("Hej då", "utf16le")]))).toEqual({
+      kind: "text",
+      text: "Hej då",
+      cut: false,
+    });
     expect(sniffFile(bytes([0xef, 0xbb, 0xbf], "with a mark"))).toEqual({ kind: "text", text: "with a mark", cut: false });
 
     const exactly = "x".repeat(MAX_TEXT_CHARACTERS);

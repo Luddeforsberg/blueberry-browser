@@ -39,7 +39,8 @@ const ABOUT: Record<string, AccountState["problemAbout"]> = {
   validation_failed: "email",
 };
 const inWords = (error: unknown): [string, AccountState["problemAbout"]] => {
-  if (error instanceof ServerError) return [WORDS[error.code] ?? "The sign-in service said no. Try again in a moment.", ABOUT[error.code] ?? null];
+  if (error instanceof ServerError)
+    return [WORDS[error.code] ?? "The sign-in service said no. Try again in a moment.", ABOUT[error.code] ?? null];
   return [NO_NETWORK, null];
 };
 
@@ -57,7 +58,7 @@ export class Account {
     // Null when no server is set up, and then nothing here does anything.
     private readonly server: GalleryServer | null,
     private readonly file: string,
-    private readonly onChange: () => void
+    private readonly onChange: () => void,
   ) {
     if (server) this.session = this.load();
   }
@@ -65,7 +66,9 @@ export class Account {
   get state(): AccountState {
     if (!this.server) return { status: "not-set-up", email: null, problem: null, problemAbout: null };
     const { problem, problemAbout } = this;
-    return this.session ? { status: "signed-in", email: this.session.email, problem, problemAbout } : { status: "signed-out", email: null, problem, problemAbout };
+    return this.session
+      ? { status: "signed-in", email: this.session.email, problem, problemAbout }
+      : { status: "signed-out", email: null, problem, problemAbout };
   }
 
   signIn(email: unknown, password: unknown): Promise<AccountState> {
@@ -80,7 +83,7 @@ export class Account {
     email: unknown,
     password: unknown,
     call: (server: GalleryServer, email: string, password: string) => Promise<ServerSession | null>,
-    minLength = 0
+    minLength = 0,
   ): Promise<AccountState> {
     if (!this.server) return this.state;
     const address = typeof email === "string" ? email.trim() : "";
@@ -179,7 +182,8 @@ export class Account {
       if (!safeStorage.isEncryptionAvailable()) return null;
       const saved = JSON.parse(safeStorage.decryptString(Buffer.from(readFileSync(this.file, "utf8"), "base64")));
       const { accessToken, refreshToken, expiresAt, email } = saved;
-      if (typeof accessToken !== "string" || typeof refreshToken !== "string" || typeof expiresAt !== "number" || typeof email !== "string") return null;
+      if (typeof accessToken !== "string" || typeof refreshToken !== "string" || typeof expiresAt !== "number" || typeof email !== "string")
+        return null;
       return { accessToken, refreshToken, expiresAt, email };
     } catch {
       return null;

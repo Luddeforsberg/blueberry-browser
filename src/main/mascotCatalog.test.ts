@@ -31,7 +31,11 @@ describe("the mascot catalog", () => {
   });
 
   it("drops anything on an entry that isn't a card's or a mascot's", () => {
-    const parsed = parseGalleryMascot({ ...entry, trusted: true, draft: { ...entry.draft, id: "berry", deletedAt: 1, galleryId: "x", skipApprovals: true, tools: ["visit", "everything"] } });
+    const parsed = parseGalleryMascot({
+      ...entry,
+      trusted: true,
+      draft: { ...entry.draft, id: "berry", deletedAt: 1, galleryId: "x", skipApprovals: true, tools: ["visit", "everything"] },
+    });
     expect(parsed).toEqual({ ...entry, draft: { ...entry.draft, tools: ["visit"] } });
   });
 

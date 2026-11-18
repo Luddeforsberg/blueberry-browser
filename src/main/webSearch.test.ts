@@ -13,15 +13,11 @@ describe("searching through Firecrawl", () => {
     const fetch = vi.fn(async () => new Response("{}", { status: 401 }));
     vi.stubGlobal("fetch", fetch);
     const search = firecrawlSearch({ FIRECRAWL_API_KEY: "fc-secret" })!;
-    const error = await search("Strawberry careers").catch(
-      (caught: Error) => caught,
-    );
+    const error = await search("Strawberry careers").catch((caught: Error) => caught);
     expect(String(error)).toBe("Error: The search service answered 401.");
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("https://api.firecrawl.dev/v2/search");
-    expect((init.headers as Record<string, string>).Authorization).toBe(
-      "Bearer fc-secret",
-    );
+    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer fc-secret");
     const body = JSON.parse(String(init.body));
     expect(body).toMatchObject({
       query: "Strawberry careers",

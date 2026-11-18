@@ -2,7 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Electron's cookie store, with its own matching: `domain` takes that domain and its subdomains, and `url` only cookies
 // that would go to that address, path included.
-interface Cookie { name: string; value: string; domain: string; hostOnly: boolean; path: string }
+interface Cookie {
+  name: string;
+  value: string;
+  domain: string;
+  hostOnly: boolean;
+  path: string;
+}
 const store: Cookie[] = [];
 const reads: object[] = [];
 const get = vi.fn(async (filter: { domain?: string; url?: string }) => {
@@ -15,11 +21,17 @@ const get = vi.fn(async (filter: { domain?: string; url?: string }) => {
     return sent && url.pathname.startsWith(cookie.path);
   });
 });
-vi.mock("electron", () => ({ app: { isPackaged: true }, dialog: {}, systemPreferences: {}, session: { defaultSession: { cookies: { get } } } }));
+vi.mock("electron", () => ({
+  app: { isPackaged: true },
+  dialog: {},
+  systemPreferences: {},
+  session: { defaultSession: { cookies: { get } } },
+}));
 
 const { readSiteCookies } = await import("./cloudLoginAccess");
 
-const add = (domain: string, name: string, path = "/", hostOnly = !domain.startsWith(".")) => store.push({ name, value: `v-${name}`, domain, hostOnly, path });
+const add = (domain: string, name: string, path = "/", hostOnly = !domain.startsWith(".")) =>
+  store.push({ name, value: `v-${name}`, domain, hostOnly, path });
 
 describe("readSiteCookies", () => {
   beforeEach(() => {

@@ -53,7 +53,12 @@ describe("factProblem", () => {
     expect(factProblem("You like webhallen.com", null)).toMatch(/web addresses/);
   });
 
-  it.each(["You want the cheapest one that's in stock.", "You keep prices in Swedish kronor.", "You like spending under 2000 kr on cables.", "You want USB-C and at least 2 m."])("lets a preference through: %s", (text) => {
+  it.each([
+    "You want the cheapest one that's in stock.",
+    "You keep prices in Swedish kronor.",
+    "You like spending under 2000 kr on cables.",
+    "You want USB-C and at least 2 m.",
+  ])("lets a preference through: %s", (text) => {
     expect(factProblem(text, null)).toBeNull();
   });
 
@@ -68,18 +73,24 @@ type Known = { text: string; site: string | null };
 const general = (known: string | Known): Known => (typeof known === "string" ? { text: known, site: null } : known);
 
 describe("parseProposals", () => {
-  const parse = (facts: unknown, sites = ["webhallen.com"], kept: (string | Known)[] = [], declined: (string | Known)[] = []) => parseProposals(JSON.stringify({ facts }), { sites, kept: kept.map(general), declined: declined.map(general) });
+  const parse = (facts: unknown, sites = ["webhallen.com"], kept: (string | Known)[] = [], declined: (string | Known)[] = []) =>
+    parseProposals(JSON.stringify({ facts }), { sites, kept: kept.map(general), declined: declined.map(general) });
 
   it("takes at most two, and nothing is fine", () => {
     expect(parse([])).toEqual([]);
     expect(parseProposals("not json", { sites: [], kept: [], declined: [] })).toEqual([]);
-    const three = ["You like A things most.", "You choose the B kind always.", "Your C ones come first here."].map((text) => ({ text, site: null }));
+    const three = ["You like A things most.", "You choose the B kind always.", "Your C ones come first here."].map((text) => ({
+      text,
+      site: null,
+    }));
     expect(parse(three)).toHaveLength(2);
   });
 
   it("drops a site the job never used, and doesn't fall back to general", () => {
     expect(parse([{ text: "You want the cheapest.", site: "evil.com" }])).toEqual([]);
-    expect(parse([{ text: "You want the cheapest.", site: "www.webhallen.com" }])).toEqual([{ text: "You want the cheapest.", site: "webhallen.com" }]);
+    expect(parse([{ text: "You want the cheapest.", site: "www.webhallen.com" }])).toEqual([
+      { text: "You want the cheapest.", site: "webhallen.com" },
+    ]);
   });
 
   it("drops what isn't said to the user, or is too long, or holds a secret", () => {
@@ -129,16 +140,38 @@ describe("worthRemembering", () => {
 });
 
 describe("statesAHabit", () => {
-  it.each(["I always go for the cheapest", "I USUALLY take the train", "I never buy hardcovers", "From now on in kronor", "Remember that I want kronor", "Jag brukar välja svart", "alltid svart", "Kom ihåg att jag vill ha kronor", "Aldrig begagnat", "varje gång"])("hears it in: %s", (said) => {
+  it.each([
+    "I always go for the cheapest",
+    "I USUALLY take the train",
+    "I never buy hardcovers",
+    "From now on in kronor",
+    "Remember that I want kronor",
+    "Jag brukar välja svart",
+    "alltid svart",
+    "Kom ihåg att jag vill ha kronor",
+    "Aldrig begagnat",
+    "varje gång",
+  ])("hears it in: %s", (said) => {
     expect(statesAHabit(said, [])).toBe(true);
   });
 
-  it.each(["Find me a black USB-C cable, 2 metres", "Hitta en svart kabel, 2 meter", "Find a USB-C cable under 200 kr", "Book a hotel in Berlin with free cancellation", "I only stay at places rated above 8.5", "hallways and walways", "", "alltidigt"])("doesn't in: %s", (said) => {
+  it.each([
+    "Find me a black USB-C cable, 2 metres",
+    "Hitta en svart kabel, 2 meter",
+    "Find a USB-C cable under 200 kr",
+    "Book a hotel in Berlin with free cancellation",
+    "I only stay at places rated above 8.5",
+    "hallways and walways",
+    "",
+    "alltidigt",
+  ])("doesn't in: %s", (said) => {
     expect(statesAHabit(said, [])).toBe(false);
   });
 
   it("goes by the words just typed, so an earlier message isn't offered again", () => {
-    const data = JSON.parse(proposalData({ said: ["I always want the cheapest", "Now an HDMI one"], routine: null, answers: [], sites: [] }, [], []));
+    const data = JSON.parse(
+      proposalData({ said: ["I always want the cheapest", "Now an HDMI one"], routine: null, answers: [], sites: [] }, [], []),
+    );
     expect(data.said).toBe("Now an HDMI one");
     expect(data.earlier).toEqual(["I always want the cheapest"]);
   });
@@ -200,11 +233,21 @@ describe("memoryNote", () => {
 });
 
 describe("MemoryStore", () => {
-  const made = (write = async () => '{"facts":[{"text":"You want the cheapest.","site":"a.se"}]}', file = join(mkdtempSync(join(tmpdir(), "memory-")), "memory.json")) => ({
+  const made = (
+    write = async () => '{"facts":[{"text":"You want the cheapest.","site":"a.se"}]}',
+    file = join(mkdtempSync(join(tmpdir(), "memory-")), "memory.json"),
+  ) => ({
     file,
-    store: new MemoryStore(file, { onChanged: () => {}, enabled: () => true, hasModel: () => true, write, isClean: (text) => !text.includes("482913x") }),
+    store: new MemoryStore(file, {
+      onChanged: () => {},
+      enabled: () => true,
+      hasModel: () => true,
+      write,
+      isClean: (text) => !text.includes("482913x"),
+    }),
   });
-  const offer = (store: MemoryStore, mascotId = "m", sourceId = "chat") => store.propose({ sourceId, mascotId, stillWanted: () => true, said: ["hi"], routine: null, answers: [], sites: ["a.se"] });
+  const offer = (store: MemoryStore, mascotId = "m", sourceId = "chat") =>
+    store.propose({ sourceId, mascotId, stillWanted: () => true, said: ["hi"], routine: null, answers: [], sites: ["a.se"] });
 
   it("stores nothing until Remember, and then exactly what was shown, for that bird alone", async () => {
     const { store, file } = made();
@@ -229,7 +272,15 @@ describe("MemoryStore", () => {
 
   it("drops a proposal once its moment has passed", async () => {
     const { store } = made();
-    await store.propose({ sourceId: "chat", mascotId: "m", stillWanted: () => false, said: [], routine: null, answers: [], sites: ["a.se"] });
+    await store.propose({
+      sourceId: "chat",
+      mascotId: "m",
+      stillWanted: () => false,
+      said: [],
+      routine: null,
+      answers: [],
+      sites: ["a.se"],
+    });
     expect(store.state.offers).toEqual([]);
   });
 
@@ -257,8 +308,18 @@ describe("MemoryStore", () => {
       null,
     ];
     writeFileSync(file, JSON.stringify(bad));
-    expect(made(undefined, file).store.factsOf("m").map(({ id }) => id)).toEqual(["1"]);
-    const many = Array.from({ length: MAX_FACTS_PER_MASCOT + 1 }, (_, at) => ({ id: `${at}`, mascotId: "m", text: "You want it cheap.", site: null, savedAt: at }));
+    expect(
+      made(undefined, file)
+        .store.factsOf("m")
+        .map(({ id }) => id),
+    ).toEqual(["1"]);
+    const many = Array.from({ length: MAX_FACTS_PER_MASCOT + 1 }, (_, at) => ({
+      id: `${at}`,
+      mascotId: "m",
+      text: "You want it cheap.",
+      site: null,
+      savedAt: at,
+    }));
     writeFileSync(file, JSON.stringify(many));
     expect(made(undefined, file).store.factsOf("m")).toHaveLength(MAX_FACTS_PER_MASCOT);
   });
@@ -294,7 +355,15 @@ describe("forgetting while a proposal is on its way", () => {
       onChanged: () => {},
       write: () => new Promise<string>((resolve) => (answer = resolve)),
     } as never);
-    const job = { sourceId: "chat", mascotId: "scout", stillWanted: () => true, said: ["I always want the cheapest"], routine: null, answers: [], sites: [] } as never;
+    const job = {
+      sourceId: "chat",
+      mascotId: "scout",
+      stillWanted: () => true,
+      said: ["I always want the cheapest"],
+      routine: null,
+      answers: [],
+      sites: [],
+    } as never;
     return { store, job, reply: (text: string) => answer(JSON.stringify({ facts: [{ text, site: null }] })) };
   };
 
@@ -329,7 +398,15 @@ describe("forgetting while a proposal is on its way", () => {
       onChanged: () => {},
       write: () => new Promise<string>((resolve) => (answer = resolve)),
     } as never);
-    const job = { sourceId: "chat", mascotId: "scout", stillWanted: () => true, said: ["I like the cheapest"], routine: null, answers: [], sites: [] } as never;
+    const job = {
+      sourceId: "chat",
+      mascotId: "scout",
+      stillWanted: () => true,
+      said: ["I like the cheapest"],
+      routine: null,
+      answers: [],
+      sites: [],
+    } as never;
     const asking = store.propose(job);
     store.clear("scout");
     answer(JSON.stringify({ facts: [{ text: "You want the cheapest.", site: null }] }));

@@ -19,19 +19,14 @@ export const zoomPercent = (levels: SiteZoomLevels, url: string): number => {
 };
 
 export const nextZoom = (percent: number, direction: 1 | -1): number => {
-  const next =
-    direction === 1
-      ? ZOOM_LEVELS.find((level) => level > percent)
-      : ZOOM_LEVELS.findLast((level) => level < percent);
+  const next = direction === 1 ? ZOOM_LEVELS.find((level) => level > percent) : ZOOM_LEVELS.findLast((level) => level < percent);
   return next ?? percent;
 };
 
 // A site at 100% isn't stored, so resetting one removes it.
 export const sanitizeSiteZoom = (raw: unknown, fallback: SiteZoomLevels = {}): SiteZoomLevels => {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return fallback;
-  return Object.fromEntries(
-    Object.entries(raw).filter(([, percent]) => percent !== 100 && ZOOM_LEVELS.includes(percent))
-  );
+  return Object.fromEntries(Object.entries(raw).filter(([, percent]) => percent !== 100 && ZOOM_LEVELS.includes(percent)));
 };
 
 interface ZoomTab {
@@ -48,7 +43,7 @@ export class SiteZoom {
       levels: () => SiteZoomLevels;
       save: (levels: SiteZoomLevels) => void;
       tabs: () => ZoomTab[];
-    }
+    },
   ) {}
 
   percent(url: string): number {

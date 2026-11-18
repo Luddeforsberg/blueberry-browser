@@ -50,14 +50,22 @@ export const isLiveView = (url: string): boolean => {
 // The navbar is Browserbase's, and the tab in Blueberry already says where it is.
 const withoutNavbar = (url: string) => `${url}${url.includes("?") ? "&" : "?"}navbar=false`;
 
-export const browserbase = ({ apiKey, projectId, saved, onSaved, fetch: send = fetch, connect = connectOverCdp }: BrowserbaseOptions): CloudBrowser => {
+export const browserbase = ({
+  apiKey,
+  projectId,
+  saved,
+  onSaved,
+  fetch: send = fetch,
+  connect = connectOverCdp,
+}: BrowserbaseOptions): CloudBrowser => {
   const call = async <T>(method: "GET" | "POST", path: string, body?: object): Promise<T> => {
     const response = await send(`${API}${path}`, {
       method,
       headers: { "X-BB-API-Key": apiKey, ...(body ? { "Content-Type": "application/json" } : {}) },
       body: body ? JSON.stringify(body) : undefined,
     });
-    if (response.status === 401 || response.status === 403) throw new Error("Browserbase refused the API key. Check it in Settings > Cloud.");
+    if (response.status === 401 || response.status === 403)
+      throw new Error("Browserbase refused the API key. Check it in Settings > Cloud.");
     if (!response.ok) throw new Error(`Browserbase answered ${response.status}.`);
     return (await response.json()) as T;
   };

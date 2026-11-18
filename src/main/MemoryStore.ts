@@ -46,7 +46,10 @@ export class MemoryStore {
   // Counts each bird's clearing, so an answer that was on its way when it happened isn't offered afterwards.
   private readonly cleared = new Map<string, number>();
 
-  constructor(private readonly file: string, private readonly sources: MemorySources) {
+  constructor(
+    private readonly file: string,
+    private readonly sources: MemorySources,
+  ) {
     try {
       const raw: unknown = JSON.parse(readFileSync(file, "utf8"));
       if (Array.isArray(raw)) {
@@ -81,7 +84,9 @@ export class MemoryStore {
       if (!stillWanted() || !this.sources.enabled() || (this.cleared.get(mascotId) ?? 0) !== clearedBefore) return;
       // As things stand now, as the user may have answered another chat's offer while this was on its way.
       const known = this.factsOf(mascotId).map(({ text, site }) => ({ text, site }));
-      const proposals = parseProposals(reply, { sites: job.sites, kept: known, declined: this.declined.get(mascotId) ?? [] }).filter(({ text }) => this.sources.isClean(text));
+      const proposals = parseProposals(reply, { sites: job.sites, kept: known, declined: this.declined.get(mascotId) ?? [] }).filter(
+        ({ text }) => this.sources.isClean(text),
+      );
       if (proposals.length === 0) return;
       const offers = proposals.map((proposal) => ({ ...proposal, id: randomUUID(), mascotId, sourceId }));
       this.offers = [...this.offers, ...offers].slice(-MAX_OFFERS);

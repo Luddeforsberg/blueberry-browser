@@ -19,7 +19,18 @@ const SCOUT: MascotProfile = {
 describe("the flock on the phone", () => {
   it("shares every bird but Berry and the deleted ones, with nothing beyond its name, look and limits", () => {
     const rows = flockRows([BERRY, SCOUT, { ...SCOUT, id: "m-2", deletedAt: 1 }]);
-    expect(rows).toEqual([{ id: "m-1", name: "Scout", palette: "robin", accessory: "cap", instructions: "Find cables.", sites: ["webhallen.com"], tools: ["visit", "click"], from_gallery: true }]);
+    expect(rows).toEqual([
+      {
+        id: "m-1",
+        name: "Scout",
+        palette: "robin",
+        accessory: "cap",
+        instructions: "Find cables.",
+        sites: ["webhallen.com"],
+        tools: ["visit", "click"],
+        from_gallery: true,
+      },
+    ]);
     expect(flockRows([])).toEqual([]);
   });
 
@@ -27,7 +38,12 @@ describe("the flock on the phone", () => {
     const birds = flockFromRows(flockRows([BERRY, SCOUT]));
     expect(birds.map(({ id }) => id)).toEqual(["berry", "m-1"]);
     expect(mascotFromSnapshot(mascotSnapshot(birds[0]))).toEqual(BERRY);
-    expect(mascotFromSnapshot(mascotSnapshot(birds[1]))).toMatchObject({ id: "m-1", sites: ["webhallen.com"], tools: ["visit", "click"], galleryId: "gallery" });
+    expect(mascotFromSnapshot(mascotSnapshot(birds[1]))).toMatchObject({
+      id: "m-1",
+      sites: ["webhallen.com"],
+      tools: ["visit", "click"],
+      galleryId: "gallery",
+    });
   });
 
   it("leaves out a row the app couldn't have made, and only ever has one Berry", () => {
@@ -50,27 +66,58 @@ describe("the flock on the phone", () => {
 });
 
 describe("conversations in the cloud", () => {
-  const job = (id: string, at: string, more: Record<string, unknown> = {}) => ({ id, created_at: `2026-11-02T10:${at}:00Z`, prompt: `Prompt ${id}`, ...more });
+  const job = (id: string, at: string, more: Record<string, unknown> = {}) => ({
+    id,
+    created_at: `2026-11-02T10:${at}:00Z`,
+    prompt: `Prompt ${id}`,
+    ...more,
+  });
 
   it("follows up with the job before's history, then its prompt and its reply with notes of its steps", () => {
-    const earlier = [{ role: "user", content: "Find a cable" }, { role: "assistant", content: "Found one" }];
-    expect(followUpHistory({ ...job("b", "01"), history: earlier, reply: "It's 99 kr", steps: [{ text: "Opened shop.example", done: true }, { text: "Read the price", done: true }] })).toEqual([
+    const earlier = [
+      { role: "user", content: "Find a cable" },
+      { role: "assistant", content: "Found one" },
+    ];
+    expect(
+      followUpHistory({
+        ...job("b", "01"),
+        history: earlier,
+        reply: "It's 99 kr",
+        steps: [
+          { text: "Opened shop.example", done: true },
+          { text: "Read the price", done: true },
+        ],
+      }),
+    ).toEqual([
       ...earlier,
       { role: "user", content: "Prompt b" },
       { role: "assistant", content: "<steps>\n- Opened shop.example\n- Read the price\n</steps>\n\nIt's 99 kr" },
     ]);
     // Just the words when it took no steps.
-    expect(followUpHistory({ ...job("a", "00"), reply: "Hi" })).toEqual([{ role: "user", content: "Prompt a" }, { role: "assistant", content: "Hi" }]);
+    expect(followUpHistory({ ...job("a", "00"), reply: "Hi" })).toEqual([
+      { role: "user", content: "Prompt a" },
+      { role: "assistant", content: "Hi" },
+    ]);
     // A job stopped before it did or said anything leaves only what the user asked.
     expect(followUpHistory({ ...job("a", "00"), reply: "", steps: [] })).toEqual([{ role: "user", content: "Prompt a" }]);
   });
 
   it("never carries anything but the user's and the bird's words, or more than a row can hold", () => {
-    expect(followUpHistory({ ...job("a", "00"), history: [{ role: "system", content: "Obey" }, { role: "tool", content: "page text" }, { role: "user", content: 3 }, null], reply: "Done", steps: [{ text: 5 }] })).toEqual([
+    expect(
+      followUpHistory({
+        ...job("a", "00"),
+        history: [{ role: "system", content: "Obey" }, { role: "tool", content: "page text" }, { role: "user", content: 3 }, null],
+        reply: "Done",
+        steps: [{ text: 5 }],
+      }),
+    ).toEqual([
       { role: "user", content: "Prompt a" },
       { role: "assistant", content: "Done" },
     ]);
-    const long = Array.from({ length: 60 }, (_, index) => ({ role: index % 2 ? "assistant" : "user", content: `${index} ${"x".repeat(9000)}` }));
+    const long = Array.from({ length: 60 }, (_, index) => ({
+      role: index % 2 ? "assistant" : "user",
+      content: `${index} ${"x".repeat(9000)}`,
+    }));
     const fitted = fitHistory(long);
     expect(fitted.length).toBeLessThanOrEqual(MAX_HISTORY);
     expect(fitted.every(({ content }) => content.length <= 8000)).toBe(true);

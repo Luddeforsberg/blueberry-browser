@@ -2,14 +2,7 @@ import { mkdirSync } from "fs";
 import { randomUUID } from "crypto";
 import { dirname } from "path";
 import { DatabaseSync } from "node:sqlite";
-import type {
-  ChatApproval,
-  ChatStep,
-  RoutineDraft,
-  RoutineRun,
-  RoutineRunStatus,
-  RoutineSchedule,
-} from "../shared/library";
+import type { ChatApproval, ChatStep, RoutineDraft, RoutineRun, RoutineRunStatus, RoutineSchedule } from "../shared/library";
 
 export interface StoredRoutine {
   id: string;
@@ -80,7 +73,8 @@ const MIGRATIONS = [
   `ALTER TABLE routines ADD COLUMN name_settled INTEGER NOT NULL DEFAULT 1;`,
 ];
 
-const ROUTINE_COLUMNS = "id, name, name_settled AS nameSettled, instructions, schedule, mascot_id AS mascotId, sites, in_cloud AS inCloud, paused, next_run_at AS nextRunAt";
+const ROUTINE_COLUMNS =
+  "id, name, name_settled AS nameSettled, instructions, schedule, mascot_id AS mascotId, sites, in_cloud AS inCloud, paused, next_run_at AS nextRunAt";
 const RUN_COLUMNS =
   "id, routine_id AS routineId, status, started_at AS startedAt, ended_at AS endedAt, late_for AS lateFor, steps, result, error, approval, tokens, seen, memory";
 
@@ -107,7 +101,10 @@ export class RoutineStore {
 
   // `recovered` is true when this launch started without the saved routines, in memory or in a new file in place of a
   // damaged one, so it doesn't know which routines are in the cloud.
-  constructor(file: string, readonly recovered = false) {
+  constructor(
+    file: string,
+    readonly recovered = false,
+  ) {
     if (file !== ":memory:") mkdirSync(dirname(file), { recursive: true });
     this.db = new DatabaseSync(file);
     this.db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
@@ -136,37 +133,69 @@ export class RoutineStore {
   }
 
   soonest(): number | null {
-    const row = this.db.prepare("SELECT MIN(next_run_at) AS at FROM routines WHERE paused = 0 AND in_cloud = 0").get() as { at: number | null };
+    const row = this.db.prepare("SELECT MIN(next_run_at) AS at FROM routines WHERE paused = 0 AND in_cloud = 0").get() as {
+      at: number | null;
+    };
     return row.at;
   }
 
-  create({ name, instructions, schedule, mascotId = null, sites = [], inCloud = false }: RoutineDraft, nextRunAt: number | null, nameSettled = true): string {
+  create(
+    { name, instructions, schedule, mascotId = null, sites = [], inCloud = false }: RoutineDraft,
+    nextRunAt: number | null,
+    nameSettled = true,
+  ): string {
     const id = randomUUID();
     this.db
-      .prepare("INSERT INTO routines (id, name, name_settled, instructions, schedule, mascot_id, sites, in_cloud, next_run_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-      .run(id, name, nameSettled ? 1 : 0, instructions, JSON.stringify(schedule), mascotId, JSON.stringify(sites), inCloud ? 1 : 0, nextRunAt, Date.now());
+      .prepare(
+        "INSERT INTO routines (id, name, name_settled, instructions, schedule, mascot_id, sites, in_cloud, next_run_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      )
+      .run(
+        id,
+        name,
+        nameSettled ? 1 : 0,
+        instructions,
+        JSON.stringify(schedule),
+        mascotId,
+        JSON.stringify(sites),
+        inCloud ? 1 : 0,
+        nextRunAt,
+        Date.now(),
+      );
     return id;
   }
 
-  update(id: string, { name, instructions, schedule, mascotId = null, sites = [], inCloud = false }: RoutineDraft, nextRunAt: number | null, nameSettled = true): boolean {
+  update(
+    id: string,
+    { name, instructions, schedule, mascotId = null, sites = [], inCloud = false }: RoutineDraft,
+    nextRunAt: number | null,
+    nameSettled = true,
+  ): boolean {
     const { changes } = this.db
-      .prepare("UPDATE routines SET name = ?, name_settled = ?, instructions = ?, schedule = ?, mascot_id = ?, sites = ?, in_cloud = ?, next_run_at = ? WHERE id = ?")
-      .run(name, nameSettled ? 1 : 0, instructions, JSON.stringify(schedule), mascotId, JSON.stringify(sites), inCloud ? 1 : 0, nextRunAt, id);
+      .prepare(
+        "UPDATE routines SET name = ?, name_settled = ?, instructions = ?, schedule = ?, mascot_id = ?, sites = ?, in_cloud = ?, next_run_at = ? WHERE id = ?",
+      )
+      .run(
+        name,
+        nameSettled ? 1 : 0,
+        instructions,
+        JSON.stringify(schedule),
+        mascotId,
+        JSON.stringify(sites),
+        inCloud ? 1 : 0,
+        nextRunAt,
+        id,
+      );
     return changes > 0;
   }
 
   // False if the user named it, or it was deleted, while the name was being written.
   setWrittenName(id: string, name: string): boolean {
-    const { changes } = this.db
-      .prepare("UPDATE routines SET name = ?, name_settled = 1 WHERE id = ? AND name_settled = 0")
-      .run(name, id);
+    const { changes } = this.db.prepare("UPDATE routines SET name = ?, name_settled = 1 WHERE id = ? AND name_settled = 0").run(name, id);
     return changes > 0;
   }
 
   setPaused(id: string, paused: boolean, nextRunAt: number | null): boolean {
-    const { changes } = this.db
-      .prepare("UPDATE routines SET paused = ?, next_run_at = ? WHERE id = ?")
-      .run(paused ? 1 : 0, nextRunAt, id);
+    const { changes } = this.db.prepare("UPDATE routines SET paused = ?, next_run_at = ? WHERE id = ?").run(paused ? 1 : 0, nextRunAt, id);
     return changes > 0;
   }
 
@@ -186,7 +215,7 @@ export class RoutineStore {
     this.db
       .prepare(
         `DELETE FROM runs WHERE routine_id = ? AND id NOT IN
-           (SELECT id FROM runs WHERE routine_id = ? ORDER BY started_at DESC, rowid DESC LIMIT ?)`
+           (SELECT id FROM runs WHERE routine_id = ? ORDER BY started_at DESC, rowid DESC LIMIT ?)`,
       )
       .run(routineId, routineId, RUNS_KEPT_PER_ROUTINE);
     return id;
@@ -195,7 +224,14 @@ export class RoutineStore {
   updateRun(id: string, steps: ChatStep[], approval: ChatApproval | null, tokens: number | null, memoryIds: string[] = []): void {
     this.db
       .prepare("UPDATE runs SET status = ?, steps = ?, approval = ?, tokens = ?, memory = ? WHERE id = ?")
-      .run(approval ? "needs-approval" : "running", JSON.stringify(steps), approval && JSON.stringify(approval), tokens, JSON.stringify(memoryIds), id);
+      .run(
+        approval ? "needs-approval" : "running",
+        JSON.stringify(steps),
+        approval && JSON.stringify(approval),
+        tokens,
+        JSON.stringify(memoryIds),
+        id,
+      );
   }
 
   finishRun(
@@ -215,11 +251,11 @@ export class RoutineStore {
       error: string | null;
       tokens: number | null;
       seen: boolean;
-    }
+    },
   ): void {
     this.db
       .prepare(
-        "UPDATE runs SET status = ?, ended_at = ?, steps = ?, result = ?, error = ?, tokens = ?, approval = NULL, seen = ? WHERE id = ?"
+        "UPDATE runs SET status = ?, ended_at = ?, steps = ?, result = ?, error = ?, tokens = ?, approval = NULL, seen = ? WHERE id = ?",
       )
       .run(status, endedAt, JSON.stringify(steps), result, error, tokens, seen ? 1 : 0, id);
   }

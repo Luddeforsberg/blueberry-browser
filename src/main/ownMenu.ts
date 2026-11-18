@@ -37,10 +37,7 @@ export interface BuiltMenu {
 
 // The rows the menu view draws, each with an id that means something only in this one menu, and what each id does,
 // which stays in main. Hidden rows go, and separators only ever split two groups.
-export const buildMenu = (
-  items: OwnMenuItem[],
-  options: { mac: boolean; role?: (role: EditRole) => () => void }
-): BuiltMenu => {
+export const buildMenu = (items: OwnMenuItem[], options: { mac: boolean; role?: (role: EditRole) => () => void }): BuiltMenu => {
   const actions = new Map<string, () => void>();
   let next = 0;
   const build = (list: OwnMenuItem[]): MenuEntry[] => {

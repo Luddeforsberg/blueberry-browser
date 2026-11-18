@@ -30,10 +30,26 @@ export const suggestionVisits = (now = Date.now()): Visit[] => {
     const start = at(now, daysAgo, 20, 5 + index * 4);
     visits.push(
       visit("https://www.google.com/search?q=flights+stockholm+lisbon+march", "flights stockholm lisbon march - Google Search", start),
-      visit("https://www.skyscanner.se/transport/flights/arn/lis/260312/260319/", "Cheap flights from Stockholm Arlanda to Lisbon | Skyscanner", start + 2 * 60_000),
-      visit("https://www.kayak.com/flights/STO-LIS/2026-03-12/2026-03-19", "Stockholm (STO) to Lisbon (LIS) flights, 12 Mar – 19 Mar | KAYAK", start + 9 * 60_000),
-      visit("https://www.momondo.se/flight-search/STO-LIS/2026-03-12/2026-03-19", "Stockholm – Lisbon, 12 mar – 19 mar | momondo", start + 15 * 60_000),
-      visit("https://www.skyscanner.se/transport/flights/arn/lis/260312/260319/", "Cheap flights from Stockholm Arlanda to Lisbon | Skyscanner", start + 22 * 60_000)
+      visit(
+        "https://www.skyscanner.se/transport/flights/arn/lis/260312/260319/",
+        "Cheap flights from Stockholm Arlanda to Lisbon | Skyscanner",
+        start + 2 * 60_000,
+      ),
+      visit(
+        "https://www.kayak.com/flights/STO-LIS/2026-03-12/2026-03-19",
+        "Stockholm (STO) to Lisbon (LIS) flights, 12 Mar – 19 Mar | KAYAK",
+        start + 9 * 60_000,
+      ),
+      visit(
+        "https://www.momondo.se/flight-search/STO-LIS/2026-03-12/2026-03-19",
+        "Stockholm – Lisbon, 12 mar – 19 mar | momondo",
+        start + 15 * 60_000,
+      ),
+      visit(
+        "https://www.skyscanner.se/transport/flights/arn/lis/260312/260319/",
+        "Cheap flights from Stockholm Arlanda to Lisbon | Skyscanner",
+        start + 22 * 60_000,
+      ),
     );
   });
   // Arsenal's score, first thing on Mondays.
@@ -43,7 +59,7 @@ export const suggestionVisits = (now = Date.now()): Visit[] => {
     if (morning > now) continue;
     visits.push(
       visit("https://www.flashscore.com/team/arsenal/hA1Zm19f/", "Arsenal live scores, results, fixtures | Flashscore", morning),
-      visit("https://www.flashscore.com/team/arsenal/hA1Zm19f/results/", "Arsenal results | Flashscore", morning + 3 * 60_000)
+      visit("https://www.flashscore.com/team/arsenal/hA1Zm19f/results/", "Arsenal results | Flashscore", morning + 3 * 60_000),
     );
   }
   // A USB-C hub, searched for again and again without settling on one.
@@ -52,9 +68,20 @@ export const suggestionVisits = (now = Date.now()): Visit[] => {
     visits.push(
       visit("https://www.google.com/search?q=best+usb-c+hub", "best usb-c hub - Google Search", start),
       visit("https://www.rtings.com/laptop/reviews/best/usb-c-hubs", "The 6 Best USB-C Hubs of 2026 - RTINGS.com", start + 2 * 60_000),
-      visit("https://www.reddit.com/r/UsbCHardware/comments/1abcde/hub_for_macbook_with_two_monitors/", "Hub for MacBook with two monitors? : r/UsbCHardware", start + 7 * 60_000)
+      visit(
+        "https://www.reddit.com/r/UsbCHardware/comments/1abcde/hub_for_macbook_with_two_monitors/",
+        "Hub for MacBook with two monitors? : r/UsbCHardware",
+        start + 7 * 60_000,
+      ),
     );
-    if (index % 2 === 0) visits.push(visit("https://www.google.com/search?q=usb-c+hub+two+monitors+macbook", "usb-c hub two monitors macbook - Google Search", start + 12 * 60_000));
+    if (index % 2 === 0)
+      visits.push(
+        visit(
+          "https://www.google.com/search?q=usb-c+hub+two+monitors+macbook",
+          "usb-c hub two monitors macbook - Google Search",
+          start + 12 * 60_000,
+        ),
+      );
   });
   // Ordinary work and reading at no particular time.
   [0, 1, 2, 3, 4, 7, 8, 9, 10, 11].forEach((daysAgo, index) => {
@@ -62,10 +89,15 @@ export const suggestionVisits = (now = Date.now()): Visit[] => {
     if (morning > now) return;
     visits.push(
       visit("https://github.com/acme/checkout/pulls", "Pull requests · acme/checkout · GitHub", morning),
-      visit(`https://github.com/acme/checkout/pull/${430 + index}`, `Checkout change ${index + 1} · Pull Request #${430 + index} · acme/checkout · GitHub`, morning + 6 * 60_000)
+      visit(
+        `https://github.com/acme/checkout/pull/${430 + index}`,
+        `Checkout change ${index + 1} · Pull Request #${430 + index} · acme/checkout · GitHub`,
+        morning + 6 * 60_000,
+      ),
     );
     if (index % 3 === 0) visits.push(visit("https://news.ycombinator.com/", "Hacker News", at(now, daysAgo, 12 + (index % 5), 40)));
-    if (index % 4 === 1) visits.push(visit("https://www.youtube.com/watch?v=abc123", "How espresso machines work - YouTube", at(now, daysAgo, 22, 5)));
+    if (index % 4 === 1)
+      visits.push(visit("https://www.youtube.com/watch?v=abc123", "How espresso machines work - YouTube", at(now, daysAgo, 22, 5)));
   });
   // Noise that must never reach the model.
   [1, 2, 3, 5, 8].forEach((daysAgo) => {
@@ -73,7 +105,7 @@ export const suggestionVisits = (now = Date.now()): Visit[] => {
       visit("https://mail.google.com/mail/u/0/#inbox", "Inbox (12) - someone@example.com - Gmail", at(now, daysAgo, 8, 5)),
       visit("https://www.google.com/search?q=sore+throat+three+weeks", "sore throat three weeks - Google Search", at(now, daysAgo, 23, 15)),
       visit("https://internbank.swedbank.se/app", "Swedbank Internetbanken", at(now, daysAgo, 19, 0)),
-      visit("http://localhost:5173/", "acme checkout dev", at(now, daysAgo, 10, 0))
+      visit("http://localhost:5173/", "acme checkout dev", at(now, daysAgo, 10, 0)),
     );
   });
   return visits.filter(({ visitedAt }) => visitedAt <= now - 60_000);
@@ -92,10 +124,19 @@ const seed = (folder: string, now: number) => {
   chat("Summarise checkout v2 notes", "Summarise the checkout v2 notes I pasted", "The notes say…");
   const routines = new RoutineStore(join(folder, "routines.db"));
   const id = routines.create(
-    { name: "Headphone price check", instructions: "Open prisjakt.nu and tell me if the Sony WH-1000XM6 is under 3,500 kr.", schedule: { kind: "daily", time: "07:00" }, sites: ["prisjakt.nu"] },
-    null
+    {
+      name: "Headphone price check",
+      instructions: "Open prisjakt.nu and tell me if the Sony WH-1000XM6 is under 3,500 kr.",
+      schedule: { kind: "daily", time: "07:00" },
+      sites: ["prisjakt.nu"],
+    },
+    null,
   );
-  [[3, "finished"], [2, "failed"], [1, "failed"]].forEach(([daysAgo, status]) => {
+  [
+    [3, "finished"],
+    [2, "failed"],
+    [1, "failed"],
+  ].forEach(([daysAgo, status]) => {
     const run = routines.startRun(id, at(now, daysAgo as number, 7, 0), null);
     routines.finishRun(run, at(now, daysAgo as number, 7, 2), {
       status: status as "finished" | "failed",
@@ -126,15 +167,17 @@ const main = async (folder: string | undefined) => {
     visits: () => history.since(now - 28 * DAY_MS, 5000),
     chats: () => chats.firstMessages(100).map((chat) => ({ ...chat, outcome: chat.replied ? "done" : "no reply" })),
     routines: () =>
-      routines.routines().map((routine): Routine => ({
-        ...routine,
-        scheduleSpec: routine.schedule,
-        schedule: scheduleLabel(routine.schedule),
-        lastResult: "",
-        status: "idle",
-        latestRun: null,
-        unseen: false,
-      })),
+      routines.routines().map(
+        (routine): Routine => ({
+          ...routine,
+          scheduleSpec: routine.schedule,
+          schedule: scheduleLabel(routine.schedule),
+          lastResult: "",
+          status: "idle",
+          latestRun: null,
+          unseen: false,
+        }),
+      ),
     runs: (id) => routines.runs(id),
     mascots: () => [],
     hasModel: () => true,
@@ -161,7 +204,8 @@ const main = async (folder: string | undefined) => {
   console.log("\nShown on the new tab:", JSON.stringify(suggestions.list(), null, 2));
 };
 
-if (process.argv[1]?.endsWith("suggestionsCheck.ts")) void main(process.argv[2]).catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+if (process.argv[1]?.endsWith("suggestionsCheck.ts"))
+  void main(process.argv[2]).catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });

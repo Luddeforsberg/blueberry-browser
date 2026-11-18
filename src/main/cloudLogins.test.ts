@@ -2,9 +2,26 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { CloudLogins, cookieDomainPattern, cookiesForSite, loginSite, MAX_SITES, parseLogins, suggestLoginSites, type CloudCookie, type CookieJar, type StoredCookie } from "./cloudLogins";
+import {
+  CloudLogins,
+  cookieDomainPattern,
+  cookiesForSite,
+  loginSite,
+  MAX_SITES,
+  parseLogins,
+  suggestLoginSites,
+  type CloudCookie,
+  type CookieJar,
+  type StoredCookie,
+} from "./cloudLogins";
 
-const cookie = (domain: string, name = "sid", more: Partial<StoredCookie> = {}): StoredCookie => ({ name, value: `value-of-${name}-at-${domain}`, domain, path: "/", ...more });
+const cookie = (domain: string, name = "sid", more: Partial<StoredCookie> = {}): StoredCookie => ({
+  name,
+  value: `value-of-${name}-at-${domain}`,
+  domain,
+  path: "/",
+  ...more,
+});
 
 describe("loginSite", () => {
   it("takes a host from whatever is typed, without www, path or port", () => {
@@ -49,7 +66,10 @@ describe("cookiesForSite", () => {
   });
 
   it("keeps a host-only cookie's exact path, which an address would widen to its folder", () => {
-    expect(cookiesForSite([cookie("example.com", "sid", { hostOnly: true, path: "/account" })], "example.com")[0]).toMatchObject({ domain: "example.com", path: "/account" });
+    expect(cookiesForSite([cookie("example.com", "sid", { hostOnly: true, path: "/account" })], "example.com")[0]).toMatchObject({
+      domain: "example.com",
+      path: "/account",
+    });
   });
 
   it("keeps a host-only cookie host-only when Electron gives its domain a dot", () => {
@@ -64,7 +84,7 @@ describe("cookiesForSite", () => {
         cookie(".example.com", "gone", { expirationDate: now / 1000 - 1 }),
       ],
       "example.com",
-      now
+      now,
     );
     expect(rest).toEqual([]);
     expect(kept).toMatchObject({ httpOnly: true, secure: true, sameSite: "None", expires: now / 1000 + 60 });
@@ -88,7 +108,16 @@ describe("cookieDomainPattern", () => {
 
 describe("suggestLoginSites", () => {
   it("names the most visited sites first, leaving out those already brought along and anything that isn't a web page", () => {
-    const urls = ["https://github.com/a", "https://www.github.com/b", "https://mail.google.com/", "https://news.ycombinator.com/", "https://news.ycombinator.com/item", "file:///tmp/x.html", "http://127.0.0.1:3000/", "blueberry://settings"];
+    const urls = [
+      "https://github.com/a",
+      "https://www.github.com/b",
+      "https://mail.google.com/",
+      "https://news.ycombinator.com/",
+      "https://news.ycombinator.com/item",
+      "file:///tmp/x.html",
+      "http://127.0.0.1:3000/",
+      "blueberry://settings",
+    ];
     expect(suggestLoginSites(urls, ["mail.google.com"])).toEqual(["github.com", "news.ycombinator.com"]);
     expect(suggestLoginSites(urls, [], 1)).toEqual(["github.com"]);
     expect(suggestLoginSites([], [])).toEqual([]);
@@ -126,7 +155,10 @@ const setup = ({ confirmed = true, cookies = [] as StoredCookie[] } = {}) => {
 };
 
 describe("CloudLogins", () => {
-  const signedIn = [cookie(".example.com", "session", { httpOnly: true, value: "secret-session-value" }), cookie("github.com", "gh", { hostOnly: true, value: "secret-github-value" })];
+  const signedIn = [
+    cookie(".example.com", "session", { httpOnly: true, value: "secret-session-value" }),
+    cookie("github.com", "gh", { hostOnly: true, value: "secret-github-value" }),
+  ];
 
   it("asks first and reads nothing when the user says no", async () => {
     const { logins, readCookies, context } = setup({ confirmed: false, cookies: signedIn });
@@ -194,7 +226,12 @@ describe("CloudLogins", () => {
 
   it("takes no more sites once the list is full, before asking or reading anything, but can bring a listed one again", async () => {
     const { file } = setup();
-    writeFileSync(file, JSON.stringify(Array.from({ length: MAX_SITES }, (_, index) => ({ site: `site${index}.com`, addedAt: 5, checkedAt: null, status: "brought" }))));
+    writeFileSync(
+      file,
+      JSON.stringify(
+        Array.from({ length: MAX_SITES }, (_, index) => ({ site: `site${index}.com`, addedAt: 5, checkedAt: null, status: "brought" })),
+      ),
+    );
     const readCookies = vi.fn(async () => [cookie(".site0.com"), cookie(".example.com")]);
     const confirm = vi.fn(async () => true);
     const logins = new CloudLogins(file, { jar: stable((act) => act(fakeContext())), confirm, readCookies, onChange: () => {} });
@@ -210,9 +247,16 @@ describe("CloudLogins", () => {
     for (const change of ["replaced", "ended"] as const) {
       const file = join(mkdtempSync(join(tmpdir(), "cloud-logins-")), "cloud-logins.json");
       const old = vi.fn(async () => {});
-      let current: { withContext: <T>(act: (jar: CookieJar) => Promise<T>) => Promise<T> } | null = { withContext: (act) => act({ addCookies: old, clearCookies: async () => {} }) };
+      let current: { withContext: <T>(act: (jar: CookieJar) => Promise<T>) => Promise<T> } | null = {
+        withContext: (act) => act({ addCookies: old, clearCookies: async () => {} }),
+      };
       let answer: (yes: boolean) => void = () => {};
-      const logins = new CloudLogins(file, { jar: () => current, confirm: () => new Promise((resolve) => (answer = resolve)), readCookies: async () => signedIn, onChange: () => {} });
+      const logins = new CloudLogins(file, {
+        jar: () => current,
+        confirm: () => new Promise((resolve) => (answer = resolve)),
+        readCookies: async () => signedIn,
+        onChange: () => {},
+      });
       const pending = logins.bring("example.com");
       await Promise.resolve();
       if (change === "ended") logins.cancelPending();
@@ -228,8 +272,15 @@ describe("CloudLogins", () => {
     // A folder where the file should be, so writing it fails.
     const dir = mkdtempSync(join(tmpdir(), "cloud-logins-"));
     const context = fakeContext();
-    const logins = new CloudLogins(dir, { jar: stable((act) => act(context)), confirm: async () => true, readCookies: async () => signedIn, onChange: () => {} });
-    expect(await logins.bring("example.com")).toMatch(/is in the cloud browser, but the list here couldn't be saved.*Forget all cloud logins/);
+    const logins = new CloudLogins(dir, {
+      jar: stable((act) => act(context)),
+      confirm: async () => true,
+      readCookies: async () => signedIn,
+      onChange: () => {},
+    });
+    expect(await logins.bring("example.com")).toMatch(
+      /is in the cloud browser, but the list here couldn't be saved.*Forget all cloud logins/,
+    );
     expect(context.cookies).toHaveLength(1);
   });
 
@@ -243,7 +294,14 @@ describe("CloudLogins", () => {
 
   it("reads back only names and dates, whatever else is in the file", () => {
     const { file } = setup();
-    writeFileSync(file, JSON.stringify([{ site: "example.com", addedAt: 5, checkedAt: null, status: "checked", value: "leaked" }, { site: "EXAMPLE.com", addedAt: 5 }, { site: "x", addedAt: 5 }]));
+    writeFileSync(
+      file,
+      JSON.stringify([
+        { site: "example.com", addedAt: 5, checkedAt: null, status: "checked", value: "leaked" },
+        { site: "EXAMPLE.com", addedAt: 5 },
+        { site: "x", addedAt: 5 },
+      ]),
+    );
     const logins = new CloudLogins(file, { jar: () => null, confirm: async () => true, readCookies: async () => [], onChange: () => {} });
     expect(logins.logins).toEqual([{ site: "example.com", addedAt: 5, checkedAt: null, status: "checked" }]);
     expect(parseLogins("nope")).toEqual([]);

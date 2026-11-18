@@ -35,7 +35,10 @@ export const fileBlocks = (file: StoredFile): ReplyBlock[] => {
   if (file.kind === "text") return [{ type: "text", text: `${open}\n${inside(file.text ?? "", "file")}\n</file>` }];
   if (!file.data) return [];
   const data = file.data.toString("base64");
-  const body: ReplyBlock = file.kind === "picture" ? { type: "image_url", image_url: { url: `data:${file.mime};base64,${data}` } } : { type: "pdf", name: file.name, data };
+  const body: ReplyBlock =
+    file.kind === "picture"
+      ? { type: "image_url", image_url: { url: `data:${file.mime};base64,${data}` } }
+      : { type: "pdf", name: file.name, data };
   return [{ type: "text", text: open }, body, { type: "text", text: "</file>" }];
 };
 

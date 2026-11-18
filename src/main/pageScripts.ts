@@ -59,12 +59,71 @@ export const SHARED = `
 // so this only spots ordinary sites doing ordinary things. It's what decides when to ask, and it's meant to
 // err towards asking.
 const RISKY_WORDS = [
-  "delete", "remove", "discard", "erase", "trash", "clear", "reset", "archive", "cancel", "close account", "deactivate",
-  "send", "post", "publish", "submit", "share", "reply", "comment", "invite", "merge", "deploy", "transfer", "upload",
-  "buy", "pay", "order", "purchase", "checkout", "subscribe", "unsubscribe", "donate", "book", "confirm", "accept",
-  "agree", "approve", "save", "update", "edit", "rename", "install", "sign out", "log out", "logout",
-  "radera", "ta bort", "töm", "avbryt", "skicka", "publicera", "dela", "svara", "kommentera", "köp", "betala",
-  "beställ", "boka", "prenumerera", "bekräfta", "godkänn", "acceptera", "spara", "uppdatera", "ändra", "logga ut",
+  "delete",
+  "remove",
+  "discard",
+  "erase",
+  "trash",
+  "clear",
+  "reset",
+  "archive",
+  "cancel",
+  "close account",
+  "deactivate",
+  "send",
+  "post",
+  "publish",
+  "submit",
+  "share",
+  "reply",
+  "comment",
+  "invite",
+  "merge",
+  "deploy",
+  "transfer",
+  "upload",
+  "buy",
+  "pay",
+  "order",
+  "purchase",
+  "checkout",
+  "subscribe",
+  "unsubscribe",
+  "donate",
+  "book",
+  "confirm",
+  "accept",
+  "agree",
+  "approve",
+  "save",
+  "update",
+  "edit",
+  "rename",
+  "install",
+  "sign out",
+  "log out",
+  "logout",
+  "radera",
+  "ta bort",
+  "töm",
+  "avbryt",
+  "skicka",
+  "publicera",
+  "dela",
+  "svara",
+  "kommentera",
+  "köp",
+  "betala",
+  "beställ",
+  "boka",
+  "prenumerera",
+  "bekräfta",
+  "godkänn",
+  "acceptera",
+  "spara",
+  "uppdatera",
+  "ändra",
+  "logga ut",
 ];
 
 const ASSESS = `
@@ -300,7 +359,7 @@ export const aimClick = (ref: string, mayScroll: boolean, arm = true): string =>
        return { status: "covered", by: (hit && nameOf(hit)) || hit?.tagName.toLowerCase() || "nothing" };
      }
      ${arm ? "expectPressOn(el);" : ""}
-     return { status: "aimed", ...point };`
+     return { status: "aimed", ...point };`,
   );
 
 // False until the input arrives, then true, or "missed" for a press that was stopped. A new page has no record, so
@@ -329,7 +388,7 @@ export const scriptedClick = (ref: string, clicks: 1 | 2): string =>
        el.click();
      }
      if (${clicks} === 2) el.dispatchEvent(new MouseEvent("dblclick", { ...at, detail: 2 }));
-     return "done";`
+     return "done";`,
   );
 
 export const aimHover = (ref: string, mayScroll: boolean): string =>
@@ -340,7 +399,7 @@ export const aimHover = (ref: string, mayScroll: boolean): string =>
      if (point) return { status: "aimed", ...point };
      if (!${mayScroll}) return { status: "scripted" };
      el.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
-     return { status: "scrolled" };`
+     return { status: "scrolled" };`,
   );
 
 // Where an element is, for drawing only. Its name is the label a person reads beside it, never what's in a field.
@@ -366,7 +425,7 @@ export const spotOf = (ref: string): string =>
      };
      const holdsText = el.isContentEditable || el.tagName === "TEXTAREA";
      const name = secret ? "" : holdsText ? clip(el.getAttribute("aria-label") || labelWithoutBox() || el.placeholder || "") : nameOf(el);
-     return { left, top, width: box.width, height: box.height, x: left + box.width / 2, y: top + box.height / 2, viewWidth: innerWidth, viewHeight: innerHeight, name, secret };`
+     return { left, top, width: box.width, height: box.height, x: left + box.width / 2, y: top + box.height / 2, viewWidth: innerWidth, viewHeight: innerHeight, name, secret };`,
   );
 
 export const isHovered = (ref: string): string => withElement(ref, `return el.matches(":hover");`);
@@ -381,7 +440,7 @@ export const scriptedHover = (ref: string): string =>
      for (const [Type, name] of [[PointerEvent, "pointerover"], [PointerEvent, "pointerenter"], [MouseEvent, "mouseover"], [MouseEvent, "mouseenter"], [MouseEvent, "mousemove"]]) {
        el.dispatchEvent(new Type(name, at));
      }
-     return "done";`
+     return "done";`,
   );
 
 export interface DragPlan {
@@ -425,7 +484,7 @@ export const planDrag = (ref: string, toRef: string): string =>
      if (!from || !onto) return { status: "out-of-view" };
      if (!reaches(hitAt(from), el) || !reaches(hitAt(onto), to)) return { status: "covered" };
      expectPressOn(el, { pressOnly: true });
-     return { status: "aimed", from, to: onto };`
+     return { status: "aimed", from, to: onto };`,
   );
 
 export interface FocusInfo {
@@ -475,7 +534,7 @@ export const typeIntoElement = (ref: string, text: string): string =>
      }
      el.dispatchEvent(new Event("change", { bubbles: true }));
      if (el.isContentEditable ? !el.innerText.includes(text) : el.value !== text) return "not-kept";
-     return "done";`
+     return "done";`,
   );
 
 // The same as `typeIntoElement`, a piece at a time, while someone is watching. Ends in `finishTyping`, which falls back
@@ -493,7 +552,7 @@ export const beginTyping = (ref: string): string =>
      el.focus();
      if (el.isContentEditable) doc.getSelection().selectAllChildren(el);
      else el.select?.();
-     return "ready";`
+     return "ready";`,
   );
 
 export const typeChunk = (ref: string, chunk: string): string =>
@@ -501,7 +560,7 @@ export const typeChunk = (ref: string, chunk: string): string =>
     ref,
     // Never takes the focus back, because it may be the user who moved it.
     `if (el.getRootNode().activeElement !== el) return false;
-     return el.ownerDocument.execCommand("insertText", false, ${JSON.stringify(chunk)});`
+     return el.ownerDocument.execCommand("insertText", false, ${JSON.stringify(chunk)});`,
   );
 
 export const finishTyping = (ref: string, text: string): string =>
@@ -512,7 +571,7 @@ export const finishTyping = (ref: string, text: string): string =>
      if (!isThere()) return "again";
      el.dispatchEvent(new Event("change", { bubbles: true }));
      // A page's own listener can change it, and what comes next mustn't go ahead on something else.
-     return isThere() ? "done" : "again";`
+     return isThere() ? "done" : "again";`,
   );
 
 // A real key goes wherever the focus is, and a page can move that after typing.
@@ -526,7 +585,7 @@ export const scriptedEnter = (ref: string): string =>
      const proceed = el.dispatchEvent(new KeyboardEvent("keydown", options));
      el.dispatchEvent(new KeyboardEvent("keyup", options));
      if (proceed && el.form) el.form.requestSubmit();
-     return "done";`
+     return "done";`,
   );
 
 // By its text first, because that's what the user sees and what the card says, then by its value. More than one
@@ -550,7 +609,7 @@ export const describeOption = (ref: string, option: string): string =>
     ref,
     `${FIND_OPTION}
      const found = el.tagName === "SELECT" ? findOption(${JSON.stringify(option)}) : null;
-     return { ${DESCRIBE_FIELDS}, option: found && clip(found.text), optionValue: found?.value ?? null };`
+     return { ${DESCRIBE_FIELDS}, option: found && clip(found.text), optionValue: found?.value ?? null };`,
   );
 
 export const chooseOption = (ref: string, option: string): string =>
@@ -567,7 +626,7 @@ export const chooseOption = (ref: string, option: string): string =>
      found.selected = true;
      el.dispatchEvent(new Event("input", { bubbles: true }));
      el.dispatchEvent(new Event("change", { bubbles: true }));
-     return { status: "done", chosen: clip(found.text) };`
+     return { status: "done", chosen: clip(found.text) };`,
   );
 
 export const selectedOptions = (ref: string): string =>

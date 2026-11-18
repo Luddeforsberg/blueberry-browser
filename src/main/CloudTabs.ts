@@ -62,7 +62,7 @@ export class CloudTabs implements ChatCloud {
     private readonly file: string,
     private readonly hooks: CloudTabsHooks,
     // Only an unpackaged app gets these, like the other test hooks: a Chrome on this computer instead of Browserbase.
-    private readonly local: { endpoint?: string; executable?: string } | null
+    private readonly local: { endpoint?: string; executable?: string } | null,
   ) {
     this.logins = new CloudLogins(join(dirname(file), "cloud-logins.json"), {
       jar: () => this.sessions,
@@ -182,12 +182,18 @@ export class CloudTabs implements ChatCloud {
     if (!sessions) throw new Error("The cloud browser is off.");
     const id = this.hooks.openTab(hostOf(url));
     try {
-      return await sessions.open(jobId, id, url, {
-        onChange: () => {
-          const page = sessions.page(id);
-          if (page) this.hooks.updateTab(id, page.title || hostOf(page.url));
+      return await sessions.open(
+        jobId,
+        id,
+        url,
+        {
+          onChange: () => {
+            const page = sessions.page(id);
+            if (page) this.hooks.updateTab(id, page.title || hostOf(page.url));
+          },
         },
-      }, allows);
+        allows,
+      );
     } catch (error) {
       this.hooks.closeTab(id);
       throw error;
@@ -346,9 +352,15 @@ export class CloudTabs implements ChatCloud {
   private load(): Saved {
     try {
       const saved = JSON.parse(readFileSync(this.file, "utf8"));
-      const open = (value: unknown) => (typeof value === "string" && safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(Buffer.from(value, "base64")) : null);
+      const open = (value: unknown) =>
+        typeof value === "string" && safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(Buffer.from(value, "base64")) : null;
       const text = (value: unknown) => (typeof value === "string" && value.length <= MAX_FIELD_LENGTH ? value : null);
-      return { apiKey: open(saved.apiKey), projectId: open(saved.projectId), contextId: text(saved.contextId), sessionId: text(saved.sessionId) };
+      return {
+        apiKey: open(saved.apiKey),
+        projectId: open(saved.projectId),
+        contextId: text(saved.contextId),
+        sessionId: text(saved.sessionId),
+      };
     } catch {
       return EMPTY;
     }

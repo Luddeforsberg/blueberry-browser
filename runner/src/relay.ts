@@ -70,8 +70,10 @@ const grantHost = (auth: RelayAuth, grantId: string, db: RelayDb): RelayHost => 
 
 // Words for a failed call that say what to do, never what came back.
 const problemWords = (error: unknown): string => {
-  if (error instanceof DbError && error.status === 403) return "This connection to Blueberry has ended, as when the cloud is unlinked in Blueberry. Connect again.";
-  if (error instanceof DbError && error.status === 400) return "Blueberry refused that. There may be too many jobs going at once, or the cloud isn't set up in Blueberry on the Mac.";
+  if (error instanceof DbError && error.status === 403)
+    return "This connection to Blueberry has ended, as when the cloud is unlinked in Blueberry. Connect again.";
+  if (error instanceof DbError && error.status === 400)
+    return "Blueberry refused that. There may be too many jobs going at once, or the cloud isn't set up in Blueberry on the Mac.";
   if (error instanceof DbError && error.status === 0) return "Couldn't reach Blueberry's server. Try again.";
   return "That didn't work in Blueberry. Try again, or connect again if it keeps failing.";
 };
@@ -103,7 +105,7 @@ export const relayApp = (config: RelayConfig, supabase: { url: string; key: stri
       issuerUrl: new URL(config.origin),
       resourceServerUrl: resource,
       resourceName: "Blueberry",
-    })
+    }),
   );
   // Some clients look for the resource's metadata at the root.
   app.get("/.well-known/oauth-protected-resource", (_req, res) => {
@@ -130,7 +132,12 @@ export const relayApp = (config: RelayConfig, supabase: { url: string; key: stri
     for (const tool of tools) {
       server.registerTool(
         tool.name,
-        { title: tool.title, description: tool.description, inputSchema: tool.shape, annotations: { readOnlyHint: tool.readOnly, openWorldHint: true } },
+        {
+          title: tool.title,
+          description: tool.description,
+          inputSchema: tool.shape,
+          annotations: { readOnlyHint: tool.readOnly, openWorldHint: true },
+        },
         async (args: Record<string, unknown>) => {
           let result;
           try {
@@ -142,7 +149,7 @@ export const relayApp = (config: RelayConfig, supabase: { url: string; key: stri
             result = { text: problemWords(error), isError: true, summary: "Failed" };
           }
           return { content: [{ type: "text" as const, text: result.text }], ...(result.isError ? { isError: true } : {}) };
-        }
+        },
       );
     }
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
@@ -155,7 +162,8 @@ export const relayApp = (config: RelayConfig, supabase: { url: string; key: stri
       await transport.handleRequest(req, res, req.body);
     } catch {
       console.error("Relay: a request failed.");
-      if (!res.headersSent) res.status(500).json({ jsonrpc: "2.0", id: null, error: { code: -32000, message: "Something went wrong in Blueberry." } });
+      if (!res.headersSent)
+        res.status(500).json({ jsonrpc: "2.0", id: null, error: { code: -32000, message: "Something went wrong in Blueberry." } });
     }
   });
 

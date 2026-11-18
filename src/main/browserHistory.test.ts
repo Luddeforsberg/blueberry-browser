@@ -21,7 +21,8 @@ describe("reading another browser's history", () => {
   let tempRoot: string;
   let data: BrowserData;
   const read = (id = "chrome", now = NOW) => readBrowserHistory(data, id, { now, tempRoot });
-  const fixture = (visits: Parameters<typeof writeChromiumHistory>[1], profile = "Default") => writeChromiumHistory(chromeHistoryFile(base, profile), visits).close();
+  const fixture = (visits: Parameters<typeof writeChromiumHistory>[1], profile = "Default") =>
+    writeChromiumHistory(chromeHistoryFile(base, profile), visits).close();
 
   beforeEach(() => {
     base = mkdtempSync(join(tmpdir(), "blueberry-browsers-"));
@@ -154,8 +155,16 @@ describe("where browsers keep their data", () => {
 
   it("only lets an unpackaged app be pointed elsewhere, and then looks at no app installed here", () => {
     expect(browserDataFor("darwin", { ...paths, packaged: false })).toEqual({ base: "/demo", layout: "mac" });
-    expect(browserDataFor("darwin", { ...paths, packaged: true })).toEqual({ base: "/app", layout: "mac", apps: ["/Applications", join("/home", "Applications")] });
-    expect(browserDataFor("win32", { ...paths, packaged: true })).toEqual({ base: "/local", layout: "windows", apps: ["/local", "/programs"] });
+    expect(browserDataFor("darwin", { ...paths, packaged: true })).toEqual({
+      base: "/app",
+      layout: "mac",
+      apps: ["/Applications", join("/home", "Applications")],
+    });
+    expect(browserDataFor("win32", { ...paths, packaged: true })).toEqual({
+      base: "/local",
+      layout: "windows",
+      apps: ["/local", "/programs"],
+    });
     expect(browserDataFor("linux", { ...paths, packaged: true })).toBeNull();
   });
 });

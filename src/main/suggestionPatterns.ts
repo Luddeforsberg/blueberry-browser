@@ -63,7 +63,8 @@ const PRIVATE_SUFFIX = /\.(local|internal|lan|corp|home|intranet|localhost)$/;
 const IP_ADDRESS = /^\d+\.\d+\.\d+\.\d+$|^\[/;
 const PRIVATE_LABEL =
   /(^|[.-])(mail|email|webmail|inbox|login|signin|sso|auth|accounts?|pay|payments?|checkout|wallet|health|patient|hospital|intranet|vpn|admin|dating)([.-]|$)/;
-const PRIVATE_WORD = /bank|mail|outlook|proton|nordea|(^|\.)seb\.|paypal|klarna|revolut|swish|skatteverket|kivra|1177|mychart|porn|xvideos|xnxx|onlyfans|tinder|grindr/;
+const PRIVATE_WORD =
+  /bank|mail|outlook|proton|nordea|(^|\.)seb\.|paypal|klarna|revolut|swish|skatteverket|kivra|1177|mychart|porn|xvideos|xnxx|onlyfans|tinder|grindr/;
 const PRIVATE_PATH = /^\/(log-?in|sign-?in|account|billing|checkout|inbox|mail|password)(\/|$)/i;
 // These are how you get somewhere, not somewhere you go. Nothing can be suggested from them.
 const JUST_A_WAY_THERE = /(^|\.)(google|bing|duckduckgo|yahoo|ecosia|kagi|baidu|yandex)\.[a-z.]+$/;
@@ -84,7 +85,8 @@ export const isShareable = (url: string): boolean => {
     if (PRIVATE_PATH.test(pathname) || [...searchParams.keys()].some((key) => SECRET_PARAMETER.test(key))) return false;
     // A fragment can carry parameters as a query does, and sign-in flows put tokens there.
     const fragment = new URLSearchParams(hash.slice(1));
-    if (/access_token|id_token/.test(hash) || [...fragment.keys()].some((key) => key !== hash.slice(1) && SECRET_PARAMETER.test(key))) return false;
+    if (/access_token|id_token/.test(hash) || [...fragment.keys()].some((key) => key !== hash.slice(1) && SECRET_PARAMETER.test(key)))
+      return false;
     return ![...pathname.split("/"), ...searchParams.values(), ...fragment.values()].some((part) => LONG_RANDOM.test(part));
   } catch {
     return false;
@@ -94,7 +96,10 @@ export const isShareable = (url: string): boolean => {
 // One line of text, with nothing in it that could pass for formatting.
 export const plainText = (text: string): string =>
   // eslint-disable-next-line no-control-regex
-  text.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
+  text
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
 export const titleToShare = (title: string): string | null => {
   const clean = plainText(title);
@@ -165,7 +170,9 @@ const median = (values: number[]): number => [...values].sort((a, b) => a - b)[M
 
 // The hour of the day that holds the most different days, if most of the visits fall in it.
 const habitualTime = (visits: PatternVisit[]): { minutes: number; days: number } | null => {
-  const sorted = visits.map(({ visitedAt }) => ({ minutes: minutesOf(visitedAt), day: dayOf(visitedAt) })).sort((a, b) => a.minutes - b.minutes);
+  const sorted = visits
+    .map(({ visitedAt }) => ({ minutes: minutesOf(visitedAt), day: dayOf(visitedAt) }))
+    .sort((a, b) => a.minutes - b.minutes);
   let best: { minutes: number; days: number } | null = null;
   // The day wraps, so a habit around midnight is one hour and not two.
   const wrapped = [...sorted, ...sorted.map(({ minutes, day }) => ({ minutes: minutes + DAY_MINUTES, day }))];
@@ -300,7 +307,10 @@ const togetherPatterns = (sites: SiteVisits[], visits: PatternVisit[], now: numb
         kind: "mascot",
         sites: [a, b].map(({ host, label }) => ({ host, label })),
         why: `You’ve gone back and forth between ${a.label} and ${b.label} ${howOften(days.size, span)}`,
-        pageTitles: [...distinctTitles(a.titles, a.label).slice(0, MAX_TITLES / 2), ...distinctTitles(b.titles, b.label).slice(0, MAX_TITLES / 2)],
+        pageTitles: [
+          ...distinctTitles(a.titles, a.label).slice(0, MAX_TITLES / 2),
+          ...distinctTitles(b.titles, b.label).slice(0, MAX_TITLES / 2),
+        ],
         chatTitles: [],
         schedule: null,
         // Above either site on its own, because noticing the two together is the better catch.
@@ -311,7 +321,9 @@ const togetherPatterns = (sites: SiteVisits[], visits: PatternVisit[], now: numb
 };
 
 const NOT_WORTH_COMPARING = new Set(
-  "about after again also and any are ask can could find for from get give have help how into let like list make me more my need new not now of on please show some tell than that the their them then there these this to today top want was what when where which who why will with would you your".split(" ")
+  "about after again also and any are ask can could find for from get give have help how into let like list make me more my need new not now of on please show some tell than that the their them then there these this to today top want was what when where which who why will with would you your".split(
+    " ",
+  ),
 );
 
 // Cut short so "flights" and "flight", or "cheap" and "cheapest", count as the same word in any language.
@@ -319,7 +331,7 @@ export const wordsOf = (text: string): Set<string> =>
   new Set(
     (text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [])
       .filter((word) => word.length > 2 && !NOT_WORTH_COMPARING.has(word))
-      .map((word) => word.slice(0, WORD_STEM))
+      .map((word) => word.slice(0, WORD_STEM)),
   );
 
 export const areSimilar = (a: Set<string>, b: Set<string>): boolean => {

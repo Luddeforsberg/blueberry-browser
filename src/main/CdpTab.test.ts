@@ -44,7 +44,9 @@ describe.skipIf(!findChrome())("a page in a browser over CDP", () => {
       response.setHeader("content-type", "text/html");
       if (request.url === "/links") {
         const away = origin.replace("127.0.0.1", "localhost");
-        response.end(`<title>Links</title><a href="${away}/popup-link" target="_blank">Link away</a> <button onclick="window.open('${away}/popup-script')">Open away</button> <a href="${origin}/next" target="_blank">Next</a>`);
+        response.end(
+          `<title>Links</title><a href="${away}/popup-link" target="_blank">Link away</a> <button onclick="window.open('${away}/popup-script')">Open away</button> <a href="${origin}/next" target="_blank">Next</a>`,
+        );
         return;
       }
       response.end(request.url === "/" ? PAGE : `<title>${request.url}</title><p>${request.url}</p>`);
@@ -116,7 +118,7 @@ describe.skipIf(!findChrome())("a page in a browser over CDP", () => {
         await tab.runInPage("location.href = '/elsewhere'");
         await tab.settled();
         return "";
-      }
+      },
     );
     expect(refused).toEqual([`${origin}/elsewhere`]);
     expect(tab.url).toBe(`${origin}/`);
@@ -148,7 +150,9 @@ describe.skipIf(!findChrome())("a page in a browser over CDP", () => {
     const main = tab;
     tab = links;
     try {
-      expect(await tool("click").run({ ref: await refOf("Link away") })).toContain("The page tried to go to localhost, which Scout isn't allowed on");
+      expect(await tool("click").run({ ref: await refOf("Link away") })).toContain(
+        "The page tried to go to localhost, which Scout isn't allowed on",
+      );
       expect(await tool("click").run({ ref: await refOf("Open away") })).toMatch(/^Done\./);
       await new Promise((resolve) => setTimeout(resolve, 1000));
     } finally {

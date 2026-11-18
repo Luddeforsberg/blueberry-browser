@@ -24,7 +24,8 @@ export const loginSite = (input: unknown): string | null => {
     return null;
   }
   host = host.replace(/^www\./, "").replace(/\.$/, "");
-  if (!host.includes(".") || host.length > MAX_SITE_LENGTH || !/^[a-z0-9.-]+$/.test(host) || host.split(".").some((label) => !label)) return null;
+  if (!host.includes(".") || host.length > MAX_SITE_LENGTH || !/^[a-z0-9.-]+$/.test(host) || host.split(".").some((label) => !label))
+    return null;
   return host;
 };
 
@@ -133,7 +134,14 @@ export const parseLogins = (data: unknown): CloudLogin[] => {
     const added = time(addedAt);
     if (!site || site !== rawSite || !added || seen.has(site)) return [];
     seen.add(site);
-    return [{ site, addedAt: added, checkedAt: time(checkedAt), status: STATUSES.includes(status as CloudLoginStatus) ? (status as CloudLoginStatus) : "brought" }];
+    return [
+      {
+        site,
+        addedAt: added,
+        checkedAt: time(checkedAt),
+        status: STATUSES.includes(status as CloudLoginStatus) ? (status as CloudLoginStatus) : "brought",
+      },
+    ];
   });
 };
 
@@ -146,7 +154,9 @@ export const withLogin = (logins: CloudLogin[], site: string, now = Date.now()):
 export const withoutLogin = (logins: CloudLogin[], site: string): CloudLogin[] => logins.filter((login) => login.site !== site);
 
 export const withCheck = (logins: CloudLogin[], site: string, signedIn: boolean, now = Date.now()): CloudLogin[] =>
-  logins.map((login): CloudLogin => (login.site === site ? { ...login, checkedAt: now, status: signedIn ? "checked" : "signed-out" } : login));
+  logins.map(
+    (login): CloudLogin => (login.site === site ? { ...login, checkedAt: now, status: signedIn ? "checked" : "signed-out" } : login),
+  );
 
 // The part of a Playwright browser context this needs.
 export interface CookieJar {
@@ -177,7 +187,7 @@ export class CloudLogins {
 
   constructor(
     private readonly file: string,
-    private readonly hooks: CloudLoginsHooks
+    private readonly hooks: CloudLoginsHooks,
   ) {
     try {
       this.list = parseLogins(JSON.parse(readFileSync(file, "utf8")));
@@ -200,22 +210,26 @@ export class CloudLogins {
     const jar = this.hooks.jar();
     if (!jar) return "The cloud browser is off.";
     // Every site on the list needs its Remove, so a full list takes no more until one comes off.
-    if (this.list.length >= MAX_SITES && !this.list.some((login) => login.site === site)) return `There are already ${MAX_SITES} sites in the cloud browser. Remove one first.`;
+    if (this.list.length >= MAX_SITES && !this.list.some((login) => login.site === site))
+      return `There are already ${MAX_SITES} sites in the cloud browser. Remove one first.`;
     const generation = this.generation;
     return this.oneAtATime(async () => {
       if (!(await this.hooks.confirm(site))) return "Nothing was brought along, because it wasn't confirmed.";
       const stored = await this.hooks.readCookies(site).catch(() => null);
       if (!stored) return "Blueberry couldn't read its own sign-in to that site. Try again.";
       const cookies = cookiesForSite(stored, site);
-      if (cookies.length === 0) return `Blueberry isn't signed in to ${site}, so there's nothing to bring along. Sign in there in a tab first.`;
+      if (cookies.length === 0)
+        return `Blueberry isn't signed in to ${site}, so there's nothing to bring along. Sign in there in a tab first.`;
       // The user took a while to confirm, and the browser it was for may have gone meanwhile.
-      if (generation !== this.generation || this.hooks.jar() !== jar) return "Nothing was brought along, because the cloud browser ended or its key changed meanwhile.";
+      if (generation !== this.generation || this.hooks.jar() !== jar)
+        return "Nothing was brought along, because the cloud browser ended or its key changed meanwhile.";
       try {
         await jar.withContext((context) => context.addCookies(cookies));
       } catch {
         return NOT_TAKEN;
       }
-      if (!this.save(withLogin(this.list, site))) return `The sign-in to ${site} is in the cloud browser, but the list here couldn't be saved, so it may not show after a restart. Try again, or use Forget all cloud logins.`;
+      if (!this.save(withLogin(this.list, site)))
+        return `The sign-in to ${site} is in the cloud browser, but the list here couldn't be saved, so it may not show after a restart. Try again, or use Forget all cloud logins.`;
       return null;
     });
   }

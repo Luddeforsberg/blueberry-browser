@@ -17,7 +17,12 @@ const addressOf = (service: AiService, env: Record<string, string | undefined>, 
   return ((!ownAddressOnly && other) || SERVICE_ADDRESS[service]).replace(/\/+$/, "");
 };
 
-const request = (service: AiService, key: string, env: Record<string, string | undefined>, ownAddressOnly: boolean): { url: string; init: RequestInit } => {
+const request = (
+  service: AiService,
+  key: string,
+  env: Record<string, string | undefined>,
+  ownAddressOnly: boolean,
+): { url: string; init: RequestInit } => {
   const { titleModel } = modelsFor(service, env);
   const base = addressOf(service, env, ownAddressOnly);
   if (service === "anthropic") {
@@ -55,7 +60,7 @@ export const tryAiKey = async (
     fetch = globalThis.fetch,
     env = process.env,
     ownAddressOnly = false,
-  }: { fetch?: typeof globalThis.fetch; env?: Record<string, string | undefined>; ownAddressOnly?: boolean } = {}
+  }: { fetch?: typeof globalThis.fetch; env?: Record<string, string | undefined>; ownAddressOnly?: boolean } = {},
 ): Promise<TryOutcome> => {
   const { url, init } = request(service, key, env, ownAddressOnly);
   try {

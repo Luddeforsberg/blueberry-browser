@@ -5,7 +5,27 @@ import type { AiKeyState, AiKeyTried, AiService } from "./aiKey";
 import type { AppIconGround } from "./appIcon";
 import type { FileChip, TabChoice } from "./attachments";
 import type { FirstJob, FirstRunStep } from "./firstRun";
-import type { ChatThread, GalleryLinked, GalleryListing, HandoffNeed, LibrarySnapshot, MascotDraft, MascotLook, MemoryResult, PublishChoices, PublishedMascot, PublishResult, RecordedDraftResult, RecordingState, RoutineDraft, RoutineRun, SavedSiteList, Suggestion, WorkFrame, WorkView } from "./library";
+import type {
+  ChatThread,
+  GalleryLinked,
+  GalleryListing,
+  HandoffNeed,
+  LibrarySnapshot,
+  MascotDraft,
+  MascotLook,
+  MemoryResult,
+  PublishChoices,
+  PublishedMascot,
+  PublishResult,
+  RecordedDraftResult,
+  RecordingState,
+  RoutineDraft,
+  RoutineRun,
+  SavedSiteList,
+  Suggestion,
+  WorkFrame,
+  WorkView,
+} from "./library";
 
 // The chrome view under the tabs, the overlay view that floats the collapsed sidebar over a page, and the
 // find bar, which floats over a page in a view of its own. The prompt view asks about what a site requested, and
@@ -13,14 +33,37 @@ import type { ChatThread, GalleryLinked, GalleryListing, HandoffNeed, LibrarySna
 // composer view is the window beside it that can take the keyboard: the prompt box, the tray and the ask. The suggestions view is the list under the address field while it's
 // being edited, over the page. The menu view draws our menus and the Asking first card over the window, and the desktop
 // menu view the mascot's menu on the desktop, in a window of its own. Only they can answer either.
-export type ChromeRegion = "chrome" | "overlay" | "find" | "prompt" | "desktop" | "composer" | "suggestions" | "tooltip" | "preview" | "menu" | "drop-menu";
+export type ChromeRegion =
+  | "chrome"
+  | "overlay"
+  | "find"
+  | "prompt"
+  | "desktop"
+  | "composer"
+  | "suggestions"
+  | "tooltip"
+  | "preview"
+  | "menu"
+  | "drop-menu";
 
 export type LayoutMode = "vertical" | "horizontal";
 
 export type ResizablePanel = "sidebar" | "chat";
 
 // Pages the chrome draws itself. They open as tabs, on the same card as a web page.
-export type InternalPage = "new-tab" | "chat" | "routines" | "settings" | "downloads" | "gallery" | "history" | "flock" | "mascot-gallery" | "needs-you" | "recording" | "cloud";
+export type InternalPage =
+  | "new-tab"
+  | "chat"
+  | "routines"
+  | "settings"
+  | "downloads"
+  | "gallery"
+  | "history"
+  | "flock"
+  | "mascot-gallery"
+  | "needs-you"
+  | "recording"
+  | "cloud";
 
 export type Appearance = "system" | "light" | "dark";
 
@@ -362,7 +405,10 @@ export interface Rect {
 // Where each region of the window goes, in window coordinates. Closed regions have no size.
 // In the horizontal layout, what opens over the page from the toolbar: Chats, or a mascot's card. `anchor` is what was
 // pressed, in the window, for the panel to open under.
-export type Popover = { kind: "chats"; anchor: Rect } | { kind: "mascot"; mascotId: string; anchor: Rect } | { kind: "account"; anchor: Rect };
+export type Popover =
+  | { kind: "chats"; anchor: Rect }
+  | { kind: "mascot"; mascotId: string; anchor: Rect }
+  | { kind: "account"; anchor: Rect };
 
 // What's open over the page, and when it closed, whether the keyboard goes back to what opened it.
 export interface PopoverState {
@@ -473,8 +519,27 @@ export type TooltipShown = TooltipRequest;
 
 // DESIGN.md section 8, Menus. The icon a row may lead with, drawn by the menu view.
 export type MenuIcon =
-  | "rename" | "delete" | "back" | "forward" | "reload" | "copy" | "cut" | "paste" | "undo" | "redo" | "select-all"
-  | "link" | "new-tab" | "save" | "berry" | "show-how" | "print" | "inspect" | "pin" | "bookmark" | "open";
+  | "rename"
+  | "delete"
+  | "back"
+  | "forward"
+  | "reload"
+  | "copy"
+  | "cut"
+  | "paste"
+  | "undo"
+  | "redo"
+  | "select-all"
+  | "link"
+  | "new-tab"
+  | "save"
+  | "berry"
+  | "show-how"
+  | "print"
+  | "inspect"
+  | "pin"
+  | "bookmark"
+  | "open";
 
 // A menu as main sends it to the menu view: words, icons and state only. Main keeps what each row does, by its id, for
 // this one menu, so the view answers with nothing but the id that was pressed.
@@ -622,7 +687,10 @@ export interface CloudLogin {
 
 // What a cloud tab shows: the provider's live view in a frame, or pictures sent as `cloud:frame`.
 // `checking` names the site when the user opened it to see whether they're signed in there.
-export type CloudView = { kind: "live"; url: string; takenOver: boolean; checking: string | null } | { kind: "frames"; takenOver: boolean; checking: string | null } | { kind: "gone" };
+export type CloudView =
+  | { kind: "live"; url: string; takenOver: boolean; checking: string | null }
+  | { kind: "frames"; takenOver: boolean; checking: string | null }
+  | { kind: "gone" };
 
 export interface CloudFrame {
   tabId: string;
@@ -697,7 +765,22 @@ export interface InvokeChannels {
   "overlay:hide": { region: "overlay"; args: []; result: void };
   "overlay:open-popover": { region: "chrome"; args: [popover: Popover]; result: void };
   "overlay:close-popover": { region: "chrome" | "overlay"; args: [refocus: boolean]; result: void };
-  "theme:get": { region: "chrome" | "overlay" | "find" | "prompt" | "desktop" | "composer" | "suggestions" | "tooltip" | "preview" | "menu" | "drop-menu"; args: []; result: ThemeState };
+  "theme:get": {
+    region:
+      | "chrome"
+      | "overlay"
+      | "find"
+      | "prompt"
+      | "desktop"
+      | "composer"
+      | "suggestions"
+      | "tooltip"
+      | "preview"
+      | "menu"
+      | "drop-menu";
+    args: [];
+    result: ThemeState;
+  };
   "library:get": { region: "chrome" | "overlay"; args: []; result: LibrarySnapshot };
   "bookmarks:toggle": { region: "chrome"; args: []; result: void };
   // Moves a saved site on top as a tile, or into the bookmarks, at a place in that list. Dragging and the menu both use it.
@@ -786,7 +869,11 @@ export interface InvokeChannels {
   "routines:stop": { region: "chrome"; args: [runId: string]; result: boolean };
   "routines:runs": { region: "chrome"; args: [id: string]; result: RoutineRun[] };
   "routines:mark-seen": { region: "chrome"; args: []; result: void };
-  "mascots:save": { region: "chrome"; args: [id: string | null, draft: MascotDraft & { worksInCloud?: boolean }]; result: MascotSaveResult };
+  "mascots:save": {
+    region: "chrome";
+    args: [id: string | null, draft: MascotDraft & { worksInCloud?: boolean }];
+    result: MascotSaveResult;
+  };
   // Asks first, in main.
   "mascots:delete": { region: "chrome"; args: [id: string]; result: boolean };
   "mascots:gallery": { region: "chrome"; args: []; result: GalleryListing };
@@ -797,7 +884,11 @@ export interface InvokeChannels {
   "mascots:gallery-linked": { region: "chrome"; args: [galleryId: string]; result: GalleryLinked };
   // By the entry's id, so main copies what it has rather than what a renderer sends. A name is only for one that clashes.
   // `version` is the one the review showed, so what's added is what was read.
-  "mascots:add-from-gallery": { region: "chrome"; args: [galleryId: string, version: string, name: string | null]; result: MascotSaveResult };
+  "mascots:add-from-gallery": {
+    region: "chrome";
+    args: [galleryId: string, version: string, name: string | null];
+    result: MascotSaveResult;
+  };
   // By the mascot's id, so what goes public is read in main, not sent by a renderer. Only the choices come from there.
   "mascots:publish": { region: "chrome"; args: [mascotId: string, choices: PublishChoices]; result: PublishResult };
   // Asks first, in main.

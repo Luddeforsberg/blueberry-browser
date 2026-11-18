@@ -12,12 +12,36 @@ type Row = Record<string, unknown> & { id: string; owner: string; hidden: boolea
 // The cloud runner's functions, which run in real Postgres here with the real migration, as the user each token stands
 // for, so the app and the runner, which signs in as a user of its own, meet the real rules.
 const CLOUD_FUNCTIONS = new Set([
-  "start_cloud_job", "my_cloud_jobs", "stop_cloud_job", "decide_cloud_approval", "forget_cloud_job", "forget_cloud_conversation",
-  "link_cloud_runner", "unlink_cloud_runner", "my_cloud_runner", "accept_cloud_runner_link",
-  "runner_claim_job", "runner_update_job", "runner_ask", "runner_decision",
-  "sync_cloud_flock", "save_push_subscription", "forget_push_subscription", "runner_push_subscriptions", "runner_forget_push_subscription", "runner_set_relay_url",
-  "create_relay_grant", "revoke_relay_grants", "relay_flock", "relay_start_job", "relay_jobs", "relay_stop_job", "relay_revoke_grant",
-  "mac_presence", "mac_claim_job", "mac_update_job",
+  "start_cloud_job",
+  "my_cloud_jobs",
+  "stop_cloud_job",
+  "decide_cloud_approval",
+  "forget_cloud_job",
+  "forget_cloud_conversation",
+  "link_cloud_runner",
+  "unlink_cloud_runner",
+  "my_cloud_runner",
+  "accept_cloud_runner_link",
+  "runner_claim_job",
+  "runner_update_job",
+  "runner_ask",
+  "runner_decision",
+  "sync_cloud_flock",
+  "save_push_subscription",
+  "forget_push_subscription",
+  "runner_push_subscriptions",
+  "runner_forget_push_subscription",
+  "runner_set_relay_url",
+  "create_relay_grant",
+  "revoke_relay_grants",
+  "relay_flock",
+  "relay_start_job",
+  "relay_jobs",
+  "relay_stop_job",
+  "relay_revoke_grant",
+  "mac_presence",
+  "mac_claim_job",
+  "mac_update_job",
 ]);
 // Tables the phone page reads with a plain select, as the user each token stands for, so row-level security decides.
 const CLOUD_TABLES = new Set(["cloud_jobs", "cloud_flock"]);
@@ -48,7 +72,10 @@ const cloudDatabase = async () => {
       await db.query("select set_config('test.uid', $1, false)", [uid ?? ""]);
       await db.exec(`set role ${role}`);
       try {
-        const { rows } = await db.query<Record<string, unknown>>(`select * from public.${name}(${names.map((key, at) => `${key} => $${at + 1}`).join(", ")})`, names.map((key) => args[key]));
+        const { rows } = await db.query<Record<string, unknown>>(
+          `select * from public.${name}(${names.map((key, at) => `${key} => $${at + 1}`).join(", ")})`,
+          names.map((key) => args[key]),
+        );
         // A function returning one value answers with it, as the REST API does. One returning rows answers with them.
         return rows.length === 1 && Object.keys(rows[0]).length === 1 && name in rows[0] ? rows[0][name] : rows;
       } finally {
@@ -150,7 +177,8 @@ export const startFakeSupabase = async ({ cloudJobs = false }: { cloudJobs?: boo
     }
     if (route === "POST /auth/v1/token" && url.searchParams.get("grant_type") === "password") {
       const account = accounts.get(body.email);
-      if (!account || account.password !== body.password) return answer(400, { error_code: "invalid_credentials", msg: "Invalid login credentials" });
+      if (!account || account.password !== body.password)
+        return answer(400, { error_code: "invalid_credentials", msg: "Invalid login credentials" });
       return answer(200, sessionFor(body.email, account.id));
     }
     if (route === "POST /auth/v1/token" && url.searchParams.get("grant_type") === "refresh_token") {
@@ -181,8 +209,16 @@ export const startFakeSupabase = async ({ cloudJobs = false }: { cloudJobs?: boo
       }
     }
 
-    if (route === "GET /rest/v1/mascots") return answer(200, rows.filter((row) => !row.hidden && (!id || row.id === id)).map(({ owner: _owner, hidden: _hidden, ...row }) => row));
-    if (route === "POST /rest/v1/rpc/my_mascots") return answer(200, rows.filter((row) => row.owner === uid).map(({ owner: _owner, ...row }) => row));
+    if (route === "GET /rest/v1/mascots")
+      return answer(
+        200,
+        rows.filter((row) => !row.hidden && (!id || row.id === id)).map(({ owner: _owner, hidden: _hidden, ...row }) => row),
+      );
+    if (route === "POST /rest/v1/rpc/my_mascots")
+      return answer(
+        200,
+        rows.filter((row) => row.owner === uid).map(({ owner: _owner, ...row }) => row),
+      );
     if (route === "POST /rest/v1/rpc/record_add") {
       const row = rows.find((candidate) => candidate.id === body.p_mascot);
       const adder = `${body.p_mascot} ${uid ?? body.p_install}`;
@@ -206,7 +242,10 @@ export const startFakeSupabase = async ({ cloudJobs = false }: { cloudJobs?: boo
     if (route === "DELETE /rest/v1/mascots") {
       const at = rows.findIndex((candidate) => candidate.id === id && candidate.owner === uid);
       const removed = at >= 0 ? rows.splice(at, 1) : [];
-      return answer(200, removed.map((row) => ({ id: row.id })));
+      return answer(
+        200,
+        removed.map((row) => ({ id: row.id })),
+      );
     }
     return answer(404, { message: "Not here" });
   });
@@ -220,7 +259,14 @@ export const startFakeSupabase = async ({ cloudJobs = false }: { cloudJobs?: boo
     state,
     // A row as someone else, or something else, might have stored it.
     seed: (row: Record<string, unknown>) => {
-      const seeded: Row = { id: randomUUID(), owner: randomUUID(), hidden: false, add_count: 0, created_at: new Date().toISOString(), ...row };
+      const seeded: Row = {
+        id: randomUUID(),
+        owner: randomUUID(),
+        hidden: false,
+        add_count: 0,
+        created_at: new Date().toISOString(),
+        ...row,
+      };
       rows.push(seeded);
       return seeded;
     },

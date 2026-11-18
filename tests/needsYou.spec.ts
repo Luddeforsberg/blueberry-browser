@@ -55,7 +55,9 @@ test("an approval answered from Needs you lets the job carry on", async () => {
 
     await expect(chrome.getByText("Allowed. Berry carries on.")).toBeVisible();
     await expect(chrome.getByText("1 of 1 answered")).toBeVisible();
-    await expect.poll(async () => (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id))?.messages.at(-1)?.content).toBe("All done");
+    await expect
+      .poll(async () => (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id))?.messages.at(-1)?.content)
+      .toBe("All done");
     await expect(chrome.getByText("Nothing needs you right now.")).toBeVisible();
     // Its tab closed once it was done.
     expect((await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).some((tab) => tab.url === address)).toBe(false);
@@ -115,7 +117,10 @@ test("a sign-in goes to the user, nothing typed reaches the model, and I'm done 
     const address = `${site.origin}/account`;
     model.callTools({ name: "open_tab", args: { url: address } });
     model.callTools({ name: "hand_to_user", args: { need: "sign-in" } });
-    const sent = await chrome.evaluate((origin) => window.chromeAPI.chat.send(null, `Check my orders on ${origin}`, { seePage: false }), site.origin);
+    const sent = await chrome.evaluate(
+      (origin) => window.chromeAPI.chat.send(null, `Check my orders on ${origin}`, { seePage: false }),
+      site.origin,
+    );
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("needs-you"));
 
     const row = chrome.getByRole("region", { name: "Berry needs you" });
@@ -141,7 +146,9 @@ test("a sign-in goes to the user, nothing typed reaches the model, and I'm done 
     model.callTools({ name: "read_page", args: { tabId: tab.id } });
     model.replyWith("Tried");
     const other = await chrome.evaluate(() => window.chromeAPI.chat.send(null, "What's on this page?", { seePage: true }));
-    await expect.poll(async () => (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), other!.id))?.messages.at(-1)?.content).toBe("Tried");
+    await expect
+      .poll(async () => (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), other!.id))?.messages.at(-1)?.content)
+      .toBe("Tried");
     const seenFromOtherChat = JSON.stringify(model.requests.slice(asked));
     expect(seenFromOtherChat).not.toContain("Order 4471");
     expect(seenFromOtherChat).toContain("something private");
@@ -152,7 +159,9 @@ test("a sign-in goes to the user, nothing typed reaches the model, and I'm done 
     model.callTools({ name: "read_page", args: {} });
     model.replyWith("Order 4471 arrives on Tuesday");
     await chrome.getByRole("button", { name: "I’m done" }).click();
-    await expect.poll(async () => (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id))?.messages.at(-1)?.content).toBe("Order 4471 arrives on Tuesday");
+    await expect
+      .poll(async () => (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id))?.messages.at(-1)?.content)
+      .toBe("Order 4471 arrives on Tuesday");
     const resumed = JSON.stringify(model.requests.slice(before));
     expect(resumed).toContain("yours again");
     expect(resumed).toContain("Order 4471");

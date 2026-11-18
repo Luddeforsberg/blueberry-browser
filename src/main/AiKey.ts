@@ -26,7 +26,7 @@ export class AiKey {
     private readonly onChange: () => void,
     // A packaged app only ever tries a key at the service's own address.
     private readonly tryKey: (service: SavedKey["service"], key: string) => Promise<TryOutcome> = (service, key) =>
-      tryAiKey(service, key, { ownAddressOnly: app.isPackaged })
+      tryAiKey(service, key, { ownAddressOnly: app.isPackaged }),
   ) {
     this.saved = this.load();
   }
