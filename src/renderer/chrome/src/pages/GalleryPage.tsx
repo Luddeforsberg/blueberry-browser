@@ -362,7 +362,7 @@ export const GalleryPage: React.FC = () => {
                         <GalleryTile entry={SAMPLE_GALLERY_ENTRY} onPick={() => undefined} />
                         <GalleryTile entry={SAMPLE_GALLERY_ENTRY} yours onPick={() => undefined} />
                         <GalleryTile entry={{ ...SAMPLE_GALLERY_ENTRY, author: 'Ana', addCount: 12, publishedAt: 1, draft: { ...SAMPLE_MASCOT, look: { palette: 'parakeet', accessory: 'cap' } } }} onPick={() => undefined} />
-                        <GalleryTile entry={{ ...SAMPLE_GALLERY_ENTRY, draft: { ...SAMPLE_MASCOT, look: { palette: 'jackdaw', accessory: 'glasses' } } }} narrow onPick={() => undefined} />
+                        <GalleryTile entry={{ ...SAMPLE_GALLERY_ENTRY, draft: { ...SAMPLE_MASCOT, look: { palette: 'jackdaw', accessory: 'glasses' } } }} onPick={() => undefined} />
                     </div>
                     <div className="mt-6 py-6 rounded-tile bg-well">
                         <StepCard

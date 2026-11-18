@@ -1,6 +1,6 @@
 import type { GalleryMascot, MascotPalette } from '@shared/library'
 // Relative because the unit tests have no alias for them.
-import { MAX_MASCOT_NAME } from '../../../shared/mascots'
+import { MAX_MASCOT_NAME, permissionsInWords } from '../../../shared/mascots'
 import { GALLERY_CATEGORIES } from '../../../shared/publishing'
 
 // What's typed in the search and the kind of job chosen. Which mascot is open lives in the tab's param
@@ -60,10 +60,6 @@ export const sortGallery = (entries: readonly GalleryMascot[]): GalleryMascot[] 
     ...entries.filter((entry) => !fromPeople(entry)),
 ]
 
-// The three published ones with the most adds. None until something has been added.
-export const mostAdded = (entries: readonly GalleryMascot[]): GalleryMascot[] =>
-    entries.filter((entry) => fromPeople(entry) && (entry.addCount ?? 0) > 0).sort(byAdds).slice(0, 3)
-
 // The kinds of job that have any, each with how many, in the order publishing offers them.
 export const galleryKinds = (entries: readonly GalleryMascot[]): { kind: string; count: number }[] => {
     const known = [...GALLERY_CATEGORIES, ...entries.map((entry) => entry.category)]
@@ -89,12 +85,29 @@ export const galleryGroups = (entries: readonly GalleryMascot[], query: string, 
     return groups.filter((group) => group.entries.length > 0)
 }
 
-// The one ↑ or ↓ goes to, staying at either end. From nothing picked, ↓ starts at the top and ↑ at the bottom.
-export const neighbour = (ids: readonly string[], picked: string | null, step: 1 | -1): string | null => {
-    if (ids.length === 0) return null
-    const at = picked === null ? -1 : ids.indexOf(picked)
-    if (at === -1) return step === 1 ? ids[0] : ids[ids.length - 1]
-    return ids[Math.min(ids.length - 1, Math.max(0, at + step))]
+// How many times a person's was added, for its tile ("Sam K. · 1,204 adds") and its page ("1,204 times").
+const counted = (count: number, one: string, many: string) => `${count.toLocaleString()} ${count === 1 ? one : many}`
+export const addsLine = (entry: GalleryMascot) => `${entry.author} · ${counted(entry.addCount ?? 0, 'add', 'adds')}`
+
+export interface GalleryFact {
+    label: 'Made by' | 'Added' | 'Visits' | 'Can' | 'Kind of job'
+    // A line each, and `limited` only for a real limit, which is the only one with a padlock.
+    lines: { text: string; limited: boolean }[]
+    mono?: boolean
+}
+
+// The facts on a mascot's page. Where it goes and what it can do are `permissionsInWords`, read from the sites and tools
+// the tool layer enforces, never from what the entry says about itself. A starter has no count, so no Added.
+export const galleryFacts = (entry: GalleryMascot): GalleryFact[] => {
+    const [where, ...hands] = permissionsInWords(entry.draft).map(({ text, open }) => ({ text, limited: !open }))
+    const plain = (text: string) => [{ text, limited: false }]
+    return [
+        { label: 'Made by', lines: plain(entry.author) },
+        ...(fromPeople(entry) ? [{ label: 'Added' as const, lines: plain(counted(entry.addCount ?? 0, 'time', 'times')), mono: true }] : []),
+        { label: 'Visits', lines: [where] },
+        { label: 'Can', lines: hands },
+        { label: 'Kind of job', lines: plain(entry.category) },
+    ]
 }
 
 // The Gallery tells mascots apart by their berry, so it names each one in full.

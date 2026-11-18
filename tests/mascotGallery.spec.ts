@@ -11,7 +11,7 @@ import { startFakeModel } from "./fakeModel";
 // The mascots a group shows, by name, in order.
 const names = (group: Locator) => group.getByRole("button").evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label")));
 
-test("a Gallery mascot is picked, read, added as a limited copy, chats, and can come back after being deleted", async () => {
+test("a Gallery tile opens its page, which shows its moods, adds a limited copy, chats, and can come back after being deleted", async () => {
   const model = await startFakeModel();
   const profile = mkdtempSync(join(tmpdir(), "blueberry-mascot-gallery-"));
   const app = await launchApp(profile, { modelEnv: model.env });
@@ -21,11 +21,10 @@ test("a Gallery mascot is picked, read, added as a limited copy, chats, and can 
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock"));
     await chrome.getByRole("button", { name: "Gallery", exact: true }).click();
 
-    // The whole Gallery: with no server there's nothing from people and nothing most added.
+    // The whole Gallery: with no server there's nothing from people.
     const blueberry = chrome.getByRole("region", { name: "From Blueberry" });
     await expect(blueberry.getByRole("button", { name: /^Prospector/ })).toBeVisible();
     await expect(chrome.getByRole("region", { name: "From people" })).toHaveCount(0);
-    await expect(chrome.getByRole("region", { name: "Most added" })).toHaveCount(0);
 
     // The search and the kinds of job really filter.
     await chrome.getByLabel("Search the Gallery").fill("pipedrive.com");
@@ -41,45 +40,64 @@ test("a Gallery mascot is picked, read, added as a limited copy, chats, and can 
     await chrome.evaluate(() =>
       window.chromeAPI.mascots.save(null, { name: "Meeting Prep", look: { palette: "robin", accessory: "cap" }, instructions: "Mine.", sites: [], tools: [] })
     );
+    // A tile opens its page in the same tab, in place of the tiles.
     await blueberry.getByRole("button", { name: /^Meeting Prep/ }).click();
     const page = chrome.getByRole("article", { name: "Meeting Prep" });
-    await expect(page.getByRole("list", { name: "What it’s allowed to do" }).getByRole("listitem")).toHaveText(["Can search the web and go anywhere", "Can’t type or click"]);
-    await expect(page.getByRole("list", { name: "What it’s allowed to do" }).getByLabel("Limited")).toHaveCount(1);
+    await expect(blueberry).toHaveCount(0);
+    const facts = page.getByLabel("About it");
+    await expect(facts).toContainText("Can search the web and go anywhere");
+    await expect(facts).toContainText("Can’t type or click");
+    await expect(facts.getByLabel("Limited")).toHaveCount(1);
     await expect(page.getByText("Before a call, I'll name the company")).toBeVisible();
     await expect(page.getByRole("region", { name: "An example" })).toContainText("Prep me for a call");
     expect(await param()).toBe("meeting-prep");
 
-    // The list beside it: ↓ moves to the next and the page follows, and Back goes to the whole Gallery.
-    const list = chrome.getByRole("complementary", { name: "Gallery" });
-    await expect(list.getByRole("button", { name: /^Meeting Prep/ })).toHaveAttribute("aria-current", "true");
-    await list.getByRole("button", { name: /^Meeting Prep/ }).focus();
-    await chrome.keyboard.press("ArrowDown");
+    // The switch on the stage really changes the mood it's drawn in.
+    const stage = (mood: string) => page.getByRole("img", { name: `Meeting Prep, ${mood}`, exact: true });
+    await expect(page.getByRole("radio", { name: "At rest" })).toBeChecked();
+    await page.getByRole("radio", { name: "Working" }).click();
+    await expect(stage("thinking")).toHaveCount(1);
+    await page.getByRole("radio", { name: "Asking" }).click();
+    await expect(stage("waiting for your decision")).toHaveCount(1);
+    await expect(stage("thinking")).toHaveCount(0);
+
+    // The crumb goes back to the tiles, with the tile it came from keeping the keyboard.
+    const crumb = chrome.getByRole("navigation", { name: "Where you are" });
+    await expect(crumb).toContainText("Meeting Prep");
+    await crumb.getByRole("button", { name: "Gallery" }).click();
+    expect(await param()).toBe("all");
+    await expect(blueberry.getByRole("button", { name: /^Meeting Prep/ })).toBeFocused();
+
+    // Picked with the keyboard, the crumb has it, and Esc goes back to the tile.
+    await blueberry.getByRole("button", { name: /^Follow-up/ }).focus();
+    await chrome.keyboard.press("Enter");
     await expect(chrome.getByRole("article", { name: "Follow-up" })).toBeVisible();
-    await expect(list.getByRole("button", { name: /^Follow-up/ })).toBeFocused();
+    await expect(crumb.getByRole("button", { name: "Gallery" })).toBeFocused();
     await expect(chrome.getByRole("article", { name: "Follow-up" }).getByRole("region", { name: "An example" })).toHaveCount(0);
+    await chrome.keyboard.press("Escape");
+    await expect(blueberry.getByRole("button", { name: /^Follow-up/ })).toBeFocused();
+
+    // The toolbar's Back does the same.
+    await blueberry.getByRole("button", { name: /^Follow-up/ }).click();
+    await expect(chrome.getByRole("article", { name: "Follow-up" })).toBeVisible();
     await chrome.evaluate(async () => window.chromeAPI.browser.goBack((await window.chromeAPI.browser.getTabs()).find((tab) => tab.isActive)!.id));
     await expect(blueberry).toBeVisible();
     expect(await param()).toBe("all");
-    await expect(blueberry.getByRole("button", { name: /^Follow-up/ })).toBeFocused();
-
-    // Picked with the keyboard, its row has it, so ↓ goes on from there. Esc closes the page, and the one looked at
-    // keeps the keyboard.
-    await chrome.keyboard.press("Enter");
-    await expect(chrome.getByRole("article", { name: "Follow-up" })).toBeVisible();
-    await expect(list.getByRole("button", { name: /^Follow-up/ })).toBeFocused();
-    await chrome.keyboard.press("Escape");
     await expect(blueberry.getByRole("button", { name: /^Follow-up/ })).toBeFocused();
 
     await blueberry.getByRole("button", { name: /^Meeting Prep/ }).click();
     const rename = page.getByLabel("You already have a Meeting Prep, so this one needs another name.");
     await expect(rename).toHaveValue("Meeting Prep 2");
     await rename.fill("meeting prep");
-    await page.getByRole("button", { name: "Add Meeting Prep" }).click();
+    await page.getByRole("button", { name: "Add Meeting Prep to your flock" }).click();
     await expect(page.getByRole("alert")).toContainText("Give this one its own name");
     await rename.fill("Briefer");
-    await page.getByRole("button", { name: "Add Meeting Prep" }).click();
-    await expect(page.getByRole("status")).toContainText("Added to your mascots");
-    await expect(list.getByRole("button", { name: "Meeting Prep, yours" })).toContainText("Yours");
+    await page.getByRole("button", { name: "Add Meeting Prep to your flock" }).click();
+    await expect(page.getByRole("status")).toHaveText("Added. It’s your own copy, so nothing in the Gallery can change it.");
+    // Added, the mascot on the stage looks pleased, and its page is a press away.
+    await expect(page.getByRole("img", { name: "Briefer, finished", exact: true })).toHaveCount(1);
+    await expect(page.getByRole("radio", { name: "Done" })).toBeChecked();
+    await expect(page.getByRole("button", { name: "Its page" })).toBeVisible();
 
     const saved = JSON.parse(readFileSync(join(profile, "mascots.json"), "utf8")) as Record<string, unknown>[];
     const copy = saved.find(({ name }) => name === "Briefer");
@@ -101,11 +119,11 @@ test("a Gallery mascot is picked, read, added as a limited copy, chats, and can 
     expect(tools).not.toContain("click");
     expect(tools).not.toContain("type_text");
 
-    // The Gallery tab still has its page, which says it's yours and offers no Add. Closed, its tile says Yours.
+    // The Gallery tab still has its page, which says it's yours and offers no Add. Back on the tiles, its tile says Yours.
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("mascot-gallery"));
     await expect(page.getByRole("button", { name: "Chat with Briefer" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Add Meeting Prep" })).toHaveCount(0);
-    await page.getByRole("button", { name: "Close" }).click();
+    await expect(page.getByRole("button", { name: "Add Meeting Prep to your flock" })).toHaveCount(0);
+    await crumb.getByRole("button", { name: "Gallery" }).click();
     await expect(blueberry.getByRole("button", { name: "Meeting Prep, yours" })).toContainText("Yours");
 
     // Deleted, it can be added again.
@@ -116,7 +134,7 @@ test("a Gallery mascot is picked, read, added as a limited copy, chats, and can 
     expect(await chrome.evaluate((mascot) => window.chromeAPI.mascots.delete(mascot), id)).toBe(true);
     await expect(blueberry.getByRole("button", { name: "Meeting Prep", exact: true })).not.toContainText("Yours");
     await blueberry.getByRole("button", { name: /^Meeting Prep/ }).click();
-    await expect(page.getByRole("button", { name: "Add Meeting Prep" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add Meeting Prep to your flock" })).toBeVisible();
   } finally {
     await app.close();
     model.close();
