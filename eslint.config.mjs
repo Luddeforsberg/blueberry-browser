@@ -3,6 +3,7 @@ import eslintConfigPrettier from "@electron-toolkit/eslint-config-prettier";
 import eslintPluginReact from "eslint-plugin-react";
 import eslintPluginReactHooks from "eslint-plugin-react-hooks";
 import eslintPluginReactRefresh from "eslint-plugin-react-refresh";
+import { complexityOver, linesOver, paramsOver } from "./eslint.limits.mjs";
 
 export default tseslint.config(
   { ignores: ["**/node_modules", "**/dist", "**/out", "site/**", "src/main/pageActorArt.ts"] },
@@ -61,5 +62,19 @@ export default tseslint.config(
     files: ["**/*.cjs", "tailwind.config.js"],
     rules: { "@typescript-eslint/no-require-imports": "off" },
   },
+  {
+    // Small files and simple functions. Files over a limit today are held where they are in eslint.limits.mjs.
+    files: ["**/*.{ts,tsx,js,mjs,cjs}"],
+    rules: {
+      "max-lines": ["error", 400],
+      complexity: ["error", 20],
+      "max-params": ["error", 4],
+      "max-depth": ["error", 4],
+      "max-nested-callbacks": ["error", 4],
+    },
+  },
+  ...Object.entries(linesOver).map(([file, max]) => ({ files: [file], rules: { "max-lines": ["error", max] } })),
+  ...Object.entries(complexityOver).map(([file, max]) => ({ files: [file], rules: { complexity: ["error", max] } })),
+  ...Object.entries(paramsOver).map(([file, max]) => ({ files: [file], rules: { "max-params": ["error", max] } })),
   eslintConfigPrettier,
 );
