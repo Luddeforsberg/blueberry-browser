@@ -24,6 +24,9 @@ const UNCHECKED = [
 const entries = (until, text, why, files) => files.map((file) => ({ file, text, until, why }));
 const saved = (text, why, ...files) => entries(9, text, why, files);
 const external = (text, why, ...files) => entries(10, text, why, files);
+// An old name in data an older version saved, read by the migration that moves it to the new name, in that file and its
+// test only. Kept for good, since old data can turn up at any time.
+const migrated = (text, why, ...files) => entries(null, text, why, files);
 
 const PAGE_ID = "The internal page's id, saved with each tab in session.json.";
 const SERVER = "A Supabase name, in the migrations and on the server.";
@@ -34,17 +37,7 @@ const COPY = "The public site's own words, deployed with its address.";
 
 // The exact text that may stay in each file, case and all.
 const ALLOWED = [
-  ...saved(
-    "birdOnPages",
-    "A key in settings.json.",
-    "src/main/SettingsStore.ts",
-    "src/main/SettingsStore.test.ts",
-    "src/main/Window.ts",
-    "src/renderer/chrome/src/pages/SettingsPage.tsx",
-    "src/shared/ipc.ts",
-    "tests/browser.spec.ts",
-    "tests/mascotOnPage.spec.ts",
-  ),
+  ...migrated("birdOnPages", "The old key in settings.json.", "src/main/SettingsStore.ts", "src/main/SettingsStore.test.ts"),
   ...saved(
     '"flock"',
     PAGE_ID,

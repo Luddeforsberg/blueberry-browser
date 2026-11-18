@@ -9,9 +9,9 @@ const tempFile = () => join(mkdtempSync(join(tmpdir(), "blueberry-settings-")), 
 
 describe("sanitizeSettings", () => {
   it("keeps the mascot on pages on unless it's really turned off", () => {
-    expect(DEFAULT_SETTINGS.birdOnPages).toBe(true);
-    expect(sanitizeSettings({ birdOnPages: false }).birdOnPages).toBe(false);
-    expect(sanitizeSettings({ birdOnPages: "no" }).birdOnPages).toBe(true);
+    expect(DEFAULT_SETTINGS.mascotOnPages).toBe(true);
+    expect(sanitizeSettings({ mascotOnPages: false }).mascotOnPages).toBe(false);
+    expect(sanitizeSettings({ mascotOnPages: "no" }).mascotOnPages).toBe(true);
   });
 
   it("falls back to the defaults for anything missing or invalid", () => {
@@ -122,6 +122,23 @@ describe("SettingsStore", () => {
 
     expect(JSON.parse(readFileSync(file, "utf8"))).toMatchObject({ layoutMode: "horizontal" });
     expect(new SettingsStore(file).get()).toMatchObject({ layoutMode: "horizontal", sidebarWidth: 300 });
+  });
+
+  it("reads the mascot on pages from its old key, and saves it only under the new one", () => {
+    const file = tempFile();
+    writeFileSync(file, JSON.stringify({ birdOnPages: false }));
+    const store = new SettingsStore(file);
+    expect(store.get().mascotOnPages).toBe(false);
+
+    store.update({ showBerry: false });
+    store.flush();
+    const saved = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
+    expect(saved.mascotOnPages).toBe(false);
+    expect(saved).not.toHaveProperty("birdOnPages");
+
+    // The new key wins, and an old file with both reads the new one.
+    expect(sanitizeSettings({ mascotOnPages: true, birdOnPages: false }).mascotOnPages).toBe(true);
+    expect(sanitizeSettings({ mascotOnPages: false }).mascotOnPages).toBe(false);
   });
 
   it("keeps the desktop mascot on the edge, and refuses anything that isn't a place", () => {

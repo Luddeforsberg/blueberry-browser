@@ -82,7 +82,7 @@ export interface Settings {
   showBerry: boolean;
   keepBerryStill: boolean;
   // Whether the working mascot is drawn on the page it works in. Off is for a site that reacts badly.
-  birdOnPages: boolean;
+  mascotOnPages: boolean;
   actionApproval: ActionApproval;
   // An absolute path, or null for the system's Downloads folder.
   downloadFolder: string | null;

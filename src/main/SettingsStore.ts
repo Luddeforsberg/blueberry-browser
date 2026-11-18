@@ -15,7 +15,7 @@ export const DEFAULT_SETTINGS: Settings = {
   chatWidth: CHAT_WIDTH.default,
   showBerry: true,
   keepBerryStill: false,
-  birdOnPages: true,
+  mascotOnPages: true,
   actionApproval: "risky",
   downloadFolder: null,
   askWhereToSave: false,
@@ -79,7 +79,8 @@ export function sanitizeSettings(raw: unknown, base: Settings = DEFAULT_SETTINGS
     chatWidth: width(input.chatWidth, CHAT_WIDTH, base.chatWidth),
     showBerry: bool(input.showBerry, base.showBerry),
     keepBerryStill: bool(input.keepBerryStill, base.keepBerryStill),
-    birdOnPages: bool(input.birdOnPages, base.birdOnPages),
+    // Saved as `birdOnPages` before the mascots were called mascots. Only the new key is written.
+    mascotOnPages: bool(input.mascotOnPages ?? input.birdOnPages, base.mascotOnPages),
     actionApproval: pick(input.actionApproval, ["risky", "always", "never"] as const, base.actionApproval),
     downloadFolder: folder(input.downloadFolder, base.downloadFolder),
     askWhereToSave: bool(input.askWhereToSave, base.askWhereToSave),
