@@ -141,9 +141,36 @@ const showChatMenu = (drive: Drive) =>
     void window.chromeAPI.chat.showMenu(chats[0].id, { x: 120, y: 160, width: 24, height: 24 });
   });
 
+// A menu is drawn in the page first and placed by main after, so it's open once main shows its view.
 const menuShows = async (drive: Drive, timeout?: number) => {
   const menu = await findView(drive.app, "view=menu");
   await menu.locator('[role=menu]:not([aria-hidden="true"]), [role=alertdialog]').filter({ visible: true }).first().waitFor({ timeout });
+  await viewShows(drive, "view=menu", timeout);
+};
+
+// Asks the chrome until the answer is true.
+const until = async (drive: Drive, check: () => Promise<boolean>, timeout = 10_000) => {
+  const started = Date.now();
+  while (!(await drive.chrome.evaluate(check))) {
+    if (Date.now() - started > timeout) throw new Error(`Still not true after ${timeout}ms: ${check.toString()}`);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+};
+
+// A view over the window is on screen: main shows it and gives it room.
+const viewShows = async (drive: Drive, urlPart: string, timeout = 10_000) => {
+  const started = Date.now();
+  while (
+    !(await drive.app.evaluate(({ BaseWindow }, urlPart) => {
+      const view = BaseWindow.getAllWindows()
+        .flatMap((window) => window.contentView.children)
+        .find((child): child is Electron.WebContentsView => "webContents" in child && (child as Electron.WebContentsView).webContents.getURL().includes(urlPart));
+      return !!view && view.getVisible() && view.getBounds().width > 1;
+    }, urlPart))
+  ) {
+    if (Date.now() - started > timeout) throw new Error(`${urlPart} never showed`);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
 };
 
 const saved = (result: { ok: true; id: string } | { ok: false; error: string }): string => {
@@ -223,6 +250,7 @@ const openAccountMenu = async (drive: Drive) => {
   await drive.chrome.getByRole("button", { name: /^(Settings and more|Account, )/ }).first().click();
   const where = drive.look.layout === "horizontal" ? await findView(drive.app, "view=overlay") : drive.chrome;
   await where.getByRole("dialog", { name: "Account" }).waitFor();
+  if (drive.look.layout === "horizontal") await viewShows(drive, "view=overlay");
 };
 
 const desktopOn = async (drive: Drive) => {
@@ -412,6 +440,7 @@ export const FEATURES: Feature[] = [
           await drive.chrome.evaluate(() => window.chromeAPI.layout.showFloatingSidebar());
           const overlay = await findView(drive.app, "view=overlay");
           await overlay.getByRole("navigation", { name: "Sidebar" }).waitFor();
+          await viewShows(drive, "view=overlay");
         },
       },
     },
@@ -451,6 +480,7 @@ export const FEATURES: Feature[] = [
           await createTab(drive, drive.site.url("alerts.example", "/notify"));
           const prompt = await findView(drive.app, "view=prompt");
           await prompt.getByRole("button", { name: "Allow", exact: true }).waitFor();
+          await viewShows(drive, "view=prompt");
         },
       },
     },
@@ -469,6 +499,7 @@ export const FEATURES: Feature[] = [
           const list = await findView(drive.app, "view=suggestions");
           await list.getByRole("option").first().waitFor();
           await list.getByRole("option").last().getByText(/Ask Berry/).waitFor();
+          await viewShows(drive, "view=suggestions");
         },
       },
     },
@@ -486,6 +517,7 @@ export const FEATURES: Feature[] = [
           const preview = await findView(drive.app, "view=preview");
           await preview.locator("[data-tab-preview]").getByText("Lisbon fares").waitFor();
           await preview.locator("[data-tab-preview] img").first().waitFor();
+          await viewShows(drive, "view=preview");
         },
       },
     },
@@ -506,6 +538,7 @@ export const FEATURES: Feature[] = [
           const find = await findView(drive.app, "view=find");
           await find.getByRole("textbox", { name: "Find in page" }).fill("jackdaw");
           await find.getByText("1 of 3").waitFor();
+          await viewShows(drive, "view=find");
         },
       },
     },
@@ -687,8 +720,7 @@ export const FEATURES: Feature[] = [
           await start.fill(drive.site.url("shop.example"));
           await start.press("Enter");
           await findView(drive.app, drive.site.url("shop.example"));
-          await drive.chrome.waitForFunction(async () => (await window.chromeAPI.recording.state()).steps.length > 0);
-          await drive.chrome.waitForTimeout(300);
+          await until(drive, async () => (await window.chromeAPI.recording.state()).steps.length > 0);
         },
       },
     },
@@ -727,7 +759,7 @@ export const FEATURES: Feature[] = [
       one: {
         open: async (drive) => {
           await drive.chrome.evaluate((address) => window.chromeAPI.browser.createTab(address), drive.site.url("shop.example", "/report.pdf"));
-          await drive.chrome.waitForFunction(async () => (await window.chromeAPI.downloads.list()).some((item) => item.state === "completed"));
+          await until(drive, async () => (await window.chromeAPI.downloads.list()).some((item) => item.state === "completed"));
           await openPage(drive, "downloads");
           await seen(drive.chrome, "report.pdf");
         },
@@ -864,10 +896,11 @@ export const FEATURES: Feature[] = [
     states: {
       page: {
         open: async (drive) => {
+          // Still working, so the job's cloud tab is open.
           drive.model.callTools({ name: "open_tab", args: { url: drive.site.url("shop.example") } });
-          drive.model.replyWith("It's open on shop.example");
-          const chatId = await startChat(drive, "Open shop.example", { cloud: true });
-          await drive.chrome.waitForFunction(async (id) => (await window.chromeAPI.library.getChat(id))?.messages.at(-1)?.content === "It's open on shop.example", chatId, { timeout: 30_000 });
+          drive.model.holdBeforeFirstToken();
+          await startChat(drive, "Open shop.example", { cloud: true });
+          await until(drive, async () => (await window.chromeAPI.browser.getTabs()).some((tab) => tab.page === "cloud" && tab.title === "Cheap Cables"), 30_000);
           await switchTo(drive, (tab) => tab.page === "cloud");
           await seen(drive.chrome, "In the cloud");
           await drive.chrome.locator("img").last().waitFor();
