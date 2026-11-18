@@ -3,7 +3,7 @@
 // every error object and value after them is dropped. The runner's own lines are single strings: job ids and outcomes.
 type Write = (...args: unknown[]) => void;
 
-export const quietly =
+const quietly =
   (write: Write): Write =>
   (first?: unknown) => {
     if (typeof first === "string") write(first);
