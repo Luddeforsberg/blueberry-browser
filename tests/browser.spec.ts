@@ -920,6 +920,8 @@ test("Berry opens an address only once allowed, and never a non-web one", async 
 
   const before = (await getTabs()).length;
   model.callTools({ name: "open_tab", args: { url: `${origin}/form` } });
+  // Held, since its tab closes once it's done.
+  const finish = model.holdBeforeFirstToken();
   await askInPanel("Open the form");
   await expect(card.locator("p").getByText(`Open ${origin}/form in a new tab`)).toBeVisible();
   expect(await getTabs()).toHaveLength(before);
@@ -928,6 +930,8 @@ test("Berry opens an address only once allowed, and never a non-web one", async 
   // It opens behind the user, who stays where they were.
   await expect.poll(async () => (await getTabs()).at(-1)?.title).toBe("Form");
   expect((await activeTab()).title).toBe("Fixture");
+  finish();
+  await expect(panel.getByText("A reply from the model")).toHaveCount(2);
 });
 
 test("chats are still there after a restart", async () => {
