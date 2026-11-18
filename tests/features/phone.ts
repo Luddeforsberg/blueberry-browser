@@ -13,7 +13,7 @@ import type { Theme } from "./map";
 
 const SITE = join(__dirname, "..", "..", "site");
 const MAC_CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-export const PHONE_BROWSER = process.platform === "win32" ? { channel: "msedge" } : { executablePath: MAC_CHROME };
+const PHONE_BROWSER = process.platform === "win32" ? { channel: "msedge" } : { executablePath: MAC_CHROME };
 export const phoneBrowserMissing = process.platform !== "win32" && !existsSync(MAC_CHROME);
 
 const TYPES: Record<string, string> = {
@@ -29,8 +29,8 @@ const TYPES: Record<string, string> = {
 const LIVE_PAGE = `<!doctype html><title>Shop</title><style>body{font:16px system-ui;margin:24px;color:#222;background:#fff}</style><h1>shop.example</h1><p>1 m cable, 49 kr</p><button>Place order</button>`;
 export const LIVE = "https://www.browserbase.com/devtools-fullscreen/inspector.html?wss=connect.browserbase.com/debug/abc";
 
-export const OWNER = "ana@example.com";
-export const OWNER_PASSWORD = "correct horse battery";
+const OWNER = "ana@example.com";
+const OWNER_PASSWORD = "correct horse battery";
 const RUNNER = "runner@example.com";
 const RUNNER_PASSWORD = "a long random runner password";
 

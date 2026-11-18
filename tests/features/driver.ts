@@ -12,7 +12,7 @@ import type { Feature, Look, Needs } from "./map";
 import { drivePhone } from "./phone";
 import { startSite, type Site } from "./site";
 
-export type FakeSupabase = Awaited<ReturnType<typeof startFakeSupabase>>;
+type FakeSupabase = Awaited<ReturnType<typeof startFakeSupabase>>;
 
 // Everything a feature's `open` gets: the app, its chrome view, and the fakes behind it.
 export interface Drive {

@@ -66,7 +66,7 @@ export const demoVisits = (now = Date.now()): Visit[] => {
   return visits.filter(({ visitedAt }) => visitedAt <= now - MINUTE_MS);
 };
 
-export const DEMO_CHATS = [
+const DEMO_CHATS = [
   { title: "Cheap flights to Lisbon", message: "Find me cheap flights from Stockholm to Lisbon in May" },
   { title: "Lisbon flights in May", message: "What are the cheapest flights to Lisbon from Stockholm in May?" },
   { title: "Stockholm to Lisbon prices", message: "Any cheaper flights Stockholm Lisbon? Weekends in May" },

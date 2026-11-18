@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 
-export interface FakeModelRequest {
+interface FakeModelRequest {
   messages: Array<{ role: string; content: unknown }>;
   tools?: Array<{ function: { name: string } }>;
 }
