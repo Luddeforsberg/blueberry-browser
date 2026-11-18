@@ -39,7 +39,7 @@ test("a Gallery tile opens its page, which shows its moods, adds a limited copy,
     await chrome.evaluate(() =>
       window.chromeAPI.mascots.save(null, {
         name: "Meeting Prep",
-        look: { palette: "robin", accessory: "cap" },
+        look: { palette: "lingon", accessory: "cap" },
         instructions: "Mine.",
         sites: [],
         tools: [],

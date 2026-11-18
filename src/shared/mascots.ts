@@ -4,15 +4,25 @@ import type { MascotAccessory, MascotDraft, MascotPalette, MascotProfile, Mascot
 
 export const BERRY_ID = "berry";
 
-// The ids are from the old drawings, kept because looks are saved under them. Each is drawn and named as a berry.
-export const PALETTES: { id: MascotPalette; label: string }[] = [
-  { id: "kingfisher", label: "Blueberry" },
-  { id: "robin", label: "Lingon" },
-  { id: "canary", label: "Cloudberry" },
-  { id: "parakeet", label: "Gooseberry" },
-  { id: "flamingo", label: "Raspberry" },
-  { id: "jackdaw", label: "Currant" },
+// Each palette is a berry, by its id. `oldId` is what a look was saved as before that, and still is in mascots.json and
+// suggestions.json from an older version, Gallery rows any version published, and the phone's shared mascots. A look is
+// read through `paletteOf` wherever it comes from, so those keep their berry for good.
+export const PALETTES: { id: MascotPalette; label: string; oldId: string }[] = [
+  { id: "blueberry", label: "Blueberry", oldId: "kingfisher" },
+  { id: "lingon", label: "Lingon", oldId: "robin" },
+  { id: "cloudberry", label: "Cloudberry", oldId: "canary" },
+  { id: "gooseberry", label: "Gooseberry", oldId: "parakeet" },
+  { id: "raspberry", label: "Raspberry", oldId: "flamingo" },
+  { id: "currant", label: "Currant", oldId: "jackdaw" },
 ];
+
+export const paletteOf = (value: unknown): MascotPalette | null =>
+  PALETTES.find(({ id, oldId }) => value === id || value === oldId)?.id ?? null;
+
+// What goes to the server is still the old id. Its tables only take those until
+// supabase/migrations/20261119000000_berry_palettes.sql is applied, and the phone page deployed today and older apps
+// only read those. Step 10 of docs/quality-plan.md switches this over.
+export const serverPalette = (palette: MascotPalette): string => PALETTES.find(({ id }) => id === palette)?.oldId ?? palette;
 
 export const ACCESSORIES: { id: MascotAccessory; label: string }[] = [
   { id: "none", label: "Nothing" },
@@ -34,7 +44,7 @@ export const BERRY: MascotProfile = {
   id: BERRY_ID,
   name: "Berry",
   // The blueberry, with nothing on.
-  look: { palette: "kingfisher", accessory: "none" },
+  look: { palette: "blueberry", accessory: "none" },
   instructions: "",
   sites: [],
   tools: MASCOT_TOOLS.map(({ id }) => id),
@@ -102,8 +112,9 @@ export const parseMascotDraft = (input: unknown): { draft: MascotDraft } | { err
   const cleanInstructions = typeof instructions === "string" ? instructions.trim() : "";
   if (!cleanInstructions) return { error: "Say what it’s for." };
   if (cleanInstructions.length > MAX_MASCOT_INSTRUCTIONS) return { error: `Keep this under ${MAX_MASCOT_INSTRUCTIONS} characters.` };
-  const { palette, accessory } = (look ?? {}) as Record<string, unknown>;
-  if (!isOneOf(PALETTES, palette) || !isOneOf(ACCESSORIES, accessory)) return { error: "Choose a look." };
+  const { palette: savedPalette, accessory } = (look ?? {}) as Record<string, unknown>;
+  const palette = paletteOf(savedPalette);
+  if (!palette || !isOneOf(ACCESSORIES, accessory)) return { error: "Choose a look." };
   if (!Array.isArray(sites) || !Array.isArray(tools)) return { error: "Choose where it can go and what it can do." };
   if (sites.length > MAX_SITES) return { error: `Keep it to ${MAX_SITES} sites.` };
   const cleanSites: string[] = [];

@@ -4,13 +4,14 @@
 // src/shared/mascots.ts
 var BERRY_ID = "berry";
 var PALETTES = [
-  { id: "kingfisher", label: "Blueberry" },
-  { id: "robin", label: "Lingon" },
-  { id: "canary", label: "Cloudberry" },
-  { id: "parakeet", label: "Gooseberry" },
-  { id: "flamingo", label: "Raspberry" },
-  { id: "jackdaw", label: "Currant" }
+  { id: "blueberry", label: "Blueberry", oldId: "kingfisher" },
+  { id: "lingon", label: "Lingon", oldId: "robin" },
+  { id: "cloudberry", label: "Cloudberry", oldId: "canary" },
+  { id: "gooseberry", label: "Gooseberry", oldId: "parakeet" },
+  { id: "raspberry", label: "Raspberry", oldId: "flamingo" },
+  { id: "currant", label: "Currant", oldId: "jackdaw" }
 ];
+var paletteOf = (value) => PALETTES.find(({ id, oldId }) => value === id || value === oldId)?.id ?? null;
 var ACCESSORIES = [
   { id: "none", label: "Nothing" },
   { id: "crown", label: "Crown" },
@@ -28,7 +29,7 @@ var BERRY = {
   id: BERRY_ID,
   name: "Berry",
   // The blueberry, with nothing on.
-  look: { palette: "kingfisher", accessory: "none" },
+  look: { palette: "blueberry", accessory: "none" },
   instructions: "",
   sites: [],
   tools: MASCOT_TOOLS.map(({ id }) => id),
@@ -59,8 +60,9 @@ var parseMascotDraft = (input) => {
   const cleanInstructions = typeof instructions === "string" ? instructions.trim() : "";
   if (!cleanInstructions) return { error: "Say what it\u2019s for." };
   if (cleanInstructions.length > MAX_MASCOT_INSTRUCTIONS) return { error: `Keep this under ${MAX_MASCOT_INSTRUCTIONS} characters.` };
-  const { palette, accessory } = look ?? {};
-  if (!isOneOf(PALETTES, palette) || !isOneOf(ACCESSORIES, accessory)) return { error: "Choose a look." };
+  const { palette: savedPalette, accessory } = look ?? {};
+  const palette = paletteOf(savedPalette);
+  if (!palette || !isOneOf(ACCESSORIES, accessory)) return { error: "Choose a look." };
   if (!Array.isArray(sites) || !Array.isArray(tools)) return { error: "Choose where it can go and what it can do." };
   if (sites.length > MAX_SITES) return { error: `Keep it to ${MAX_SITES} sites.` };
   const cleanSites = [];

@@ -145,7 +145,7 @@ test.describe("attaching to a message", () => {
     const saved = await chrome.evaluate(() =>
       window.chromeAPI.mascots.save(null, {
         name: "Deal Watcher",
-        look: { palette: "robin", accessory: "none" },
+        look: { palette: "lingon", accessory: "none" },
         instructions: "Watch prices.",
         sites: ["prisjakt.nu"],
         tools: ["visit"],

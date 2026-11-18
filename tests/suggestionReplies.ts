@@ -46,7 +46,7 @@ export const demoProposals = (digest: string): string => {
         sites: ["github.com", "linear.app"],
         name: "Linus",
         instructions: "Keep an eye on my checkout pull requests and the issues next to them.",
-        palette: "kingfisher",
+        palette: "blueberry",
         accessory: "glasses",
       },
       // An id that isn't there.

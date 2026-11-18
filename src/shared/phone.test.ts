@@ -15,7 +15,7 @@ import {
 const SCOUT: MascotProfile = {
   id: "m-1",
   name: "Scout",
-  look: { palette: "robin", accessory: "cap" },
+  look: { palette: "lingon", accessory: "cap" },
   instructions: "Find cables.",
   sites: ["webhallen.com"],
   tools: ["visit", "click"],
@@ -45,6 +45,7 @@ describe("the mascots on the phone", () => {
   it("reads back what it shared, with Berry first, and sends a snapshot the runner accepts", () => {
     const mascots = mascotsFromSharedRows(sharedMascotRows([BERRY, SCOUT]));
     expect(mascots.map(({ id }) => id)).toEqual(["berry", "m-1"]);
+    expect(mascots[1].look).toEqual(SCOUT.look);
     expect(mascotFromSnapshot(mascotSnapshot(mascots[0]))).toEqual(BERRY);
     expect(mascotFromSnapshot(mascotSnapshot(mascots[1]))).toMatchObject({
       id: "m-1",
@@ -52,6 +53,14 @@ describe("the mascots on the phone", () => {
       tools: ["visit", "click"],
       galleryId: "gallery",
     });
+  });
+
+  it("draws a row under a palette's old id as its berry, and one under the new id as it is", () => {
+    const [row] = sharedMascotRows([SCOUT]);
+    const looks = mascotsFromSharedRows([row, { ...row, id: "m-2", palette: "currant" }, { ...row, id: "m-3", palette: "jackdaw" }])
+      .slice(1)
+      .map(({ look }) => look.palette);
+    expect(looks).toEqual(["lingon", "currant", "currant"]);
   });
 
   it("leaves out a row the app couldn't have made, and only ever has one Berry", () => {

@@ -7,7 +7,7 @@ const entry = {
   author: "Blueberry",
   category: "Work",
   description: "Does a thing.",
-  draft: { name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "Read.", sites: [], tools: [] },
+  draft: { name: "Scout", look: { palette: "lingon", accessory: "cap" }, instructions: "Read.", sites: [], tools: [] },
 };
 
 describe("the mascot catalog", () => {

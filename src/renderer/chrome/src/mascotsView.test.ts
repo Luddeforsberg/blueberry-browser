@@ -40,9 +40,9 @@ describe("changing one part of a mascot", () => {
     const changed = { ...opened, onlySomeSites: true, sites: ["svt.se"], tools: [] };
     expect(withPart(now, changed, "limits")).toEqual({ ...now, onlySomeSites: true, sites: ["svt.se"], tools: [] });
     expect(withPart(now, { ...opened, name: "Pip" }, "name")).toEqual({ ...now, name: "Pip" });
-    expect(withPart(now, { ...opened, palette: "robin", accessory: "bow" }, "look")).toEqual({
+    expect(withPart(now, { ...opened, palette: "lingon", accessory: "bow" }, "look")).toEqual({
       ...now,
-      palette: "robin",
+      palette: "lingon",
       accessory: "bow",
     });
   });

@@ -229,10 +229,15 @@ test("files saved before the mascots were called mascots open as they did", asyn
   const profile = mkdtempSync(join(tmpdir(), "blueberry-test-"));
   writeFileSync(join(profile, "settings.json"), JSON.stringify({ onboarded: true, startersAdded: true, birdOnPages: false }));
   writeFileSync(join(profile, "session.json"), JSON.stringify({ tabs: [{ page: "flock", param: null, title: "" }], active: 0 }));
+  const scout = { id: "scout", name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "Read.", sites: [], tools: [] };
+  writeFileSync(join(profile, "mascots.json"), JSON.stringify([scout]));
   const { app, chrome } = await launch(profile);
 
   await expect.poll(async () => (await tabs(chrome)).map((tab) => tab.page)).toEqual(["mascots"]);
-  await expect(chrome.getByRole("list", { name: "Your mascots" }).first()).toBeVisible();
+  const list = chrome.getByRole("list", { name: "Your mascots" }).first();
+  await expect(list.getByRole("listitem")).toHaveCount(2);
+  // Saved as a robin, which was always drawn as the lingon.
+  await expect(list.getByRole("listitem").nth(1).locator("svg[data-mascot]").first()).toHaveAttribute("data-mascot", "lingon");
   expect((await chrome.evaluate(() => window.chromeAPI.settings.getSettings())).mascotOnPages).toBe(false);
   await app.close();
 });

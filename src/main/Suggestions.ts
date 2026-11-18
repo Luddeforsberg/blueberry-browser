@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { dirname } from "path";
 import type { MascotProfile, Routine, RoutineRun, Suggestion, SuggestionKind } from "../shared/library";
+import { parseMascotDraft } from "../shared/mascots";
 import { buildDigest, type Digest, type DigestChat, type Feedback } from "./suggestionDigest";
 import { findPatterns, topPatterns, type Pattern, type PatternChat, type PatternVisit } from "./suggestionPatterns";
 import {
@@ -59,6 +60,13 @@ const pickShown = (cards: Suggestion[]): Suggestion[] => {
 
 const asList = <T>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
 
+// A mascot card is read again, since one saved by an older version has its look under a palette's old id.
+const savedProposal = (proposal: Proposal): Proposal[] => {
+  if (proposal.card.kind !== "mascot") return [proposal];
+  const parsed = parseMascotDraft(proposal.card.draft);
+  return "error" in parsed ? [] : [{ ...proposal, card: { ...proposal.card, draft: parsed.draft } }];
+};
+
 // What the new tab page offers. The model reads a digest of what the user did and proposes jobs, each citing the
 // digest's ids, and code checks every one. Without a model, or with nothing that checks out, the old rules find what's
 // repeated and code words it. A new tab never waits for a model or pays for one: what was checked is saved and reused.
@@ -76,9 +84,9 @@ export class Suggestions {
     try {
       const raw = JSON.parse(readFileSync(file, "utf8")) as Partial<SavedSuggestions>;
       this.saved = {
-        proposals: asList<Proposal>(raw.proposals).filter(
-          (proposal) => proposal?.card && Array.isArray(proposal.sources) && Array.isArray(proposal.sites),
-        ),
+        proposals: asList<Proposal>(raw.proposals)
+          .filter((proposal) => proposal?.card && Array.isArray(proposal.sources) && Array.isArray(proposal.sites))
+          .flatMap(savedProposal),
         dismissed: asList<string>(raw.dismissed),
         feedback: asList<Feedback>(raw.feedback),
         askedAt: typeof raw.askedAt === "number" ? raw.askedAt : 0,

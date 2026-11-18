@@ -54,7 +54,7 @@ test("a mascot chats inside its limits, and is still itself after a restart", as
   await chrome.evaluate(() =>
     window.chromeAPI.mascots.save(null, {
       name: "Scout",
-      look: { palette: "kingfisher", accessory: "crown" },
+      look: { palette: "blueberry", accessory: "crown" },
       instructions: "Always answer like a sea captain.",
       sites: ["127.0.0.1"],
       tools: ["visit", "click", "type"],

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { narrowSites, NOWHERE, permissionsInWords, siteAllowed } from "./mascots";
+import type { MascotPalette } from "./library";
+import { narrowSites, NOWHERE, PALETTES, parseMascotDraft, permissionsInWords, serverPalette, siteAllowed } from "./mascots";
 
 const words = (sites: string[], tools: ("visit" | "click" | "type")[]) => permissionsInWords({ sites, tools }).map(({ text }) => text);
 
@@ -42,5 +43,38 @@ describe("narrowSites", () => {
   it("goes nowhere when the two don't meet, because an empty list would mean anywhere", () => {
     expect(narrowSites(["a.example"], ["b.example"])).toEqual([NOWHERE]);
     expect(siteAllowed("https://a.example/", [NOWHERE])).toBe(false);
+  });
+});
+
+// Each palette's id before the ids were the berries' names, and the berry it was drawn as then.
+const OLD_IDS = {
+  kingfisher: "blueberry",
+  robin: "lingon",
+  canary: "cloudberry",
+  parakeet: "gooseberry",
+  flamingo: "raspberry",
+  jackdaw: "currant",
+};
+
+describe("a look's palette", () => {
+  const lookOf = (palette: unknown) => {
+    const parsed = parseMascotDraft({ name: "Scout", look: { palette, accessory: "cap" }, instructions: "Read.", sites: [], tools: [] });
+    return "error" in parsed ? parsed.error : parsed.draft.look;
+  };
+
+  it("reads an old id as the berry it was drawn as, and a new id as it is", () => {
+    for (const [old, berry] of Object.entries(OLD_IDS)) {
+      expect(lookOf(old)).toEqual({ palette: berry, accessory: "cap" });
+      expect(lookOf(berry)).toEqual({ palette: berry, accessory: "cap" });
+    }
+    expect(PALETTES.map(({ id }) => id)).toEqual(Object.values(OLD_IDS));
+  });
+
+  it("refuses anything else", () => {
+    for (const palette of ["", "Robin", "red", "toString", null, 3]) expect(lookOf(palette)).toBe("Choose a look.");
+  });
+
+  it("goes to the server under its old id, which today's server and phone page check for", () => {
+    for (const [old, berry] of Object.entries(OLD_IDS)) expect(serverPalette(berry as MascotPalette)).toBe(old);
   });
 });

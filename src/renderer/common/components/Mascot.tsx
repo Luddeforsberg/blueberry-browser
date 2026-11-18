@@ -1,15 +1,15 @@
 import React, { useId, useRef } from "react";
 import { MessageCircle } from "lucide-react";
-import type { MascotAccessory, MascotLook } from "@shared/library";
+import type { MascotAccessory, MascotLook, MascotPalette } from "@shared/library";
+import { PALETTES } from "@shared/mascots";
 import { cn } from "../lib/utils";
 import { mascotDetail, type MascotDetail } from "./mascotDetail";
 import { useFrame, useStill } from "./motion";
 import { pipFrames } from "./pipPatterns";
 import { useMascotReaction, type Reaction } from "./useMascotReaction";
 import { MOOD_LABELS, type Mood } from "./moods";
-import { BERRY_KIND, type BerryKind } from "./berryKinds";
 
-const BERRY_LOOK: MascotLook = { palette: "kingfisher", accessory: "none" };
+const BERRY_LOOK: MascotLook = { palette: "blueberry", accessory: "none" };
 
 // Colours are the mascots' own tokens, as attributes, so a drawing copied out of the app keeps them without styles.
 const c = (token: string) => `var(--berry-${token})`;
@@ -23,7 +23,7 @@ interface Ids {
   shade: string;
   fade: string;
   fadeGradient: string;
-  clip: (kind: BerryKind) => string;
+  clip: (kind: MascotPalette) => string;
 }
 const url = (id: string) => `url(#${id})`;
 
@@ -47,7 +47,7 @@ const beadCircles = (list: Bead[]) => list.map(([x, y, r]) => <circle key={`${x}
 
 // Each berry's outline, with no fill of its own: its body, and the clip that keeps its shade inside it. Shapes only,
 // since a clip path takes no groups.
-const SHAPE: Record<BerryKind, React.ReactNode> = {
+const SHAPE: Record<MascotPalette, React.ReactNode> = {
   blueberry: <ellipse cx={24} cy={30} rx={19} ry={16} />,
   lingon: <circle cx={24} cy={29.6} r={16.4} />,
   cloudberry: (
@@ -72,7 +72,7 @@ const inFace = (x: number, y: number) => x > 12 && x < 36 && y > 20 && y < 39;
 const GOOSE_VEINS = [-0.8, -0.42, 0, 0.42, 0.8];
 
 // What a berry's skin looks like up close, from 48px.
-const TEXTURE: Record<BerryKind, React.ReactNode> = {
+const TEXTURE: Record<MascotPalette, React.ReactNode> = {
   blueberry: <ellipse cx={21} cy={21.5} rx={13} ry={6.5} fill={WHITE} opacity={0.12} />,
   lingon: null,
   cloudberry: CLOUD_BEADS.map(([x, y, r]) => {
@@ -124,7 +124,7 @@ const TEXTURE: Record<BerryKind, React.ReactNode> = {
 };
 
 // Under 48px only the gooseberry keeps two of its veins, as they're part of its outline.
-const SMALL_TEXTURE: Partial<Record<BerryKind, React.ReactNode>> = {
+const SMALL_TEXTURE: Partial<Record<MascotPalette, React.ReactNode>> = {
   gooseberry: <path d="M24 12.4Q12.5 29 24 45.6M24 12.4Q35.5 29 24 45.6" stroke={c("gooseberry-stripe")} strokeWidth={1.5} fill="none" />,
 };
 
@@ -140,7 +140,7 @@ const SHINE: Record<"lingon" | "other", React.ReactNode> = {
 };
 
 // What grows on top, which with the outline says which berry it is, down to 14px.
-const TOP: Record<BerryKind, React.ReactNode> = {
+const TOP: Record<MascotPalette, React.ReactNode> = {
   blueberry: (
     <>
       <path
@@ -209,11 +209,11 @@ const ACCESSORY_BEHIND: Partial<Record<MascotAccessory, React.ReactNode>> = {
 };
 
 // The lingon's and the currant's stems lean right, so what they wear beside the top goes on the left.
-const leansRight = (kind: BerryKind) => kind === "lingon" || kind === "currant";
+const leansRight = (kind: MascotPalette) => kind === "lingon" || kind === "currant";
 
 // Worn in front: the crown and the bow small and at an angle beside the top, and the glasses on the eyes, in ink, or
 // light on the currant (tokens.css).
-const accessoryInFront = (accessory: MascotAccessory, kind: BerryKind, working: boolean): React.ReactNode => {
+const accessoryInFront = (accessory: MascotAccessory, kind: MascotPalette, working: boolean): React.ReactNode => {
   switch (accessory) {
     case "crown": {
       const x = leansRight(kind) ? 12.6 : 34;
@@ -375,7 +375,7 @@ const Mouth: React.FC<{ mood: Mood }> = ({ mood }) => {
 };
 
 // The shade, the face fade and each berry's clip, by the ids this drawing was given.
-const Defs: React.FC<{ ids: Ids; kinds: BerryKind[] }> = ({ ids, kinds }) => (
+const Defs: React.FC<{ ids: Ids; kinds: MascotPalette[] }> = ({ ids, kinds }) => (
   <defs>
     <radialGradient id={ids.shade}>
       <stop offset={0} stopColor="#000" stopOpacity={0.2} />
@@ -403,7 +403,7 @@ const Defs: React.FC<{ ids: Ids; kinds: BerryKind[] }> = ({ ids, kinds }) => (
 // The body in its colour and what's on its skin: a shade underneath, its texture faded over the face, and a shine. A
 // plain body, while it works or on the address field, is the outline alone, so the pips are the one thing on it.
 const Body: React.FC<{
-  kind: BerryKind;
+  kind: MascotPalette;
   fill: string;
   plain: boolean;
   detail: MascotDetail;
@@ -433,7 +433,7 @@ const Body: React.FC<{
 
 // What grows on top, raised under a cap so it sits on the cap's crown, then what's worn in front.
 const Top: React.FC<{
-  kind: BerryKind;
+  kind: MascotPalette;
   accessory: MascotAccessory;
   working: boolean;
 }> = ({ kind, accessory, working }) => (
@@ -443,7 +443,7 @@ const Top: React.FC<{
   </>
 );
 
-const KINDS = Object.values(BERRY_KIND);
+const KINDS = PALETTES.map(({ id }) => id);
 
 // The two reactions that are moods, and only from at rest, so a mood that means something is never covered up.
 const POSE_FOR: Partial<Record<Reaction, Mood>> = {
@@ -509,7 +509,7 @@ export const Mascot: React.FC<MascotProps> = ({
     );
   }
 
-  const kind = BERRY_KIND[look.palette];
+  const kind = look.palette;
   const kinds = anyLook ? KINDS : [kind];
   const ids: Ids = {
     shade: `${id}shade`,
@@ -521,7 +521,7 @@ export const Mascot: React.FC<MascotProps> = ({
   const working = drawn === "thinking" || drawn === "fetching";
   const plain = working || inverted;
   // Of every berry's layers, only its own mascot's show where the drawing carries them all.
-  const each = (draw: (kind: BerryKind) => React.ReactNode) =>
+  const each = (draw: (kind: MascotPalette) => React.ReactNode) =>
     anyLook
       ? kinds.map((berry) => (
           <g key={berry} data-berry={berry}>

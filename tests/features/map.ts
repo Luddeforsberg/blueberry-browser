@@ -204,7 +204,7 @@ const saveScout = async (drive: Drive) =>
     await drive.chrome.evaluate(() =>
       window.chromeAPI.mascots.save(null, {
         name: "Scout",
-        look: { palette: "kingfisher", accessory: "crown" },
+        look: { palette: "blueberry", accessory: "crown" },
         instructions: "Find the cheapest one that's in stock.",
         sites: ["shop.example"],
         tools: ["visit", "click"],
@@ -279,7 +279,7 @@ const desktopOn = async (drive: Drive) => {
 const SCOUT: MascotProfile = {
   id: "m-scout",
   name: "Scout",
-  look: { palette: "robin", accessory: "cap" },
+  look: { palette: "lingon", accessory: "cap" },
   instructions: "Find the cheapest one that fits.",
   sites: ["shop.example"],
   tools: ["visit", "click", "type"],

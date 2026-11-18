@@ -112,12 +112,12 @@ export const galleryFacts = (entry: GalleryMascot): GalleryFact[] => {
 
 // The Gallery tells mascots apart by their berry, so it names each one in full.
 export const BERRY_NAMES: Record<MascotPalette, string> = {
-  kingfisher: "Blueberry",
-  robin: "Lingonberry",
-  canary: "Cloudberry",
-  parakeet: "Gooseberry",
-  flamingo: "Raspberry",
-  jackdaw: "Blackcurrant",
+  blueberry: "Blueberry",
+  lingon: "Lingonberry",
+  cloudberry: "Cloudberry",
+  gooseberry: "Gooseberry",
+  raspberry: "Raspberry",
+  currant: "Blackcurrant",
 };
 
 // A name that's free, to start from when the entry's own is taken: Scout, then Scout 2. It stays within the limit.

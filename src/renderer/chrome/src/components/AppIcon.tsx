@@ -2,7 +2,6 @@ import React, { useId } from "react";
 import type { MascotLook } from "@shared/library";
 import type { AppIconGround } from "@shared/appIcon";
 import { Mascot } from "@common/components/Mascot";
-import { BERRY_KIND } from "@common/components/berryKinds";
 
 // The app's icon (DESIGN.md section 10, Settings, App icon): a square with corners a quarter of its width, and the
 // mascot's face at about two thirds of it. Paper and Night carry the dot grid, fading towards the middle. Its colour is
@@ -12,12 +11,12 @@ import { BERRY_KIND } from "@common/components/berryKinds";
 // Night is drawn with the dark tokens, so a dark body still shows on it, and the rest with the light ones, whatever the
 // window's theme.
 
-const BERRY_LOOK: MascotLook = { palette: "kingfisher", accessory: "none" };
+const BERRY_LOOK: MascotLook = { palette: "blueberry", accessory: "none" };
 const FACE = 66.7;
 
 export const AppIcon: React.FC<{ look?: MascotLook; ground: AppIconGround; size: number }> = ({ look = BERRY_LOOK, ground, size }) => {
   const id = useId().replace(/[^\w-]/g, "");
-  const body = `var(--berry-${BERRY_KIND[look.palette]})`;
+  const body = `var(--berry-${look.palette})`;
   const dots = ground === "paper" || ground === "night";
   return (
     <svg aria-hidden viewBox="0 0 100 100" width={size} height={size} className={`${ground === "night" ? "dark" : "light"} shrink-0`}>

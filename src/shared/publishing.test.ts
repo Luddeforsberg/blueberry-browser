@@ -11,7 +11,7 @@ import {
 import { MAX_MASCOT_INSTRUCTIONS, MAX_MASCOT_NAME } from "./mascots";
 
 const ID = "00000000-0000-4000-8000-000000000001";
-const draft = { name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "Read.", sites: ["svt.se"], tools: ["visit"] };
+const draft = { name: "Scout", look: { palette: "lingon", accessory: "cap" }, instructions: "Read.", sites: ["svt.se"], tools: ["visit"] };
 const row = {
   id: ID,
   name: "Scout",
@@ -68,6 +68,13 @@ describe("what strangers publish", () => {
       publishedAt: Date.parse(row.created_at),
       draft: { ...draft, tools: ["visit"] },
     });
+  });
+
+  it("reads a row under a palette's old id, from any version of the app, as its berry, and publishes under the old id", () => {
+    expect(parsePublishedRow(row)?.draft.look).toEqual({ palette: "lingon", accessory: "cap" });
+    expect(parsePublishedRow({ ...row, palette: "lingon" })?.draft.look).toEqual({ palette: "lingon", accessory: "cap" });
+    // The server only takes the old ids until its migration is applied, and today's phone page and older apps only read them.
+    expect(publicRow(draft as never, choices).palette).toBe("robin");
   });
 
   it.each([

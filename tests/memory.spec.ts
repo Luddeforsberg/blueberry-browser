@@ -90,7 +90,7 @@ test("a mascot offers to remember after a job, keeps it only on Remember, uses i
   await chrome.evaluate(() =>
     window.chromeAPI.mascots.save(null, {
       name: "Scout",
-      look: { palette: "robin", accessory: "cap" },
+      look: { palette: "lingon", accessory: "cap" },
       instructions: "Find things.",
       sites: [],
       tools: [],

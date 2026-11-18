@@ -23,7 +23,7 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     await chrome.evaluate(() =>
       window.chromeAPI.mascots.save(null, {
         name: "Scout",
-        look: { palette: "robin", accessory: "cap" },
+        look: { palette: "lingon", accessory: "cap" },
         instructions: "Read svt.se and mail ana.private@example.com.",
         sites: ["svt.se"],
         tools: ["visit"],
@@ -275,7 +275,7 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     const popular = entries.find((entry) => entry.draft.name === "Popular");
     expect(popular?.draft).toEqual({
       name: "Popular",
-      look: { palette: "canary", accessory: "bow" },
+      look: { palette: "cloudberry", accessory: "bow" },
       instructions: "Read.",
       sites: [],
       tools: ["visit"],
@@ -398,7 +398,7 @@ test("with no server set up there's no sign-in or publish control, and the Galle
     await chrome.evaluate(() =>
       window.chromeAPI.mascots.save(null, {
         name: "Scout",
-        look: { palette: "robin", accessory: "cap" },
+        look: { palette: "lingon", accessory: "cap" },
         instructions: "Read.",
         sites: [],
         tools: [],

@@ -74,6 +74,7 @@ const ALLOWED = [
     "AGENTS.md",
     "site/app/api.js",
     "src/shared/phoneApi.test.ts",
+    "supabase/berryPalettes.test.ts",
     "supabase/phone.test.ts",
     "supabase/relay.test.ts",
     "tests/fakeSupabase.ts",

@@ -8,7 +8,7 @@ const berriesIn = (node: ArtNode): string[] => [
 
 describe("artFor", () => {
   it("keeps only the berry the palette draws as, with its own clip", () => {
-    const art = artFor(ACTOR_ART.glasses.looking, "flamingo");
+    const art = artFor(ACTOR_ART.glasses.looking, "raspberry");
     expect(berriesIn(art)).toEqual(["raspberry"]);
     expect(JSON.stringify(art)).toContain("clip-raspberry");
     expect(JSON.stringify(art)).not.toContain("clip-blueberry");

@@ -258,8 +258,8 @@ export interface Routine {
   unseen: boolean;
 }
 
-// One drawing with changeable colours and one accessory. The blueberry never changes.
-export type MascotPalette = "jackdaw" | "robin" | "canary" | "parakeet" | "flamingo" | "kingfisher";
+// Which of the six berries a mascot is (DESIGN.md section 9), and one accessory. Berry is always the blueberry.
+export type MascotPalette = "blueberry" | "lingon" | "cloudberry" | "gooseberry" | "raspberry" | "currant";
 export type MascotAccessory = "none" | "crown" | "cap" | "glasses" | "headphones" | "bow";
 
 export interface MascotLook {

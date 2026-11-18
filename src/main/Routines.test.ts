@@ -109,7 +109,7 @@ describe("the scheduler", () => {
     const scout = (): MascotProfile => ({
       id: "m-1",
       name: "Scout",
-      look: { palette: "robin", accessory: "cap" },
+      look: { palette: "lingon", accessory: "cap" },
       instructions: "Find.",
       sites: [],
       tools: ["visit"],

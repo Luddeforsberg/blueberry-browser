@@ -1,4 +1,4 @@
-import { ACTOR_ART, ACTOR_ART_SHEET, ACTOR_BERRY, type ArtNode } from "./pageActorArt";
+import { ACTOR_ART, ACTOR_ART_SHEET, ACTOR_BERRIES, type ArtNode } from "./pageActorArt";
 import { SHARED } from "./pageScripts";
 
 // The mascot drawn on a web page while a job works in it, run in the same isolated world as the tools. Everything about it
@@ -85,14 +85,13 @@ export interface ActorLook {
   pictured: boolean;
 }
 
-// The drawing holds every berry's parts, and the sheet shows the one the palette draws as. A page only needs that one:
-// every other berry's parts, and their clips, are left out. A palette nobody knows keeps them all, as before.
+// The drawing holds every berry's parts, and the sheet shows the palette's own, as each palette is a berry. A page only
+// needs that one: every other berry's parts, and their clips, are left out. A palette nobody knows keeps them all.
 export const artFor = (node: ArtNode, palette: string): ArtNode => {
-  const berry = ACTOR_BERRY[palette];
-  if (!berry) return node;
-  const others = Object.values(ACTOR_BERRY).filter((each) => each !== berry);
+  if (!ACTOR_BERRIES.includes(palette)) return node;
+  const others = ACTOR_BERRIES.filter((each) => each !== palette);
   const keep = ([tag, attributes]: ArtNode): boolean =>
-    !(attributes["data-berry"] && attributes["data-berry"] !== berry) &&
+    !(attributes["data-berry"] && attributes["data-berry"] !== palette) &&
     !(tag === "clipPath" && others.some((each) => attributes.id?.endsWith(`clip-${each}`)));
   const prune = ([tag, attributes, ...children]: ArtNode): ArtNode => [tag, attributes, ...children.filter(keep).map(prune)];
   return prune(node);

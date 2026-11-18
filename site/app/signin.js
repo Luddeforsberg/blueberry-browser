@@ -10,9 +10,9 @@ import { hooks, problemWords, state } from "./state.js";
 // Who stands with Berry before anyone has signed in, so before their own mascots are known: two of the berries.
 const [BERRY] = mascotsFromSharedRows([]);
 const STANDING = [
-  { ...BERRY, name: "Lingon", look: { palette: "robin", accessory: "none" } },
+  { ...BERRY, name: "Lingon", look: { palette: "lingon", accessory: "none" } },
   BERRY,
-  { ...BERRY, name: "Cloudberry", look: { palette: "canary", accessory: "none" } },
+  { ...BERRY, name: "Cloudberry", look: { palette: "cloudberry", accessory: "none" } },
 ];
 
 export const mountSignIn = (app) => {

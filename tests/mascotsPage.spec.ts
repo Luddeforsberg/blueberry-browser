@@ -66,7 +66,7 @@ test("a mascot is made in four steps, its limits are changed from its page, and 
     await made.getByRole("button", { name: "Done" }).click();
     const scout = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).mascots.find((mascot) => mascot.name === "Scout")!;
     expect(scout).toMatchObject({
-      look: { palette: "robin", accessory: "crown" },
+      look: { palette: "lingon", accessory: "crown" },
       instructions: "Find the cheapest cable.",
       sites: ["127.0.0.1.nip.io"],
       tools: ["visit", "click"],

@@ -326,7 +326,7 @@ describe("MemoryStore", () => {
 });
 
 describe("memory and everything that copies a mascot", () => {
-  const mascot = { name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "Find things.", sites: [], tools: [] };
+  const mascot = { name: "Scout", look: { palette: "lingon", accessory: "cap" }, instructions: "Find things.", sites: [], tools: [] };
 
   it("has no way into what's published", () => {
     const parsed = parseMascotDraft({ ...mascot, memory: ["You want the cheapest."], facts: ["You want the cheapest."] });

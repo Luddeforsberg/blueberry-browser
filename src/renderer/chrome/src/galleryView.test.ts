@@ -13,7 +13,7 @@ const entry = (
   author: published ? "Ana" : "Blueberry",
   category,
   description: `${name} does its job.`,
-  draft: { name, look: { palette: "robin", accessory: "cap" }, instructions: "Look around.", sites, tools },
+  draft: { name, look: { palette: "lingon", accessory: "cap" }, instructions: "Look around.", sites, tools },
   ...(published ? { addCount: published.adds, publishedAt: published.at } : {}),
 });
 
