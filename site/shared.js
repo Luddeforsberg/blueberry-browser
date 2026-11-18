@@ -333,7 +333,6 @@ var plausibleCode = (text) => {
 export {
   BERRY_ID,
   asContinuation,
-  conversationIdOf,
   conversationsOf,
   fetchWithin,
   finishedWhen,

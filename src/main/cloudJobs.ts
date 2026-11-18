@@ -4,7 +4,7 @@ import { STEP_KINDS, type ChatApproval, type ChatStep, type MascotProfile, type 
 import { BERRY, BERRY_ID, normaliseSite, parseMascotDraft } from "../shared/mascots";
 import { fitHistory, type MascotSnapshot } from "../shared/phone";
 
-export { mascotSnapshot, type MascotSnapshot } from "../shared/phone";
+export { mascotSnapshot } from "../shared/phone";
 
 // What goes into a cloud job's row and what comes back out, for the app and the runner alike. Plain data, no Electron.
 // Everything read from a row is checked again here, whoever wrote it, and a mascot's limits can only come out the same
@@ -91,7 +91,7 @@ export const fitJobUpdate = <T extends { steps?: ChatStep[]; reply?: string; err
 // Nobody is at the computer to see what a job does, so it never asks less than the default: "Never ask" becomes "risky".
 export const actionApprovalFromRow = (input: unknown): ActionApproval => (input === "always" ? "always" : "risky");
 
-export type ApprovalKind = "approval" | "question" | "handoff";
+type ApprovalKind = "approval" | "question" | "handoff";
 
 export interface ApprovalToAsk {
   kind: ApprovalKind;
