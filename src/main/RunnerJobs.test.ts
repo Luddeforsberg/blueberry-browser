@@ -396,17 +396,17 @@ describe("conversations from elsewhere", () => {
   });
 });
 
-describe("the flock shared with the phone", () => {
+describe("the mascots shared with the phone", () => {
   const SCOUT = { ...BERRY, id: "m-1", name: "Scout", instructions: "Find cables.", sites: ["webhallen.com"] };
   const make = (accepted: boolean) => {
     const account = { state: { status: "signed-in", email: ANA, problem: null } as AccountState };
-    const syncCloudFlock = vi.fn(async () => {});
+    const syncCloudMascots = vi.fn(async () => {});
     const server = {
       myCloudRunner: async () => ({ email: "runner@example.com", accepted, relayUrl: null }),
-      syncCloudFlock,
+      syncCloudMascots,
       cloudConversationJobs: async () => [],
     } as unknown as GalleryServer;
-    const flock = [BERRY, SCOUT];
+    const mascots = [BERRY, SCOUT];
     const runner = new RunnerJobs(
       server,
       {
@@ -416,64 +416,64 @@ describe("the flock shared with the phone", () => {
         accessToken: async () => (account.state.status === "signed-in" ? "token" : null),
       },
       join(mkdtempSync(join(tmpdir(), "runner-jobs-")), "runner-jobs.json"),
-      { changed: vi.fn(), finished: vi.fn(), contextId: () => null, flock: () => flock },
+      { changed: vi.fn(), finished: vi.fn(), contextId: () => null, mascots: () => mascots },
       5,
     );
-    return { runner, account, syncCloudFlock, flock };
+    return { runner, account, syncCloudMascots, mascots };
   };
 
   it("goes once a runner has accepted, again only when it changes, and never while signed out", async () => {
-    const { runner, account, syncCloudFlock, flock } = make(true);
+    const { runner, account, syncCloudMascots, mascots } = make(true);
     await settle();
-    expect(syncCloudFlock).toHaveBeenCalledTimes(1);
-    expect(syncCloudFlock).toHaveBeenLastCalledWith("token", [
+    expect(syncCloudMascots).toHaveBeenCalledTimes(1);
+    expect(syncCloudMascots).toHaveBeenLastCalledWith("token", [
       expect.objectContaining({ id: "m-1", name: "Scout", sites: ["webhallen.com"] }),
     ]);
-    await runner.flockChanged();
-    expect(syncCloudFlock).toHaveBeenCalledTimes(1);
-    flock.push({ ...SCOUT, id: "m-2", name: "Penny" });
-    await runner.flockChanged();
-    expect(syncCloudFlock).toHaveBeenCalledTimes(2);
+    await runner.mascotsChanged();
+    expect(syncCloudMascots).toHaveBeenCalledTimes(1);
+    mascots.push({ ...SCOUT, id: "m-2", name: "Penny" });
+    await runner.mascotsChanged();
+    expect(syncCloudMascots).toHaveBeenCalledTimes(2);
     account.state = { status: "signed-out", email: null, problem: null, problemAbout: null };
     runner.accountChanged();
-    flock.pop();
-    await runner.flockChanged();
-    expect(syncCloudFlock).toHaveBeenCalledTimes(2);
+    mascots.pop();
+    await runner.mascotsChanged();
+    expect(syncCloudMascots).toHaveBeenCalledTimes(2);
     runner.destroy();
   });
 
-  it("sends one flock at a time, and the newest last", async () => {
-    const { runner, syncCloudFlock, flock } = make(true);
+  it("sends one list at a time, and the newest last", async () => {
+    const { runner, syncCloudMascots, mascots } = make(true);
     let open = 0;
     let most = 0;
     const releases: (() => void)[] = [];
-    syncCloudFlock.mockImplementation(async () => {
+    syncCloudMascots.mockImplementation(async () => {
       most = Math.max(most, ++open);
       await new Promise<void>((resolve) => releases.push(resolve));
       open--;
     });
     await settle();
     // The first send is still out when two edits come in.
-    flock.push({ ...SCOUT, id: "m-2", name: "Penny" });
-    void runner.flockChanged();
-    flock.push({ ...SCOUT, id: "m-3", name: "Pip" });
-    const last = runner.flockChanged();
+    mascots.push({ ...SCOUT, id: "m-2", name: "Penny" });
+    void runner.mascotsChanged();
+    mascots.push({ ...SCOUT, id: "m-3", name: "Pip" });
+    const last = runner.mascotsChanged();
     while (releases.length) {
       releases.shift()!();
       await settle();
     }
     await last;
     expect(most).toBe(1);
-    expect(syncCloudFlock).toHaveBeenCalledTimes(2);
-    expect((syncCloudFlock.mock.calls.at(-1) as unknown[])[1]).toHaveLength(3);
+    expect(syncCloudMascots).toHaveBeenCalledTimes(2);
+    expect((syncCloudMascots.mock.calls.at(-1) as unknown[])[1]).toHaveLength(3);
     runner.destroy();
   });
 
   it("isn't shared before a runner has accepted", async () => {
-    const { runner, syncCloudFlock } = make(false);
+    const { runner, syncCloudMascots } = make(false);
     await settle();
-    await runner.flockChanged();
-    expect(syncCloudFlock).not.toHaveBeenCalled();
+    await runner.mascotsChanged();
+    expect(syncCloudMascots).not.toHaveBeenCalled();
     runner.destroy();
   });
 });
@@ -502,7 +502,7 @@ describe("routines kept in the cloud", () => {
     });
     const server = {
       myCloudRunner: async () => ({ email: "runner@example.com", accepted: true, relayUrl: null }),
-      syncCloudFlock: async () => {},
+      syncCloudMascots: async () => {},
       syncCloudRoutine,
       forgetCloudRoutine,
       myCloudRoutineKeys: async () => [...keys],

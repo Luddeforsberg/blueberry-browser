@@ -253,7 +253,7 @@ describe("whether an address with no query asks in the default mode", () => {
       null,
     ],
     ["a site an earlier reply was on", "https://example.org/news", { beenTo: ["example.org"] }, false, null],
-    ["a site the bird is limited to", "https://docs.github.com/en", { open: "https://github.com/", sites: ["github.com"] }, false, null],
+    ["a site the mascot is limited to", "https://docs.github.com/en", { open: "https://github.com/", sites: ["github.com"] }, false, null],
     ["a search", "https://www.google.com/search?q=jet+engine", {}, false, null],
     ["a page no tab is on", "https://elsewhere.example/", { open: "about:blank" }, true, host("new-site", "elsewhere.example")],
   ])("%s", async (_, url, options, expected, why) => {
@@ -678,7 +678,7 @@ describe("the web_search tool", () => {
   const offered = (limits?: { sites: string[]; tools: MascotTool[] }) =>
     toolsWith(nothing, limits).some(({ name }) => name === "web_search");
 
-  it("is offered only with a search service, and never to a bird limited to sites", () => {
+  it("is offered only with a search service, and never to a mascot limited to sites", () => {
     expect(
       createPageTools({
         activeTab: () => tab,
@@ -759,7 +759,7 @@ describe("the fetch_page tool", () => {
   const fetchOf = (tools: ReturnType<typeof toolsWith>) => tools.find(({ name }) => name === "fetch_page");
   const echo = vi.fn(async (url: string) => page(url));
 
-  it("is offered only with a page service, and to a bird limited to sites only with visit", () => {
+  it("is offered only with a page service, and to a mascot limited to sites only with visit", () => {
     expect(
       fetchOf(
         createPageTools({
@@ -859,7 +859,7 @@ describe("the fetch_page tool", () => {
     expect(await fetchOf(tools)!.whyRisky!({ url: "https://acme.example/news" })).toBeNull();
   });
 
-  it("keeps a bird to its sites, wherever the page ends up", async () => {
+  it("keeps a mascot to its sites, wherever the page ends up", async () => {
     const service = vi.fn(async (url: string) => page(url.includes("redirect") ? "https://example.com/landing" : url));
     const tool = fetchOf(toolsWith(service, { limits: { sites: ["github.com"], tools: ["visit"] } }))!;
     expect(await tool.refuses!({ url: "https://example.com/" })).toMatchObject({ label: "Stayed off example.com" });

@@ -43,9 +43,9 @@ const setUp = ({ enabled = true, mascot = SCOUT as unknown }: { enabled?: boolea
     enabled: () => switchOn.value,
     linked: () => true,
     start: vi.fn(
-      (prompt: string, options: { bird: MascotProfile; askAtLeast: string; from: string }, onEnd: (ended: EndedReply) => void) => {
+      (prompt: string, options: { mascot: MascotProfile; askAtLeast: string; from: string }, onEnd: (ended: EndedReply) => void) => {
         void prompt;
-        if (options.bird.id === "gone") return null;
+        if (options.mascot.id === "gone") return null;
         const id = `chat-${chats.size + 1}`;
         chats.set(id, { reply: "", steps: [], waiting: false, end: onEnd });
         return id;
@@ -90,7 +90,7 @@ describe("MacJobs", () => {
     expect(presence).toEqual([true]);
     expect(host.start).toHaveBeenCalledTimes(1);
     expect(host.start.mock.calls[0][1]).toMatchObject({
-      bird: { id: "scout", sites: ["tea.example"], tools: ["visit"] },
+      mascot: { id: "scout", sites: ["tea.example"], tools: ["visit"] },
       askAtLeast: "risky",
       from: RELAY_FROM,
     });
@@ -107,7 +107,7 @@ describe("MacJobs", () => {
     expect(rows.get("job-1")).toMatchObject({ status: "done", reply: "It's £4.", error: null });
     // Then the next, as Berry.
     await jobs.tick();
-    expect(host.start.mock.calls[1][1].bird).toBe(BERRY);
+    expect(host.start.mock.calls[1][1].mascot).toBe(BERRY);
   });
 
   it("reports only the reply it started, not one the user asks for in the chat afterwards", async () => {
@@ -121,7 +121,7 @@ describe("MacJobs", () => {
     expect(jobs.running).toBeNull();
   });
 
-  it("checks the row's bird as the runner does, and refuses what's malformed or missing", async () => {
+  it("checks the row's mascot as the runner does, and refuses what's malformed or missing", async () => {
     for (const mascot of [
       // Berry's id with tools taken away isn't Berry.
       { id: "berry", name: "Berry", instructions: "", sites: [], tools: [] },
@@ -135,7 +135,7 @@ describe("MacJobs", () => {
       expect(host.start, JSON.stringify(mascot)).not.toHaveBeenCalled();
       expect(rows.get("job-1")).toMatchObject({ status: "failed", error: expect.stringMatching(/didn't pass Blueberry's checks/) });
     }
-    // One that passes but isn't in the flock here.
+    // One that passes but isn't here.
     const { jobs, rows } = setUp({ mascot: { ...SCOUT, id: "gone" } });
     await jobs.tick();
     expect(rows.get("job-1")).toMatchObject({ status: "failed", error: expect.stringMatching(/isn't in Blueberry on the Mac/) });

@@ -27,7 +27,7 @@ const MIGRATIONS = [
   // A settled title is final: the user chose it, or it was generated. Chats from before this keep theirs.
   `ALTER TABLE chats ADD COLUMN title_settled INTEGER NOT NULL DEFAULT 1;`,
   `ALTER TABLE messages ADD COLUMN steps TEXT;`,
-  // Chats from before the flock have none, which means Berry.
+  // Chats from before there were other mascots have none, which means Berry.
   `ALTER TABLE chats ADD COLUMN mascot_id TEXT;`,
   `ALTER TABLE messages ADD COLUMN memory TEXT;`,
   // The app outside Blueberry that started the chat, such as "Claude Code". Null for the user's own.

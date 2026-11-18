@@ -25,7 +25,7 @@ const findBarVisible = (app: ElectronApplication) =>
 test("find, zoom and the page menu on a web page", async () => {
   const server = createServer((_, response) => {
     response.setHeader("content-type", "text/html");
-    response.end(`<!doctype html><title>Birds</title><body>
+    response.end(`<!doctype html><title>Jackdaws</title><body>
       <p>jackdaw one, jackdaw two, jackdaw three</p>
       <a id="link" href="/next">a link</a>
       <input id="field" value="text">
@@ -41,7 +41,7 @@ test("find, zoom and the page menu on a web page", async () => {
     await chrome.evaluate((url) => window.chromeAPI.browser.createTab(url), origin);
     const page = await findView(app, origin);
     const find = await findView(app, "view=find");
-    await expect(page).toHaveTitle("Birds");
+    await expect(page).toHaveTitle("Jackdaws");
 
     // Find: counts matches, steps through them, and closes on Esc.
     await clickMenu(app, "Find…");

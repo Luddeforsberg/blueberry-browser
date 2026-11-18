@@ -244,7 +244,7 @@ export class Routines {
     return latest?.status ?? "idle";
   }
 
-  // The routines that run in the cloud, as rows for it. Each bird's limits are narrowed by the routine's own sites. The
+  // The routines that run in the cloud, as rows for it. Each mascot's limits are narrowed by the routine's own sites. The
   // first time is only when this would run it next, which the server takes for a new or changed one. Null when the saved
   // routines couldn't be read, so the cloud's are left as they are rather than taken for deleted.
   cloudRows(

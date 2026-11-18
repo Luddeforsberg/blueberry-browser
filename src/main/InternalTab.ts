@@ -1,5 +1,5 @@
 import type { InternalPage } from "../shared/ipc";
-import { flockBack } from "../shared/flockPlaces";
+import { mascotsBack } from "../shared/mascotsPlaces";
 import { galleryBack } from "../shared/galleryPlaces";
 import { routinesBack } from "../shared/routinePlaces";
 import { settingsBack } from "../shared/settingsPlaces";
@@ -44,7 +44,7 @@ export class InternalTab {
 
   private get back(): string | null {
     if (this.page === "settings") return settingsBack(this.param);
-    if (this.page === "flock") return flockBack(this.param);
+    if (this.page === "flock") return mascotsBack(this.param);
     if (this.page === "routines") return routinesBack(this.param);
     if (this.page === "mascot-gallery") return galleryBack(this.param);
     return null;

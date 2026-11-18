@@ -5,7 +5,7 @@ import { Button } from "@common/components/Button";
 import { cn } from "@common/lib/utils";
 import { Berry } from "../components/Berry";
 import { useAssistantName } from "../components/useAssistantName";
-import { useFlock, useLibrary } from "../contexts/useLibrary";
+import { useMascots, useLibrary } from "../contexts/useLibrary";
 import { liveFrameLock, useCloudView } from "../cloudView";
 
 const api = () => window.chromeAPI.cloud;
@@ -41,7 +41,7 @@ export const CloudPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
   const [answered, setAnswered] = useState(false);
   // A job handed this page to the user, who signs in through the live view and presses I'm done in the toolbar.
   const handoff = useLibrary().needsYou.find(({ approval }) => approval.handoff?.tabId === tab.id);
-  const asker = useAssistantName(useFlock().find(handoff?.mascotId ?? null));
+  const asker = useAssistantName(useMascots().find(handoff?.mascotId ?? null));
 
   const pictures = view?.kind === "frames";
   const area = useFitPage(tab.id, pictures || view?.kind === "live");

@@ -1,7 +1,7 @@
 import { nextRun, parseSchedule } from "../../src/main/routineSchedule";
 
 // Routines that run with the Mac off. The owner's app keeps them in Supabase, and this starts a job for each one that's
-// due, which the runner then takes like any other job, with the same checks on its bird. It only ever learns a routine's
+// due, which the runner then takes like any other job, with the same checks on its mascot. It only ever learns a routine's
 // id, schedule, time zone and when it's due: the job is made from the rest in the database.
 
 export interface DueRoutine {

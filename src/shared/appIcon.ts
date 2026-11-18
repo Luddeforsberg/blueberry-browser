@@ -10,7 +10,7 @@ export type AppIconGround = (typeof APP_ICON_GROUNDS)[number];
 export const APP_ICON_SIZE = 256;
 export const SHIPPED_ICON_SIZE = 1024;
 
-// The chosen mascot while it's still in the flock, and otherwise Berry, which is null. A deleted mascot hands the icon
+// The chosen mascot while it's still one of the mascots, and otherwise Berry, which is null. A deleted mascot hands the icon
 // back to Berry this way, without anyone having to clear the setting.
-export const iconMascotId = (id: string | null, flock: readonly { id: string; deletedAt: number | null }[]): string | null =>
-  id !== null && id !== BERRY_ID && flock.some((mascot) => mascot.id === id && mascot.deletedAt === null) ? id : null;
+export const iconMascotId = (id: string | null, mascots: readonly { id: string; deletedAt: number | null }[]): string | null =>
+  id !== null && id !== BERRY_ID && mascots.some((mascot) => mascot.id === id && mascot.deletedAt === null) ? id : null;

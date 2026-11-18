@@ -29,7 +29,7 @@ export interface PageTarget {
   readonly mayShowCode: boolean;
   // How much bigger the page draws its pixels.
   readonly zoomFactor: number;
-  // The bird drawn on the page. Null where there's nobody to see one, as in a browser in the cloud.
+  // The mascot drawn on the page. Null where there's nobody to see one, as in a browser in the cloud.
   readonly actor: PageActor | null;
 
   // In a world of its own, which shares the page's DOM but not its variables, and stays the same world for a document.

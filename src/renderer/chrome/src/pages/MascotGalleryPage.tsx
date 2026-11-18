@@ -11,12 +11,12 @@ import type { Mood } from "@common/components/moods";
 import { Pips } from "@common/components/Pips";
 import { useStill } from "@common/components/motion";
 import { cn } from "@common/lib/utils";
-import { useFlock } from "../contexts/useLibrary";
+import { useMascots } from "../contexts/useLibrary";
 import { useShell } from "../contexts/useShell";
 import { Berry } from "../components/Berry";
 import { ChatError, Markdown } from "../components/ChatMessage";
 import { EmptyPage, PageHeader, SearchField } from "../components/PageFrame";
-import { openMascots, startMascot } from "../flockView";
+import { openMascots, startMascot } from "../mascotsView";
 import {
   addsLine,
   BERRY_NAMES,
@@ -271,7 +271,7 @@ const Crumb: React.FC<{ name?: string; onClose: () => void }> = ({ name, onClose
 
 // Add, or once it's yours, Chat with it and its page.
 const Actions: React.FC<{ name: string; copy: MascotProfile | null; onAdd: () => void }> = ({ name, copy, onAdd }) => {
-  const { choose } = useFlock();
+  const { choose } = useMascots();
   if (!copy) {
     return (
       <Button aria-label={`Add ${name} to your mascots`} className="w-full h-[38px] text-14" onClick={onAdd}>
@@ -301,10 +301,10 @@ const MascotPage: React.FC<{ entry: GalleryMascot; copy: MascotProfile | null; l
   linked,
   narrow,
 }) => {
-  const { flock } = useFlock();
+  const { mascots } = useMascots();
   const { showBerry } = useShell().settings;
   const { name } = entry.draft;
-  const taken = flock.map((mascot) => mascot.name);
+  const taken = mascots.map((mascot) => mascot.name);
   const clash = !copy && taken.some((other) => other.toLowerCase() === name.toLowerCase());
   const [ownName, setOwnName] = useState(() => freeName(name, taken));
   const [error, setError] = useState<string | null>(null);
@@ -435,7 +435,7 @@ const NothingFound: React.FC<{ query: string }> = ({ query }) => (
 );
 
 export const MascotGalleryPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
-  const { flock } = useFlock();
+  const { mascots } = useMascots();
   const still = useStill();
   const [view, setViewState] = useState<GalleryView>(galleryView);
   const [asks, setAsks] = useState(galleryLinkAsks);
@@ -449,7 +449,7 @@ export const MascotGalleryPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
   // Whether the keyboard was in the page when a tile was picked, so it moves on to the crumb.
   const onTile = useRef(false);
   // Publishing or unpublishing changes this, and that changes what the page should show.
-  const ownPublished = flock.map((mascot) => mascot.publishedId ?? "").join();
+  const ownPublished = mascots.map((mascot) => mascot.publishedId ?? "").join();
 
   const [retries, setRetries] = useState(0);
   const place = galleryPlace(tab.pageParam);
@@ -512,7 +512,7 @@ export const MascotGalleryPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
   const narrow = width > 0 && width < NARROW;
   const groups = galleryGroups(entries, view.query, view.category);
   // Your own published one counts as yours, so it's never offered back to you.
-  const copyOf = (entry: GalleryMascot) => flock.find((mascot) => mascot.galleryId === entry.id || mascot.publishedId === entry.id) ?? null;
+  const copyOf = ({ id }: GalleryMascot) => mascots.find(({ galleryId, publishedId }) => galleryId === id || publishedId === id) ?? null;
   const linked = place.page === "linked" && linkedAnswer?.key === linkKey ? linkedAnswer.answer : null;
   const picked = place.page === "linked" ? (linked?.entry ?? null) : (entries.find((entry) => entry.id === pickedId) ?? null);
   // Still being asked, so nothing shows rather than something wrong.

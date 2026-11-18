@@ -21,7 +21,7 @@ export const confirmCloudLogin = async (window: BaseWindow, site: string): Promi
     type: "question",
     message: `Bring your sign-in to ${site} into the cloud browser?`,
     detail:
-      "Its cookies are copied from Blueberry into the cloud browser, where a bird working in the cloud can use the site as you. Nothing else is copied, and you can take it out again in Settings > Cloud.",
+      "Its cookies are copied from Blueberry into the cloud browser, where a mascot working in the cloud can use the site as you. Nothing else is copied, and you can take it out again in Settings > Cloud.",
     buttons: ["Bring it along", "Cancel"],
     defaultId: 1,
     cancelId: 1,

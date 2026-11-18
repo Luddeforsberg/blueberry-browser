@@ -152,7 +152,7 @@ describe("verifying a proposal", () => {
     }
   });
 
-  it("gives a bird only its evidence's sites and going to pages", () => {
+  it("gives a mascot only its evidence's sites and going to pages", () => {
     const [kept] = verify({
       kind: "mascot",
       line: "I'm Gull, and I'll hunt Lisbon fares.",
@@ -197,7 +197,7 @@ describe("verifying a proposal", () => {
     expect(
       verifyProposals(JSON.stringify({ cards: [prompt({})] }), digest, { ...NONE, feedback: [{ ...feedback[0], verdict: "used" }] }),
     ).toHaveLength(1);
-    const bird = {
+    const card = {
       kind: "mascot",
       line: "I'm Gull, and I'll hunt fares.",
       why: "You compared fares",
@@ -206,7 +206,7 @@ describe("verifying a proposal", () => {
       instructions: "Find me fares.",
     };
     expect(
-      verifyProposals(JSON.stringify({ cards: [bird] }), digest, { ...NONE, mascots: [{ name: "Tern", sites: ["kayak.com"] }] }),
+      verifyProposals(JSON.stringify({ cards: [card] }), digest, { ...NONE, mascots: [{ name: "Tern", sites: ["kayak.com"] }] }),
     ).toEqual([]);
   });
 

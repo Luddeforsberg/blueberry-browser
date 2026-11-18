@@ -8,7 +8,7 @@ import { chatRoutine } from "../routinesView";
 import { useAssistantName } from "../components/useAssistantName";
 import { MemoryOffers } from "../components/MemoryInChat";
 import { ChatComposer } from "../components/Composer";
-import { useFlock, useLibrary } from "../contexts/useLibrary";
+import { useMascots, useLibrary } from "../contexts/useLibrary";
 import { WorkingStrip, WorkingView } from "../components/WorkingView";
 import { useWorkView } from "../components/useWorkView";
 import { RunnerView } from "../components/RunnerView";
@@ -28,7 +28,7 @@ const COLUMN = "w-full max-w-[720px] mx-auto px-[clamp(28px,calc(396px_-_50%),36
 export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
   const chatId = tab.pageParam;
   const thread = useChatThread(chatId);
-  const { find } = useFlock();
+  const { find } = useMascots();
   // A chat stays with the mascot it started with.
   const mascot = find(thread?.mascotId ?? null);
   const name = useAssistantName(mascot);

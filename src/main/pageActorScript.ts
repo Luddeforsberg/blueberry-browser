@@ -1,7 +1,7 @@
 import { ACTOR_ART, ACTOR_ART_SHEET, ACTOR_BERRY, type ArtNode } from "./pageActorArt";
 import { SHARED } from "./pageScripts";
 
-// The bird drawn on a web page while a job works in it, run in the same isolated world as the tools. Everything about it
+// The mascot drawn on a web page while a job works in it, run in the same isolated world as the tools. Everything about it
 // keeps it out of the page's way and out of the agent's sight:
 // - A closed shadow root, so neither the page nor `list_elements` can reach into it.
 // - No box and no pointer events, so nothing can land on it and `elementFromPoint` goes through it.
@@ -23,13 +23,13 @@ const SHEET = `
   * { pointer-events: none; box-sizing: border-box; }
   .sky { position: absolute; left: 0; top: 0; width: 0; height: 0; }
   .sky.covered { visibility: hidden; }
-  .bird, .flip, .body { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
-  .bird { will-change: transform; }
+  .mascot, .flip, .body { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
+  .mascot { will-change: transform; }
   .flip { transition: transform 90ms ease-out; }
   .pose {
     position: absolute; display: none; overflow: visible;
     width: var(--size); height: var(--size); left: calc(var(--size) * -0.475); top: calc(var(--size) * -0.95);
-    /* A thin pale edge and a small shadow, so a dark bird stays a bird on a dark page. */
+    /* A thin pale edge and a small shadow, so a dark mascot stays a mascot on a dark page. */
     filter: drop-shadow(0 0 1px rgb(255 255 255 / 0.85)) drop-shadow(0 2px 3px rgb(20 22 36 / 0.3));
   }
   .pose.shown { display: block; }
@@ -78,7 +78,7 @@ export interface ActorLook {
   dark: boolean;
   plain: boolean;
   still: boolean;
-  // The page's zoom, so the bird stays one size on screen.
+  // The page's zoom, so the mascot stays one size on screen.
   zoom: number;
   size: number;
   // Drawn for a picture of the page in the chat, not for anyone looking at the page.
@@ -101,7 +101,7 @@ export const artFor = (node: ArtNode, palette: string): ArtNode => {
 const posesFor = (accessory: string, palette: string): Record<string, ArtNode> =>
   Object.fromEntries(Object.entries(ACTOR_ART[accessory] ?? ACTOR_ART.none).map(([pose, node]) => [pose, artFor(node, palette)]));
 
-// Where the feet were on the last page, so the bird carries on from there after a navigation.
+// Where the feet were on the last page, so the mascot carries on from there after a navigation.
 export const installActor = (key: string, look: ActorLook, start: { x: number; y: number } | null): string => `(() => {
   globalThis.__berryActor?.remove();
   ${SHARED}
@@ -147,10 +147,10 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
   if (LOOK.pictured) sky.classList.add("pictured");
   sky.dataset.mascot = LOOK.palette;
   sky.style.setProperty("--unit", String(1 / LOOK.zoom));
-  const bird = div("bird", sky);
-  const flip = div("flip", bird);
+  const mascot = div("mascot", sky);
+  const flip = div("flip", mascot);
   const body = div("body", flip);
-  const line = div("line", bird);
+  const line = div("line", mascot);
   const poses = {};
   const addPose = (name, art, extra) => {
     const el = draw(art);
@@ -180,7 +180,7 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
   let covered = false;
   // What a flight from \`go\` lands as, which a job stopping to ask can still change on the way.
   let landingPose = null;
-  // What the bird is here to do, which the line keeps clear of, and the line's place from the feet.
+  // What the mascot is here to do, which the line keeps clear of, and the line's place from the feet.
   let target = null;
   let lineAt = null;
 
@@ -199,10 +199,10 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
   };
   const place = ({ x, y }) => {
     spot = { x, y };
-    bird.style.transform = "translate(" + x + "px, " + y + "px)";
+    mascot.style.transform = "translate(" + x + "px, " + y + "px)";
   };
   const now = () => {
-    const matrix = new DOMMatrixReadOnly(getComputedStyle(bird).transform);
+    const matrix = new DOMMatrixReadOnly(getComputedStyle(mascot).transform);
     return { x: matrix.e, y: matrix.f };
   };
 
@@ -230,7 +230,7 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
   };
   const overlaps = (left, top, width, height, box) => left < box.right && left + width > box.left && top < box.bottom && top + height > box.top;
 
-  // Tries the places around the bird and takes the first with the least under it, always wholly on screen. Over the bird
+  // Tries the places around the mascot and takes the first with the least under it, always wholly on screen. Over the mascot
   // or what it's about to do is worse than over any text.
   const placeLine = () => {
     if (!spot || !line.classList.contains("shown")) return;
@@ -243,7 +243,7 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
     const reach = size() * 0.6;
     const rect = target?.isConnected ? rectOf(target) : null;
     const box = rect && { left: rect.left, top: rect.top, right: rect.left + rect.width, bottom: rect.top + rect.height };
-    const bird = { left: spot.x - reach, top: spot.y - size(), right: spot.x + reach, bottom: spot.y };
+    const self = { left: spot.x - reach, top: spot.y - size(), right: spot.x + reach, bottom: spot.y };
     const above = spot.y - size() - height - gap;
     const beside = spot.y - size() * 0.75;
     const places = [
@@ -257,7 +257,7 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
     let best = null;
     let bestScore = Infinity;
     places.forEach(([left, top], order) => {
-      const inTheWay = (box && overlaps(left, top, width, height, box) ? 100 : 0) + (overlaps(left, top, width, height, bird) ? 100 : 0);
+      const inTheWay = (box && overlaps(left, top, width, height, box) ? 100 : 0) + (overlaps(left, top, width, height, self) ? 100 : 0);
       const score = inTheWay + crowded(left, top, width, height) * 10 + order;
       if (score < bestScore) {
         best = [left, top];
@@ -314,7 +314,7 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
     }
     place(to);
     landingPose = null;
-    const run = bird.animate(frames, { duration: ms, easing: "linear" });
+    const run = mascot.animate(frames, { duration: ms, easing: "linear" });
     flight = run;
     run.onfinish = () => {
       if (flight !== run) return;
@@ -324,7 +324,7 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
     return run;
   };
 
-  const fade = () => bird.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 120, easing: "ease-out" });
+  const fade = () => mascot.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 120, easing: "ease-out" });
 
   const rectOf = (el) => {
     const box = el.getBoundingClientRect();
@@ -340,7 +340,7 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
     return { left, top, width: box.width, height: box.height };
   };
 
-  // A page moves under the bird, so what it's standing on stays under its feet, as far as the screen goes.
+  // A page moves under the mascot, so what it's standing on stays under its feet, as far as the screen goes.
   const follow = () => {
     if (!anchor || flight || !anchor.el.isConnected) return;
     const rect = rectOf(anchor.el);
@@ -412,7 +412,7 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
     if (leaving !== null) {
       clearTimeout(leaving);
       leaving = null;
-      bird.getAnimations().forEach((run) => run.cancel());
+      mascot.getAnimations().forEach((run) => run.cancel());
       flight = null;
     }
     sky.style.setProperty("--size", size() + "px");
@@ -442,7 +442,7 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
     ).onfinish = () => el.remove();
   };
 
-  // Everything from here on answers false if nothing was drawn, so main doesn't wait for a bird nobody can see.
+  // Everything from here on answers false if nothing was drawn, so main doesn't wait for a mascot nobody can see.
   const api = {
     key: ${JSON.stringify(key)},
 
@@ -670,7 +670,7 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
       setFacing(1);
       const to = { x: Math.min(spot.x + size() * 3, innerWidth + size()), y: -size() * 1.5 };
       flyTo(to, ms, 0);
-      bird.animate([{ opacity: 1, offset: 0.5 }, { opacity: 0 }], { duration: ms, easing: "ease-in" });
+      mascot.animate([{ opacity: 1, offset: 0.5 }, { opacity: 0 }], { duration: ms, easing: "ease-in" });
       leaving = setTimeout(remove, ms);
       return true;
     },
@@ -695,5 +695,5 @@ const call = (key: string, command: string): string => {
 
 export const actorCommand = (key: string, name: string, args: object = {}): string => call(key, `${name}(${JSON.stringify(args)})`);
 
-// For anything that shouldn't bring the bird back if it isn't there.
+// For anything that shouldn't bring the mascot back if it isn't there.
 export const ifThere = (name: string, args: object = {}): string => `globalThis.__berryActor?.${name}(${JSON.stringify(args)})`;

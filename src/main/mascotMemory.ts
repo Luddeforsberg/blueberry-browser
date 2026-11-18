@@ -3,7 +3,7 @@ import { siteAllowed, normaliseSite } from "../shared/mascots";
 import { factProblem } from "../shared/memory";
 import { cleanLine } from "../shared/publishing";
 
-// The pure parts of a bird's memory: what's worth asking about, what the model is given, what's kept of what it says, and
+// The pure parts of a mascot's memory: what's worth asking about, what the model is given, what's kept of what it says, and
 // what goes into a job.
 
 const MAX_PROPOSALS = 2;
@@ -158,8 +158,8 @@ const mentions = (text: string, site: string): boolean => {
 };
 
 // What goes into a job. Anything general always does. One about a site goes in when the job has a reason to be there: it's
-// on that site, the chat has already been there, the bird is limited to it, or the user's words name it. A site the job
-// only finds on the way brings its facts from the next message. Nothing about a site the bird can't use goes in, and only
+// on that site, the chat has already been there, the mascot is limited to it, or the user's words name it. A site the job
+// only finds on the way brings its facts from the next message. Nothing about a site the mascot can't use goes in, and only
 // so many fit, with the ones about a site first and the newest first.
 export const relevantFacts = (
   facts: MemoryFact[],

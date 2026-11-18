@@ -5,7 +5,7 @@ import type { Mood } from "@common/components/moods";
 import { useShell } from "../contexts/useShell";
 import { atPointer } from "./menuAnchors";
 
-// Berry, or one of the flock, as the settings say: hidden, still, or itself. Right-clicking it offers both switches.
+// Berry, or one of the mascots, as the settings say: hidden, still, or itself. Right-clicking it offers both switches.
 // `still` holds it still whatever the settings say, where something else in its area already moves.
 export const Berry: React.FC<{
   mood?: Mood;

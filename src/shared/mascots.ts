@@ -4,7 +4,7 @@ import type { MascotAccessory, MascotDraft, MascotPalette, MascotProfile, Mascot
 
 export const BERRY_ID = "berry";
 
-// The ids are the old birds', kept because looks are saved under them. Each is drawn and named as a berry.
+// The ids are from the old drawings, kept because looks are saved under them. Each is drawn and named as a berry.
 export const PALETTES: { id: MascotPalette; label: string }[] = [
   { id: "kingfisher", label: "Blueberry" },
   { id: "robin", label: "Lingon" },
@@ -29,7 +29,7 @@ export const MASCOT_TOOLS: { id: MascotTool; label: string; hint: string }[] = [
   { id: "type", label: "Type", hint: "Fill in fields and press keys." },
 ];
 
-// The first of the flock. Always there, never limited, and it can't be changed or deleted.
+// The first of the mascots. Always there, never limited, and it can't be changed or deleted.
 export const BERRY: MascotProfile = {
   id: BERRY_ID,
   name: "Berry",

@@ -1,4 +1,4 @@
-import { flockFromRows } from "../shared.js";
+import { mascotsFromSharedRows } from "../shared.js";
 import { appearance, setAppearance } from "../theme.js";
 import * as api from "./api.js";
 import { el, icon } from "./dom.js";
@@ -101,7 +101,7 @@ const notifications = () => {
 
 const cloud = () => {
   const ready = state.linked === true;
-  const shared = state.flock.length - 1;
+  const shared = state.mascots.length - 1;
   const pill =
     state.linked === null ? null : el("span", { className: `pill ${ready ? "on" : ""}`, textContent: ready ? "Ready" : "Not set up" });
   return [
@@ -115,7 +115,7 @@ const cloud = () => {
       el("span", { className: "tile" }, icon("mascots")),
       "Your mascots",
       shared > 0
-        ? `${shared} shared from your computer${state.flockShared ? ` ${finished(state.flockShared)}` : ""}`
+        ? `${shared} shared from your computer${state.mascotsShared ? ` ${finished(state.mascotsShared)}` : ""}`
         : "Only Berry so far. The others show once Blueberry on your computer shares them.",
     ),
   ];
@@ -126,8 +126,8 @@ const signOut = async () => {
   await api.signOut();
   Object.assign(state, {
     jobs: null,
-    flock: flockFromRows([]),
-    flockShared: null,
+    mascots: mascotsFromSharedRows([]),
+    mascotsShared: null,
     linked: null,
     problem: null,
     said: null,
@@ -142,7 +142,7 @@ const signOut = async () => {
 // What the sheet shows, so a poll draws it again only when that has changed.
 let drawnAs = "";
 const signature = () =>
-  JSON.stringify([api.signedIn()?.email, state.push, state.linked, state.flock.length, state.flockShared, appearance()]);
+  JSON.stringify([api.signedIn()?.email, state.push, state.linked, state.mascots.length, state.mascotsShared, appearance()]);
 
 const draw = (problem = null) => {
   const body = sheetBody();

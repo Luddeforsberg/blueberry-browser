@@ -50,7 +50,7 @@ export type RelayWhere = "auto" | "mac" | "cloud";
 
 // What the relay may ask the database, as the runner, with a grant's secret.
 export interface RelayDb {
-  relayFlock(secret: string): Promise<Record<string, unknown>[]>;
+  relayMascots(secret: string): Promise<Record<string, unknown>[]>;
   // Null when it was for the Mac and the Mac isn't there.
   relayStartJob(secret: string, prompt: string, mascot: object, where: RelayWhere): Promise<string | null>;
   // The grant's own jobs by id, or its newest with none.
@@ -162,7 +162,7 @@ export const supabaseDb = (
       await rpc("runner_set_relay_url", { p_url: relayUrl });
     },
     // The relay's calls, as this runner, each with a grant's secret. None of them can decide anything.
-    relayFlock: async (secret) => (await rpc<Record<string, unknown>[]>("relay_flock", { p_secret: secret })) ?? [],
+    relayMascots: async (secret) => (await rpc<Record<string, unknown>[]>("relay_flock", { p_secret: secret })) ?? [],
     relayStartJob: async (secret, prompt, mascot, where) => {
       const id = await rpc<unknown>("relay_start_job", { p_secret: secret, p_prompt: prompt, p_mascot: mascot, p_where: where });
       if (id === null && where === "mac") return null;

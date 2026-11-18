@@ -9,7 +9,7 @@ import { Choice, Switch } from "@common/components/Controls";
 import { BIG_CARD, BIG_SHELL } from "@common/components/cardShell";
 import { LABEL, StatusPill } from "@common/components/StatusPill";
 import { cn } from "@common/lib/utils";
-import { useFlock } from "../contexts/useLibrary";
+import { useMascots } from "../contexts/useLibrary";
 import { Berry, BerrySpot } from "../components/Berry";
 import { useAssistantName } from "../components/useAssistantName";
 import { ChatError } from "../components/ChatMessage";
@@ -19,7 +19,7 @@ import { FIELD, PartNav, SiteChips, StepCard, StepNav } from "../components/Step
 import { formatTime } from "../components/formatTime";
 import { narrowerLimits } from "../shortWords";
 import { useRunner } from "../useRunner";
-import { keepTabDraft, tabDraft } from "../flockView";
+import { keepTabDraft, tabDraft } from "../mascotsView";
 import {
   blankForm,
   formFor,
@@ -300,7 +300,7 @@ export const WhenAnswer: React.FC<{ values: RoutineFormValues; set: Set; often?:
 // --- Step 3: who does it ---------------------------------------------------------------------------------------------
 
 const WhoAnswer: React.FC<{ values: RoutineFormValues; set: Set }> = ({ values, set }) => {
-  const { flock } = useFlock();
+  const { mascots } = useMascots();
   const chosen = values.mascotId ?? BERRY_ID;
   return (
     <ul
@@ -308,7 +308,7 @@ const WhoAnswer: React.FC<{ values: RoutineFormValues; set: Set }> = ({ values, 
       aria-label="Who does it"
       className="max-h-[300px] overflow-y-auto rounded-sheet shadow-[inset_0_0_0_1px_var(--line)]"
     >
-      {flock.map((mascot) => {
+      {mascots.map((mascot) => {
         const limits = narrowerLimits(mascot);
         const on = chosen === mascot.id;
         return (
@@ -347,7 +347,7 @@ const MascotName: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => (
 // --- Step 4: where it may go -----------------------------------------------------------------------------------------
 
 const WhereAnswer: React.FC<{ values: RoutineFormValues; set: Set }> = ({ values, set }) => {
-  const mascot = useFlock().find(values.mascotId);
+  const mascot = useMascots().find(values.mascotId);
   const name = useAssistantName(mascot);
   return (
     <>
@@ -420,7 +420,7 @@ const fresh = (values: RoutineFormValues = blankForm()): Making => ({ values, st
 
 // It ends here: the mascot looking pleased, and the routine read back as one sentence.
 const SavedCard: React.FC<{ routine: Routine | null; values: RoutineFormValues; id: string }> = ({ routine, values, id }) => {
-  const mascot = useFlock().find(routine?.mascotId ?? values.mascotId);
+  const mascot = useMascots().find(routine?.mascotId ?? values.mascotId);
   const name = useAssistantName(mascot);
   const shown = routine ? formFor(routine) : values;
   return (
@@ -455,7 +455,7 @@ const SavedCard: React.FC<{ routine: Routine | null; values: RoutineFormValues; 
 // Making one, in four steps. What's typed lasts while the tab stays open, and saves nothing until the last step.
 export const NewRoutine: React.FC<{ tabId: string; routines: Routine[] }> = ({ tabId, routines }) => {
   const param = routinesParam({ page: "new" });
-  const { find } = useFlock();
+  const { find } = useMascots();
   const [making, setMakingState] = useState<Making>(() => {
     const started = takeStartedRoutine();
     return started ? fresh(started) : tabDraft(tabId, param, () => fresh());
@@ -551,7 +551,7 @@ export const NewRoutine: React.FC<{ tabId: string; routines: Routine[] }> = ({ t
 // One part of a routine, alone, with Cancel and Save. It saves the whole routine with only that part changed.
 export const ChangeRoutinePart: React.FC<{ tabId: string; routine: Routine; part: RoutinePart }> = ({ tabId, routine, part }) => {
   const param = routinesParam({ page: "part", id: routine.id, part });
-  const { find } = useFlock();
+  const { find } = useMascots();
   const [values, setValuesState] = useState<RoutineFormValues>(() => tabDraft(tabId, param, () => formFor(routine)));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);

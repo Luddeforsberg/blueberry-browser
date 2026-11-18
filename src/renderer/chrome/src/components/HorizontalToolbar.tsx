@@ -4,9 +4,9 @@ import type { Popover } from "@shared/ipc";
 import type { MascotProfile } from "@shared/library";
 import { cn } from "@common/lib/utils";
 import { useBrowser } from "../contexts/useBrowser";
-import { useFlock, useLibrary } from "../contexts/useLibrary";
+import { useMascots, useLibrary } from "../contexts/useLibrary";
 import { useShell } from "../contexts/useShell";
-import { dockFaces, openMascots } from "../flockView";
+import { dockFaces, openMascots } from "../mascotsView";
 import { AccountButton } from "./AccountMenu";
 import { AddressBar } from "./AddressBar";
 import { DownloadsButton } from "./DownloadsButton";
@@ -91,11 +91,11 @@ const ChatsPill: React.FC<{ shown: Popover | null }> = ({ shown }) => {
 // Every mascot's face, as in the sidebar's dock. Pressing one opens its card over the page. When they don't all fit,
 // the dock folds to the chosen one, any that are asking or working, and a count of the rest, which opens the mascots' page.
 const Dock: React.FC<{ shown: Popover | null; room: number }> = ({ shown, room }) => {
-  const { flock, chosen } = useFlock();
+  const { mascots, chosen } = useMascots();
   const stateOf = useMascotState();
   const busy = (mascot: MascotProfile) => stateOf(mascot).mood !== "rest";
-  const others = flock.filter((mascot) => mascot.id !== chosen.id);
-  const faces = room >= flock.length ? { shown: flock, more: 0 } : dockFaces([chosen, ...others], 2 + others.filter(busy).length, busy);
+  const others = mascots.filter((mascot) => mascot.id !== chosen.id);
+  const faces = room >= mascots.length ? { shown: mascots, more: 0 } : dockFaces([chosen, ...others], 2 + others.filter(busy).length, busy);
   return (
     <ul aria-label="Your mascots" className="h-[34px] ml-1 mr-0.5 px-2 shrink-0 flex items-center gap-1 rounded-tile bg-tray">
       {faces.shown.map((mascot) => {

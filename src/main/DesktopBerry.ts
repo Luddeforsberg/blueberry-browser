@@ -973,7 +973,7 @@ export class DesktopBerry {
     const face = (mascot: MascotProfile) => ({ id: mascot.id, name: this.host.nameOf(mascot.id), look: mascot.look });
     return {
       chosen: face(chosen),
-      flock: library.mascots.filter(({ deletedAt }) => deletedAt === null).map(face),
+      mascots: library.mascots.filter(({ deletedAt }) => deletedAt === null).map(face),
       cloud: desktopCloud(chosen, this.host.cloud()),
       recent: this.panelOpen === "box" ? this.host.recentJobs() : [],
       shortcut: this.registered,
@@ -989,8 +989,8 @@ export class DesktopBerry {
       // A row keeps its key while it's showing, so a press made just as the tray changes still reaches it.
       const before = new Map([...this.trayKeys].map(([key, target]) => [JSON.stringify(target), key]));
       this.trayKeys.clear();
-      const flock = library.mascots.filter(({ deletedAt }) => deletedAt === null);
-      tray = desktopTray({ ...facts, running: facts.running.map((job) => this.withProgress(job)) }, flock, (target) => {
+      const mascots = library.mascots.filter(({ deletedAt }) => deletedAt === null);
+      tray = desktopTray({ ...facts, running: facts.running.map((job) => this.withProgress(job)) }, mascots, (target) => {
         const key = before.get(JSON.stringify(target)) ?? `k${++this.keyCount}`;
         this.trayKeys.set(key, target);
         return key;

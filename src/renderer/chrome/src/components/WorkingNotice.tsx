@@ -1,13 +1,13 @@
 import React from "react";
 import { useBrowser } from "../contexts/useBrowser";
-import { useFlock } from "../contexts/useLibrary";
+import { useMascots } from "../contexts/useLibrary";
 import { useAssistantName } from "./useAssistantName";
 import { TabIcon } from "./TabIcon";
 
 // For when there's no sidebar to say it: work going on in another tab, and one press to go and see it.
 export const WorkingNotice: React.FC = () => {
   const { tabs, switchTab } = useBrowser();
-  const { find } = useFlock();
+  const { find } = useMascots();
   const elsewhere = tabs.filter((tab) => tab.berryWorking && !tab.isActive);
   const first = elsewhere.at(0);
   const name = useAssistantName(first ? find(first.workingMascotId) : undefined);

@@ -13,7 +13,7 @@ import { BERRY } from "../shared/mascots";
 
 const SCOUT = { id: "m-1", name: "Scout", instructions: "Find flights.", sites: ["sas.se"], tools: ["visit"], fromGallery: false };
 
-describe("a job's bird, read back from its row", () => {
+describe("a job's mascot, read back from its row", () => {
   it("comes back as it was sent", () => {
     const { fromGallery: _, ...rest } = SCOUT;
     const profile = { ...rest, look: BERRY.look, tools: ["visit" as const], deletedAt: null };

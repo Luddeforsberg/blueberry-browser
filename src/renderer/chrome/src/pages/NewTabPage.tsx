@@ -9,14 +9,14 @@ import { Button } from "@common/components/Button";
 import { cn } from "@common/lib/utils";
 import { LABEL } from "@common/components/StatusPill";
 import { looksLikeUrl, toUrl } from "@common/lib/url";
-import { useFlock, useLibrary } from "../contexts/useLibrary";
+import { useMascots, useLibrary } from "../contexts/useLibrary";
 import { useShell } from "../contexts/useShell";
 import { Berry } from "../components/Berry";
 import { useAssistantName } from "../components/useAssistantName";
 import { Composer, type PillFace } from "../components/Composer";
 import { useCloud } from "../useCloud";
 import { useRunner } from "../useRunner";
-import { startMascot, suggestedMascot } from "../flockView";
+import { startMascot, suggestedMascot } from "../mascotsView";
 import { openRoutines, startRoutine, suggestedForm } from "../routinesView";
 import { asContinuation, withSiteNames } from "../siteNames";
 import { SuggestionItem } from "../components/SuggestionItem";
@@ -173,7 +173,7 @@ const Label: React.FC<{ ask?: boolean; id: string; children: React.ReactNode }> 
 );
 
 const WaitingRow: React.FC<{ item: NeedsYouItem }> = ({ item }) => {
-  const mascot = useFlock().find(item.mascotId);
+  const mascot = useMascots().find(item.mascotId);
   const name = useAssistantName(mascot);
   const { approval } = item;
   // An approval says what it would do, so it reads on from the mascot's name. A question or a handoff is already a sentence.
@@ -212,7 +212,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
   const browser = window.chromeAPI.browser;
   const library = useLibrary();
   const { settings } = useShell();
-  const { chosen, choose, flock } = useFlock();
+  const { chosen, choose, mascots } = useMascots();
   // Who was chosen as the page opened, so choosing one from a row doesn't reorder the rows.
   const [chosenAtOpen] = useState(chosen.id);
   const { shown, face, switching, still } = useMascotSwitch(chosen);
@@ -321,7 +321,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
 
   const name = useAssistantName(shown);
   const asking = new Set(library.needsYou.map(({ id }) => id));
-  const rows = suggestionRows({ chats: library.chats, asking, suggestions, flock, examples, chosenAtOpen });
+  const rows = suggestionRows({ chats: library.chats, asking, suggestions, mascots, examples, chosenAtOpen });
 
   if (recording) return <ShowMeHow tab={tab} />;
 

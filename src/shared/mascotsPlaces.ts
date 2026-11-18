@@ -7,7 +7,7 @@ import { BERRY_ID } from "./mascots";
 const MASCOT_PARTS = ["look", "name", "purpose", "limits"] as const;
 export type MascotPart = (typeof MASCOT_PARTS)[number];
 
-export type FlockPlace =
+export type MascotsPlace =
   | { page: "list" }
   // Making one, in four steps.
   | { page: "new" }
@@ -19,7 +19,7 @@ export type FlockPlace =
 const isPart = (value: string): value is MascotPart => (MASCOT_PARTS as readonly string[]).includes(value);
 
 // A mascot's id never has a slash, and is never one of the words the list and the steps use.
-export const flockParam = (place: FlockPlace): string => {
+export const mascotsParam = (place: MascotsPlace): string => {
   switch (place.page) {
     case "list":
     case "new":
@@ -35,7 +35,7 @@ export const flockParam = (place: FlockPlace): string => {
 
 // Where a param lands. None, or one nobody knows, is the list. Berry can't be changed or published, so those land on
 // its page instead.
-export const flockPlace = (param: string | null): FlockPlace => {
+export const mascotsPlace = (param: string | null): MascotsPlace => {
   if (!param || param === "list") return { page: "list" };
   if (param === "new") return { page: "new" };
   const [id, sub, ...rest] = param.split("/");
@@ -50,9 +50,9 @@ export const flockPlace = (param: string | null): FlockPlace => {
 
 // One step back: from a mascot's part, memory or publishing to its page, and from its page or the steps to the list.
 // The list has nowhere to go back to.
-export const flockBack = (param: string | null): string | null => {
-  const place = flockPlace(param);
+export const mascotsBack = (param: string | null): string | null => {
+  const place = mascotsPlace(param);
   if (place.page === "list") return null;
-  if (place.page === "new" || place.page === "mascot") return flockParam({ page: "list" });
-  return flockParam({ page: "mascot", id: place.id });
+  if (place.page === "new" || place.page === "mascot") return mascotsParam({ page: "list" });
+  return mascotsParam({ page: "mascot", id: place.id });
 };

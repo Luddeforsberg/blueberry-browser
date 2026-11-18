@@ -7,7 +7,7 @@ import type { Mood } from "@common/components/moods";
 import { Button } from "@common/components/Button";
 import { StatusPill } from "@common/components/StatusPill";
 import { cn } from "@common/lib/utils";
-import { useFlock, useLibrary } from "../contexts/useLibrary";
+import { useMascots, useLibrary } from "../contexts/useLibrary";
 import { Berry } from "../components/Berry";
 import { useAssistantName } from "../components/useAssistantName";
 import { ChatError } from "../components/ChatMessage";
@@ -16,7 +16,7 @@ import { LINE_BETWEEN, OFF_ROW_HIDE, ON_ROW, ON_ROW_SHOW, ROW } from "../compone
 import { BackButton, SettingsGroup, SettingsLabel } from "../components/SettingsRow";
 import { ShowHowButton } from "../components/ShowBerry";
 import { RoutineRunRow } from "../components/RoutineRunRow";
-import { forgetTabDraftElsewhere } from "../flockView";
+import { forgetTabDraftElsewhere } from "../mascotsView";
 import {
   formFor,
   groupRoutines,
@@ -61,7 +61,7 @@ const answer = (routine: Routine) => {
 // or keyboard, Run now or Stop takes its place. One waiting for you always shows Answer, and one waiting to start has
 // nothing to press.
 const RoutineRow: React.FC<{ routine: Routine }> = ({ routine }) => {
-  const mascot = useFlock().find(routine.mascotId);
+  const mascot = useMascots().find(routine.mascotId);
   const { words, last } = routineLine(routine);
   const asking = routine.status === "needs-approval";
   const queued = routine.status === "queued";
@@ -243,7 +243,7 @@ const Fact: React.FC<{ label: string; onOpen: () => void; children: React.ReactN
 // A routine's own page: who and what on top, what it does in full, three facts, its runs on a thread, and Delete.
 const RoutineView: React.FC<{ routine: Routine }> = ({ routine }) => {
   const library = useLibrary();
-  const mascot = useFlock().find(routine.mascotId);
+  const mascot = useMascots().find(routine.mascotId);
   const who = useAssistantName(mascot);
   const [runs, setRuns] = useState<RoutineRun[]>([]);
   const queued = routine.status === "queued";

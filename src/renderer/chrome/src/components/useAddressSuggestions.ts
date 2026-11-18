@@ -2,7 +2,7 @@ import type React from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { AddressSuggestion } from "@shared/ipc";
 import { useBrowser } from "../contexts/useBrowser";
-import { useFlock, useLibrary } from "../contexts/useLibrary";
+import { useMascots, useLibrary } from "../contexts/useLibrary";
 import { useShell } from "../contexts/useShell";
 import { addressSuggestions } from "../addressSuggestions";
 import { useAssistantName } from "./useAssistantName";
@@ -27,7 +27,7 @@ interface Options {
 export const useAddressSuggestions = ({ editing, value, setValue, field, input, onDone }: Options) => {
   const { tabs, activeTab, switchTab, navigateToUrl } = useBrowser();
   const { bookmarks, pinned } = useLibrary();
-  const { chosen } = useFlock();
+  const { chosen } = useMascots();
   const { layout, settings } = useShell();
   const name = useAssistantName(chosen);
 

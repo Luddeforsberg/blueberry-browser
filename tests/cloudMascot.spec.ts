@@ -50,7 +50,7 @@ test("a mascot that works in the cloud starts the box on Cloud, and it can still
     await here.click();
     await expect(here).toHaveAttribute("aria-checked", "true");
     await expect(send("Send")).toBeVisible();
-    // Any change of bird goes back to following it, wherever it was chosen, as the chat panel shares the choice.
+    // Any change of mascot goes back to following it, wherever it was chosen, as the chat panel shares the choice.
     await choose("Berry");
     await expect(send("Send")).toBeVisible();
     await choose("Scout");

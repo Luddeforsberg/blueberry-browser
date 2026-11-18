@@ -280,7 +280,7 @@ const verifyOne = (raw: Record<string, unknown>, digest: Digest): Proposal | nul
     return { card, why, sources, sites };
   }
 
-  // A bird needs somewhere to work, and a name of its own.
+  // A mascot needs somewhere to work, and a name of its own.
   if (sites.length === 0 || TAKEN_NAMES.includes(name.toLowerCase())) return null;
   if (!fits(line, why) || !numbersFit(why, numbers) || !numbersFit(line, numbers)) return null;
   const draft = mascotDraft(raw, name, instructions, sites);

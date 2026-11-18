@@ -27,7 +27,7 @@ class BackgroundWindow extends electron.BaseWindow {
     // Nothing: a test window never takes the keyboard from whatever's in front.
   }
 
-  // A window that moves itself, like the bird on the desktop, stays off-screen by the same distance.
+  // A window that moves itself, like the mascot on the desktop, stays off-screen by the same distance.
   setBounds(bounds, ...rest) {
     super.setBounds({ ...bounds, x: bounds.x + OFF_SCREEN.x, y: bounds.y + OFF_SCREEN.y }, ...rest);
   }
@@ -51,7 +51,7 @@ Module._load = function (request, ...rest) {
   return request === "electron" ? wrapped : load.call(this, request, ...rest);
 };
 
-// Bringing the app forward is the one thing a click on the desktop bird does outside its own window.
+// Bringing the app forward is the one thing a click on the desktop mascot does outside its own window.
 electron.app.focus = () => {};
 electron.app.show = () => {};
 

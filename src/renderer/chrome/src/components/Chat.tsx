@@ -1,7 +1,7 @@
 import React from "react";
 import { useBrowser } from "../contexts/useBrowser";
 import { useChat, type Message } from "../contexts/useChat";
-import { useFlock, useLibrary } from "../contexts/useLibrary";
+import { useMascots, useLibrary } from "../contexts/useLibrary";
 import { BerrySpot } from "./Berry";
 import { useAssistantName } from "./useAssistantName";
 import { AssistantMessage, ChatApprovalCard, ThinkingMessage, UserMessage, WentWrong, type ReplyActions } from "./ChatMessage";
@@ -39,7 +39,7 @@ export const Chat: React.FC = () => {
     takeDraft,
     mascotId,
   } = useChat();
-  const { find, chosen, choose } = useFlock();
+  const { find, chosen, choose } = useMascots();
   // A chat not started yet goes to whoever is chosen. After that, it stays with the mascot it started with.
   const mascot = chatId ? find(mascotId) : chosen;
   const library = useLibrary();

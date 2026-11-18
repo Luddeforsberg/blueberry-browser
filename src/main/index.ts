@@ -8,7 +8,7 @@ import { BookmarkStore } from "./BookmarkStore";
 import { ChatStore } from "./ChatStore";
 import { RoutineStore } from "./RoutineStore";
 import { MascotStore } from "./MascotStore";
-import { addStarterFlock } from "./starterFlock";
+import { addStarters } from "./starters";
 import { Downloads } from "./Downloads";
 import { SitePermissions } from "./SitePermissions";
 import { installSessionHandlers } from "./sessionHandlers";
@@ -82,7 +82,7 @@ const createWindow = (): Window => {
   );
   mascotStore ??= new MascotStore(join(app.getPath("userData"), "mascots.json"));
   try {
-    addStarterFlock(mascotStore, settings);
+    addStarters(mascotStore, settings);
   } catch (error) {
     // Tried again on the next launch, since it was never marked done.
     console.error("Failed to add the starter mascots:", error);
@@ -160,7 +160,7 @@ app.whenReady().then(() => {
     if (BaseWindow.getAllWindows().length === 0) {
       mainWindow = createWindow();
     } else if (mainWindow && !mainWindow.baseWindow.isVisible() && !mainWindow.baseWindow.isMinimized()) {
-      // Hidden on its own, with the bird still out on the desktop.
+      // Hidden on its own, with the mascot still out on the desktop.
       mainWindow.show();
       mainWindow.focus();
     }

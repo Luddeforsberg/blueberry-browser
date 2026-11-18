@@ -1,8 +1,8 @@
 import "./theme.js";
-import { BIRDS } from "./birds.js";
+import { DRAWINGS } from "./mascots.js";
 
 // A few of the mascots that come with Blueberry, as they look in its Gallery (src/main/mascotCatalog.ts), and Berry.
-const FLOCK = [
+const MASCOTS = [
   { name: "Berry", what: "Comes with every Blueberry.", palette: "kingfisher", accessory: "none" },
   { name: "Prospector", what: "Finds companies that fit your customer.", palette: "robin", accessory: "cap" },
   { name: "Meeting Prep", what: "Briefs you before a call.", palette: "robin", accessory: "glasses" },
@@ -18,10 +18,10 @@ const el = (tag, props = {}, ...children) => {
   return node;
 };
 
-document.getElementById("flock").replaceChildren(
-  ...FLOCK.map(({ name, what, palette, accessory }) => {
+document.getElementById("mascots").replaceChildren(
+  ...MASCOTS.map(({ name, what, palette, accessory }) => {
     const perch = el("div", { className: "perch" });
-    perch.innerHTML = BIRDS[accessory];
+    perch.innerHTML = DRAWINGS[accessory];
     const drawing = perch.querySelector("svg");
     drawing.dataset.mascot = palette;
     drawing.setAttribute("aria-hidden", "true");

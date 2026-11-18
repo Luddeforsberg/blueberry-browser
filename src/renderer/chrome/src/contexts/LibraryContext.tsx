@@ -6,7 +6,7 @@ import { ChosenContext, EMPTY, LibraryContext } from "./useLibrary";
 export const LibraryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [library, setLibrary] = useState<LibrarySnapshot>(EMPTY);
   const [chosenId, setChosenId] = useState(BERRY_ID);
-  // Saved, because the bird on the desktop goes by it too, and a mascot's card over the page chooses from another view.
+  // Saved, because the mascot on the desktop goes by it too, and a mascot's card over the page chooses from another view.
   const choose = useCallback((id: string) => {
     setChosenId(id);
     void window.chromeAPI.mascots.choose(id === BERRY_ID ? null : id);

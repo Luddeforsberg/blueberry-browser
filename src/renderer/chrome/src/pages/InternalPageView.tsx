@@ -7,7 +7,7 @@ import { SettingsPage } from "./SettingsPage";
 import { GalleryPage } from "./GalleryPage";
 import { DownloadsPage } from "./DownloadsPage";
 import { HistoryPage } from "./HistoryPage";
-import { FlockPage } from "./FlockPage";
+import { MascotsPage } from "./MascotsPage";
 import { MascotGalleryPage } from "./MascotGalleryPage";
 import { NeedsYouPage } from "./NeedsYouPage";
 import { RecordingPage } from "./RecordingPage";
@@ -30,7 +30,7 @@ export const InternalPageView: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     case "history":
       return <HistoryPage />;
     case "flock":
-      return <FlockPage tab={tab} />;
+      return <MascotsPage tab={tab} />;
     case "mascot-gallery":
       return <MascotGalleryPage tab={tab} />;
     case "needs-you":

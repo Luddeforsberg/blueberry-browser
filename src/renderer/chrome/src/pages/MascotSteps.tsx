@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { GalleryMascot, MascotProfile } from "@shared/library";
-import { flockParam, type MascotPart } from "@shared/flockPlaces";
+import { mascotsParam, type MascotPart } from "@shared/mascotsPlaces";
 import { ACCESSORIES, BERRY, MASCOT_TOOLS, MAX_MASCOT_INSTRUCTIONS, MAX_MASCOT_NAME, PALETTES, permissionsInWords } from "@shared/mascots";
 import type { Mood } from "@common/components/moods";
 import { Button } from "@common/components/Button";
@@ -8,7 +8,7 @@ import { Choice, Switch } from "@common/components/Controls";
 import { BIG_CARD, BIG_SHELL } from "@common/components/cardShell";
 import { cn } from "@common/lib/utils";
 import { LABEL, StatusPill } from "@common/components/StatusPill";
-import { useFlock } from "../contexts/useLibrary";
+import { useMascots } from "../contexts/useLibrary";
 import { Berry, BerrySpot } from "../components/Berry";
 import { ChatError } from "../components/ChatMessage";
 import { BETWEEN } from "../components/pageRows";
@@ -26,7 +26,7 @@ import {
   toMascotDraft,
   withPart,
   type MascotFormValues,
-} from "../flockView";
+} from "../mascotsView";
 import { Tooltip } from "@common/components/Tooltip";
 
 // DESIGN.md section 10, Your mascots: making one is four questions, one at a time, each a card set into a shell like the
@@ -140,7 +140,7 @@ const NameAnswer: React.FC<{ values: MascotFormValues; set: Set; onEnter: () => 
 
 // Up to three of the bundled starters the user hasn't added. Pressing one fills in its words, never its sites or tools.
 const useStarters = (): GalleryMascot[] => {
-  const { flock } = useFlock();
+  const { mascots } = useMascots();
   const [entries, setEntries] = useState<GalleryMascot[]>([]);
   useEffect(() => {
     let live = true;
@@ -152,7 +152,7 @@ const useStarters = (): GalleryMascot[] => {
       live = false;
     };
   }, []);
-  return entries.filter((entry) => !flock.some((mascot) => mascot.galleryId === entry.id)).slice(0, 3);
+  return entries.filter((entry) => !mascots.some((mascot) => mascot.galleryId === entry.id)).slice(0, 3);
 };
 
 const PurposeAnswer: React.FC<{ values: MascotFormValues; set: Set; offerStarters: boolean }> = ({ values, set, offerStarters }) => {
@@ -261,7 +261,7 @@ const fresh = (values: MascotFormValues = blankMascot()): Making => ({ values, s
 
 // It ends here: the mascot looking pleased, read back to you.
 const MadeCard: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
-  const { choose } = useFlock();
+  const { choose } = useMascots();
   return (
     <section aria-label={`${mascot.name} is added`} className="w-[520px] max-w-full mx-auto">
       <div className={BIG_SHELL}>
@@ -307,8 +307,8 @@ export const LimitTags: React.FC<{ mascot: Pick<MascotProfile, "sites" | "tools"
 
 // Making one, in four steps. What's typed lasts while the tab is away, and leaving keeps nothing.
 export const NewMascot: React.FC<{ tabId: string }> = ({ tabId }) => {
-  const param = flockParam({ page: "new" });
-  const { flock } = useFlock();
+  const param = mascotsParam({ page: "new" });
+  const { mascots } = useMascots();
   const [making, setMakingState] = useState<Making>(() => {
     const started = takeStartedMascot();
     return started ? fresh(started) : tabDraft(tabId, param, () => fresh());
@@ -337,12 +337,12 @@ export const NewMascot: React.FC<{ tabId: string }> = ({ tabId }) => {
 
   // Until the library has it, it's read back from what was saved.
   if (making.madeId)
-    return <MadeCard mascot={flock.find((mascot) => mascot.id === making.madeId) ?? { ...asProfile(making.values), id: making.madeId }} />;
+    return <MadeCard mascot={mascots.find(({ id }) => id === making.madeId) ?? { ...asProfile(making.values), id: making.madeId }} />;
 
   const { values, step } = making;
   const part = STEPS[step];
   const set: Set = (patch) => setMaking({ ...making, values: { ...values, ...patch } });
-  const others = flock.map((mascot) => mascot.name);
+  const others = mascots.map((mascot) => mascot.name);
   const off = blocked(part, values);
   const last = step === STEPS.length - 1;
 
@@ -414,7 +414,7 @@ export const NewMascot: React.FC<{ tabId: string }> = ({ tabId }) => {
 
 // One part of a mascot, alone, with Cancel and Save. It saves the whole mascot with only that part changed.
 export const ChangePart: React.FC<{ tabId: string; mascot: MascotProfile; part: MascotPart }> = ({ tabId, mascot, part }) => {
-  const param = flockParam({ page: "part", id: mascot.id, part });
+  const param = mascotsParam({ page: "part", id: mascot.id, part });
   const [values, setValuesState] = useState<MascotFormValues>(() => tabDraft(tabId, param, () => mascotForm(mascot)));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);

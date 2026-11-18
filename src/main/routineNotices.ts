@@ -45,7 +45,7 @@ export const deleteRoutineWords = (name: string): AskWords => ({
 
 export const clearMemoryWords = (name: string, count: number): AskWords => ({
   question: `Forget everything ${name} remembers?`,
-  detail: `${count === 1 ? "The one thing it remembers goes" : `All ${count} things it remembers go`}, and it can’t be undone. Other birds aren’t affected, because they never had it.`,
+  detail: `${count === 1 ? "The one thing it remembers goes" : `All ${count} things it remembers go`}, and it can’t be undone. Other mascots aren’t affected, because they never had it.`,
   action: "Forget everything",
   mascot: null,
 });

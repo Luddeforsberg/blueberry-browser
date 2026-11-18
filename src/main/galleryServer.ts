@@ -332,9 +332,9 @@ export class GalleryServer {
     await this.request("/rest/v1/rpc/unlink_cloud_runner", { method: "POST", token, body: {} });
   }
 
-  // The flock as the phone page sees it, replaced whole. Mascot fields only, never memory.
-  async syncCloudFlock(token: string, birds: object[]): Promise<void> {
-    await this.request("/rest/v1/rpc/sync_cloud_flock", { method: "POST", token, body: { p_birds: birds } });
+  // The mascots as the phone page sees them, replaced whole. Mascot fields only, never memory.
+  async syncCloudMascots(token: string, mascots: object[]): Promise<void> {
+    await this.request("/rest/v1/rpc/sync_cloud_flock", { method: "POST", token, body: { p_birds: mascots } });
   }
 
   async syncCloudRoutine(token: string, row: CloudRoutineRow): Promise<void> {

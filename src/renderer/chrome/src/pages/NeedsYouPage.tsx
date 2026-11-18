@@ -5,7 +5,7 @@ import type { NeedsYouItem } from "@shared/library";
 import { ApprovalCard, CardInShell, WhyLine } from "@common/components/ApprovalCard";
 import { Button } from "@common/components/Button";
 import { cn } from "@common/lib/utils";
-import { useFlock, useLibrary } from "../contexts/useLibrary";
+import { useMascots, useLibrary } from "../contexts/useLibrary";
 import { useShell } from "../contexts/useShell";
 import { Berry } from "../components/Berry";
 import { useAssistantName } from "../components/useAssistantName";
@@ -58,7 +58,7 @@ const jobWords = (name: string, item: NeedsYouItem) => `${name} · ${item.job}${
 
 // The mascot that's asking, with the `ask` dot.
 const Asking: React.FC<{ item: NeedsYouItem; size: number }> = ({ item, size }) => {
-  const mascot = useFlock().find(item.mascotId);
+  const mascot = useMascots().find(item.mascotId);
   return (
     <span className="relative shrink-0">
       <Berry mood="asking" size={size} mascot={mascot} still />
@@ -69,7 +69,7 @@ const Asking: React.FC<{ item: NeedsYouItem; size: number }> = ({ item, size }) 
 
 // The one that's open: the real card, with who's asking, for what and how long over its words.
 export const WaitingCard: React.FC<{ item: NeedsYouItem; now: number; onAnswered: OnAnswered }> = ({ item, now, onAnswered }) => {
-  const mascot = useFlock().find(item.mascotId);
+  const mascot = useMascots().find(item.mascotId);
   const name = useAssistantName(mascot);
   const { showBerry } = useShell().settings;
   const [answer, setAnswer] = useState("");
@@ -164,7 +164,7 @@ export const WaitingCard: React.FC<{ item: NeedsYouItem; now: number; onAnswered
 
 // The card just after an answer, saying what happened.
 const AnsweredCard: React.FC<{ item: NeedsYouItem; said: string }> = ({ item, said }) => {
-  const mascot = useFlock().find(item.mascotId);
+  const mascot = useMascots().find(item.mascotId);
   return (
     <CardInShell label="Answered">
       <p role="status" className="min-h-8 flex items-center gap-2.5 text-15 text-ink">
@@ -177,7 +177,7 @@ const AnsweredCard: React.FC<{ item: NeedsYouItem; said: string }> = ({ item, sa
 
 // One of the rest, as one line. Pressing it opens it as the card.
 export const WaitingRow: React.FC<{ item: NeedsYouItem; now: number; onOpen: () => void }> = ({ item, now, onOpen }) => {
-  const mascot = useFlock().find(item.mascotId);
+  const mascot = useMascots().find(item.mascotId);
   const name = useAssistantName(mascot);
   return (
     <li className={cn(ROW, ON_ROW, LINE_BETWEEN, "before:left-12 px-0")}>
@@ -201,17 +201,17 @@ export const WaitingRow: React.FC<{ item: NeedsYouItem; now: number; onOpen: () 
 // Nothing waiting. Anyone working is named, because "resting" has to be true.
 const AllClear: React.FC = () => {
   const { chats, routines } = useLibrary();
-  const { flock, find } = useFlock();
+  const { mascots, find } = useMascots();
   const working = new Set([
     ...chats.filter((chat) => chat.running).map((chat) => find(chat.mascotId).id),
     ...routines.filter((routine) => routine.status === "running").map((routine) => find(routine.mascotId).id),
   ]);
-  const anyone = useAssistantName(flock.find((mascot) => working.has(mascot.id)));
+  const anyone = useAssistantName(mascots.find((mascot) => working.has(mascot.id)));
   return (
     <EmptyPage
       face={
         <ul aria-hidden className="flex items-end justify-center gap-2">
-          {flock.slice(0, MAX_RESTING).map((mascot) => (
+          {mascots.slice(0, MAX_RESTING).map((mascot) => (
             <li key={mascot.id}>
               <Berry mood={working.has(mascot.id) ? "fetching" : "off-duty"} size={40} mascot={mascot} />
             </li>
@@ -247,7 +247,7 @@ const PhoneLine: React.FC = () => {
   );
 };
 
-// Everything the flock is waiting on, from every chat and routine, answered here one at a time.
+// Everything the mascots are waiting on, from every chat and routine, answered here one at a time.
 export const NeedsYouPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
   const { needsYou } = useLibrary();
   const now = useNow();

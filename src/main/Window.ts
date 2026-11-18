@@ -369,7 +369,7 @@ export class Window {
         sendToRenderer(this.chrome.view.webContents, "cloud:runner-updated", state);
         this.macJobs?.sync();
       },
-      flock: () => this.mascotStore.all(),
+      mascots: () => this.mascotStore.all(),
       adopt: ({ prompt, mascotId }) => this.chats.adoptRunnerChat(prompt, mascotId),
       followedUp: (chatId, prompt) => this.chats.runnerFollowedUp(chatId, prompt),
       routinesSettled: () => this.routines.cloudChanged(),
@@ -574,14 +574,14 @@ export class Window {
     this.macJobs = new MacJobs(server, this.account, {
       enabled: () => this.settings.relayOnMac,
       linked: () => this.runnerJobs.available(),
-      // The bird from the row only narrows the one here with its id, and one that isn't here doesn't start.
-      start: (prompt, { bird, askAtLeast, from }, onEnd) => {
+      // The mascot from the row only narrows the one here with its id, and one that isn't here doesn't start.
+      start: (prompt, { mascot, askAtLeast, from }, onEnd) => {
         const clean = (text: string) => this.chats.withoutCodes(text);
         const sent = this.chats.send(null, prompt, {
           seePage: false,
-          mascotId: bird.id === BERRY.id ? null : bird.id,
-          sites: bird.sites,
-          tools: bird.tools,
+          mascotId: mascot.id === BERRY.id ? null : mascot.id,
+          sites: mascot.sites,
+          tools: mascot.tools,
           askAtLeast,
           from,
           onEnd: (ended) =>
@@ -807,7 +807,7 @@ export class Window {
     const snapshot = this.librarySnapshot;
     const known = this.knownWaiting;
     this.knownWaiting = new Set(snapshot.needsYou.map(({ approval }) => approval.id));
-    // The bird on the desktop says so instead, and it isn't one more thing to clear.
+    // The mascot on the desktop says so instead, and it isn't one more thing to clear.
     if (!this.userIsBusyOrHere && !this.settings.desktopBerry) {
       snapshot.needsYou
         .filter(({ approval }) => !known.has(approval.id))
@@ -1468,8 +1468,8 @@ export class Window {
 
   private mascotsChanged(): void {
     this.broadcast("library:updated", this.librarySnapshot);
-    void this.runnerJobs.flockChanged();
-    // A bird's limits go with its routines in the cloud.
+    void this.runnerJobs.mascotsChanged();
+    // A mascot's limits go with its routines in the cloud.
     void this.runnerJobs.routinesChanged();
   }
 
@@ -1761,7 +1761,7 @@ export class Window {
     this._baseWindow.show();
   }
 
-  // Hiding the whole app takes the bird with it, and showing the bird again brings everything back. So while it's out
+  // Hiding the whole app takes the mascot with it, and showing the mascot again brings everything back. So while it's out
   // on the desktop, Hide Blueberry hides this window alone.
   hideBlueberry(): void {
     if (!this.settings.desktopBerry) return app.hide();

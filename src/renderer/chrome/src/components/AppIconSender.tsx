@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { APP_ICON_SIZE, iconMascotId } from "@shared/appIcon";
 import { useShell } from "../contexts/useShell";
-import { useFlock } from "../contexts/useLibrary";
+import { useMascots } from "../contexts/useLibrary";
 import { AppIcon } from "./AppIcon";
 import { iconPicture } from "../iconPicture";
 
@@ -9,10 +9,10 @@ import { iconPicture } from "../iconPicture";
 // and once when the window opens. A mascot that's gone draws as Berry. Main only takes it if it's for what's chosen.
 export const AppIconSender: React.FC = () => {
   const { settings } = useShell();
-  const { flock } = useFlock();
+  const { mascots } = useMascots();
   const drawing = useRef<HTMLDivElement>(null);
-  const mascotId = iconMascotId(settings.appIconMascotId, flock);
-  const look = flock.find((mascot) => mascot.id === mascotId)?.look;
+  const mascotId = iconMascotId(settings.appIconMascotId, mascots);
+  const look = mascots.find((mascot) => mascot.id === mascotId)?.look;
   const ground = settings.appIconGround;
 
   useEffect(() => {

@@ -9,7 +9,7 @@ import { normalize } from "node:path/posix";
 import webpush from "web-push";
 import { mascotFromSnapshot, mascotSnapshot } from "../src/main/cloudJobs";
 import type { MascotProfile } from "../src/shared/library";
-import { flockRows, followUpHistory, type ConversationJob } from "../src/shared/phone";
+import { sharedMascotRows, followUpHistory, type ConversationJob } from "../src/shared/phone";
 import { FAKE_KEY, startFakeSupabase } from "./fakeSupabase";
 
 // The phone page, served from site/ as Netlify would, in Chrome at a phone's size, against the real migrations in
@@ -146,14 +146,14 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
   };
 
   try {
-    // Set up as the app leaves it: the runner linked and accepted, and the flock shared, with mascot fields only.
+    // Set up as the app leaves it: the runner linked and accepted, and the mascots shared, with mascot fields only.
     await supabase.addAccount(OWNER, OWNER_PASSWORD);
     await supabase.addAccount(RUNNER, RUNNER_PASSWORD);
     const owner = await signIn(OWNER, OWNER_PASSWORD);
     const runner = await signIn(RUNNER, RUNNER_PASSWORD);
     expect(await rpc(owner, "link_cloud_runner", { p_email: RUNNER })).toBe(true);
     expect(await rpc(runner, "accept_cloud_runner_link", { p_owner_email: OWNER })).toBe(true);
-    await rpc(owner, "sync_cloud_flock", { p_birds: flockRows([SCOUT, PENNY]) });
+    await rpc(owner, "sync_cloud_flock", { p_birds: sharedMascotRows([SCOUT, PENNY]) });
 
     // A job sent from the Mac, which the runner has started and is now asking about.
     const first = await rpc(owner, "start_cloud_job", {

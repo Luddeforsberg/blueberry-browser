@@ -1,13 +1,13 @@
 import { isUuid, mascotSnapshot, permissionsInWords } from "../shared.js";
 import * as api from "./api.js";
-import { bird, el, grow, icon } from "./dom.js";
+import { drawMascot, el, grow, icon } from "./dom.js";
 import { closeSheet, openSheet } from "./sheet.js";
 import { choose, chosen, contextOf, hooks, NOT_SET_UP, problemWords, state } from "./state.js";
 
 // Starting a job has no page of its own: the box rises as a sheet over home, with who goes and what that mascot may
 // do, in the app's own words. Putting it away keeps what was typed.
 
-// A new conversation, under the job's own id, as `mascot`, which is in the flock as it is now.
+// A new conversation, under the job's own id, as `mascot`, as the phone has it now.
 export const startJob = async (prompt, mascot) => {
   const id = await api.rpc("start_cloud_job", {
     p_prompt: prompt,
@@ -30,12 +30,12 @@ const mayDo = (mascot) =>
     el("li", {}, icon("bell"), el("span", { textContent: "Asks you first before anything risky" })),
   );
 
-// The flock as faces to choose from, the chosen one ringed.
+// The mascots as faces to choose from, the chosen one ringed.
 const faces = (size, onChoose, current = chosen()) =>
   el(
     "div",
-    { className: "flock", role: "radiogroup", ariaLabel: "Who goes" },
-    ...state.flock.map((mascot) =>
+    { className: "mascots", role: "radiogroup", ariaLabel: "Who goes" },
+    ...state.mascots.map((mascot) =>
       el(
         "button",
         {
@@ -46,7 +46,7 @@ const faces = (size, onChoose, current = chosen()) =>
           dataKey: `face-${mascot.id}`,
           onclick: () => onChoose(mascot),
         },
-        el("span", { className: "ring" }, bird(mascot, "rest", size, { named: false })),
+        el("span", { className: "ring" }, drawMascot(mascot, "rest", size, { named: false })),
         el("span", { className: "face-name", textContent: mascot.name }),
       ),
     ),
@@ -120,7 +120,7 @@ export const openStart = () => {
       el("h2", { className: "lab", textContent: "Who goes" }),
       who,
       can,
-      state.flock.length === 1
+      state.mascots.length === 1
         ? el("p", { className: "note", textContent: "Your other mascots show here once Blueberry on your computer shares them." })
         : null,
       state.linked === false ? el("p", { className: "problem", textContent: NOT_SET_UP }) : null,

@@ -19,15 +19,15 @@ import { AccountForm } from "../components/AccountForm";
 import { Berry } from "../components/Berry";
 import { CopyLink } from "../components/CopyLink";
 import { ChatError, Markdown } from "../components/ChatMessage";
-import { useFlock, useLibrary } from "../contexts/useLibrary";
+import { useMascots, useLibrary } from "../contexts/useLibrary";
 import { useShell } from "../contexts/useShell";
-import { lastExchange, type PublishValues } from "../flockView";
+import { lastExchange, type PublishValues } from "../mascotsView";
 import { useAccount } from "../useAccount";
 import { GalleryTile } from "./MascotGalleryPage";
 
 const INPUT = "w-full px-3 rounded-tile border bg-sheet text-14 outline-none focus-visible:ring-2 focus-visible:ring-focus";
 const ROW = "py-5 border-b";
-const BIRD = 148;
+const MASCOT_SIZE = 148;
 // How far down the standing drawing its feet reach, so its toes grip the line under it.
 const FEET_Y = 113 / 120;
 
@@ -117,7 +117,7 @@ export const PublishMascot: React.FC<{
   onChange: (values: PublishValues) => void;
   onBack: () => void;
 }> = ({ mascotId, values, onChange, onBack }) => {
-  const { flock } = useFlock();
+  const { mascots } = useMascots();
   const { chats } = useLibrary();
   const [account, setAccount] = useAccount();
   const [error, setError] = useState<string | null>(null);
@@ -133,7 +133,7 @@ export const PublishMascot: React.FC<{
   const { showBerry } = useShell().settings;
   const latest = useRef(values);
   latest.current = values;
-  const mascot = flock.find(({ id }) => id === mascotId);
+  const mascot = mascots.find(({ id }) => id === mascotId);
   // What the fill below starts from, as it starts. It runs only when it's first possible, whatever's typed by then.
   const startedWith = useRef({ publishedId: mascot?.publishedId, loadFailed, onChange });
   startedWith.current = { publishedId: mascot?.publishedId, loadFailed, onChange };
@@ -271,9 +271,9 @@ export const PublishMascot: React.FC<{
           <div
             key={mascot.publishedId}
             className="relative shrink-0"
-            style={{ width: showBerry ? BIRD : 32, height: showBerry ? BIRD * FEET_Y : 32 }}
+            style={{ width: showBerry ? MASCOT_SIZE : 32, height: showBerry ? MASCOT_SIZE * FEET_Y : 32 }}
           >
-            <Berry mood="delivered" size={showBerry ? BIRD : 32} mascot={mascot} />
+            <Berry mood="delivered" size={showBerry ? MASCOT_SIZE : 32} mascot={mascot} />
           </div>
         </header>
 

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import type { Popover } from "@shared/ipc";
 import { BrowserProvider } from "./contexts/BrowserContext";
 import { LibraryProvider } from "./contexts/LibraryContext";
-import { useFlock } from "./contexts/useLibrary";
+import { useMascots } from "./contexts/useLibrary";
 import { ShellProvider } from "./contexts/ShellContext";
 import { useShell } from "./contexts/useShell";
 import { ChatsFace, MascotCard, Sidebar } from "./components/Sidebar";
@@ -78,7 +78,7 @@ const EDGE = 8;
 
 const OverPage: React.FC<{ popover: Popover }> = ({ popover }) => {
   const { layout } = useShell();
-  const { find } = useFlock();
+  const { find } = useMascots();
   const panel = useRef<HTMLDivElement>(null);
   const area = layout.popover;
   const close = (refocus: boolean) => void window.chromeAPI.layout.closePopover(refocus);

@@ -1,11 +1,11 @@
 import React from "react";
 import { Plus } from "lucide-react";
 import { cn } from "@common/lib/utils";
-import { useFlock } from "../contexts/useLibrary";
+import { useMascots } from "../contexts/useLibrary";
 import { BERRY_ID } from "@shared/mascots";
 import { Berry } from "./Berry";
 import { useAssistantName } from "./useAssistantName";
-import { startMascot } from "../flockView";
+import { startMascot } from "../mascotsView";
 
 // Your mascots in a row, to choose who runs a routine. In the flow rather than floating, so it fits in the form.
 export const MascotPerch: React.FC<{ selectedId: string; onChoose: (id: string) => void; onClose?: () => void }> = ({
@@ -13,10 +13,10 @@ export const MascotPerch: React.FC<{ selectedId: string; onChoose: (id: string) 
   onChoose,
   onClose,
 }) => {
-  const { flock, find } = useFlock();
+  const { mascots, find } = useMascots();
   const berryName = useAssistantName();
   // A routine can still belong to a mascot that's been deleted, and shows it until it's moved.
-  const shown = flock.some((mascot) => mascot.id === selectedId) ? flock : [...flock, find(selectedId)];
+  const shown = mascots.some((mascot) => mascot.id === selectedId) ? mascots : [...mascots, find(selectedId)];
 
   return (
     <ul

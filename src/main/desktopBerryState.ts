@@ -153,8 +153,8 @@ export type TrayTarget = { kind: "ask"; chatId: string; approvalId: string } | {
 const targetOf = ({ chatId, routineId }: { chatId: string | null; routineId?: string | null }): DesktopTarget | null =>
   chatId ? { page: "chat", chatId } : routineId ? { page: "routine", routineId } : null;
 
-// The tray: the flock in their moods, then what needs you, what's working and what finished today, newest first.
-export const desktopTray = (facts: DesktopFacts, flock: MascotProfile[], keyFor: (target: TrayTarget) => string): DesktopTray => {
+// The tray: the mascots in their moods, then what needs you, what's working and what finished today, newest first.
+export const desktopTray = (facts: DesktopFacts, mascots: MascotProfile[], keyFor: (target: TrayTarget) => string): DesktopTray => {
   const { needsYou, results, finishedToday, chosen } = facts;
   const running = notWaiting(facts);
   const moodOf = (id: string): DesktopFace["mood"] =>
@@ -166,7 +166,7 @@ export const desktopTray = (facts: DesktopFacts, flock: MascotProfile[], keyFor:
           ? "delivered"
           : "rest";
   return {
-    flock: flock.map((mascot) => ({
+    mascots: mascots.map((mascot) => ({
       name: facts.nameOf(mascot),
       look: mascot.look,
       mood: moodOf(mascot.id),

@@ -137,7 +137,7 @@ interface Run {
   onChange?: () => void;
   // Sites earlier replies in this chat were on, which give a reason to remember what's about them.
   earlierSites: Set<string>;
-  // What its bird remembered going in, by id, and the words the model got.
+  // What its mascot remembered going in, by id, and the words the model got.
   memoryIds: string[];
   memoryNote: string;
   // Questions it asked and what the user typed back.
@@ -219,7 +219,7 @@ export interface RunnerProgress {
   approval: (ChatApproval & { askedAt: number }) | null;
 }
 
-// What a job needs of a bird's memory. No tool can reach any of this.
+// What a job needs of a mascot's memory. No tool can reach any of this.
 export interface ChatMemory {
   factsOf: (mascotId: string) => MemoryFact[];
   propose: (job: MemoryToOffer) => Promise<void>;
@@ -955,7 +955,7 @@ export class Chats {
     // A job in the cloud works in its own browser there, never in a tab here. Files go to the model from here as ever.
     if (inCloud && tabIds.length > 0) return null;
 
-    // The renderer's choice is checked here, so nothing but a mascot in the flock can start a chat.
+    // The renderer's choice is checked here, so only a mascot that's here can start a chat.
     const chosen = typeof mascotId === "string" && mascotId !== BERRY.id ? mascotId : null;
     if (!chatId && chosen && this.mascotOf(chosen).deletedAt !== null) return null;
     const profile = this.mascotOf(chatId ? (this.store.chat(chatId)?.mascotId ?? null) : chosen);
@@ -1042,7 +1042,7 @@ export class Chats {
     return this.thread(id);
   }
 
-  // A conversation in the cloud that was started elsewhere, such as on the phone, becomes a runner chat here, as the bird
+  // A conversation in the cloud that was started elsewhere, such as on the phone, becomes a runner chat here, as the mascot
   // its first job ran as. Its messages follow through `runnerFollowedUp` and `runnerFinished`.
   adoptRunnerChat(prompt: string, mascotId: string | null): string {
     return this.store.createChat(titleFrom(prompt), mascotId && mascotId !== BERRY.id ? mascotId : null, null);
@@ -1187,7 +1187,7 @@ export class Chats {
     return (this.store.chat(chatId)?.messages ?? []).filter(({ role }) => role === "user").map(({ content }) => content);
   }
 
-  // What this bird remembers that's about this job, which goes into its prompt and shows on the reply.
+  // What this mascot remembers that's about this job, which goes into its prompt and shows on the reply.
   private recall(id: string, run: Run, text: string): void {
     const facts = this.memory?.factsOf(run.mascot.id) ?? [];
     if (facts.length === 0) return;

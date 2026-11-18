@@ -17,7 +17,7 @@ const MAX_QUERY_LENGTH = 80;
 const MAX_CHATS = 30;
 const MAX_ROUTINES = 20;
 const MAX_RUNS = 5;
-const MAX_FLOCK = 20;
+const MAX_MASCOTS = 20;
 const MAX_FEEDBACK = 20;
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -270,14 +270,14 @@ export const buildDigest = ({ visits, chats, routines, mascots, feedback, now }:
       };
     });
 
-  const flockData = mascots
+  const mascotData = mascots
     .flatMap(({ name, sites }) => {
       const shared = titleToShare(name);
       return shared ? [{ name: shared, sites: shareableSites(sites) }] : [];
     })
-    .slice(0, MAX_FLOCK)
+    .slice(0, MAX_MASCOTS)
     .map((mascot, index) => ({ id: `m${index + 1}`, ...mascot }));
-  // Only what the bird said, never the prompt or instructions under it, which can hold what the user typed.
+  // Only what the mascot said, never the prompt or instructions under it, which can hold what the user typed.
   const feedbackData = feedback
     .slice(-MAX_FEEDBACK)
     .flatMap(({ verdict, kind, line }) => {
@@ -300,7 +300,7 @@ export const buildDigest = ({ visits, chats, routines, mascots, feedback, now }:
       searches: searchData,
       chats: chatData,
       routines: routineData,
-      flock: flockData,
+      flock: mascotData,
       feedback: feedbackData,
     },
     evidence,

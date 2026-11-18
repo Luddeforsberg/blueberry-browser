@@ -10,7 +10,7 @@ import type { ChatStep, MascotProfile } from "../shared/library";
 // Mac is there, and takes the account's jobs for the Mac one at a time, as the signed-in owner. Each runs as an MCP job
 // does, through `Chats.send` with no page and a `from`, so every limit, approval and handoff is the chat's, and its
 // approvals stay here: nothing is written back but status, step notes and the reply. A Stop from the relay stops it.
-// The bird in the row is checked as the runner checks it, and only narrows the one here: tools, sites and how much it
+// The mascot in the row is checked as the runner checks it, and only narrows the one here: tools, sites and how much it
 // asks. The job is that one reply, so nothing the user asks in the chat afterwards goes back to the relay.
 
 const POLL_MS = 3_000;
@@ -20,8 +20,8 @@ const FINAL_TRIES = 5;
 // What the chat says it came from.
 export const RELAY_FROM = "ChatGPT or Claude";
 
-const NO_BIRD = "That bird isn't in Blueberry on the Mac, so the job didn't start.";
-const BAD_BIRD = "This job's bird didn't pass Blueberry's checks, so it didn't start.";
+const NO_MASCOT = "That bird isn't in Blueberry on the Mac, so the job didn't start.";
+const BAD_MASCOT = "This job's bird didn't pass Blueberry's checks, so it didn't start.";
 const OFF_BEFORE = "Jobs from ChatGPT and Claude were turned off on the Mac before this one started.";
 const QUIT_BEFORE = "Blueberry quit on the Mac before this job started.";
 const SWITCHED_OFF = "Jobs from ChatGPT and Claude were turned off on the Mac, so it stopped there.";
@@ -32,11 +32,11 @@ export interface MacJobsHost {
   enabled: () => boolean;
   // Signed in with a runner that has accepted, which the relay needs.
   linked: () => boolean;
-  // Starts the reply as `bird`, which only narrows the one in the flock with the same id. Says the chat's id, or null if
-  // it couldn't start, such as for a bird that isn't in the flock. `onEnd` hears how that reply ended, and no later one.
+  // Starts the reply as `mascot`, which only narrows the one here with the same id. Says the chat's id, or null if
+  // it couldn't start, such as for a mascot that isn't here. `onEnd` hears how that reply ended, and no later one.
   start: (
     prompt: string,
-    options: { bird: MascotProfile; askAtLeast: ActionApproval; from: string },
+    options: { mascot: MascotProfile; askAtLeast: ActionApproval; from: string },
     onEnd: (ended: EndedReply) => void,
   ) => string | null;
   // The reply so far, while it runs. Null once the chat is gone.
@@ -171,21 +171,21 @@ export class MacJobs {
       return;
     }
     // Checked as the runner checks it, so a row that's odd or edited doesn't run at all.
-    const bird = mascotFromSnapshot(row.mascot);
-    if (!bird) {
-      await fail(BAD_BIRD);
+    const mascot = mascotFromSnapshot(row.mascot);
+    if (!mascot) {
+      await fail(BAD_MASCOT);
       return;
     }
     const job: Current = { account, jobId, chatId: "", ended: null, stopped: false, why: null, finalTries: 0 };
     const chatId = this.host.start(
       String(row.prompt),
-      { bird, askAtLeast: actionApprovalFromRow(row.action_approval), from: RELAY_FROM },
+      { mascot, askAtLeast: actionApprovalFromRow(row.action_approval), from: RELAY_FROM },
       (ended) => {
         job.ended = ended;
       },
     );
     if (!chatId) {
-      await fail(NO_BIRD);
+      await fail(NO_MASCOT);
       return;
     }
     console.log(`Mac job ${jobId}: started.`);

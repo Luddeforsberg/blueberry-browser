@@ -7,7 +7,7 @@ import { Button } from "@common/components/Button";
 import { cn } from "@common/lib/utils";
 import { useShell } from "../contexts/useShell";
 import { openSettings } from "../openSettings";
-import { openMascots } from "../flockView";
+import { openMascots } from "../mascotsView";
 import { useAccount } from "../useAccount";
 import { Berry } from "./Berry";
 import { Tooltip } from "@common/components/Tooltip";

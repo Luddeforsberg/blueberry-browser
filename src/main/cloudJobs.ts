@@ -17,7 +17,7 @@ export type CloudJobStatus = "queued" | "running" | "waiting" | "done" | "failed
 export const FINISHED: readonly CloudJobStatus[] = ["done", "failed", "stopped"];
 
 // A row is written with the user's session, so it can only say what the user could have sent: a stolen session could
-// already make any bird and answer its approvals. What this stops is a row that's odd or edited. Berry's id is the only
+// already make any mascot and answer its approvals. What this stops is a row that's odd or edited. Berry's id is the only
 // one with no limits, and only with none in the row, which is how the app always sends Berry. A routine of Berry's
 // limited to some sites comes as Berry with those sites, which can only narrow it. Anyone else must pass the same checks
 // as a mascot made in the app, or the job doesn't run at all.
@@ -135,7 +135,7 @@ export const approvalFromRow = (row: Record<string, unknown>): (ChatApproval & {
   };
 };
 
-// A routine that runs in the cloud, as the app keeps it there for the runner. Its bird's limits are narrowed by the
+// A routine that runs in the cloud, as the app keeps it there for the runner. Its mascot's limits are narrowed by the
 // routine's own sites before it goes. When it's due is the server's from then on: `firstRunAt` only counts for a new
 // routine, a changed schedule or a resume.
 export interface CloudRoutineRow {

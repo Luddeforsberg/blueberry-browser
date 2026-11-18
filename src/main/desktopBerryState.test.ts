@@ -194,7 +194,7 @@ describe("desktopTray", () => {
       { kind: "open", target: { page: "chat", chatId: "chat-4" } },
       { kind: "open", target: { page: "chat", chatId: "chat-3" } },
     ]);
-    expect(tray.flock).toEqual([
+    expect(tray.mascots).toEqual([
       { name: "Berry", look: BERRY.look, mood: "fetching", chosen: true },
       { name: "Scout", look: SCOUT.look, mood: "asking", chosen: false },
     ]);

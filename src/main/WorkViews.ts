@@ -4,7 +4,7 @@ import type { Tab } from "./Tab";
 import type { WorkOutcome, WorkTab, WorkTabState, WorkView } from "../shared/library";
 import type { WebContents } from "electron";
 
-// A picture every this often while the bird is doing something, and it can really be seen flying and pecking.
+// A picture every this often while the mascot is doing something, and it can really be seen flying and pecking.
 const LIVELY_MS = 80;
 const CURRENT_MS = 500;
 // A page that hasn't changed for a while gets looked at less.
@@ -29,7 +29,7 @@ export interface JobWork {
   // The tab it used last, which is where it's working now.
   currentId: string | null;
   sites: string[];
-  // What a running step says, for when there's no bird to say anything.
+  // What a running step says, for when there's no mascot to say anything.
   step: string | null;
 }
 
@@ -162,7 +162,7 @@ export class WorkViews {
     };
   }
 
-  // Which tabs count as watched, for the bird: only the big picture, as there's one bird. It moves as soon as the job
+  // Which tabs count as watched, for the mascot: only the big picture, as there's one mascot. It moves as soon as the job
   // does, before anything is drawn, because using a tab makes it the current one.
   private setScales(job: JobWork | null): void {
     const width = this.watching?.width ?? 0;
