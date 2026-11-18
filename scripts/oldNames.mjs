@@ -2,9 +2,10 @@
 // part of a word. Run by `pnpm run lint`. It reads every file git tracks or would track, so a new file counts before
 // it's added. Code says "mascot" or "mascots", or "Berry" where it means Berry.
 //
-// What's left is saved on disk, sent to a server, read by a model or an app, or public, so it can't change without a
-// migration. Each is listed below with the step of docs/quality-plan.md that renames it: 9 for saved formats, 10 for
-// server- and model-facing names. An entry whose text is no longer in its file fails too, so this list only shrinks.
+// What's left is sent to a server, read by a model or an app, or public, so it can't change without a migration, and is
+// listed below with step 10 of docs/quality-plan.md, which renames it. Names saved on disk were renamed in step 9, and
+// only the migrations that read old saved data still name them. An entry whose text is no longer in its file fails too,
+// so this list only shrinks.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 
@@ -22,7 +23,6 @@ const UNCHECKED = [
 ];
 
 const entries = (until, text, why, files) => files.map((file) => ({ file, text, until, why }));
-const saved = (text, why, ...files) => entries(9, text, why, files);
 const external = (text, why, ...files) => entries(10, text, why, files);
 // An old name in data an older version saved, read by the migration that moves it to the new name, in that file and its
 // test only. Kept for good, since old data can turn up at any time.
@@ -50,7 +50,12 @@ const ALLOWED = [
     "src/main/Session.test.ts",
     "tests/session.spec.ts",
   ),
-  ...saved('"blueberry.bird"', "The phone page's key in the browser's localStorage.", "site/app/state.js"),
+  ...migrated(
+    '"blueberry.bird"',
+    "The phone page's old key in the browser's sessionStorage.",
+    "site/app/state.js",
+    "src/shared/phoneState.test.ts",
+  ),
 
   ...external(
     "sync_cloud_flock",
