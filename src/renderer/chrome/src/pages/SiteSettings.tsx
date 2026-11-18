@@ -1,12 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { X } from "lucide-react";
-import type { SavedSitePermission, SiteDecision } from "@shared/ipc";
+import type { SiteDecision } from "@shared/ipc";
 import { Button } from "@common/components/Button";
 import { Choice, Switch } from "@common/components/Controls";
 import { ASKS_EVERY_TIME, SITE_PERMISSION_WORDS, siteName } from "@common/lib/sitePermissions";
 import { SettingsGroup, SettingsRow } from "../components/SettingsRow";
 import { ToolBarButton } from "../components/ToolBarButton";
-import { useShell } from "../contexts/ShellContext";
+import { useShell } from "../contexts/useShell";
+import { useSitePermissions } from "./useSitePermissions";
 
 export const DownloadSettings: React.FC = () => {
   const { settings, updateSettings } = useShell();
@@ -36,16 +37,6 @@ export const DownloadSettings: React.FC = () => {
       </SettingsRow>
     </>
   );
-};
-
-// Every answer a site has saved, kept up to date.
-export const useSitePermissions = () => {
-  const [saved, setSaved] = useState<SavedSitePermission[]>([]);
-  useEffect(() => {
-    void window.chromeAPI.permissions.saved().then(setSaved);
-    return window.chromeAPI.permissions.onSavedUpdated(setSaved);
-  }, []);
-  return saved;
 };
 
 export const SitePermissionsSettings: React.FC = () => {

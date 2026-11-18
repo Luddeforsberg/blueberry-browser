@@ -3,14 +3,16 @@ import { ChevronRight, Pencil, Plus } from "lucide-react";
 import type { TabInfo } from "@shared/ipc";
 import type { Routine, RoutineRun } from "@shared/library";
 import { routinesParam, routinesPlace, type RoutinePart } from "@shared/routinePlaces";
-import type { Mood } from "@common/components/Mascot";
+import type { Mood } from "@common/components/moods";
 import { Button } from "@common/components/Button";
 import { StatusPill } from "@common/components/StatusPill";
 import { cn } from "@common/lib/utils";
-import { useFlock, useLibrary } from "../contexts/LibraryContext";
-import { Berry, useAssistantName } from "../components/Berry";
+import { useFlock, useLibrary } from "../contexts/useLibrary";
+import { Berry } from "../components/Berry";
+import { useAssistantName } from "../components/useAssistantName";
 import { ChatError } from "../components/ChatMessage";
-import { EmptyPage, LINE_BETWEEN, OFF_ROW_HIDE, ON_ROW, ON_ROW_SHOW, PageFrame, PageHeader, ROW } from "../components/PageFrame";
+import { EmptyPage, PageFrame, PageHeader } from "../components/PageFrame";
+import { LINE_BETWEEN, OFF_ROW_HIDE, ON_ROW, ON_ROW_SHOW, ROW } from "../components/pageRows";
 import { BackButton, SettingsGroup, SettingsLabel } from "../components/SettingsRow";
 import { ShowHowButton } from "../components/ShowBerry";
 import { RoutineRunRow } from "../components/RoutineRunRow";
@@ -27,7 +29,8 @@ import {
   toDraft,
   withRoutinePart,
 } from "../routinesView";
-import { ChangeRoutinePart, NewRoutine, PART_NAMES } from "./RoutineSteps";
+import { ChangeRoutinePart, NewRoutine } from "./RoutineSteps";
+import { PART_NAMES } from "./routineParts";
 import { Tooltip } from "@common/components/Tooltip";
 
 // DESIGN.md section 10, Routines: a page in a tab, with the list, each routine's own page, making one in four steps,

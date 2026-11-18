@@ -1,4 +1,3 @@
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const motion = require("./src/renderer/common/motion.json");
 const ms = (name) => `${motion.ms[name]}ms`;
 
@@ -230,6 +229,5 @@ module.exports = {
       },
     },
   },
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   plugins: [require("@tailwindcss/typography")],
 };

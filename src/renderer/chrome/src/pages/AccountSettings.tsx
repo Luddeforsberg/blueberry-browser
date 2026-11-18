@@ -6,10 +6,10 @@ import { AccountForm } from "../components/AccountForm";
 import { Avatar } from "../components/AccountMenu";
 import { CopyLink } from "../components/CopyLink";
 import { cn } from "@common/lib/utils";
-import { LINE_BETWEEN, ROW } from "../components/PageFrame";
+import { LINE_BETWEEN, ROW } from "../components/pageRows";
 import { SettingsGroup, SettingsRow } from "../components/SettingsRow";
-import { useShell } from "../contexts/ShellContext";
-import { useLibrary } from "../contexts/LibraryContext";
+import { useShell } from "../contexts/useShell";
+import { useLibrary } from "../contexts/useLibrary";
 import { useAccount } from "../useAccount";
 
 // Settings > Account. The name is the user's own, kept in Settings on this computer: nothing sends, prompts or publishes it.

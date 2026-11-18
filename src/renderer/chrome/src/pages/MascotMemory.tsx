@@ -4,11 +4,13 @@ import { MAX_FACT_LENGTH } from "@shared/memory";
 import { Button } from "@common/components/Button";
 import { CardInShell } from "@common/components/ApprovalCard";
 import { cn } from "@common/lib/utils";
-import { useFlock, useLibrary } from "../contexts/LibraryContext";
-import { BerrySpot, useAssistantName } from "../components/Berry";
+import { useFlock, useLibrary } from "../contexts/useLibrary";
+import { BerrySpot } from "../components/Berry";
+import { useAssistantName } from "../components/useAssistantName";
 import { ChatError } from "../components/ChatMessage";
 import { SettingsGroup, StepInHeader } from "../components/SettingsRow";
-import { EmptyPage, LINE_BETWEEN, ROW } from "../components/PageFrame";
+import { EmptyPage } from "../components/PageFrame";
+import { LINE_BETWEEN, ROW } from "../components/pageRows";
 
 // DESIGN.md section 10, Your mascots: what one mascot remembers, one step in from its page. Everything it knows is on
 // this page, and nothing else is. An offer waiting for an answer sits on top until it gets one.

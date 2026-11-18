@@ -1,20 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
-import type { McpActivity, McpSnippet, McpState } from "@shared/ipc";
+import type { McpActivity, McpSnippet } from "@shared/ipc";
 import { Button } from "@common/components/Button";
 import { Switch } from "@common/components/Controls";
 import { SettingsGroup, SettingsRow } from "../components/SettingsRow";
+import { useMcp } from "./useMcp";
 
-const OFF: McpState = { on: false, url: null, problem: null, snippets: [], activity: [] };
 const SAID_FOR_MS = 1500;
-
-export const useMcp = () => {
-  const [state, setState] = useState(OFF);
-  useEffect(() => {
-    void window.chromeAPI.mcp.state().then(setState);
-    return window.chromeAPI.mcp.onUpdated(setState);
-  }, []);
-  return [state, setState] as const;
-};
 
 const timeOf = (at: number) => new Date(at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 

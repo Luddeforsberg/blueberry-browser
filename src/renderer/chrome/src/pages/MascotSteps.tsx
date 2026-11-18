@@ -2,16 +2,16 @@ import React, { useEffect, useRef, useState } from "react";
 import type { GalleryMascot, MascotProfile } from "@shared/library";
 import { flockParam, type MascotPart } from "@shared/flockPlaces";
 import { ACCESSORIES, BERRY, MASCOT_TOOLS, MAX_MASCOT_INSTRUCTIONS, MAX_MASCOT_NAME, PALETTES, permissionsInWords } from "@shared/mascots";
-import type { Mood } from "@common/components/Mascot";
+import type { Mood } from "@common/components/moods";
 import { Button } from "@common/components/Button";
 import { Choice, Switch } from "@common/components/Controls";
 import { BIG_CARD, BIG_SHELL } from "@common/components/cardShell";
 import { cn } from "@common/lib/utils";
 import { LABEL, StatusPill } from "@common/components/StatusPill";
-import { useFlock } from "../contexts/LibraryContext";
+import { useFlock } from "../contexts/useLibrary";
 import { Berry, BerrySpot } from "../components/Berry";
 import { ChatError } from "../components/ChatMessage";
-import { BETWEEN } from "../components/PageFrame";
+import { BETWEEN } from "../components/pageRows";
 import { FIELD, PartNav, SiteChips, StepCard, StepNav } from "../components/StepCard";
 import {
   blankMascot,
@@ -55,7 +55,7 @@ const QUESTIONS: Record<MascotPart, { question: string; hint: string; label: str
 };
 
 // The mascot as it's being made, to draw.
-export const asProfile = (values: MascotFormValues): MascotProfile => ({
+const asProfile = (values: MascotFormValues): MascotProfile => ({
   ...BERRY,
   id: values.id ?? "new",
   name: values.name.trim() || "New mascot",

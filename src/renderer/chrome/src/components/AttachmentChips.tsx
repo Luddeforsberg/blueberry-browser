@@ -2,7 +2,8 @@ import React from "react";
 import { File, FileText, Image, X } from "lucide-react";
 import type { FileChip as FileChipInfo, SentAttachment, TabChoice } from "@shared/attachments";
 import { cn } from "@common/lib/utils";
-import { Favicon, siteIcon } from "./Favicon";
+import { Favicon } from "./Favicon";
+import { siteIcon } from "./siteIcon";
 import { Tooltip } from "@common/components/Tooltip";
 
 // DESIGN.md section 10, The prompt box: what a mascot is given to read is chips at the top of the card, each with its ×,

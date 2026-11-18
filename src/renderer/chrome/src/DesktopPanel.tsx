@@ -10,7 +10,7 @@ import { Mascot } from "@common/components/Mascot";
 import { Pips } from "@common/components/Pips";
 import { TIP_KEY, Tooltip, TooltipProvider } from "@common/components/Tooltip";
 import { cn } from "@common/lib/utils";
-import { HANDOFF_TITLE } from "./components/ChatMessage";
+import { HANDOFF_TITLE } from "./components/approvalWords";
 import { DropFace, DropShape } from "./DesktopDrop";
 import { EASE, FADES_IN, clockTime, dropAt, elapsed, restingSize, sideEdge } from "./desktopShape";
 import { waitedFor } from "./needsYouWords";

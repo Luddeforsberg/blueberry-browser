@@ -1,10 +1,10 @@
 import React from "react";
 import { Check, ChevronRight } from "lucide-react";
 import { firstJobRows, type FirstJob } from "@shared/firstRun";
-import { buttonVariants } from "@common/components/Button";
+import { buttonVariants } from "@common/components/buttonVariants";
 import { LABEL } from "@common/components/StatusPill";
 import { cn } from "@common/lib/utils";
-import { useShell } from "../contexts/ShellContext";
+import { useShell } from "../contexts/useShell";
 
 // DESIGN.md section 10, First run, then the new tab: a few first things to do, where suggestions will be once there's
 // something to suggest from. A row is done when main has seen it happen, not when it's pressed, and the group goes once

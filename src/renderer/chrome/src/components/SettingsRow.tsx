@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@common/lib/utils";
 import { Button } from "@common/components/Button";
 import { StatusPill, type PillTone } from "@common/components/StatusPill";
-import { LINE_BETWEEN, ON_ROW, ROW } from "./PageFrame";
+import { LINE_BETWEEN, ON_ROW, ROW } from "./pageRows";
 
 // DESIGN.md section 10, Settings and A page in a tab: a group is a label in words and its rows, straight on the page,
 // and a row has its name on the left, at most one line of explanation, and one control on the right. Anything longer

@@ -1,6 +1,6 @@
 import React from "react";
-import { useBrowser } from "../contexts/BrowserContext";
-import { useLibrary } from "../contexts/LibraryContext";
+import { useBrowser } from "../contexts/useBrowser";
+import { useLibrary } from "../contexts/useLibrary";
 
 // For when there's no sidebar to say it.
 export const NeedsYouNotice: React.FC = () => {

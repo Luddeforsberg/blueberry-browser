@@ -1,38 +1,19 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef } from "react";
 import { ArrowUpRight, ClipboardPaste, KeyRound, Lock } from "lucide-react";
-import { AI_SERVICES, maskedKey, type AiKeyState, type AiKeyTried, type AiService } from "@shared/aiKey";
+import { AI_SERVICES, maskedKey, type AiService } from "@shared/aiKey";
 import { Button } from "@common/components/Button";
 import { Pips } from "@common/components/Pips";
 import { StatusPill } from "@common/components/StatusPill";
 import { cn } from "@common/lib/utils";
-import { useShell } from "../contexts/ShellContext";
+import { useShell } from "../contexts/useShell";
 import { Berry } from "./Berry";
 import { ServiceMark } from "./ServiceMark";
+import { SERVICES, type KeyTry, type Said } from "./useAiKey";
 
 // DESIGN.md section 10, First run, Give me a brain, and Settings > Connections > AI service: the two services as tiles
 // side by side, and one field under them for the chosen one's key. The key is only ever in that field until it's sent to
 // main, and the field is emptied once main has kept it. Main never sends it back, only the service and its last four
 // characters.
-
-const SERVICES: Record<AiService, { name: string; models: string }> = {
-  openai: { name: "OpenAI", models: "GPT models" },
-  anthropic: { name: "Anthropic", models: "Claude models" },
-};
-
-const NONE: AiKeyState = { service: null, last4: null };
-
-export const useAiKey = () => {
-  const [state, setState] = useState(NONE);
-  useEffect(() => {
-    void window.chromeAPI.aiKey.state().then(setState);
-    return window.chromeAPI.aiKey.onUpdated(setState);
-  }, []);
-  return state;
-};
-
-export const aiServiceName = (service: AiService) => SERVICES[service].name;
-
-type Said = AiKeyTried | "trying" | "nothing-to-paste" | null;
 
 const PROBLEMS: Record<Exclude<Said, "works" | "trying" | null>, (service: AiService) => string> = {
   "nothing-to-paste": () => "There’s no key on the clipboard. Copy it from the service’s page, then press Paste.",
@@ -47,50 +28,6 @@ const PROBLEMS: Record<Exclude<Said, "works" | "trying" | null>, (service: AiSer
 
 // The key itself was wrong, rather than the service out of reach or nothing pasted, so the field says so too.
 const KEY_AT_FAULT: Said[] = ["refused", "not-a-key"];
-
-// The chosen service, what's in the field, and how the last try went. `works` is true once a key is kept, whether it was
-// just tried or saved before.
-export const useKeyTry = () => {
-  const saved = useAiKey();
-  const [chosen, setChosen] = useState<AiService | null>(null);
-  const service = chosen ?? saved.service ?? "openai";
-  const [key, setKey] = useState("");
-  const [said, setSaid] = useState<Said>(null);
-  const tryKey = async () => {
-    if (!key.trim() || said === "trying") return;
-    setSaid("trying");
-    const { outcome } = await window.chromeAPI.aiKey.tryKey(service, key);
-    // Kept in main now, so it goes from here.
-    if (outcome === "works") setKey("");
-    setSaid(outcome);
-  };
-  return {
-    saved,
-    service,
-    choose: (next: AiService) => {
-      setChosen(next);
-      // What's in the field was for the other service, and must never be tried with this one.
-      if (next !== service) setKey("");
-      setSaid(null);
-    },
-    key,
-    setKey: (next: string) => {
-      setKey(next);
-      setSaid(null);
-    },
-    said,
-    tryKey,
-    paste: async () => {
-      const pasted = await window.chromeAPI.aiKey.paste(service);
-      if (pasted) setKey(pasted);
-      setSaid(pasted ? null : "nothing-to-paste");
-    },
-    works: saved.service === service && said !== "trying" && !key,
-    canTry: !!key.trim() && said !== "trying",
-  };
-};
-
-export type KeyTry = ReturnType<typeof useKeyTry>;
 
 // The two services, a choice of one. The arrow keys move it, as in any group of radio buttons, and only the chosen tile
 // is a stop for Tab.

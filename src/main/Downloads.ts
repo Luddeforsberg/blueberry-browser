@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, promises as fs, readFileSync, renameSync, writeF
 import { basename, dirname, extname, isAbsolute, join } from "path";
 import type { DownloadItem } from "electron";
 import type { DownloadAction, DownloadInfo, DownloadState, Settings } from "../shared/ipc";
+import { replaceControlCharacters } from "./controlCharacters";
 
 type Item = Pick<
   DownloadItem,
@@ -41,9 +42,8 @@ const STATES: readonly DownloadState[] = ["progressing", "paused", "completed", 
 
 // A site picks the suggested name, so nothing in it may leave the folder or hide what the file is.
 export const safeFilename = (raw: string): string => {
-  const cleaned = raw
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u001f\u007f<>:"/\\|?*]/g, "_")
+  const cleaned = replaceControlCharacters(raw, "_")
+    .replace(/[<>:"/\\|?*]/g, "_")
     .replace(/^[.\s]+/, "")
     .replace(/[.\s]+$/, "");
   const ext = extname(cleaned);

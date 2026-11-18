@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { ChevronLeft, Plus, X } from "lucide-react";
 import type { MascotProfile } from "@shared/library";
 import { normaliseSite } from "@shared/mascots";
-import type { Mood } from "@common/components/Mascot";
+import type { Mood } from "@common/components/moods";
 import { Button } from "@common/components/Button";
 import { BIG_CARD, BIG_SHELL } from "@common/components/cardShell";
 import { useStill } from "@common/components/motion";

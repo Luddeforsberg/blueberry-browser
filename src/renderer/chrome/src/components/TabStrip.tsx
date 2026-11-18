@@ -1,5 +1,5 @@
 import React from "react";
-import { useShell } from "../contexts/ShellContext";
+import { useShell } from "../contexts/useShell";
 import { Tabs } from "./Tabs";
 
 export const TabStrip: React.FC = () => {

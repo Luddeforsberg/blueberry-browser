@@ -3,19 +3,20 @@ import { Check } from "lucide-react";
 import type { MascotProfile, Routine } from "@shared/library";
 import { routinesParam, type RoutinePart } from "@shared/routinePlaces";
 import { BERRY_ID } from "@shared/mascots";
-import type { Mood } from "@common/components/Mascot";
+import type { Mood } from "@common/components/moods";
 import { Button } from "@common/components/Button";
 import { Choice, Switch } from "@common/components/Controls";
 import { BIG_CARD, BIG_SHELL } from "@common/components/cardShell";
 import { LABEL, StatusPill } from "@common/components/StatusPill";
 import { cn } from "@common/lib/utils";
-import { useFlock } from "../contexts/LibraryContext";
-import { Berry, BerrySpot, useAssistantName } from "../components/Berry";
+import { useFlock } from "../contexts/useLibrary";
+import { Berry, BerrySpot } from "../components/Berry";
+import { useAssistantName } from "../components/useAssistantName";
 import { ChatError } from "../components/ChatMessage";
-import { BETWEEN } from "../components/PageFrame";
+import { BETWEEN } from "../components/pageRows";
 import { MarkedSteps } from "../components/MarkedSteps";
 import { FIELD, PartNav, SiteChips, StepCard, StepNav } from "../components/StepCard";
-import { formatTime } from "../components/RoutineRunRow";
+import { formatTime } from "../components/formatTime";
 import { narrowerLimits } from "../shortWords";
 import { useRunner } from "../useRunner";
 import { keepTabDraft, tabDraft } from "../flockView";
@@ -36,6 +37,7 @@ import {
   type RoutineFormValues,
 } from "../routinesView";
 import { Tooltip } from "@common/components/Tooltip";
+import { PART_NAMES } from "./routineParts";
 
 // DESIGN.md section 10, Routines: making one is four questions, one at a time, in the voice of the mascot that will do
 // it, on the same card as making a mascot. The name is never asked for: main names it from what it does. Changing one
@@ -45,14 +47,6 @@ const api = () => window.chromeAPI.routines;
 const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-focus";
 
 const STEPS: RoutinePart[] = ["does", "when", "who", "where"];
-
-export const PART_NAMES: Record<RoutinePart, string> = {
-  name: "Name",
-  does: "What it does",
-  when: "When",
-  who: "Who does it",
-  where: "Where it may go",
-};
 
 const QUESTIONS: Record<RoutinePart, { question: string; hint?: string; mood: Mood }> = {
   does: {

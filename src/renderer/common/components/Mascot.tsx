@@ -1,40 +1,13 @@
 import React, { useId, useRef } from "react";
 import { MessageCircle } from "lucide-react";
-import type { MascotAccessory, MascotLook, MascotPalette } from "@shared/library";
+import type { MascotAccessory, MascotLook } from "@shared/library";
 import { cn } from "../lib/utils";
 import { mascotDetail, type MascotDetail } from "./mascotDetail";
 import { useFrame, useStill } from "./motion";
-import { pipFrames } from "./Pips";
+import { pipFrames } from "./pipPatterns";
 import { useMascotReaction, type Reaction } from "./useMascotReaction";
-
-export type Mood = "rest" | "sitting" | "curious" | "thinking" | "fetching" | "asking" | "delivered" | "oops" | "off-duty";
-
-// Every mood has words, so nothing depends on seeing the drawing.
-export const MOOD_LABELS: Record<Mood, string> = {
-  rest: "at rest",
-  sitting: "sitting",
-  curious: "curious",
-  thinking: "thinking",
-  fetching: "fetching",
-  asking: "waiting for your decision",
-  delivered: "finished",
-  oops: "something went wrong",
-  "off-duty": "asleep",
-};
-
-// DESIGN.md section 9: the six berries. Each is drawn on a 48-unit square, body bottom at 46.
-export type BerryKind = "blueberry" | "lingon" | "cloudberry" | "gooseberry" | "raspberry" | "currant";
-
-// A look is saved by its old palette id, in files, published rows and the phone's flock, so the ids stay and each
-// draws as the berry nearest the colour its owner chose. Berry is the blueberry.
-export const BERRY_KIND: Record<MascotPalette, BerryKind> = {
-  kingfisher: "blueberry",
-  robin: "lingon",
-  canary: "cloudberry",
-  parakeet: "gooseberry",
-  flamingo: "raspberry",
-  jackdaw: "currant",
-};
+import { MOOD_LABELS, type Mood } from "./moods";
+import { BERRY_KIND, type BerryKind } from "./berryKinds";
 
 const BERRY_LOOK: MascotLook = { palette: "kingfisher", accessory: "none" };
 

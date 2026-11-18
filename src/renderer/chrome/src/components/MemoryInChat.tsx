@@ -3,10 +3,11 @@ import { ChevronRight } from "lucide-react";
 import type { MascotProfile, MemoryFact, MemoryOffer } from "@shared/library";
 import { Button } from "@common/components/Button";
 import { cn } from "@common/lib/utils";
-import { useLibrary } from "../contexts/LibraryContext";
-import { useShell } from "../contexts/ShellContext";
+import { useLibrary } from "../contexts/useLibrary";
+import { useShell } from "../contexts/useShell";
 import { openMascots } from "../flockView";
-import { Berry, useAssistantName } from "./Berry";
+import { Berry } from "./Berry";
+import { useAssistantName } from "./useAssistantName";
 
 const MAX_SHOWN = 2;
 

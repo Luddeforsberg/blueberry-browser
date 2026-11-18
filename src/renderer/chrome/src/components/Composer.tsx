@@ -2,17 +2,20 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ARM_MS } from "@common/components/cardKeys";
 import { ArrowUp, Check, ChevronDown, Cloud, Laptop, Lock, Plus } from "lucide-react";
 import type { MascotProfile } from "@shared/library";
-import type { Mood } from "@common/components/Mascot";
+import type { Mood } from "@common/components/moods";
 import { cn } from "@common/lib/utils";
 import { SHELL } from "@common/components/cardShell";
-import { useFlock } from "../contexts/LibraryContext";
-import { useShell } from "../contexts/ShellContext";
-import { Berry, useAssistantName } from "./Berry";
+import { useFlock } from "../contexts/useLibrary";
+import { useShell } from "../contexts/useShell";
+import { Berry } from "./Berry";
+import { useAssistantName } from "./useAssistantName";
 import { limitsInBrief } from "../shortWords";
 import { startMascot } from "../flockView";
-import { MenuRule, MenuSheet, menuRowClass } from "./MenuSheet";
+import { MenuRule, MenuSheet } from "./MenuSheet";
+import { menuRowClass } from "./menuRows";
 import { AddMenu, type AddMenuOptions } from "./AddMenu";
-import { BoxChips, useAddMenu } from "./BoxAttachments";
+import { BoxChips } from "./BoxAttachments";
+import { useAddMenu } from "./useAddMenu";
 import { useAttachments, type Attached, type JobPlace } from "../useAttachments";
 import { BERRY } from "@shared/mascots";
 import { Tooltip } from "@common/components/Tooltip";
@@ -540,13 +543,6 @@ export const Composer: React.FC<{
     </div>
   );
 };
-
-// While a question waits, what's sent from the prompt box is its answer, through `chat:decide` like a pressed one. An
-// answer is words only, so with anything attached it isn't sent, and stays in the box.
-export const answerInBox = (chatId: string, approvalId: string, words: string, attached: Attached): Promise<boolean> =>
-  attached.files.length > 0 || attached.tabs.length > 0
-    ? Promise.resolve(false)
-    : window.chromeAPI.chat.decide(chatId, approvalId, true, words).catch(() => false);
 
 // A composer that sends on Enter, for both chats.
 export const ChatComposer: React.FC<{

@@ -1,30 +1,33 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, Cloud, Ellipsis, PanelLeft, Plus } from "lucide-react";
-import { Favicon, siteIcon } from "./Favicon";
-import type { Bookmark, ChatThreadSummary, MascotProfile, Routine } from "@shared/library";
+import { Favicon } from "./Favicon";
+import { siteIcon } from "./siteIcon";
+import type { ChatThreadSummary, MascotProfile, Routine } from "@shared/library";
 import type { MenuAnchor } from "@shared/ipc";
-import { atPointer, underBox } from "./MenuSheet";
+import { atPointer, underBox } from "./menuAnchors";
 import { holdWhile } from "../menuHold";
-import { useBrowser } from "../contexts/BrowserContext";
-import { useFlock, useLibrary } from "../contexts/LibraryContext";
-import { useShell } from "../contexts/ShellContext";
+import { useBrowser } from "../contexts/useBrowser";
+import { useFlock, useLibrary } from "../contexts/useLibrary";
+import { useShell } from "../contexts/useShell";
 import { Tabs } from "./Tabs";
 import { useSiteDrag } from "./useSiteDrag";
 import { ToolBarButton } from "./ToolBarButton";
 import { Pips } from "@common/components/Pips";
 import { LABEL } from "@common/components/StatusPill";
-import { buttonVariants } from "@common/components/Button";
+import { buttonVariants } from "@common/components/buttonVariants";
 import { cn } from "@common/lib/utils";
-import { Berry, useAssistantName } from "./Berry";
+import { Berry } from "./Berry";
+import { useAssistantName } from "./useAssistantName";
 import { limitsInBrief, rowTime } from "../shortWords";
 import { openRoutines } from "../routinesView";
 import { dockFaces, openMascots } from "../flockView";
-import { BERRY_ID } from "@shared/mascots";
 import { AccountButton, AccountMenu } from "./AccountMenu";
 import { SegmentSwitch } from "./SegmentSwitch";
 import { usePresence } from "@common/components/motion";
 import { SHORTCUTS } from "@shared/shortcuts";
 import { Tooltip } from "@common/components/Tooltip";
+import { sameSite, savedSiteMenu } from "./savedSites";
+import { useMascotState } from "./useMascotState";
 
 // DESIGN.md section 10, Sidebar: straight on the ground, with two faces and the dock under both.
 
@@ -91,19 +94,6 @@ const useTick = (going: boolean) => {
 };
 
 // --- Tabs -----------------------------------------------------------------------------------------------------------
-
-export const sameSite = (a: string, b: string) => {
-  try {
-    return new URL(a).hostname === new URL(b).hostname;
-  } catch {
-    return false;
-  }
-};
-
-export const savedSiteMenu = (event: React.MouseEvent, site: Bookmark) => {
-  event.preventDefault();
-  void holdWhile(window.chromeAPI.library.showBookmarkMenu(site.id, atPointer(event)));
-};
 
 export type SiteDragging = ReturnType<typeof useSiteDrag>;
 
@@ -568,18 +558,6 @@ export const ChatsFace: React.FC<{ onSheet?: boolean }> = ({ onSheet = false }) 
 };
 
 // --- The dock -------------------------------------------------------------------------------------------------------
-
-// What a mascot's face says in the dock: asking, working, or at rest.
-export const useMascotState = () => {
-  const library = useLibrary();
-  return (mascot: MascotProfile) => {
-    const ownChats = library.chats.filter((chat) => (chat.mascotId ?? BERRY_ID) === mascot.id);
-    const asking = library.needsYou.filter((item) => item.mascotId === mascot.id);
-    const running = ownChats.filter((chat) => chat.running && !asking.some((item) => item.id === chat.id));
-    const mood = asking.length > 0 ? "asking" : running.length > 0 ? "fetching" : "rest";
-    return { mood, asking, running, recent: ownChats.filter((chat) => !chat.running).slice(0, 3) } as const;
-  };
-};
 
 // Pressing a mascot in the dock opens this: who it is, what it may do, what it's doing, and a way to start a chat with
 // it. It shows, it doesn't choose. In the sidebar it sits above the dock; over the page, where `className` places it.

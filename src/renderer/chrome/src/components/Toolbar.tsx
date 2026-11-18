@@ -1,7 +1,7 @@
 import React from "react";
 import { ChevronLeft, ChevronRight, PanelLeft, PanelRight, RotateCw, X } from "lucide-react";
-import { useBrowser } from "../contexts/BrowserContext";
-import { useShell } from "../contexts/ShellContext";
+import { useBrowser } from "../contexts/useBrowser";
+import { useShell } from "../contexts/useShell";
 import { AddressBar } from "./AddressBar";
 import { DownloadsButton } from "./DownloadsButton";
 import { HorizontalToolbar } from "./HorizontalToolbar";

@@ -2,10 +2,12 @@ import React, { useState } from "react";
 import type { TabInfo } from "@shared/ipc";
 import { Button } from "@common/components/Button";
 import { Pips } from "@common/components/Pips";
-import { Berry, useAssistantName } from "../components/Berry";
+import { Berry } from "../components/Berry";
+import { useAssistantName } from "../components/useAssistantName";
 import { ChatError, LiveWords } from "../components/ChatMessage";
 import { EmptyPage, PageFrame, PageHeader } from "../components/PageFrame";
-import { RecordingNotice, TrailNotes, useRecording } from "../components/ShowBerry";
+import { RecordingNotice, TrailNotes } from "../components/ShowBerry";
+import { useRecording } from "../components/useRecording";
 import { recordedForm, startRoutine } from "../routinesView";
 
 const api = () => window.chromeAPI.recording;

@@ -1,9 +1,9 @@
 import React from "react";
 import type { MascotProfile } from "@shared/library";
-import { BERRY_ID } from "@shared/mascots";
-import { Mascot, type Mood } from "@common/components/Mascot";
-import { useShell } from "../contexts/ShellContext";
-import { atPointer } from "./MenuSheet";
+import { Mascot } from "@common/components/Mascot";
+import type { Mood } from "@common/components/moods";
+import { useShell } from "../contexts/useShell";
+import { atPointer } from "./menuAnchors";
 
 // Berry, or one of the flock, as the settings say: hidden, still, or itself. Right-clicking it offers both switches.
 // `still` holds it still whatever the settings say, where something else in its area already moves.
@@ -30,13 +30,6 @@ export const Berry: React.FC<{
       }}
     />
   );
-};
-
-// With Berry hidden, the copy turns neutral too. A mascot the user named keeps its name, so they can tell who's who.
-export const useAssistantName = (mascot?: MascotProfile) => {
-  const { showBerry } = useShell().settings;
-  if (mascot && mascot.id !== BERRY_ID) return mascot.name;
-  return showBerry ? "Berry" : "Assistant";
 };
 
 // A mascot where a page has room for it, such as an empty chat. With Berry hidden there's nothing in its place.

@@ -9,10 +9,12 @@ import { BIG_CARD, BIG_SHELL } from "@common/components/cardShell";
 import { Choice, Switch } from "@common/components/Controls";
 import { LABEL, StatusPill } from "@common/components/StatusPill";
 import { cn } from "@common/lib/utils";
-import { useShell } from "../contexts/ShellContext";
-import { AiKeyForm, useKeyTry } from "./AiKeyForm";
+import { useShell } from "../contexts/useShell";
+import { AiKeyForm } from "./AiKeyForm";
+import { useKeyTry } from "./useAiKey";
 import { Berry, BerrySpot } from "./Berry";
-import { SourceRows, useHistoryImport } from "./HistoryImport";
+import { SourceRows } from "./HistoryImport";
+import { useHistoryImport } from "./useHistoryImport";
 import { FIELD, StepCard, StepNav } from "./StepCard";
 import { WindowPicture } from "./WindowPicture";
 

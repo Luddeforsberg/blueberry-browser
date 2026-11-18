@@ -1,25 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import type { Layout, Settings, ThemeState } from "@shared/ipc";
 import { StillContext } from "@common/components/motion";
-
-interface ShellContextType {
-  layout: Layout;
-  theme: ThemeState;
-  settings: Settings;
-  toggleSidebar: () => void;
-  toggleChat: () => void;
-  updateSettings: (patch: Partial<Settings>) => void;
-}
-
-const ShellContext = createContext<ShellContextType | null>(null);
-
-export const useShell = () => {
-  const context = useContext(ShellContext);
-  if (!context) {
-    throw new Error("useShell must be used within a ShellProvider");
-  }
-  return context;
-};
+import { ShellContext, type ShellContextType } from "./useShell";
 
 // Layout, theme and settings all come from main, which owns the window.
 export const ShellProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

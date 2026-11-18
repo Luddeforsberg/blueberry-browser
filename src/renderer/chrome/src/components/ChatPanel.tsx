@@ -1,10 +1,11 @@
 import React from "react";
 import { SquarePen, X } from "lucide-react";
-import { useChat } from "../contexts/ChatContext";
-import { useFlock } from "../contexts/LibraryContext";
-import { useShell } from "../contexts/ShellContext";
+import { useChat } from "../contexts/useChat";
+import { useFlock } from "../contexts/useLibrary";
+import { useShell } from "../contexts/useShell";
 import { Chat } from "./Chat";
-import { Berry, useAssistantName } from "./Berry";
+import { Berry } from "./Berry";
+import { useAssistantName } from "./useAssistantName";
 import { SHORTCUTS } from "@shared/shortcuts";
 import { Tooltip } from "@common/components/Tooltip";
 

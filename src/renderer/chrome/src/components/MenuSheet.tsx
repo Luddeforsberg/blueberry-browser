@@ -1,5 +1,4 @@
 import React, { useEffect, useRef } from "react";
-import type { MenuAnchor } from "@shared/ipc";
 import { cn } from "@common/lib/utils";
 
 // DESIGN.md section 8, Menus: a sheet with a 22px radius and `lift`. Every menu is this, with the same keys: up and down
@@ -115,22 +114,5 @@ export const MenuSheet: React.FC<
   );
 };
 
-// Where a menu main opens hangs from, in this view: the pointer for a right-click, or under a button.
-export const atPointer = (event: React.MouseEvent): MenuAnchor => ({ x: event.clientX, y: event.clientY, width: 0, height: 0 });
-export const underBox = (element: Element): MenuAnchor => {
-  const { x, y, width, height } = element.getBoundingClientRect();
-  return { x, y, width, height };
-};
-
 // A hairline between groups of rows.
 export const MenuRule: React.FC = () => <div aria-hidden className="h-px mx-2.5 my-1.5 bg-line" />;
-
-// A row is 40px, or 46px with a second line, and hovering or the keyboard gives it a 14px `sheet-2` fill. One that's
-// ruled out stays, in `faint`, and its second line says why.
-export const menuRowClass = (twoLines: boolean, off = false) =>
-  cn(
-    "w-full px-2.5 flex items-center gap-[11px] rounded-[14px] text-left outline-none",
-    twoLines ? "h-[46px]" : "h-10",
-    "focus-visible:bg-sheet-2",
-    off ? "text-faint cursor-default" : "hover:bg-sheet-2",
-  );

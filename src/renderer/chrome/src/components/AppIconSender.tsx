@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { APP_ICON_SIZE, iconMascotId } from "@shared/appIcon";
-import { useShell } from "../contexts/ShellContext";
-import { useFlock } from "../contexts/LibraryContext";
+import { useShell } from "../contexts/useShell";
+import { useFlock } from "../contexts/useLibrary";
 import { AppIcon } from "./AppIcon";
 import { iconPicture } from "../iconPicture";
 

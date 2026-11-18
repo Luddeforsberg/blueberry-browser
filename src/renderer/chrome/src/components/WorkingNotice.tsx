@@ -1,7 +1,7 @@
 import React from "react";
-import { useBrowser } from "../contexts/BrowserContext";
-import { useFlock } from "../contexts/LibraryContext";
-import { useAssistantName } from "./Berry";
+import { useBrowser } from "../contexts/useBrowser";
+import { useFlock } from "../contexts/useLibrary";
+import { useAssistantName } from "./useAssistantName";
 import { TabIcon } from "./TabIcon";
 
 // For when there's no sidebar to say it: work going on in another tab, and one press to go and see it.

@@ -1,22 +1,17 @@
 import React from "react";
-import { useBrowser } from "../contexts/BrowserContext";
-import { useChat, type Message } from "../contexts/ChatContext";
-import { useFlock, useLibrary } from "../contexts/LibraryContext";
-import { useAssistantName, BerrySpot } from "./Berry";
-import {
-  AssistantMessage,
-  ChatApprovalCard,
-  ThinkingMessage,
-  UserMessage,
-  WentWrong,
-  didWork,
-  useFollowReply,
-  type ReplyActions,
-} from "./ChatMessage";
+import { useBrowser } from "../contexts/useBrowser";
+import { useChat, type Message } from "../contexts/useChat";
+import { useFlock, useLibrary } from "../contexts/useLibrary";
+import { BerrySpot } from "./Berry";
+import { useAssistantName } from "./useAssistantName";
+import { AssistantMessage, ChatApprovalCard, ThinkingMessage, UserMessage, WentWrong, type ReplyActions } from "./ChatMessage";
+import { didWork } from "./didWork";
+import { useFollowReply } from "./useFollowReply";
 import { chatRoutine } from "../routinesView";
 import { MemoryOffers } from "./MemoryInChat";
 import { PageChip } from "./AttachmentChips";
-import { ChatComposer, answerInBox } from "./Composer";
+import { ChatComposer } from "./Composer";
+import { answerInBox } from "./answerInBox";
 import { siteAllowed } from "@shared/mascots";
 
 const hostOf = (url: string) => {

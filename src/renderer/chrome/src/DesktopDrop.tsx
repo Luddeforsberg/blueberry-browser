@@ -2,7 +2,8 @@ import React from "react";
 import type { DesktopEdge, DesktopFace } from "@shared/ipc";
 import { DESKTOP_FILLET } from "@shared/desktopSizes";
 import { Mascot } from "@common/components/Mascot";
-import { Pips, type PipMark, type PipPattern } from "@common/components/Pips";
+import { Pips } from "@common/components/Pips";
+import type { PipMark, PipPattern } from "@common/components/pipPatterns";
 import { cn } from "@common/lib/utils";
 import { EASE, SIZE_MS, dropRadius, intoEdge } from "./desktopShape";
 

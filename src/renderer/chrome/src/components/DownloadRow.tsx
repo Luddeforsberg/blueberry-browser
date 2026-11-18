@@ -4,7 +4,7 @@ import type { DownloadAction, DownloadInfo } from "@shared/ipc";
 import { Button } from "@common/components/Button";
 import { cn } from "@common/lib/utils";
 import { downloadStatus, fileEnding, fractionDone, isActive, timeLeft } from "./downloadStatus";
-import { LINE_BETWEEN, OFF_ROW_HIDE, ON_ROW, ON_ROW_SHOW, ROW } from "./PageFrame";
+import { LINE_BETWEEN, OFF_ROW_HIDE, ON_ROW, ON_ROW_SHOW, ROW } from "./pageRows";
 import { Tooltip } from "@common/components/Tooltip";
 
 // DESIGN.md section 10, Downloads: the kind of file on its tile, its name, and one line with its size, the site it came
