@@ -13,6 +13,12 @@
   ],
   "compilerOptions": {
     "composite": true,
+    // Off or unset in @electron-toolkit/tsconfig. Each one costs nothing to keep on.
+    "noImplicitAny": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
