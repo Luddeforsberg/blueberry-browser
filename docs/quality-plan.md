@@ -69,13 +69,13 @@ This is the `foundations` audit of the preview branch at `581637f`. The full rep
 - **Saved and public names:** the public site `blueberry-flock.netlify.app` would break shared links if renamed, so it needs the user's call. The palette ids become the berry names (`blueberry`, `lingon`, `cloudberry`, `gooseberry`, `raspberry`, `currant`).
 
 **Order after the merge.** Each step is a PR, risk in brackets.
-1. Prettier config and `format:check` (low).
-2. The format-all commit (low).
-3. Remove the 35 triple-slash disables (low).
-4. Zero warnings, and inline disables are errors (medium).
-5. Compiler flags that cost 0 errors (low).
-6. `knip` (low).
-7. Size and complexity limits, with a list of exceptions that only shrinks (low).
+1. Prettier config and `format:check` (low). Done.
+2. The format-all commit (low). Done.
+3. Remove the 35 triple-slash disables (low). Done.
+4. Zero warnings, and inline disables are errors (medium). Done.
+5. Compiler flags that cost 0 errors (low). Done.
+6. `knip` (low). Done.
+7. Size and complexity limits, with a list of exceptions that only shrinks (low). Done.
 8. Code-only rename, plus a check against "bird" and "flock" (low).
 9. Renames in saved formats, with migrations (medium).
 10. Server and model-facing renames (high, Codex).
