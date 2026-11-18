@@ -1,14 +1,14 @@
-import { flockFromRows } from "../shared.js";
+import { mascotsFromSharedRows } from "../shared.js";
 import * as api from "./api.js";
-import { bird, el, icon } from "./dom.js";
+import { drawMascot, el, icon } from "./dom.js";
 import { pushState } from "./push.js";
 import { hooks, problemWords, state } from "./state.js";
 
 // Signing in, on the ground: three of the mascots, what this is for, and email and password in a card. Drawn once, so
 // what's typed stays.
 
-// Who stands with Berry before anyone has signed in, so before their own flock is known: two of the berries.
-const [BERRY] = flockFromRows([]);
+// Who stands with Berry before anyone has signed in, so before their own mascots are known: two of the berries.
+const [BERRY] = mascotsFromSharedRows([]);
 const STANDING = [
   { ...BERRY, name: "Lingon", look: { palette: "robin", accessory: "none" } },
   BERRY,
@@ -91,7 +91,7 @@ export const mountSignIn = (app) => {
           el(
             "span",
             { className: `stand ${mascot === BERRY ? "front" : "side"}` },
-            bird(mascot, "rest", mascot === BERRY ? 84 : 52, { named: false }),
+            drawMascot(mascot, "rest", mascot === BERRY ? 84 : 52, { named: false }),
           ),
         ),
       ),

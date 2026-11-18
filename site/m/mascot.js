@@ -1,5 +1,5 @@
 import "../theme.js";
-import { BIRDS } from "../birds.js";
+import { DRAWINGS } from "../mascots.js";
 import { GET_BLUEBERRY_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "../config.js";
 import { isUuid, parsePublishedRow, permissionsInWords, plainFromMarkdown } from "../shared.js";
 
@@ -24,9 +24,9 @@ const say = (title, words) =>
     el("div", { className: "actions" }, el("a", { className: "button outline", href: GET_BLUEBERRY_URL, textContent: "About Blueberry" })),
   );
 
-const bird = ({ look, name }) => {
-  const holder = el("div", { className: "bird" });
-  holder.innerHTML = BIRDS[look.accessory];
+const drawMascot = ({ look, name }) => {
+  const holder = el("div", { className: "mascot" });
+  holder.innerHTML = DRAWINGS[look.accessory];
   const drawing = holder.querySelector("svg");
   drawing.dataset.mascot = look.palette;
   drawing.setAttribute("aria-label", `A bird called ${name}`);
@@ -78,7 +78,7 @@ const show = ({ id, draft, author, description, example, addCount }) => {
             "Blueberry shows you all of this again, and nothing is added until you press Add. Don’t have it? It isn’t out for download yet.",
         }),
       ),
-      bird(draft),
+      drawMascot(draft),
     ),
     el(
       "section",

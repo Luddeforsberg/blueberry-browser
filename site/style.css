@@ -168,7 +168,7 @@ section > h2 {
   outline-offset: 2px;
 }
 
-/* A mascot's page: the bird stands on the line under the heading, as in the app's review. On a phone it stands on its
+/* A mascot's page: the mascot stands on the line under the heading, as in the app's review. On a phone it stands on its
    own short wire above the name. */
 .hero {
   display: flex;
@@ -180,13 +180,13 @@ section > h2 {
   flex: 1;
   min-width: 0;
 }
-.bird {
+.mascot {
   flex-shrink: 0;
   width: 144px;
   height: calc(144px * 46 / 48);
   border-bottom: 1.5px solid var(--wire);
 }
-.bird svg {
+.mascot svg {
   width: 144px;
   height: 144px;
 }
@@ -211,14 +211,14 @@ section > h2 {
   stroke-linejoin: round;
 }
 
-/* The flock, standing on wires the width of the page, as on the app's Flock page: each bird at the start of its place,
+/* The mascots, standing on wires the width of the page, as on the app's Your mascots page: each mascot at the start of its place,
    its name under it. Every other one turns round, or every third on a wide row. */
-.flock {
+.mascots {
   display: flex;
   flex-wrap: wrap;
   margin-top: 48px;
 }
-.flock li {
+.mascots li {
   width: 50%;
   padding-bottom: 16px;
 }
@@ -231,19 +231,19 @@ section > h2 {
   width: 96px;
   height: 96px;
 }
-.flock li:nth-child(2n) .perch svg {
+.mascots li:nth-child(2n) .perch svg {
   transform: scaleX(-1);
 }
-.flock .name,
-.flock .what {
+.mascots .name,
+.mascots .what {
   padding-right: 16px;
 }
-.flock .name {
+.mascots .name {
   margin-top: 12px;
   font-size: 14px;
   font-weight: 600;
 }
-.flock .what {
+.mascots .what {
   margin-top: 2px;
   font-size: 13px;
   color: rgb(var(--ink-2));
@@ -275,23 +275,23 @@ section > h2 {
     align-items: flex-end;
     gap: 32px;
   }
-  .bird {
+  .mascot {
     width: 200px;
     height: calc(200px * 46 / 48);
     margin-bottom: -32px;
     border-bottom: 0;
   }
-  .bird svg {
+  .mascot svg {
     width: 200px;
     height: 200px;
   }
-  .flock li {
+  .mascots li {
     width: calc(100% / 3);
   }
-  .flock li:nth-child(2n) .perch svg {
+  .mascots li:nth-child(2n) .perch svg {
     transform: none;
   }
-  .flock li:nth-child(3n) .perch svg {
+  .mascots li:nth-child(3n) .perch svg {
     transform: scaleX(-1);
   }
   .perch {
@@ -303,8 +303,8 @@ section > h2 {
   }
 }
 
-/* Wide: a larger heading, the whole flock on one wire, and every section as a row of the same two columns, its heading
-   on the left and what it says on the right. The second starts a third of the way across, under the third bird. */
+/* Wide: a larger heading, every mascot on one wire, and every section as a row of the same two columns, its heading
+   on the left and what it says on the right. The second starts a third of the way across, under the third mascot. */
 @media (min-width: 960px) {
   :root {
     --gutter: 48px;
@@ -329,16 +329,16 @@ section > h2 {
   .hero-text .lede {
     color: rgb(var(--ink));
   }
-  .flock {
+  .mascots {
     margin-top: 72px;
   }
-  .flock li {
+  .mascots li {
     width: calc(100% / 6);
   }
-  .flock .name {
+  .mascots .name {
     font-size: 16px;
   }
-  .flock .what {
+  .mascots .what {
     font-size: 14px;
   }
   .points {
@@ -374,7 +374,7 @@ section > h2 {
   .hero {
     padding-bottom: 40px;
   }
-  .bird {
+  .mascot {
     margin-bottom: -40px;
   }
 }

@@ -1,7 +1,7 @@
 import { followUpHistory, mascotSnapshot } from "../shared.js";
 import * as api from "./api.js";
 import { decide, hold, openAsk } from "./ask.js";
-import { bird, copyButton, el, grow, icon, patch, pips, replyText, stepPips, stopSquare } from "./dom.js";
+import { drawMascot, copyButton, el, grow, icon, patch, pips, replyText, stepPips, stopSquare } from "./dom.js";
 import { nowStep } from "./home.js";
 import { liveSlot } from "./live.js";
 import { startJob } from "./start.js";
@@ -199,7 +199,7 @@ const ended = (job) => {
     el(
       "div",
       { className: "reply" },
-      bird(mascot, moodOf(job), 28),
+      drawMascot(mascot, moodOf(job), 28),
       el(
         "div",
         { className: "w" },
@@ -250,7 +250,7 @@ const followUp = (conversationId, job) => {
         const attempt = async () => {
           const latest = conversation(conversationId)?.latest;
           if (!latest || going(latest)) throw new api.ApiError(409);
-          // Only as a mascot that's still in the flock, with its limits as they are now.
+          // Only as a mascot the phone still has, with its limits as they are now.
           const sender = senderOf(latest);
           if (!sender) return "gone";
           const last = await api.jobWithHistory(latest.id);
@@ -295,7 +295,7 @@ const followUp = (conversationId, job) => {
         }
       },
     },
-    el("div", { className: "box" }, el("span", { className: "who lone" }, bird(mascot, "rest", 28, { named: false })), box, send),
+    el("div", { className: "box" }, el("span", { className: "who lone" }, drawMascot(mascot, "rest", 28, { named: false })), box, send),
   );
   box.addEventListener("keydown", (event) => {
     if (event.key === "Enter" && !event.shiftKey && !event.isComposing && matchMedia("(pointer: fine)").matches) {
@@ -332,7 +332,7 @@ const working = (job) => {
       el(
         "div",
         { className: "box work" },
-        bird(mascot, moodOf(job), 28, { named: false }),
+        drawMascot(mascot, moodOf(job), 28, { named: false }),
         el(
           "div",
           { className: "w" },
@@ -385,7 +385,7 @@ export const mountJob = (app, id) => {
       JSON.stringify([mascot, moodOf(job), job.status, job.error, job.updated_at]),
       () => [
         back(),
-        bird(mascot, moodOf(job), 32, { named: false }),
+        drawMascot(mascot, moodOf(job), 32, { named: false }),
         el("div", { className: "w" }, el("h1", { className: "top-name", textContent: mascot.name }), topLine(job)),
       ],
       { force },
@@ -408,7 +408,7 @@ export const mountJob = (app, id) => {
         [...allSteps].includes(job.id),
         state.said,
         state.problem,
-        state.flock.map((one) => one.id),
+        state.mascots.map((one) => one.id),
         waiting().map((one) => one.ask.approval_id),
         [...state.taken],
       ]),
@@ -513,7 +513,7 @@ export const mountFull = (app, id, taking) => {
           el(
             "div",
             { className: "handrow" },
-            bird(mascot, "asking", 40, { named: false }),
+            drawMascot(mascot, "asking", 40, { named: false }),
             el(
               "div",
               { className: "w" },

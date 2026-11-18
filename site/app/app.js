@@ -1,4 +1,4 @@
-import { flockFromRows, oneAtATime, runnerLinkDue } from "../shared.js";
+import { mascotsFromSharedRows, oneAtATime, runnerLinkDue } from "../shared.js";
 import * as api from "./api.js";
 import { refreshAsk } from "./ask.js";
 import { mountHome } from "./home.js";
@@ -30,16 +30,16 @@ const load = async () => {
   const asked = api.sessionVersion();
   try {
     const askLink = state.linked === null || runnerLinkDue(linkCheckedAt, Date.now());
-    const [jobs, flock, linked] = await Promise.all([api.jobs(), api.flock(), askLink ? api.runner() : Promise.resolve(undefined)]);
+    const [jobs, shared, linked] = await Promise.all([api.jobs(), api.mascots(), askLink ? api.runner() : Promise.resolve(undefined)]);
     // Someone signed out or in while it was asking, so none of this is theirs.
     if (api.sessionVersion() !== asked) return;
     // A new question takes the place of whatever was said about the last one.
     const asking = jobs.flatMap((job) => (job.ask ? [job.ask.approval_id] : []));
     if (asking.some((id) => !(state.jobs ?? []).some((known) => known.ask?.approval_id === id))) state.said = null;
     state.jobs = jobs;
-    state.flock = flockFromRows(flock);
-    state.flockShared =
-      flock
+    state.mascots = mascotsFromSharedRows(shared);
+    state.mascotsShared =
+      shared
         .map((row) => row.updated_at)
         .sort()
         .at(-1) ?? null;

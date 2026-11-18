@@ -1,6 +1,6 @@
 import { plausibleCode, withSiteNames } from "../shared.js";
 import * as api from "./api.js";
-import { bird, el, grow, typing } from "./dom.js";
+import { drawMascot, el, grow, typing } from "./dom.js";
 import { liveSlot, placeLive } from "./live.js";
 import { closeSheet, openSheet, sheetBody, sheetKind } from "./sheet.js";
 import { asked, handoffWords, hooks, liveOf, problemWords, state, waiting, wanted } from "./state.js";
@@ -48,7 +48,7 @@ const say = (id, mascot, words) => {
     el(
       "div",
       { className: "ask-said", role: "status" },
-      bird(mascot, "rest", 72, { named: false }),
+      drawMascot(mascot, "rest", 72, { named: false }),
       el("p", { className: "ask-title", textContent: words }),
     ),
   );
@@ -185,7 +185,7 @@ const draw = (entry) => {
   body.replaceChildren(
     ...[
       all.length > 1 ? el("p", { className: "ask-count", textContent: `${at + 1} of ${all.length}` }) : null,
-      el("div", { className: "asker" }, bird(entry.mascot, "asking", 72, { named: false })),
+      el("div", { className: "asker" }, drawMascot(entry.mascot, "asking", 72, { named: false })),
       ...content,
       // What job it's for, which opens it.
       el("a", { className: "ask-for", href: `#job/${entry.conversation}`, textContent: `For “${entry.job.prompt}”` }),

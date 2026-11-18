@@ -73,9 +73,9 @@ const MOOD_WORDS = { rest: "at rest", fetching: "working", asking: "waiting for 
 let drawn = 0;
 // A mascot in one mood, always the whole drawing, at one of the sizes app.css has. Each gets gradient ids of its own, so
 // one hidden drawing can't take the others' colour. `named` is false where its name is written beside it already.
-export const bird = (mascot, mood, size, { named = true } = {}) => {
+export const drawMascot = (mascot, mood, size, { named = true } = {}) => {
   const poses = POSES[mascot.look.accessory] ?? POSES.none;
-  const holder = el("span", { className: `bird s${size}` });
+  const holder = el("span", { className: `mascot s${size}` });
   const own = `b${++drawn}`;
   holder.innerHTML = (poses[mood] ?? poses.rest).replace(/«[^»]*»/g, (id) => `${own}${id.length}`);
   const drawing = holder.querySelector("svg");

@@ -179,16 +179,16 @@ var linkWords = (text, href) => {
 var plainFromMarkdown = (markdown) => markdown.replace(/^\s*(```|~~~).*$/gm, "").replace(/^\s{0,3}(?:[-*_]\s*){3,}$/gm, "").replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/\[([^\]]*)\]\(\s*<?([^)\s>]*)>?(?:\s+"[^"]*")?\s*\)/g, (_, text, href) => linkWords(text, href)).replace(/<(https?:\/\/[^>\s]+)>/g, (_, href) => linkWords(href, href)).replace(/^\s{0,3}#{1,6}\s+/gm, "").replace(/^\s{0,3}>\s?/gm, "").replace(/^(\s*)[-*+]\s+/gm, "$1\u2022 ").replace(/(\*\*|__)(?=\S)(.+?)(?<=\S)\1/g, "$2").replace(/(^|[^\w*])[*_](?=\S)(.+?)(?<=\S)[*_](?=[^\w*]|$)/g, "$1$2").replace(/~~(.+?)~~/g, "$1").replace(/`([^`]+)`/g, "$1").replace(/\n{3,}/g, "\n\n").trim();
 
 // src/shared/phone.ts
-var flockFromRows = (rows) => {
-  const birds = [BERRY];
+var mascotsFromSharedRows = (rows) => {
+  const mascots = [BERRY];
   for (const row of Array.isArray(rows) ? rows : []) {
     const { id, name, palette, accessory, instructions, sites, tools, from_gallery: fromGallery } = row ?? {};
-    if (typeof id !== "string" || !/^[\w-]{1,100}$/.test(id) || id === BERRY_ID || birds.some((bird) => bird.id === id)) continue;
+    if (typeof id !== "string" || !/^[\w-]{1,100}$/.test(id) || id === BERRY_ID || mascots.some((mascot) => mascot.id === id)) continue;
     const parsed = parseMascotDraft({ name, look: { palette, accessory }, instructions, sites, tools });
     if ("error" in parsed) continue;
-    birds.push({ ...parsed.draft, id, deletedAt: null, ...fromGallery === true ? { galleryId: "gallery" } : {} });
+    mascots.push({ ...parsed.draft, id, deletedAt: null, ...fromGallery === true ? { galleryId: "gallery" } : {} });
   }
-  return birds;
+  return mascots;
 };
 var mascotSnapshot = ({ id, name, instructions, sites, tools, galleryId }) => ({
   id,
@@ -336,10 +336,10 @@ export {
   conversationsOf,
   fetchWithin,
   finishedWhen,
-  flockFromRows,
   followUpHistory,
   isUuid,
   mascotSnapshot,
+  mascotsFromSharedRows,
   oneAtATime,
   parsePublishedRow,
   permissionsInWords,

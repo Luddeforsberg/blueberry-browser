@@ -1,7 +1,7 @@
 import { BERRY_ID } from "../shared.js";
 import * as api from "./api.js";
 import { openAsk } from "./ask.js";
-import { bird, el, icon, patch, pips, stepPips } from "./dom.js";
+import { drawMascot, el, icon, patch, pips, stepPips } from "./dom.js";
 import { openSettings } from "./settings.js";
 import { openStart, startJob } from "./start.js";
 import {
@@ -26,8 +26,8 @@ import {
   waiting,
 } from "./state.js";
 
-// Home, on the ground: the greeting and what's going on, the flock, what needs you, what's working and what's done,
-// and the box at the bottom. With nothing going on it's the flock standing together over the greeting.
+// Home, on the ground: the greeting and what's going on, the mascots, what needs you, what's working and what's done,
+// and the box at the bottom. With nothing going on it's the mascots standing together over the greeting.
 
 const sep = () => el("span", { className: "sep", ariaHidden: "true" });
 
@@ -68,13 +68,13 @@ const pick = (mascot) => {
   hooks.show();
 };
 
-// The flock in one row, each in the mood it's in. Tapping one chooses who the box talks to.
-const flockRow = () => {
+// The mascots in one row, each in the mood it's in. Tapping one chooses who the box talks to.
+const mascotRow = () => {
   const current = chosen();
   return el(
     "div",
-    { className: "flock home-flock", role: "radiogroup", ariaLabel: "Who the box talks to" },
-    ...state.flock.map((mascot) =>
+    { className: "mascots home-mascots", role: "radiogroup", ariaLabel: "Who the box talks to" },
+    ...state.mascots.map((mascot) =>
       el(
         "button",
         {
@@ -85,17 +85,17 @@ const flockRow = () => {
           dataKey: `face-${mascot.id}`,
           onclick: () => pick(mascot),
         },
-        el("span", { className: "ring" }, bird(mascot, moodOfMascot(mascot), 48)),
+        el("span", { className: "ring" }, drawMascot(mascot, moodOfMascot(mascot), 48)),
         el("span", { className: "face-name", ariaHidden: "true", textContent: mascot.name }),
       ),
     ),
   );
 };
 
-// The flock standing together, the chosen one in front and up to two either side of it.
+// The mascots standing together, the chosen one in front and up to two either side of it.
 const stage = () => {
   const current = chosen();
-  const others = state.flock.filter((mascot) => mascot.id !== current.id).slice(0, 4);
+  const others = state.mascots.filter((mascot) => mascot.id !== current.id).slice(0, 4);
   const left = others.filter((_, at) => at % 2 === 1).reverse();
   const right = others.filter((_, at) => at % 2 === 0);
   const side = (mascot, at, edge) =>
@@ -108,14 +108,14 @@ const stage = () => {
         dataKey: `stand-${mascot.id}`,
         onclick: () => pick(mascot),
       },
-      bird(mascot, "rest", 52, { named: false }),
+      drawMascot(mascot, "rest", 52, { named: false }),
     );
   // The chosen one stands in the middle of the screen however many are on each side.
   return el(
     "div",
     { className: "stage wings" },
     el("div", { className: "wing left" }, ...left.map((mascot, at) => side(mascot, at, at === 0 && left.length === 2))),
-    el("span", { className: "stand front" }, bird(current, "rest", 96)),
+    el("span", { className: "stand front" }, drawMascot(current, "rest", 96)),
     el("div", { className: "wing" }, ...right.map((mascot, at) => side(mascot, at, at === 1))),
   );
 };
@@ -125,7 +125,7 @@ const askCard = (entry) =>
   el(
     "button",
     { type: "button", className: "askcard", dataKey: `ask-${entry.ask.approval_id}`, onclick: () => openAsk(entry) },
-    bird(entry.mascot, "asking", 40, { named: false }),
+    drawMascot(entry.mascot, "asking", 40, { named: false }),
     el(
       "span",
       { className: "w" },
@@ -150,7 +150,7 @@ const workingRow = ({ id, jobs, latest }) => {
   return el(
     "a",
     { className: "row", href: `#job/${id}`, dataKey: `row-${id}` },
-    bird(mascotOf(latest), moodOf(latest), 40),
+    drawMascot(mascotOf(latest), moodOf(latest), 40),
     el(
       "span",
       { className: "w" },
@@ -172,7 +172,7 @@ const earlierRow = ({ id, jobs, latest }) => {
   return el(
     "a",
     { className: "row dim", href: `#job/${id}`, dataKey: `row-${id}` },
-    bird(mascotOf(latest), moodOf(latest), 40),
+    drawMascot(mascotOf(latest), moodOf(latest), 40),
     el(
       "span",
       { className: "w" },
@@ -273,7 +273,7 @@ const dock = () => {
         el(
           "button",
           { type: "button", className: "who", ariaLabel: `Who goes: ${mascot.name}. Choose`, dataKey: "who", onclick: openStart },
-          bird(mascot, "rest", 28, { named: false }),
+          drawMascot(mascot, "rest", 28, { named: false }),
           icon("down"),
         ),
         el("button", {
@@ -309,7 +309,7 @@ export const mountHome = (app) => {
       state.problem,
       state.linked,
       mascot.id,
-      state.flock,
+      state.mascots,
       state.jobs === null,
       asks.map(({ ask, mascot: who }) => [ask, who.name]),
       working.map(({ id, jobs, latest }) => [id, jobs[0].prompt, latest.status, stepsOf(latest).at(-1), latest.mascot?.id]),
@@ -347,7 +347,7 @@ export const mountHome = (app) => {
             el("div", { className: "w" }, el("h1", { textContent: greeting() }), statusLine(asks.length, working.length)),
             initial(),
           ),
-          flockRow(),
+          mascotRow(),
           asks.length ? [label("Needs you", asks.length, true), el("div", { className: "cards" }, ...asks.map(askCard))] : null,
           working.length ? [label("Working", working.length), el("div", { className: "rows" }, ...working.map(workingRow))] : null,
           earlier.length ? [label("Earlier"), el("div", { className: "rows" }, ...earlier.map(earlierRow))] : null,

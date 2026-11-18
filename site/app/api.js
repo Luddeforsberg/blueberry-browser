@@ -157,7 +157,7 @@ export const jobWithHistory = async (id) => {
   return row ?? null;
 };
 
-export const flock = async () =>
+export const mascots = async () =>
   (await asUser("/rest/v1/cloud_flock?select=id,name,palette,accessory,instructions,sites,tools,from_gallery,updated_at&order=position")) ??
   [];
 
