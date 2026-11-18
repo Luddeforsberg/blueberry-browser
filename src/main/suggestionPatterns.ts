@@ -95,8 +95,8 @@ export const isShareable = (url: string): boolean => {
 
 // One line of text, with nothing in it that could pass for formatting.
 export const plainText = (text: string): string =>
-  // eslint-disable-next-line no-control-regex
   text
+    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001f\u007f]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
