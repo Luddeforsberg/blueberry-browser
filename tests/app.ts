@@ -43,11 +43,29 @@ export async function closeWithin(close: () => Promise<void>, kill: () => void, 
   kill();
 }
 
-// Windows needs the whole tree named, or the app's helper processes stay behind.
+// Signal 0 only asks whether the process is there.
+const isRunning = (pid: number): boolean => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// Windows needs the whole tree named, or the app's helper processes stay behind. taskkill fails when part of the tree has
+// already ended while it worked, which is only a failure if the app is still running.
 export const killApp = (app: ElectronApplication) => {
   const { pid } = app.process();
-  if (process.platform === "win32" && pid) execFileSync("taskkill", ["/pid", String(pid), "/T", "/F"]);
-  else app.process().kill("SIGKILL");
+  if (process.platform !== "win32" || !pid) {
+    app.process().kill("SIGKILL");
+    return;
+  }
+  try {
+    execFileSync("taskkill", ["/pid", String(pid), "/T", "/F"], { stdio: "pipe" });
+  } catch (error) {
+    if (isRunning(pid)) throw error;
+  }
 };
 
 // Launches the built app in out/, so run `pnpm exec electron-vite build` first.
