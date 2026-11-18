@@ -1,4 +1,4 @@
-import { ACTOR_ART, ACTOR_ART_SHEET, type ArtNode } from "./pageActorArt";
+import { ACTOR_ART, ACTOR_ART_SHEET, ACTOR_BERRY, type ArtNode } from "./pageActorArt";
 import { SHARED } from "./pageScripts";
 
 // The bird drawn on a web page while a job works in it, run in the same isolated world as the tools. Everything about it
@@ -72,6 +72,21 @@ export interface ActorLook {
   pictured: boolean;
 }
 
+// The drawing holds every berry's parts, and the sheet shows the one the palette draws as. A page only needs that one:
+// every other berry's parts, and their clips, are left out. A palette nobody knows keeps them all, as before.
+export const artFor = (node: ArtNode, palette: string): ArtNode => {
+  const berry = ACTOR_BERRY[palette];
+  if (!berry) return node;
+  const others = Object.values(ACTOR_BERRY).filter((each) => each !== berry);
+  const keep = ([tag, attributes]: ArtNode): boolean =>
+    !(attributes["data-berry"] && attributes["data-berry"] !== berry) && !(tag === "clipPath" && others.some((each) => attributes.id?.endsWith(`clip-${each}`)));
+  const prune = ([tag, attributes, ...children]: ArtNode): ArtNode => [tag, attributes, ...children.filter(keep).map(prune)];
+  return prune(node);
+};
+
+const posesFor = (accessory: string, palette: string): Record<string, ArtNode> =>
+  Object.fromEntries(Object.entries(ACTOR_ART[accessory] ?? ACTOR_ART.none).map(([pose, node]) => [pose, artFor(node, palette)]));
+
 // Where the feet were on the last page, so the bird carries on from there after a navigation.
 export const installActor = (key: string, look: ActorLook, start: { x: number; y: number } | null): string => `(() => {
   globalThis.__berryActor?.remove();
@@ -82,7 +97,7 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
   if (document.documentElement?.namespaceURI !== XHTML) return false;
 
   const LOOK = ${JSON.stringify(look)};
-  const ART = ${JSON.stringify(ACTOR_ART[look.accessory] ?? ACTOR_ART.none)};
+  const ART = ${JSON.stringify(posesFor(look.accessory, look.palette))};
   const POINTER_ART = ${JSON.stringify(POINTER_ART)};
   const START = ${JSON.stringify(start)};
   const FRAME_TAGS = "iframe,frame";

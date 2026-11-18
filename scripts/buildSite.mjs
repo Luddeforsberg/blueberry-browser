@@ -167,7 +167,7 @@ const eyes = tokens.match(/(?:\[data-mascot="[a-z]+"\],?\s*)+\{[^}]*\}/g).map((r
 const sheet = [`.sky { ${block(":root")} }`, `.sky.dark { ${block(".dark")} }`, ...eyes, ...rules].join("\n");
 writeFileSync(
   join(root, "src/main/pageActorArt.ts"),
-  `${NOTE}export type ArtNode = [tag: string, attributes: Record<string, string>, ...children: ArtNode[]];\n\nexport const ACTOR_ART = ${JSON.stringify(tree)} as unknown as Record<string, Record<string, ArtNode>>;\n\nexport const ACTOR_ART_SHEET = ${JSON.stringify(sheet)};\n`
+  `${NOTE}export type ArtNode = [tag: string, attributes: Record<string, string>, ...children: ArtNode[]];\n\nexport const ACTOR_ART = ${JSON.stringify(tree)} as unknown as Record<string, Record<string, ArtNode>>;\n\nexport const ACTOR_ART_SHEET = ${JSON.stringify(sheet)};\n\n// Which berry each saved palette draws as, so a page gets only that one's parts.\nexport const ACTOR_BERRY: Record<string, string> = ${JSON.stringify(BERRY_KIND)};\n`
 );
 
 // The picture a shared link shows, since a link preview can't run the page: the mascots in a row, on `ground` in light mode. It's
