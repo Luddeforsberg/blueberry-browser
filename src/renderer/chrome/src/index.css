@@ -55,8 +55,8 @@
     @apply relative after:absolute after:inset-x-0 after:top-full after:h-1.5;
   }
 
-  /* In the Gallery a mascot is told apart by its berry's colour alone (DESIGN.md section 10, Gallery): mixed 24% into
-     the sheet behind it, and 62% into ink for the berry's name. `data-tint` names the berry, on the element or above it. */
+  /* In the Gallery a berry's colour is only in the mascot, and in its name on the stage of a mascot's page, mixed 62% into
+     ink (DESIGN.md section 10, Gallery). `data-tint` names the berry, on the element or above it. */
   [data-tint="blueberry"] {
     --berry: var(--berry-blueberry);
   }
@@ -79,16 +79,6 @@
 
   [data-tint="currant"] {
     --berry: var(--berry-currant);
-  }
-
-  .berry-tint {
-    background-color: color-mix(in srgb, var(--berry) 24%, rgb(var(--sheet)));
-  }
-
-  /* Pointed at, a tile or card steps its colour up a little, as a hovered row's fill does. Nothing moves. */
-  .group:hover > .berry-tint,
-  button.berry-tint:hover {
-    background-color: color-mix(in srgb, var(--berry) 32%, rgb(var(--sheet)));
   }
 
   .berry-ink {

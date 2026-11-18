@@ -141,11 +141,7 @@ module.exports = {
         "menu-in-above": `menu-in-above ${ms("menu")} ${motion.ease}`,
         "menu-out": `menu-out ${ms("fast")} ${motion.ease} forwards`,
         "menu-out-above": `menu-out-above ${ms("fast")} ${motion.ease} forwards`,
-        // The Gallery's tiles folding into the list, its page opening beside it, and the tiles coming back. With the
-        // motion held still, a fade.
-        "gallery-list": `gallery-list ${ms("panel")} ${motion.ease}`,
-        "gallery-page": `gallery-page ${ms("panel")} ${motion.ease}`,
-        "gallery-tiles": `gallery-tiles ${ms("panel")} ${motion.ease}`,
+        // The Gallery's page opening and going back.
         "gallery-fade": `mascot-fade ${ms("panel")} ${motion.ease}`,
       },
       keyframes: {
@@ -173,18 +169,6 @@ module.exports = {
         "mascot-fade": {
           "0%": { opacity: "0" },
           "100%": { opacity: "1" },
-        },
-        "gallery-list": {
-          "0%": { opacity: "0", transform: "translateX(-16px)" },
-          "100%": { opacity: "1", transform: "none" },
-        },
-        "gallery-page": {
-          "0%": { opacity: "0", transform: "translateX(24px)" },
-          "100%": { opacity: "1", transform: "none" },
-        },
-        "gallery-tiles": {
-          "0%": { opacity: "0", transform: "scale(.985)" },
-          "100%": { opacity: "1", transform: "none" },
         },
         "step-next": {
           "0%": { opacity: "0", transform: "translateX(24px)" },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GalleryMascot } from "@shared/library";
-import { filterGallery, freeName, galleryGroups, galleryKinds, mostAdded, neighbour, sortGallery } from "./galleryView";
+import { addsLine, filterGallery, freeName, galleryFacts, galleryGroups, galleryKinds, sortGallery } from "./galleryView";
 
 const entry = (name: string, category: string, sites: string[], tools: GalleryMascot["draft"]["tools"], published?: { adds: number; at: number }): GalleryMascot => ({
   id: name,
@@ -54,21 +54,6 @@ describe("sortGallery", () => {
   });
 });
 
-describe("mostAdded", () => {
-  it("is nothing until something has adds", () => {
-    expect(mostAdded([])).toEqual([]);
-    expect(mostAdded([tidy, watch, quiet])).toEqual([]);
-  });
-
-  it("takes only those with adds, so one added once shows alone", () => {
-    expect(names(mostAdded([quiet, fifth, tidy]))).toEqual(["Fifth"]);
-  });
-
-  it("takes the three most added, the newest first on a tie, and no more", () => {
-    expect(names(mostAdded([fifth, older, quiet, newer, top]))).toEqual(["Top", "Newer", "Older"]);
-  });
-});
-
 describe("galleryKinds", () => {
   it("counts each kind that has any, in the order publishing offers them", () => {
     expect(galleryKinds([watch, tidy, newer, top])).toEqual([
@@ -96,21 +81,37 @@ describe("galleryGroups", () => {
   });
 });
 
-describe("neighbour", () => {
-  const ids = ["a", "b", "c"];
+describe("galleryFacts", () => {
+  const facts = (from: GalleryMascot) => galleryFacts(from).map(({ label, lines }) => [label, lines.map(({ text, limited }) => (limited ? `🔒 ${text}` : text))]);
 
-  it("moves one along, and stays at either end", () => {
-    expect(neighbour(ids, "b", 1)).toBe("c");
-    expect(neighbour(ids, "b", -1)).toBe("a");
-    expect(neighbour(ids, "c", 1)).toBe("c");
-    expect(neighbour(ids, "a", -1)).toBe("a");
+  it("gives a person's how many times it was added, and its limits in the tool layer's words, with a padlock only on a real limit", () => {
+    expect(facts(entry("Roamer", "Work", [], ["visit"], { adds: 1204, at: 0 }))).toEqual([
+      ["Made by", ["Ana"]],
+      ["Added", [`${(1204).toLocaleString()} times`]],
+      ["Visits", ["Can search the web and go anywhere"]],
+      ["Can", ["🔒 Can’t type or click"]],
+      ["Kind of job", ["Work"]],
+    ]);
+    expect(facts(fifth)[1]).toEqual(["Added", ["1 time"]]);
+    expect(facts(quiet)[1]).toEqual(["Added", ["0 times"]]);
   });
 
-  it("starts from an end when nothing in the list is picked", () => {
-    expect(neighbour(ids, null, 1)).toBe("a");
-    expect(neighbour(ids, "gone", -1)).toBe("c");
-    expect(neighbour([], "a", 1)).toBeNull();
-    expect(neighbour(["a"], "a", 1)).toBe("a");
+  it("has no count for a starter, and every line of what it can't do when it can't open pages", () => {
+    expect(facts(tidy)).toEqual([
+      ["Made by", ["Blueberry"]],
+      ["Visits", ["🔒 Only visits pipedrive.com"]],
+      ["Can", ["Can click and type"]],
+      ["Kind of job", ["Work"]],
+    ]);
+    expect(facts(entry("Reader", "Work", [], [])).find(([label]) => label === "Can")).toEqual(["Can", ["🔒 Can’t open pages by itself", "🔒 Can’t type or click"]]);
+  });
+});
+
+describe("addsLine", () => {
+  it("says who and how many adds, one add alone", () => {
+    expect(addsLine(top)).toBe("Ana · 40 adds");
+    expect(addsLine(fifth)).toBe("Ana · 1 add");
+    expect(addsLine(quiet)).toBe("Ana · 0 adds");
   });
 });
 

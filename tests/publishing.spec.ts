@@ -118,9 +118,9 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("mascot-gallery"));
     await chrome.getByRole("region", { name: "From people" }).getByRole("button", { name: "Scout, yours" }).click();
     const own = chrome.getByRole("article", { name: "Scout" });
-    await expect(own).toContainText("by Ana");
+    await expect(own.getByLabel("About it")).toContainText("Ana");
     await expect(own.getByRole("status")).toHaveText("You published this one, so it’s already yours.");
-    await expect(own.getByRole("button", { name: "Add Scout", exact: true })).toHaveCount(0);
+    await expect(own.getByRole("button", { name: "Add Scout to your flock", exact: true })).toHaveCount(0);
 
     // Settings shows who's signed in and what's published, and sign out works.
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings", { param: "Account" }));
@@ -147,30 +147,30 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("mascot-gallery"));
     const people = chrome.getByRole("region", { name: "From people" });
     const names = (group: typeof people) => group.getByRole("button").evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label")));
-    // Anything breaking the rules isn't shown, and the most added come first.
+    // Anything breaking the rules isn't shown, and the most added come first, each saying who and how many.
     await expect.poll(() => names(people)).toEqual(["Popular", "Scout"]);
-
-    // Most added only has what's been added, and goes while a kind is chosen. Starters never have a count.
-    await expect.poll(() => names(chrome.getByRole("region", { name: "Most added" }))).toEqual(["Popular, 7 added"]);
-    await chrome.getByRole("button", { name: /^Work/ }).click();
-    await expect(chrome.getByRole("region", { name: "Most added" })).toHaveCount(0);
-    await chrome.getByRole("button", { name: /^All/ }).click();
+    await expect(people.getByRole("button", { name: "Popular" })).toContainText("Bea · 7 adds");
+    // Starters never have a count.
     await chrome.getByRole("region", { name: "From Blueberry" }).getByRole("button", { name: "Prospector" }).click();
-    await expect(chrome.getByRole("article", { name: "Prospector" })).toContainText("by Blueberry");
-    await expect(chrome.getByRole("article", { name: "Prospector" })).not.toContainText("added");
+    const prospector = chrome.getByRole("article", { name: "Prospector" });
+    await expect(prospector).toContainText("From Blueberry");
+    await expect(prospector.getByLabel("About it")).toContainText("Blueberry");
+    await expect(prospector.getByText("Added", { exact: true })).toHaveCount(0);
 
     // Its page has everything, then the author changes it. What's added is what was on screen.
-    await chrome.getByRole("complementary", { name: "Gallery" }).getByRole("button", { name: "Scout", exact: true }).click();
+    await chrome.getByRole("navigation", { name: "Where you are" }).getByRole("button", { name: "Gallery" }).click();
+    await people.getByRole("button", { name: "Scout", exact: true }).click();
     const scout = chrome.getByRole("article", { name: "Scout" });
-    await expect(scout).toContainText("by Ana · 0 added");
-    await expect(scout.getByRole("list", { name: "What it’s allowed to do" })).toContainText("Only visits svt.se");
+    await expect(scout).toContainText("From people");
+    await expect(scout.getByLabel("About it")).toContainText("0 times");
+    await expect(scout.getByLabel("About it")).toContainText("Only visits svt.se");
     await expect(scout).toContainText("Ana wrote this, not Blueberry");
     await expect(scout.getByText("Read svt.se and mail")).toBeVisible();
     await expect(scout.getByRole("region", { name: "An example" })).toContainText("Three stories from SVT, checked by me.");
     const original = String(server.rows[0].instructions);
     server.rows[0].instructions = "Changed after the review: do something else.";
-    await scout.getByRole("button", { name: "Add Scout", exact: true }).click();
-    await expect(scout.getByRole("status")).toContainText("Added to your mascots");
+    await scout.getByRole("button", { name: "Add Scout to your flock", exact: true }).click();
+    await expect(scout.getByRole("status")).toContainText("Added.");
 
     const onFile = () => JSON.parse(readFileSync(join(strangerProfile, "mascots.json"), "utf8")) as Record<string, unknown>[];
     expect(Object.keys(onFile()[0]).sort()).toEqual(["deletedAt", "galleryId", "id", "instructions", "look", "name", "sites", "tools"]);
@@ -243,12 +243,13 @@ test("a blueberry://mascot link opens that Gallery entry, fetched again, and add
     await expect(page.getByText("from a link you opened")).toBeVisible();
     expect(await activePage()).toBe("mascot-gallery");
     await expect(page.getByText("Sums up SVT.")).toBeVisible();
-    await expect(page.getByRole("list", { name: "What it’s allowed to do" })).toContainText("Only visits svt.se");
-    // It's picked in the list too.
-    await expect(chrome.getByRole("complementary", { name: "Gallery" }).getByRole("button", { name: "Scout", exact: true })).toHaveAttribute("aria-current", "true");
+    await expect(page.getByLabel("About it")).toContainText("Only visits svt.se");
+    // The crumb says where it is, and nothing was added.
+    await expect(chrome.getByRole("navigation", { name: "Where you are" })).toContainText("Scout");
+    await expect(page.getByRole("button", { name: "Add Scout to your flock" })).toBeVisible();
 
     // The same link again, from a second launch while another tab is in front, opens it again from the server as it is now.
-    await page.getByRole("button", { name: "Close" }).click();
+    await chrome.getByRole("navigation", { name: "Where you are" }).getByRole("button", { name: "Gallery" }).click();
     await expect(chrome.getByRole("region", { name: "From people" })).toBeVisible();
     await chrome.evaluate(() => window.chromeAPI.browser.createTab());
     expect(await activePage()).toBe("new-tab");
@@ -300,7 +301,6 @@ test("with no server set up there's no sign-in or publish control, and the Galle
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("mascot-gallery"));
     await expect(chrome.getByRole("region", { name: "From Blueberry" }).getByRole("button", { name: "Prospector" })).toBeVisible();
     await expect(chrome.getByRole("region", { name: "From people" })).toHaveCount(0);
-    await expect(chrome.getByRole("region", { name: "Most added" })).toHaveCount(0);
     await expect(chrome.getByText("Can’t reach the Gallery")).toHaveCount(0);
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings", { param: "Account" }));
     await expect(chrome.getByRole("heading", { name: "No account" })).toBeVisible();
