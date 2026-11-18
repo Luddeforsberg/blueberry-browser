@@ -67,8 +67,9 @@ export const MenuSheet: React.FC<Placement & {
                     onClose(false)
                 }
             }}
-            // Main fits a sheet inside the window, so one taller than that scrolls rather than running out of its view.
-            style={at && { left: at.x, top: at.y, maxHeight: `calc(100vh - ${at.y}px)` }}
+            // Main fits a sheet inside the window, so one taller than that scrolls rather than running out of its view. While
+            // it's hidden it's being measured, at its full height.
+            style={at && { left: at.x, top: at.y, maxHeight: hidden ? undefined : `calc(100vh - ${at.y}px)` }}
             className={cn(
                 'absolute z-30 max-w-[calc(100vw-32px)] p-1.5 rounded-menu bg-sheet text-14 text-ink shadow-lift cursor-default',
                 hidden && 'invisible',
