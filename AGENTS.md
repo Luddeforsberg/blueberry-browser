@@ -13,6 +13,8 @@ An AI browser built with Electron, React and TypeScript. [DESIGN.md](./DESIGN.md
 | `pnpm run test` | Run unit tests in `src/` with Vitest |
 | `pnpm exec electron-vite build` | Build into `out/` |
 | `pnpm run test:e2e` | Run Playwright against `out/`, so build first |
+| `pnpm run drive -- <feature> [--state s] [--theme light\|dark] [--layout vertical\|horizontal] [--width n]` | Open one feature from `tests/features/map.ts` in the built `out/` and save a picture. Prints its path |
+| `pnpm run baseline [dir]` then `pnpm run baseline:compare <old> <new>` | Picture every feature in every state, light and dark, into `baselines/<commit>`, then compare two of them in an HTML report. Exits 1 on any difference |
 | `pnpm exec electron-builder --dir` | Package an unsigned app into `dist/` |
 | `pnpm run eval` | Run Berry on real websites with the real model, which costs money. See `evals/README.md` |
 | `pnpm run site:build` | Regenerate what comes from the app: in `site/`, the drawings, the phone page's poses, pips and fonts, permission wording and checks on a row, and `src/main/pageActorArt.ts`, the bird drawn on pages. Run it after changing any of them |

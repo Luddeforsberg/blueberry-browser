@@ -54,9 +54,15 @@ export const killApp = (app: ElectronApplication) => {
 // Pass a profile folder to launch again with the same saved settings.
 // Tests skip onboarding unless they ask for a first launch, and start with only Berry unless they ask for the starters.
 // They have no model unless they pass one, and a .env file can't change that: it never overrides these.
+// `preload` adds scripts for the main process to load first, as tests/features/driveFakes.cjs is for `drive`.
 export async function launchApp(
   userDataDir = mkdtempSync(join(tmpdir(), "blueberry-test-")),
-  { firstLaunch = false, starters = false, modelEnv = {} }: { firstLaunch?: boolean; starters?: boolean; modelEnv?: Record<string, string> } = {}
+  {
+    firstLaunch = false,
+    starters = false,
+    modelEnv = {},
+    preload = [],
+  }: { firstLaunch?: boolean; starters?: boolean; modelEnv?: Record<string, string>; preload?: string[] } = {}
 ): Promise<ElectronApplication> {
   const settingsFile = join(userDataDir, "settings.json");
   if (!firstLaunch && !existsSync(settingsFile)) {
@@ -88,7 +94,7 @@ export async function launchApp(
     electron.launch({
       executablePath: electronPath as unknown as string,
       // A fresh profile keeps tests apart and away from the developer's real browsing data.
-      args: [...background, "-r", join(__dirname, "fakeKeychain.cjs"), "-r", join(__dirname, "fakeShortcut.cjs"), "-r", join(__dirname, "fakeProtocol.cjs"), ".", `--user-data-dir=${userDataDir}`],
+      args: [...background, ...preload.flatMap((file) => ["-r", file]), "-r", join(__dirname, "fakeKeychain.cjs"), "-r", join(__dirname, "fakeShortcut.cjs"), "-r", join(__dirname, "fakeProtocol.cjs"), ".", `--user-data-dir=${userDataDir}`],
       env,
       timeout: LAUNCH_TIMEOUT_MS,
     })
