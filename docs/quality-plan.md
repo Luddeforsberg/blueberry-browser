@@ -99,7 +99,7 @@ This is the `foundations` audit of the preview branch at `581637f`. The full rep
 15. Split `Chats.ts` (high, Codex). Done: `Chats` keeps every public method and hands each to one of 10 parts in `chats/`, which nothing outside `chats/` may import.
 16. Split `Window.ts` (medium). Done: `Window` is the face callers see, `WindowParts` builds the window and holds 20 parts, one job each.
 17. Split `ipc.ts` (low). Done: `src/shared/ipc.ts` re-exports ten files in `src/shared/ipc/`, held to types only by a lint rule. The built app is byte-identical.
-18. The other files over 400 lines.
+18. The other files over 400 lines. Done: every file is within 400 lines, and `linesOver` in `eslint.limits.mjs` is empty.
 19. `exactOptionalPropertyTypes`, then `noUncheckedIndexedAccess` (medium).
 20. Type-aware lint, one rule at a time (medium).
 21. Fences: SQL, `fetch`, effects and timers, the UI kit (medium).

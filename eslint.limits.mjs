@@ -1,5 +1,6 @@
 // Files over a limit in eslint.config.mjs today, each held at what it has now. A number here only goes down:
-// lower it when the file improves, and remove the line once the file is within the limit. Never add a file.
+// lower it when the file improves, and remove the line once the file is within the limit. Never add a file, except
+// when a split moves a function over a limit into a new one: its number moves with it, unchanged.
 
 // Lines in the file, against 400.
 export const linesOver = {};
