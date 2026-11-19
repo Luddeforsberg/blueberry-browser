@@ -93,9 +93,9 @@ This is the `foundations` audit of the preview branch at `581637f`. The full rep
     - Later, the user's call: write the new palette ids to mascots.json once going back to an older version no longer matters.
 11. `src/main` into folders (medium). Done: 18 folders by job, and the built app is byte-identical.
 12. Boundary rules (low). Done: `eslint.boundaries.mjs` holds where Electron may load, what preloads, renderers and `src/shared` may import, and the modules nothing else may reach, each with its importers by name. `scripts/runnerElectron.mjs`, in `lint`, fails if anything the runner bundles reaches Electron.
-    - Later: only the runner's reach is checked through other files, so an Electron-free folder could still reach Electron through a runtime import of an Electron folder (`settings/PermissionPromptView.ts` imports `window/chromeView.ts`). A `typeof import("…")` in a type isn't caught. `desktop/desktopBerryState.ts`, called pure, imports `HANDOFF_WORDS` from `tools/browserTools.ts` at run time.
+    - Later: only the runner's reach is checked through other files, so an Electron-free folder could still reach Electron through a runtime import of an Electron folder (`settings/PermissionPromptView.ts` imports `window/chromeView.ts`). A `typeof import("…")` in a type isn't caught.
 13. Page code out of template strings (high). Done.
-14. Split `browserTools.ts` (high, Codex).
+14. Split `browserTools.ts` (high, Codex). Done: 13 files in `tools/`, with the ask-first rules alone in `askFirst.ts`. The tool list the model sees is identical before and after.
 15. Split `Chats.ts` (high, Codex).
 16. Split `Window.ts` (medium).
 17. Split `ipc.ts` (low).
