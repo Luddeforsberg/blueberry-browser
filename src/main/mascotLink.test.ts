@@ -22,7 +22,7 @@ describe("mascotFromLink", () => {
       `blueberry:mascot/${ID}`,
       `BLUEBERRY://MASCOT/${ID}`,
       `blueberry://user@mascot/${ID}`,
-      `https://blueberry-flock.netlify.app/m/?id=${ID}`,
+      `https://blueberry.example/m/?id=${ID}`,
       ` blueberry://mascot/${ID}`,
     ])
       expect(mascotFromLink(link), link).toBeNull();

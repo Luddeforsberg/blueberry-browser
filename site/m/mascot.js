@@ -29,7 +29,7 @@ const drawMascot = ({ look, name }) => {
   holder.innerHTML = DRAWINGS[look.accessory];
   const drawing = holder.querySelector("svg");
   drawing.dataset.mascot = look.palette;
-  drawing.setAttribute("aria-label", `A bird called ${name}`);
+  drawing.setAttribute("aria-label", `A mascot called ${name}`);
   return holder;
 };
 
