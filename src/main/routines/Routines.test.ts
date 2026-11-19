@@ -3,6 +3,7 @@ import { LATE_AFTER_MS, MAX_ACTIVE_RUNS } from "./Routines";
 import { RoutineStore } from "./RoutineStore";
 import type { MascotProfile } from "../../shared/library";
 import { DAY, daily, flush, jump, MINUTE, NOW, save, setup, started, runOnFakeClock } from "./routinesTesting";
+import { defined } from "../../shared/testing";
 
 runOnFakeClock();
 
@@ -16,9 +17,9 @@ describe("the scheduler", () => {
     expect(runs).toHaveLength(0);
     await vi.advanceTimersByTimeAsync(MINUTE);
     expect(runs).toHaveLength(1);
-    expect(runs[0].message).toContain("Look");
+    expect(defined(runs[0]).message).toContain("Look");
 
-    runs[0].end();
+    defined(runs[0]).end();
     await flush();
     expect(store.latestRun(id)).toMatchObject({ status: "finished", result: "done", lateFor: null, tokens: 10, seen: false });
     expect(store.routine(id)?.nextRunAt).toBe(NOW + 60 * MINUTE + DAY);
@@ -45,7 +46,7 @@ describe("the scheduler", () => {
       deletedAt: null,
     });
     const options = { actionApproval: "risky", contextId: "ctx-1", timeZone: "Europe/Stockholm" } as const;
-    const [row] = routines.cloudRows(scout, options)!;
+    const row = defined(routines.cloudRows(scout, options)![0]);
     expect(row).toMatchObject({
       key: id,
       mascot: { id: "m-1", sites: ["shop.example"] },
@@ -67,7 +68,7 @@ describe("the scheduler", () => {
     const id = save(routines, { ...daily("13:00"), inCloud: true });
     save(routines, daily("13:00"), id);
     started(routines);
-    expect(routines.list()[0].cloudNote).toBe("Moving back to this Mac…");
+    expect(defined(routines.list()[0]).cloudNote).toBe("Moving back to this Mac…");
 
     // Its time comes while the cloud may still run it: skipped here, and on to the next.
     await vi.advanceTimersByTimeAsync(60 * MINUTE);
@@ -76,7 +77,7 @@ describe("the scheduler", () => {
 
     there = false;
     routines.cloudChanged();
-    expect(routines.list()[0].cloudNote).toBeNull();
+    expect(defined(routines.list()[0]).cloudNote).toBeNull();
     await jump(DAY);
     expect(runs).toHaveLength(1);
   });
@@ -84,7 +85,7 @@ describe("the scheduler", () => {
   it("keeps a routine that only runs when asked out of the cloud", () => {
     const { routines } = setup();
     save(routines, { name: "Ask me", instructions: "Look", schedule: { kind: "manual" }, inCloud: true });
-    expect(routines.list()[0].inCloud).toBe(false);
+    expect(defined(routines.list()[0]).inCloud).toBe(false);
     expect(
       routines.cloudRows(
         () => {
@@ -111,7 +112,7 @@ describe("the scheduler", () => {
   it("says when a routine couldn't be sent to the cloud", () => {
     const { routines } = setup(undefined, { cloudFailed: () => true });
     save(routines, { ...daily("13:00"), inCloud: true });
-    expect(routines.list()[0].cloudNote).toBe("Couldn’t reach the cloud, will retry");
+    expect(defined(routines.list()[0]).cloudNote).toBe("Couldn’t reach the cloud, will retry");
   });
 
   it("runs a missed routine once when the app opens and says it was late, however many it missed", async () => {
@@ -127,7 +128,7 @@ describe("the scheduler", () => {
     await vi.advanceTimersByTimeAsync(10_000);
 
     expect(second.started).toHaveLength(1);
-    second.started[0].end();
+    defined(second.started[0]).end();
     await vi.advanceTimersByTimeAsync(10 * MINUTE);
 
     expect(second.started).toHaveLength(1);
@@ -165,7 +166,7 @@ describe("the scheduler", () => {
     const second = setup(store);
     started(second.routines);
     await vi.advanceTimersByTimeAsync(10_000);
-    second.started[0].end();
+    defined(second.started[0]).end();
     await jump(2 * DAY);
 
     expect(second.started).toHaveLength(1);
@@ -185,7 +186,7 @@ describe("the scheduler", () => {
     expect(runs).toHaveLength(1);
     expect(store.routine(id)?.nextRunAt).toBeGreaterThan(Date.now());
 
-    runs[0].end();
+    defined(runs[0]).end();
     await flush();
     expect(runs).toHaveLength(1);
     expect(store.runs(id)).toHaveLength(1);
@@ -213,7 +214,7 @@ describe("the scheduler", () => {
     expect(runs).toHaveLength(MAX_ACTIVE_RUNS);
     expect(routines.list().find((routine) => routine.id === ids[MAX_ACTIVE_RUNS])?.status).toBe("queued");
 
-    runs[0].end();
+    defined(runs[0]).end();
     await flush();
     expect(runs).toHaveLength(MAX_ACTIVE_RUNS + 1);
   });
@@ -225,7 +226,7 @@ describe("the scheduler", () => {
     await vi.advanceTimersByTimeAsync(60 * MINUTE);
     expect(runs).toHaveLength(MAX_ACTIVE_RUNS);
 
-    runs[0].progress({ steps: [], approval: { id: "a", text: "Delete it" }, tokens: 0 });
+    defined(runs[0]).progress({ steps: [], approval: { id: "a", text: "Delete it" }, tokens: 0 });
     expect(runs).toHaveLength(MAX_ACTIVE_RUNS + 1);
   });
 
@@ -235,9 +236,9 @@ describe("the scheduler", () => {
     started(routines);
     ids.forEach((id) => expect(routines.runNow(id)).toBe(true));
     expect(runs).toHaveLength(MAX_ACTIVE_RUNS);
-    expect(routines.list()[2].status).toBe("queued");
+    expect(defined(routines.list()[2]).status).toBe("queued");
 
-    runs[1].end();
+    defined(runs[1]).end();
     await flush();
     expect(runs).toHaveLength(MAX_ACTIVE_RUNS + 1);
   });
@@ -247,11 +248,11 @@ describe("the scheduler", () => {
     const ids = [save(routines, daily("23:00", "A")), save(routines, daily("23:00", "B")), save(routines, daily("23:00", "C"))];
     started(routines);
     ids.forEach((id) => routines.runNow(id));
-    expect(routines.cancelRequest(ids[2])).toBe(true);
-    expect(routines.cancelRequest(ids[2])).toBe(false);
-    expect(routines.list()[2].status).not.toBe("queued");
+    expect(routines.cancelRequest(defined(ids[2]))).toBe(true);
+    expect(routines.cancelRequest(defined(ids[2]))).toBe(false);
+    expect(defined(routines.list()[2]).status).not.toBe("queued");
 
-    runs[1].end();
+    defined(runs[1]).end();
     await flush();
     expect(runs).toHaveLength(MAX_ACTIVE_RUNS);
   });
@@ -263,7 +264,7 @@ describe("the scheduler", () => {
     routines.setPaused(id, true);
     await jump(2 * DAY);
     expect(runs).toHaveLength(0);
-    expect(routines.list()[0].status).toBe("paused");
+    expect(defined(routines.list()[0]).status).toBe("paused");
 
     routines.setPaused(id, false);
     await flush();
