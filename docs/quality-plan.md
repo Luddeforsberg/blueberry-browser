@@ -93,3 +93,10 @@ This is the `foundations` audit of the preview branch at `581637f`. The full rep
 21. Fences: SQL, `fetch`, effects and timers, the UI kit (medium).
 22. End-to-end tests in CI, and protect `main` (medium).
 23. AGENTS.md down to about 60 lines (low).
+
+## Found on the way, each its own PR
+- **Done:** the phone page showed what it had just sent a poll later, because `oneAtATime` handed a fresh load the poll already out (`e0d2ee5`).
+- **`riskyWord` matches too broadly.** The page code's risky-word check has always used `[^p{L}]` where `[^\p{L}]` was meant, since a backslash was lost in the old template, so a risky word counts next to almost any letter and Berry asks more often than it should (for example before clicking "Bookmarks"). Fixing it makes Berry ask less, so the user merges it.
+- **`scrollPage` can finish too early,** on the end event of the scroll before it.
+- **`NewTabPage.ask` sends, then opens the chat's tab,** so a job's tab can land on either side of it in the sidebar.
+- **The runner's Docker image** has the page-code generator now (Build 32), checked by copying the Dockerfile's files by hand. Build the real image once Docker is available.
