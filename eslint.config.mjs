@@ -22,6 +22,8 @@ export default tseslint.config(
   },
   {
     // Type-aware rules read each file's types from the tsconfig that holds it, so every TypeScript file is in one.
+    // require-await, return-await, prefer-nullish-coalescing and no-unnecessary-condition stay off: see step 20 in
+    // docs/quality-plan.md.
     files: ["**/*.{ts,tsx}"],
     languageOptions: { parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname } },
     rules: {
