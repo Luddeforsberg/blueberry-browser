@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MascotPalette } from "./library";
-import { narrowSites, NOWHERE, PALETTES, parseMascotDraft, permissionsInWords, serverPalette, siteAllowed } from "./mascots";
+import { narrowSites, NOWHERE, PALETTES, parseMascotDraft, permissionsInWords, storedPalette, siteAllowed } from "./mascots";
 
 const words = (sites: string[], tools: ("visit" | "click" | "type")[]) => permissionsInWords({ sites, tools }).map(({ text }) => text);
 
@@ -75,6 +75,6 @@ describe("a look's palette", () => {
   });
 
   it("goes to the server under its old id, which today's server and phone page check for", () => {
-    for (const [old, berry] of Object.entries(OLD_IDS)) expect(serverPalette(berry as MascotPalette)).toBe(old);
+    for (const [old, berry] of Object.entries(OLD_IDS)) expect(storedPalette(berry as MascotPalette)).toBe(old);
   });
 });

@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { dirname } from "path";
 import type { MascotProfile } from "../shared/library";
-import { BERRY, BERRY_ID, parseMascotDraft } from "../shared/mascots";
+import { BERRY, BERRY_ID, parseMascotDraft, storedPalette } from "../shared/mascots";
 
 // Stands in for a mascot that isn't on file, such as after the file was lost. It can do nothing but talk, because a
 // chat or routine limited to one site mustn't turn into Berry and get them all.
@@ -111,7 +111,8 @@ export class MascotStore {
   private write(mascots: MascotProfile[]): void {
     mkdirSync(dirname(this.file), { recursive: true });
     const temp = `${this.file}.tmp`;
-    writeFileSync(temp, JSON.stringify(mascots, null, 2));
+    const onDisk = mascots.map((mascot) => ({ ...mascot, look: { ...mascot.look, palette: storedPalette(mascot.look.palette) } }));
+    writeFileSync(temp, JSON.stringify(onDisk, null, 2));
     renameSync(temp, this.file);
     this.mascots = mascots;
   }

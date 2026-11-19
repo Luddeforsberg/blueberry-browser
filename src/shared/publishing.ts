@@ -1,5 +1,5 @@
 import type { MascotDraft, MascotExample, MascotProfile, GalleryMascot, PublishChoices } from "./library";
-import { parseMascotDraft, serverPalette } from "./mascots";
+import { parseMascotDraft, storedPalette } from "./mascots";
 
 // What strangers can read and add. Runtime code shared by main, the chrome renderer and the public site, so preloads may
 // only `import type` from here. Everything published is untrusted, in both directions: this checks what's sent, and
@@ -83,7 +83,7 @@ export const publicRow = (
   { author, description, category, example }: PublishChoices,
 ) => ({
   name,
-  palette: serverPalette(look.palette),
+  palette: storedPalette(look.palette),
   accessory: look.accessory,
   description,
   category,

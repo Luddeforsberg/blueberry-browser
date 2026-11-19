@@ -19,10 +19,11 @@ export const PALETTES: { id: MascotPalette; label: string; oldId: string }[] = [
 export const paletteOf = (value: unknown): MascotPalette | null =>
   PALETTES.find(({ id, oldId }) => value === id || value === oldId)?.id ?? null;
 
-// What goes to the server is still the old id. Its tables only take those until
-// supabase/migrations/20261119000000_berry_palettes.sql is applied, and the phone page deployed today and older apps
-// only read those. Step 10 of docs/quality-plan.md switches this over.
-export const serverPalette = (palette: MascotPalette): string => PALETTES.find(({ id }) => id === palette)?.oldId ?? palette;
+// What's written for anything but this version of the app is still the old id: the server, whose tables only take
+// those until supabase/migrations/20261119000000_berry_palettes.sql is applied, and which the phone page deployed today
+// reads, and mascots.json, since an older version run on the same computer drops a mascot whose palette it doesn't know,
+// and its next save loses it for good. Writing the new ids is a later step, once going back no longer matters.
+export const storedPalette = (palette: MascotPalette): string => PALETTES.find(({ id }) => id === palette)?.oldId ?? palette;
 
 export const ACCESSORIES: { id: MascotAccessory; label: string }[] = [
   { id: "none", label: "Nothing" },
