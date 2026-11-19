@@ -3,6 +3,7 @@ import eslintConfigPrettier from "@electron-toolkit/eslint-config-prettier";
 import eslintPluginReact from "eslint-plugin-react";
 import eslintPluginReactHooks from "eslint-plugin-react-hooks";
 import eslintPluginReactRefresh from "eslint-plugin-react-refresh";
+import { boundaries } from "./eslint.boundaries.mjs";
 import { complexityOver, linesOver, paramsOver } from "./eslint.limits.mjs";
 
 export default tseslint.config(
@@ -94,25 +95,8 @@ export default tseslint.config(
       "no-restricted-syntax": ["error", { selector: "ImportExpression", message: "Code that runs in a page imports nothing at run time." }],
     },
   },
-  {
-    // Everything else reaches page code through src/main/tools/pageCode.ts, as the strings scripts/buildPage.mjs bundles, and
-    // only borrows its types.
-    files: [
-      "src/main/**/*.ts",
-      "src/shared/**/*.ts",
-      "src/preload/**/*.ts",
-      "src/renderer/**/*.{ts,tsx}",
-      "runner/**/*.ts",
-      "tests/**/*.ts",
-      "evals/**/*.ts",
-    ],
-    rules: {
-      "@typescript-eslint/no-restricted-imports": [
-        "error",
-        { patterns: [{ regex: "(^|/)page(/|$)", allowTypeImports: true, message: "Run page code through src/main/tools/pageCode.ts." }] },
-      ],
-    },
-  },
+  // Who may import what: the rules AGENTS.md states, and page code only through src/main/tools/pageCode.ts.
+  ...boundaries,
   ...Object.entries(linesOver).map(([file, max]) => ({ files: [file], rules: { "max-lines": ["error", max] } })),
   ...Object.entries(complexityOver).map(([file, max]) => ({ files: [file], rules: { complexity: ["error", max] } })),
   ...Object.entries(paramsOver).map(([file, max]) => ({ files: [file], rules: { "max-params": ["error", max] } })),
