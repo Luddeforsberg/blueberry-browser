@@ -9,6 +9,7 @@ import type { OAuthClientInformationMixed, OAuthTokens } from "@modelcontextprot
 import { startFakeSupabase } from "../../tests/fakeSupabase";
 import { supabaseDb, runnerSession, type DbConfig } from "./db";
 import { relayApp, relayConfig } from "./relay";
+import { defined } from "../../src/shared/testing";
 
 // What relay.test.ts uses: the relay in front of the fake Supabase on the real migrations, with the owner, the runner and
 // a stranger signed up, and ways in as each.
@@ -155,5 +156,6 @@ export const connect = async () => {
   return client;
 };
 
-export const textOf = (result: Awaited<ReturnType<Client["callTool"]>>) => (result.content as { type: string; text: string }[])[0].text;
+export const textOf = (result: Awaited<ReturnType<Client["callTool"]>>) =>
+  defined((result.content as { type: string; text: string }[])[0]).text;
 export const dataOf = (result: Awaited<ReturnType<Client["callTool"]>>) => JSON.parse(textOf(result).replace(/^[^[{]*/, ""));

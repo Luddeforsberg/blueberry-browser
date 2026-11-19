@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isPushEndpoint, pushConfig, pusher, type PushSubscriptionRow } from "./push";
+import { defined } from "../../src/shared/testing";
 
 const CONFIG = { publicKey: "BPublic", privateKey: "private", subject: "mailto:ana@example.com" };
 const PHONE: PushSubscriptionRow = { endpoint: "https://web.push.apple.com/QGx", p256dh: "BKey", auth: "secret" };
@@ -26,7 +27,7 @@ describe("notifications to the phone", () => {
     await notify("needs-you");
     await notify("finished");
     expect(sent.map(({ payload }) => JSON.parse(payload))).toEqual([{ kind: "needs-you" }, { kind: "finished" }]);
-    expect(sent[0].options).toMatchObject({ vapidDetails: CONFIG, topic: "needs-you" });
+    expect(defined(sent[0]).options).toMatchObject({ vapidDetails: CONFIG, topic: "needs-you" });
   });
 
   it("go only to a browser's own push service, and forget a device that's gone", async () => {

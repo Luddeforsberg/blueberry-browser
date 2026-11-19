@@ -283,11 +283,11 @@ export class RelayAuth implements OAuthServerProvider {
   }
 
   private connectionOf(refreshToken: string): string | null {
-    const match = /^bb_rt_([0-9a-f-]{36})\.([\w-]+)\.([\w-]+)$/.exec(refreshToken);
-    if (!match) return null;
-    const given = Buffer.from(match[3], "base64url");
-    const wanted = mac(this.keys, `refresh:${match[1]}.${match[2]}`);
-    return given.length === wanted.length && timingSafeEqual(given, wanted) ? match[1] : null;
+    const [, connection, random, signature] = /^bb_rt_([0-9a-f-]{36})\.([\w-]+)\.([\w-]+)$/.exec(refreshToken) ?? [];
+    if (connection === undefined || random === undefined || signature === undefined) return null;
+    const given = Buffer.from(signature, "base64url");
+    const wanted = mac(this.keys, `refresh:${connection}.${random}`);
+    return given.length === wanted.length && timingSafeEqual(given, wanted) ? connection : null;
   }
 
   private byHash(field: "accessHash" | "refreshHash", token: string): Grant | null {

@@ -22,6 +22,7 @@ import {
   token,
   setUpRelay,
 } from "./relayTesting";
+import { defined } from "../../src/shared/testing";
 
 // The relay against the real migrations in Postgres, through the fake Supabase: OAuth as the owner, a job started as them,
 // taken by the runner as any other, and nothing that can answer what it asks.
@@ -189,7 +190,7 @@ describe("the MCP endpoint", () => {
       `select j.prompt, j.mascot, j.action_approval, j.conversation_id::text, u.email from public.cloud_jobs j join auth.users u on u.id = j.owner where j.id = '${started.jobId}'`,
     );
     expect(row).toMatchObject({ prompt: "Find the price of tea", action_approval: "risky", email: OWNER, conversation_id: started.jobId });
-    expect(row.mascot).toMatchObject({ id: "scout", sites: ["tea.shop.example"] });
+    expect(defined(row).mascot).toMatchObject({ id: "scout", sites: ["tea.shop.example"] });
 
     const claimed = await runnerDb.claim();
     expect(claimed?.id).toBe(started.jobId);
