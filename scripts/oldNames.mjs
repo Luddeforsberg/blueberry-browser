@@ -77,7 +77,7 @@ const ALLOWED = [
   ]),
 
   // Real birds, not mascots. The feature map pictures this page, so renaming it would change a baseline picture.
-  ...entries(null, '"birds.example", "/birds"', "A page about jackdaws.", ["tests/features/map.ts"]),
+  ...entries(null, '"birds.example", "/birds"', "A page about jackdaws.", ["tests/features/map/window.ts"]),
   ...entries(null, '"/birds": page("Birds", "<h1>Birds</h1>', "A page about jackdaws.", ["tests/features/site.ts"]),
 ];
 
