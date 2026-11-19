@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MascotPalette } from "./library";
-import { narrowSites, NOWHERE, PALETTES, parseMascotDraft, permissionsInWords, storedPalette, siteAllowed } from "./mascots";
+import { narrowSites, NOWHERE, PALETTES, paletteOnDisk, parseMascotDraft, permissionsInWords, siteAllowed } from "./mascots";
 
 const words = (sites: string[], tools: ("visit" | "click" | "type")[]) => permissionsInWords({ sites, tools }).map(({ text }) => text);
 
@@ -74,7 +74,7 @@ describe("a look's palette", () => {
     for (const palette of ["", "Robin", "red", "toString", null, 3]) expect(lookOf(palette)).toBe("Choose a look.");
   });
 
-  it("goes to the server under its old id, which today's server and phone page check for", () => {
-    for (const [old, berry] of Object.entries(OLD_IDS)) expect(storedPalette(berry as MascotPalette)).toBe(old);
+  it("goes to mascots.json under its old id, which an older version on the same computer reads", () => {
+    for (const [old, berry] of Object.entries(OLD_IDS)) expect(paletteOnDisk(berry as MascotPalette)).toBe(old);
   });
 });
