@@ -66,7 +66,7 @@ test("the mascot isn't in a screenshot", async () => {
       let dark = 0;
       for (let at = 0; at < width * height * 4; at += 4) {
         // BGRA. The mascot and the line are dark or white, and the page isn't either.
-        if (bitmap[at + 1] < 100 || (bitmap[at] > 150 && bitmap[at + 2] > 150)) dark++;
+        if (bitmap.readUInt8(at + 1) < 100 || (bitmap.readUInt8(at) > 150 && bitmap.readUInt8(at + 2) > 150)) dark++;
       }
       return dark;
     }, image!);

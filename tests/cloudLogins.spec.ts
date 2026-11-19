@@ -6,6 +6,7 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
+import { defined } from "../src/shared/testing";
 
 // Bringing a sign-in into the cloud, with a headless Chrome on this computer standing in for Browserbase.
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
@@ -101,7 +102,7 @@ test("a site's sign-in comes into the cloud after confirming, can be taken out, 
     );
     expect(sent).not.toBeNull();
     await expect(chrome.getByRole("tab", { name: /^Chats.*1 needs you/ })).toBeVisible({ timeout: 20_000 });
-    const waiting = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).needsYou[0];
+    const waiting = defined((await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).needsYou[0]);
     expect(waiting.approval.handoff).toMatchObject({ need: "sign-in", site: "127.0.0.1" });
     // It points at the cloud tab, so Go to the tab works.
     expect(waiting.tabId).not.toBeNull();

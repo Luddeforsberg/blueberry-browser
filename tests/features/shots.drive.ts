@@ -4,13 +4,14 @@ import { join } from "node:path";
 import { DEFAULT_LOOK, driveFeature } from "./driver";
 import { FEATURES, featureNamed, layoutsOf, type Feature, type Look } from "./map";
 import { ENTRIES, readRequest, shotFile, type Entry } from "./shots";
+import { defined } from "../../src/shared/testing";
 
 // What scripts/drive.mjs asked for: one feature in one state and look, or every one of them for a baseline.
 const request = readRequest();
 
 const shotsFor = (feature: Feature): Array<{ state: string; look: Look }> => {
   if (request.feature) {
-    const state = request.state ?? Object.keys(feature.states)[0];
+    const state = request.state ?? defined(Object.keys(feature.states)[0]);
     return [
       {
         state,

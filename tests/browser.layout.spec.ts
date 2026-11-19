@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { findView, openMenuRows } from "./app";
-import { setUpBrowserApp, app, chrome, activeTab, openFixture, setContentSize } from "./browserSetup";
+import { setUpBrowserApp, app, chrome, activeTab, openFixture, setContentSize, widthAndHeight } from "./browserSetup";
 
 declare global {
   interface Window {
@@ -13,11 +13,14 @@ setUpBrowserApp();
 test("the page card follows the sidebar and chat as they open and close", async () => {
   // The window may not get the size it asks for on a small screen, such as a CI runner, and Windows can add a few
   // pixels for its frame. The rest of this works from the size it really got.
-  const [width, height] = await app.evaluate(({ BaseWindow }) => {
-    const baseWindow = BaseWindow.getAllWindows()[0];
-    baseWindow.setContentSize(1200, 700);
-    return baseWindow.getContentSize();
-  });
+  const [width, height] = widthAndHeight(
+    await app.evaluate(({ BaseWindow }) => {
+      const [baseWindow] = BaseWindow.getAllWindows();
+      if (!baseWindow) throw new Error("No window");
+      baseWindow.setContentSize(1200, 700);
+      return baseWindow.getContentSize();
+    }),
+  );
   expect(width).toBeGreaterThanOrEqual(1200);
 
   const page = await openFixture();
@@ -39,24 +42,27 @@ test("the page card follows the sidebar and chat as they open and close", async 
 });
 
 test("the chrome fills the window as it resizes", async () => {
-  const [width, height] = await app.evaluate(({ BaseWindow }) => {
-    const baseWindow = BaseWindow.getAllWindows()[0];
-    baseWindow.setContentSize(1100, 700);
-    return baseWindow.getContentSize();
-  });
+  const [width, height] = widthAndHeight(
+    await app.evaluate(({ BaseWindow }) => {
+      const [baseWindow] = BaseWindow.getAllWindows();
+      if (!baseWindow) throw new Error("No window");
+      baseWindow.setContentSize(1100, 700);
+      return baseWindow.getContentSize();
+    }),
+  );
   expect(width).toBeGreaterThanOrEqual(1100);
 
   await expect.poll(() => chrome.evaluate(() => [window.innerWidth, window.innerHeight])).toEqual([width, height]);
 });
 
 const overlayVisible = () =>
-  app.evaluate(({ BaseWindow }) =>
-    BaseWindow.getAllWindows()[0]
-      .contentView.children.find((view) =>
-        "webContents" in view ? (view as Electron.WebContentsView).webContents.getURL().includes("view=overlay") : false,
-      )
-      ?.getVisible(),
-  );
+  app.evaluate(({ BaseWindow }) => {
+    const [main] = BaseWindow.getAllWindows();
+    if (!main) throw new Error("No window");
+    return main.contentView.children
+      .find((view) => ("webContents" in view ? (view as Electron.WebContentsView).webContents.getURL().includes("view=overlay") : false))
+      ?.getVisible();
+  });
 
 test("horizontal tabs put a tab row above the toolbar, with the same tabs", async () => {
   const [width, height] = await setContentSize(1200, 700);
@@ -92,7 +98,9 @@ test("a tab closed in the row folds away without squeezing the tabs beside it", 
   const narrowest = await row.evaluate(async (list) => {
     const staying = () => [...list.querySelectorAll("li:not([data-folding])")].map((item) => item.getBoundingClientRect().width);
     const before = Math.min(...staying());
-    list.querySelectorAll("li")[1].querySelector<HTMLElement>("button[aria-label^='Close']")!.click();
+    const second = list.querySelectorAll("li")[1];
+    if (!second) throw new Error("No second tab");
+    second.querySelector<HTMLElement>("button[aria-label^='Close']")!.click();
     let least = before;
     const until = performance.now() + 400;
     while (performance.now() < until) {
@@ -149,7 +157,9 @@ test("off a Mac, the menu button opens the app's own menu just under itself", as
   // Where the open menu's sheet is in the window: the view's place, and the sheet's in the view.
   const sheetInWindow = async () => {
     const view = await app.evaluate(({ BaseWindow }) => {
-      const found = BaseWindow.getAllWindows()[0].contentView.children.find(
+      const [main] = BaseWindow.getAllWindows();
+      if (!main) throw new Error("No window");
+      const found = main.contentView.children.find(
         (child) => "webContents" in child && (child as Electron.WebContentsView).webContents.getURL().includes("view=menu"),
       );
       return found?.getBounds();
@@ -173,7 +183,11 @@ test("off a Mac, the menu button opens the app's own menu just under itself", as
     await expect.poll(() => openMenuRows(app)).toEqual(["File", "Edit", "View", "Go"]);
     // 4px under the button, moved in from the window's edge.
     await expect.poll(async () => (await sheetInWindow())?.y).toBe(menuButton.y + menuButton.height + 4);
-    const { width } = await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].getContentBounds());
+    const { width } = await app.evaluate(({ BaseWindow }) => {
+      const [main] = BaseWindow.getAllWindows();
+      if (!main) throw new Error("No window");
+      return main.getContentBounds();
+    });
     expect((await sheetInWindow())!.right).toBeLessThanOrEqual(width - 8);
     // A submenu opens beside its row, on the side with room, and Escape closes only it, then the menu.
     await menu.getByRole("menuitem", { name: "View", exact: true }).focus();

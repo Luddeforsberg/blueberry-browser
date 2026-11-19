@@ -2,13 +2,16 @@ import { expect, test, type ElectronApplication, type Page } from "@playwright/t
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { findView, launchApp } from "./app";
+import { defined } from "../src/shared/testing";
 
 // Each page is one colour, so the picture on its card can be checked by its middle.
 const COLOURS: Record<string, string> = { red: "rgb(220, 30, 30)", green: "rgb(30, 160, 60)", blue: "rgb(30, 60, 220)" };
 
 const previewView = (app: ElectronApplication) =>
   app.evaluate(({ BaseWindow }) => {
-    const view = BaseWindow.getAllWindows()[0].contentView.children.find(
+    const [main] = BaseWindow.getAllWindows();
+    if (!main) throw new Error("No window");
+    const view = main.contentView.children.find(
       (child) => "webContents" in child && (child as Electron.WebContentsView).webContents.getURL().includes("view=preview"),
     );
     return view ? { visible: view.getVisible(), bounds: view.getBounds() } : null;
@@ -34,7 +37,7 @@ test("resting on a tab behind shows a card of it, in both layouts, and it gets o
     const name = request.url!.slice(1);
     response.setHeader("content-type", "text/html");
     response.end(
-      `<!doctype html><title>${name[0].toUpperCase()}${name.slice(1)} page</title>` +
+      `<!doctype html><title>${defined(name[0]).toUpperCase()}${name.slice(1)} page</title>` +
         `<body style="margin:0;height:100vh;background:${COLOURS[name] ?? "white"}" onclick="document.title='Clicked'"></body>`,
     );
   });
@@ -48,10 +51,10 @@ test("resting on a tab behind shows a card of it, in both layouts, and it gets o
       await chrome.evaluate((url) => window.chromeAPI.browser.createTab(url), `${origin}/${name}`);
       await expect
         .poll(async () => (await tabs()).find((tab) => tab.isActive)?.title)
-        .toBe(`${name[0].toUpperCase()}${name.slice(1)} page`);
+        .toBe(`${defined(name[0]).toUpperCase()}${name.slice(1)} page`);
     };
     // Red and green have been in front and left, blue is in front, and the new tab page is one of Blueberry's own.
-    const [start] = await tabs();
+    const start = defined((await tabs())[0]);
     await open("red");
     await open("green");
     await open("blue");

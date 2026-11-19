@@ -78,7 +78,8 @@ const cloudDatabase = async () => {
           names.map((key) => args[key]),
         );
         // A function returning one value answers with it, as the REST API does. One returning rows answers with them.
-        return rows.length === 1 && Object.keys(rows[0]).length === 1 && name in rows[0] ? rows[0][name] : rows;
+        const [only] = rows;
+        return rows.length === 1 && only && Object.keys(only).length === 1 && name in only ? only[name] : rows;
       } finally {
         await db.exec("reset role");
       }

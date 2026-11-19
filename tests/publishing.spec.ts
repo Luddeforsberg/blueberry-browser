@@ -5,6 +5,7 @@ import { findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
 import { startFakeSupabase } from "./fakeSupabase";
 import { inTempDir } from "./publishingSetup";
+import { defined } from "../src/shared/testing";
 
 const EMAIL = "ana.private@example.com";
 const PASSWORD = "correct horse battery";
@@ -87,7 +88,7 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     await chrome.getByRole("button", { name: "Publish for anyone to read" }).click();
     await expect(chrome.getByRole("heading", { name: "Scout is in the Gallery" })).toBeVisible();
     expect(server.rows).toHaveLength(1);
-    id = server.rows[0].id;
+    id = defined(server.rows[0]).id;
     await expect(chrome.getByText(`https://gallery.example/m/?id=${id}`)).toBeVisible();
 
     // Words typed and then cancelled never show as if they were public.
@@ -239,15 +240,24 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     await expect(scout).toContainText("Ana wrote this, not Blueberry");
     await expect(scout.getByText("Read svt.se and mail")).toBeVisible();
     await expect(scout.getByRole("region", { name: "An example" })).toContainText("Three stories from SVT, checked by me.");
-    const original = String(server.rows[0].instructions);
-    server.rows[0].instructions = "Changed after the review: do something else.";
+    const original = String(defined(server.rows[0]).instructions);
+    defined(server.rows[0]).instructions = "Changed after the review: do something else.";
     await scout.getByRole("button", { name: "Add Scout to your mascots", exact: true }).click();
     await expect(scout.getByRole("status")).toContainText("Added.");
 
     const onFile = () => JSON.parse(readFileSync(join(strangerProfile, "mascots.json"), "utf8")) as Record<string, unknown>[];
-    expect(Object.keys(onFile()[0]).sort()).toEqual(["deletedAt", "galleryId", "id", "instructions", "look", "name", "sites", "tools"]);
+    expect(Object.keys(defined(onFile()[0])).sort()).toEqual([
+      "deletedAt",
+      "galleryId",
+      "id",
+      "instructions",
+      "look",
+      "name",
+      "sites",
+      "tools",
+    ]);
     expect(onFile()[0]).toMatchObject({ instructions: original, sites: ["svt.se"], tools: ["visit"], galleryId: id });
-    await expect.poll(() => server.rows[0].add_count).toBe(1);
+    await expect.poll(() => defined(server.rows[0]).add_count).toBe(1);
 
     // It's a limited mascot, under the safety rules, and it never reads the entry again.
     model.replyWith("Hello.");
@@ -266,7 +276,7 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     server.rows.splice(0, 1);
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("mascots", { param: "list" }));
     await expect(chrome.getByRole("button", { name: "Chat with Scout" })).toBeVisible();
-    expect(onFile()[0].instructions).toBe(original);
+    expect(defined(onFile()[0]).instructions).toBe(original);
 
     // Hidden characters and unknown tools don't come through on the other one.
     const entries = (await chrome.evaluate(() => window.chromeAPI.mascots.gallery())).entries;

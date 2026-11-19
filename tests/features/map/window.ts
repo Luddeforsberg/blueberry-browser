@@ -7,7 +7,9 @@ import { createTab, threeTabs, someChats } from "./ways";
 const showChatMenu = (drive: Drive) =>
   drive.chrome.evaluate(async () => {
     const { chats } = await window.chromeAPI.library.getLibrary();
-    void window.chromeAPI.chat.showMenu(chats[0].id, { x: 120, y: 160, width: 24, height: 24 });
+    const [first] = chats;
+    if (!first) throw new Error("No chat");
+    void window.chromeAPI.chat.showMenu(first.id, { x: 120, y: 160, width: 24, height: 24 });
   });
 
 // A menu is drawn in the page first and placed by main after, so it's open once main shows its view.

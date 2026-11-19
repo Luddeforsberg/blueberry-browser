@@ -3,6 +3,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { findView, launchApp } from "./app";
 import { startFakeModel, type FakeModel } from "./fakeModel";
+import { defined } from "../src/shared/testing";
 
 // What the browser.*.spec.ts files share: a server of test pages and a fake model for each file, a fresh app for each
 // test, and the ways in that their tests use.
@@ -144,7 +145,7 @@ export const getTabs = () => chrome.evaluate(() => window.chromeAPI.browser.getT
 export const activeTab = async () => {
   const active = (await getTabs()).filter((tab) => tab.isActive);
   expect(active).toHaveLength(1);
-  return active[0];
+  return defined(active[0]);
 };
 
 export const openFixture = async (path = "/") => {
@@ -175,12 +176,18 @@ export const chatInSidebar = (title: string) =>
   chrome.getByRole("tabpanel", { name: "Chats" }).getByRole("button", { name: new RegExp(`^${title}`) });
 export const showChats = () => chrome.getByRole("tab", { name: /^Chats/ }).click();
 
-export const setContentSize = (width: number, height: number) =>
-  app.evaluate(
-    ({ BaseWindow }, [width, height]) => {
-      const baseWindow = BaseWindow.getAllWindows()[0];
-      baseWindow.setContentSize(width, height);
-      return baseWindow.getContentSize();
-    },
-    [width, height],
+// What the main window's getContentSize gives, as the width and height it always is.
+export const widthAndHeight = (size: number[]) => [defined(size[0]), defined(size[1])] satisfies [number, number];
+
+export const setContentSize = async (width: number, height: number) =>
+  widthAndHeight(
+    await app.evaluate(
+      ({ BaseWindow }, [width, height]) => {
+        const [baseWindow] = BaseWindow.getAllWindows();
+        if (!baseWindow) throw new Error("No window");
+        baseWindow.setContentSize(width, height);
+        return baseWindow.getContentSize();
+      },
+      [width, height] satisfies [number, number],
+    ),
   );

@@ -16,11 +16,13 @@ const clickMenu = (app: ElectronApplication, label: string) =>
   }, label);
 
 const findBarVisible = (app: ElectronApplication) =>
-  app.evaluate(({ BaseWindow }) =>
-    BaseWindow.getAllWindows()[0].contentView.children.some(
+  app.evaluate(({ BaseWindow }) => {
+    const [main] = BaseWindow.getAllWindows();
+    if (!main) throw new Error("No window");
+    return main.contentView.children.some(
       (view) => "webContents" in view && (view as Electron.WebContentsView).webContents.getURL().includes("view=find") && view.getVisible(),
-    ),
-  );
+    );
+  });
 
 test("find, zoom and the page menu on a web page", async () => {
   const server = createServer((_, response) => {

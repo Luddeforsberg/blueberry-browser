@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
 import { FAKE_BOT_TOKEN, startFakeTelegram } from "./fakeTelegram";
+import { defined } from "../src/shared/testing";
 
 const startSite = async () => {
   const server = createServer((request, response) => {
@@ -219,7 +220,7 @@ test("from the phone: pair, press Allow, and a code goes in the page without eve
     const sent = await chrome.evaluate(() => window.chromeAPI.chat.send(null, "Check my orders", { seePage: false }));
     const asked = await lastSent(`Open ${address} in a new tab`);
     expect(asked.buttons.map(({ text }) => text)).toEqual(["Allow", "Don’t allow"]);
-    telegram.userPresses(asked.buttons[0], asked.message_id);
+    telegram.userPresses(defined(asked.buttons[0]), asked.message_id);
     await expect.poll(() => telegram.editsOf.get(asked.message_id) ?? "").toContain("Allowed. Berry carries on.");
     expect(telegram.answeredCallbacks).toContain(`press-${asked.message_id}`);
 

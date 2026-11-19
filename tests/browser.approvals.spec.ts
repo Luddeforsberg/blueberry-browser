@@ -11,6 +11,7 @@ import {
   askBeforeActing,
   askInPanel,
 } from "./browserSetup";
+import { defined } from "../src/shared/testing";
 
 setUpBrowserApp();
 
@@ -105,7 +106,7 @@ test("by default Berry acts without asking unless it's risky, and Settings can t
     ["Load more", "Load more"],
     ["Find", "Find"],
   ]) {
-    await act("click", { ref: ref(name) });
+    await act("click", { ref: ref(defined(name)) });
     await expect(replies()).toHaveCount(++done);
     expect(await clicked()).toBe(expected);
     await expect(card).toHaveCount(0);
@@ -121,7 +122,7 @@ test("by default Berry acts without asking unless it's risky, and Settings can t
     [ref("Go"), "Go"],
   ]) {
     await act("click", { ref: element });
-    await expect(card.locator("p").getByText(expected, { exact: false })).toBeVisible();
+    await expect(card.locator("p").getByText(defined(expected), { exact: false })).toBeVisible();
     await card.getByRole("button", { name: "Don’t allow" }).click();
     await expect(replies()).toHaveCount(++done);
   }

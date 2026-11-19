@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { answerAsk, findView, launchApp } from "./app";
 import { startFakeModel, type FakeModel } from "./fakeModel";
+import { defined } from "../src/shared/testing";
 
 let server: Server;
 let origin: string;
@@ -59,8 +60,8 @@ test("a restart brings tabs back without loading them all, and history is kept",
   await open(chrome, "page-four");
   // Four goes before three now, and three is the tab being looked at.
   const before = await tabs(chrome);
-  await chrome.evaluate(([id]) => window.chromeAPI.browser.moveTab(id, 1), [before[2].id]);
-  await chrome.evaluate(([id]) => window.chromeAPI.browser.switchTab(id), [before[1].id]);
+  await chrome.evaluate(([id]) => window.chromeAPI.browser.moveTab(id, 1), [defined(before[2]).id] satisfies [string]);
+  await chrome.evaluate(([id]) => window.chromeAPI.browser.switchTab(id), [defined(before[1]).id] satisfies [string]);
   await chrome.evaluate(() => window.chromeAPI.layout.toggleSidebar());
   await app.close();
 
@@ -82,12 +83,12 @@ test("a restart brings tabs back without loading them all, and history is kept",
   await expect.poll(loaded).toEqual([`${origin}/page-three`]);
 
   // Going to a tab loads it, with its back button working.
-  const [first] = await tabs(chrome);
+  const first = defined((await tabs(chrome))[0]);
   await chrome.evaluate((id) => window.chromeAPI.browser.switchTab(id), first.id);
   await expect.poll(loaded).toEqual([`${origin}/page-three`, `${origin}/page-two`]);
   await expect.poll(async () => (await tabs(chrome))[0]).toMatchObject({ canGoBack: true, isLoading: false });
   await chrome.evaluate((id) => window.chromeAPI.browser.goBack(id), first.id);
-  await expect.poll(async () => (await tabs(chrome))[0].title).toBe("Title of page-one");
+  await expect.poll(async () => defined((await tabs(chrome))[0]).title).toBe("Title of page-one");
 
   // Coming back after a restart wasn't a visit, but going back was.
   await chrome.evaluate(() => window.chromeAPI.layout.toggleSidebar());

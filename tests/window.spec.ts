@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { answerAsk, findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
+import { defined } from "../src/shared/testing";
 
 const startSite = async () => {
   const server = createServer((_request, response) => {
@@ -204,18 +205,20 @@ test("in the horizontal layout, Chats and a mascot's card open over a web page, 
     await expect(panel).toBeVisible();
     await expect(pill).toHaveAttribute("aria-expanded", "true");
     // Over the page: the overlay's view is showing, above the tab's view, and covers where the page is.
-    const stack = await app.evaluate(({ BaseWindow, WebContentsView }) =>
-      BaseWindow.getAllWindows()[0].contentView.children.map((view) => ({
+    const stack = await app.evaluate(({ BaseWindow, WebContentsView }) => {
+      const [main] = BaseWindow.getAllWindows();
+      if (!main) throw new Error("No window");
+      return main.contentView.children.map((view) => ({
         url: view instanceof WebContentsView ? view.webContents.getURL() : "",
         visible: view.getVisible(),
         bounds: view.getBounds(),
-      })),
-    );
+      }));
+    });
     const overlayAt = stack.findIndex(({ url }) => url.includes("view=overlay"));
     const pageAt = stack.findIndex(({ url }) => url.startsWith(site.origin));
-    expect(stack[overlayAt].visible).toBe(true);
+    expect(defined(stack[overlayAt]).visible).toBe(true);
     expect(overlayAt).toBeGreaterThan(pageAt);
-    expect(stack[overlayAt].bounds.y).toBeLessThanOrEqual(stack[pageAt].bounds.y);
+    expect(defined(stack[overlayAt]).bounds.y).toBeLessThanOrEqual(defined(stack[pageAt]).bounds.y);
 
     await overlay.keyboard.press("Escape");
     await expect(panel).toBeHidden();

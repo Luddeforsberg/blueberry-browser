@@ -18,6 +18,7 @@ import {
   showChats,
   setContentSize,
 } from "./browserSetup";
+import { defined } from "../src/shared/testing";
 
 setUpBrowserApp();
 
@@ -130,7 +131,7 @@ for (const change of ["renamed", "generated"] as const) {
   test(`reopening a closed chat uses its ${change} title`, async () => {
     await startChat("Original title");
     const tab = await activeTab();
-    const [chat] = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).chats;
+    const chat = defined((await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).chats[0]);
     await chrome.evaluate(() => window.chromeAPI.browser.createTab());
     await chrome.evaluate((id) => window.chromeAPI.browser.closeTab(id), tab.id);
 
@@ -150,7 +151,15 @@ for (const change of ["renamed", "generated"] as const) {
       item.click();
     });
     await expect.poll(async () => (await activeTab()).title).toBe(title);
-    await expect.poll(() => app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].getTitle())).toBe(title);
+    await expect
+      .poll(() =>
+        app.evaluate(({ BaseWindow }) => {
+          const [main] = BaseWindow.getAllWindows();
+          if (!main) throw new Error("No window");
+          return main.getTitle();
+        }),
+      )
+      .toBe(title);
   });
 }
 

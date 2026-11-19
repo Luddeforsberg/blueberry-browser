@@ -1,6 +1,7 @@
 import type { ElectronApplication } from "@playwright/test";
 import pixelmatch from "pixelmatch";
 import { PNG } from "pngjs";
+import { defined } from "../../src/shared/testing";
 
 // A window is a stack of views (AGENTS.md, src/main), and Playwright only sees one at a time, so a picture of the
 // window is each visible view captured by Electron and laid over the ones beneath it, in the window's own order.
@@ -99,10 +100,12 @@ const compose = ({ width, height, layers }: { width: number; height: number; lay
         if (left < 0 || left >= width) continue;
         const from = (y * picture.width + x) * 4;
         const to = (top * width + left) * 4;
-        const alpha = picture.data[from + 3] / 255;
+        const alpha = defined(picture.data[from + 3]) / 255;
         if (alpha === 0) continue;
         for (let channel = 0; channel < 3; channel++) {
-          out.data[to + channel] = Math.round(picture.data[from + channel] * alpha + out.data[to + channel] * (1 - alpha));
+          out.data[to + channel] = Math.round(
+            defined(picture.data[from + channel]) * alpha + defined(out.data[to + channel]) * (1 - alpha),
+          );
         }
       }
     }

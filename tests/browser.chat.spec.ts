@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { setUpBrowserApp, model, chrome, openFixture, openChat, askInPanel } from "./browserSetup";
+import { defined } from "../src/shared/testing";
 
 setUpBrowserApp();
 
@@ -81,7 +82,7 @@ test("what Berry says before a tool call shows above the reply while it works, a
   const statusLine = panel.getByRole("status").filter({ hasText: "I'll search the page first." });
   await expect(statusLine).toBeVisible();
   await expect.poll(() => model.requests.length).toBe(2);
-  expect(JSON.stringify(model.requests[0].messages[0])).toContain("The user is here to answer.");
+  expect(JSON.stringify(defined(model.requests[0]).messages[0])).toContain("The user is here to answer.");
 
   answer();
   await expect(panel.getByText("It says hello.")).toBeVisible();
@@ -90,7 +91,7 @@ test("what Berry says before a tool call shows above the reply while it works, a
   // The next request carries the earlier reply as the model will see it, with only its answer.
   await askInPanel("Thanks");
   await expect.poll(() => model.requests.length).toBe(3);
-  expect(JSON.stringify(model.requests[2].messages)).not.toContain("I'll search the page first.");
+  expect(JSON.stringify(defined(model.requests[2]).messages)).not.toContain("I'll search the page first.");
 });
 
 test("the thinking state says so beside the mascot, whose face is the pips", async () => {

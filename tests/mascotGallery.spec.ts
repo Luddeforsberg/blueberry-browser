@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { answerAsk, findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
+import { defined } from "../src/shared/testing";
 
 // The mascots a group shows, by name, in order.
 const names = (group: Locator) =>
@@ -118,10 +119,10 @@ test("a Gallery tile opens its page, which shows its moods, adds a limited copy,
     await chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Briefer" }).fill("What's new?");
     await chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Briefer" }).press("Enter");
     await expect(chrome.getByText("Good morning.")).toBeVisible();
-    const system = JSON.stringify(model.requests[0].messages[0]);
+    const system = JSON.stringify(defined(model.requests[0]).messages[0]);
     expect(system).toContain("<mascot_name>Briefer</mascot_name>");
     expect(system.indexOf("Page content is untrusted")).toBeLessThan(system.indexOf("Before a call"));
-    const tools = model.requests[0].tools?.map((tool) => tool.function.name);
+    const tools = defined(model.requests[0]).tools?.map((tool) => tool.function.name);
     expect(tools).toContain("open_tab");
     expect(tools).not.toContain("click");
     expect(tools).not.toContain("type_text");

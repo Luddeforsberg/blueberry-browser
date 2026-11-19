@@ -21,7 +21,10 @@ test("Berry keeps a tab the user only looks at, and gives it up when they click 
     const goTo = (id: string) => chrome.evaluate((tab) => window.chromeAPI.browser.switchTab(tab), id);
     // Sent from wherever the user is, as the chat goes on behind them.
     const ask = async (chatId: string | null, text: string) => {
-      const sent = await chrome.evaluate(([chat, words]) => window.chromeAPI.chat.send(chat, words!, { seePage: false }), [chatId, text]);
+      const sent = await chrome.evaluate(([chat, words]) => window.chromeAPI.chat.send(chat, words, { seePage: false }), [
+        chatId,
+        text,
+      ] satisfies [string | null, string]);
       const replies = sent!.messages.filter(({ role }) => role === "user").length;
       await expect
         .poll(

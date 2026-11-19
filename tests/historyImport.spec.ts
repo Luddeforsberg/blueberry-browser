@@ -7,6 +7,7 @@ import { findView, launchApp } from "./app";
 import { chromeHistoryFile, writeChromiumHistory } from "./chromiumHistory";
 import { startFakeModel } from "./fakeModel";
 import { DEMO_LINES, demoProposals } from "./suggestionReplies";
+import { defined } from "../src/shared/testing";
 
 test("the first run brings in another browser's history, and the mascots speak about it on the new tab", async () => {
   test.setTimeout(60_000);
@@ -43,7 +44,7 @@ test("the first run brings in another browser's history, and the mascots speak a
 
     // What the step says goes out is what went out.
     expect(model.suggestionRequests).toHaveLength(1);
-    const sent = JSON.stringify(model.suggestionRequests[0].messages);
+    const sent = JSON.stringify(defined(model.suggestionRequests[0]).messages);
     expect(sent).toContain("news.ycombinator.com");
     expect(sent).not.toContain("/pull/412");
     expect(sent).not.toContain("Swedbank");

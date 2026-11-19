@@ -10,6 +10,7 @@ import { BERRY } from "../src/shared/mascots";
 import { findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
 import { startFakeSupabase } from "./fakeSupabase";
+import { defined } from "../src/shared/testing";
 
 // A job sent to the cloud runner: the real runner, built and started as its own Node process, takes it from the real
 // migration in Postgres, works in a headless Chrome standing in for Browserbase, and waits on an approval the user
@@ -133,10 +134,11 @@ test("a job on the runner keeps going without the app's agent, waits on Needs yo
     await chrome.waitForTimeout(500);
     await shoot(chrome, "chat-waiting-light-horizontal");
     await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ appearance: "system", layoutMode: "vertical" }));
-    const [job] = await supabase.cloudRows("select id, status from public.cloud_jobs");
+    const job = defined((await supabase.cloudRows("select id, status from public.cloud_jobs"))[0]);
     expect(job.status).toBe("waiting");
     const steps = await chrome.evaluate(async () => {
       const [chat] = (await window.chromeAPI.library.getLibrary()).chats;
+      if (!chat) throw new Error("No chat");
       return (await window.chromeAPI.library.getChat(chat.id))?.steps.map((step) => step.text);
     });
     expect(steps?.length).toBeGreaterThan(0);
@@ -147,7 +149,7 @@ test("a job on the runner keeps going without the app's agent, waits on Needs yo
 
     // Only the user's session wrote that, and the runner carried on to the end.
     await expect
-      .poll(async () => (await supabase.cloudRows("select status from public.cloud_jobs"))[0].status, { timeout: 30_000 })
+      .poll(async () => defined((await supabase.cloudRows("select status from public.cloud_jobs"))[0]).status, { timeout: 30_000 })
       .toBe("done");
     expect(await supabase.cloudRows("select kind, decision from public.cloud_approvals")).toEqual([
       { kind: "approval", decision: "allow" },
@@ -157,6 +159,7 @@ test("a job on the runner keeps going without the app's agent, waits on Needs yo
         async () =>
           chrome.evaluate(async () => {
             const [chat] = (await window.chromeAPI.library.getLibrary()).chats;
+            if (!chat) throw new Error("No chat");
             return (await window.chromeAPI.library.getChat(chat.id))?.messages.at(-1)?.content;
           }),
         { timeout: 15_000 },
@@ -167,7 +170,11 @@ test("a job on the runner keeps going without the app's agent, waits on Needs yo
     const tabs = await chrome.evaluate(() => window.chromeAPI.browser.getTabs());
     expect(tabs.some((tab) => tab.url === shop || tab.page === "cloud")).toBe(false);
 
-    const chatId = await chrome.evaluate(async () => (await window.chromeAPI.library.getLibrary()).chats[0].id);
+    const chatId = await chrome.evaluate(async () => {
+      const [first] = (await window.chromeAPI.library.getLibrary()).chats;
+      if (!first) throw new Error("No chat");
+      return first.id;
+    });
     await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), chatId);
     await expect(chrome.getByText("Ordered it")).toBeVisible();
     await shoot(chrome, "chat-done");
@@ -223,7 +230,9 @@ test("a job on the runner keeps going without the app's agent, waits on Needs yo
         timeout: 30_000,
       })
       .toBe("done");
-    const [followUp] = await supabase.cloudRows("select conversation_id, history from public.cloud_jobs where prompt = 'And from here?'");
+    const followUp = defined(
+      (await supabase.cloudRows("select conversation_id, history from public.cloud_jobs where prompt = 'And from here?'"))[0],
+    );
     expect(followUp.conversation_id).toBe(phoneJob);
     expect(followUp.history).toEqual([
       { role: "user", content: PHONE_PROMPT },
