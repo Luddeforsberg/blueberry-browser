@@ -15,8 +15,8 @@ const findOption = (el: HTMLSelectElement, wanted: string): HTMLOptionElement | 
     options.filter((option) => clip(option.text).toLowerCase() === text.toLowerCase()),
     options.filter((option) => option.value === wanted),
   ];
-  const matches = tiers.find((tier) => tier.length > 0) ?? [];
-  return matches.length === 1 ? matches[0] : null;
+  const [only, ...others] = tiers.find((tier) => tier.length > 0) ?? [];
+  return only && others.length === 0 ? only : null;
 };
 
 export const describeOption = ({

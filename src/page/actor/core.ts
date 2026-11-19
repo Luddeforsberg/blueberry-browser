@@ -1,5 +1,5 @@
 import type { Point } from "../lib/dom";
-import type { Actor } from "./stage";
+import { poseOf, type Actor } from "./stage";
 
 export interface Rect {
   left: number;
@@ -10,7 +10,7 @@ export interface Rect {
 
 // Where the mascot is and what it looks like, which everything else that moves it goes through.
 export const makeCore = (a: Actor) => {
-  const { flip, mascot, poses } = a.stage;
+  const { flip, mascot } = a.stage;
   const quietMotion = (): boolean => a.look.still || matchMedia("(prefers-reduced-motion: reduce)").matches;
   const size = (): number => (quietMotion() ? Math.min(a.look.size, 28) : a.look.size) / a.look.zoom;
   // What each moment looks like once the settings have had their say.
@@ -21,8 +21,8 @@ export const makeCore = (a: Actor) => {
     a.nod?.cancel();
     a.nod = null;
     if (next === a.pose) return;
-    if (a.pose) poses[a.pose].classList.remove("shown");
-    poses[next].classList.add("shown");
+    if (a.pose) poseOf(a.stage, a.pose).classList.remove("shown");
+    poseOf(a.stage, next).classList.add("shown");
     a.pose = next;
   };
   const setFacing = (next: number): void => {
