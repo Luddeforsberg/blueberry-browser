@@ -10,7 +10,7 @@ An AI browser built with Electron, React and TypeScript. [DESIGN.md](./DESIGN.md
 | `pnpm dev` | Run the app with hot reload |
 | `pnpm run typecheck` | Typecheck main, preload, tests and renderers |
 | `pnpm run format` | Format everything with Prettier (`.prettierrc.json`). `pnpm run format:check` fails on any file that isn't |
-| `pnpm run lint` | Lint. Any warning or error fails, and a comment can't turn a rule off: change it in `eslint.config.mjs`. Who may import what is in `eslint.boundaries.mjs`, and `scripts/runnerElectron.mjs` checks the runner never reaches Electron |
+| `pnpm run lint` | Lint, with types, so every TypeScript file must be in a tsconfig. Any warning or error fails, and a comment can't turn a rule off: change it in `eslint.config.mjs`. Who may import what is in `eslint.boundaries.mjs`, and `scripts/runnerElectron.mjs` checks the runner never reaches Electron |
 | `pnpm run knip` | Fail on unused files, exports and dependencies. `knip.config.ts` says where the entry points are |
 | `pnpm run test` | Run unit tests in `src/` with Vitest |
 | `pnpm exec electron-vite build` | Build into `out/` |
