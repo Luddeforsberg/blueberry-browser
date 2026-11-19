@@ -94,6 +94,12 @@ const rules = [
     message: "pageTarget.ts is types only, so Tab and CdpTab can both implement it with nothing loaded.",
   },
   {
+    in: ["src/shared/ipc.ts", "src/shared/ipc"],
+    syntax:
+      'Program > :not(ImportDeclaration[importKind="type"], ExportNamedDeclaration[exportKind="type"], TSInterfaceDeclaration, TSTypeAliasDeclaration)',
+    message: "The IPC contract is types only, since the sandboxed preload can't load shared runtime code (AGENTS.md Traps).",
+  },
+  {
     in: main("mcp"),
     except: main("mcp/mcpPages.ts"),
     imports: folder("tools"),

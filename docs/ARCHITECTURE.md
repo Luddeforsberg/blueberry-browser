@@ -54,7 +54,7 @@ Each tab is a [src/main/tabs/Tab.ts](../src/main/tabs/Tab.ts) around its own `We
 
 ## The typed IPC contract
 
-[src/shared/ipc.ts](../src/shared/ipc.ts) is the one contract between main and the renderer: every channel, its arguments, its result, and which chrome region may call it. It's types only, because the preload is sandboxed and can't load shared runtime code. [src/preload/chrome.ts](../src/preload/chrome.ts) exposes it to the renderer as `chromeAPI`.
+[src/shared/ipc.ts](../src/shared/ipc.ts) is the one contract between main and the renderer, made of the files in [src/shared/ipc/](../src/shared/ipc/), with the channels in `invoke.ts` and `events.ts`: every channel, its arguments, its result, and which chrome region may call it. It's types only, because the preload is sandboxed and can't load shared runtime code. [src/preload/chrome.ts](../src/preload/chrome.ts) exposes it to the renderer as `chromeAPI`.
 
 `CHANNEL_REGIONS` in [src/main/window/ipc.ts](../src/main/window/ipc.ts) lists the regions for each channel, and [src/main/window/EventManager.ts](../src/main/window/EventManager.ts) registers every handler through one function that checks the caller first. A call is refused unless it comes from the main frame of one of the named views, at the page that view loaded. So a web page, or a frame inside the chrome, can't call anything, and only the permission prompt can answer a permission request.
 

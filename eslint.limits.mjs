@@ -37,7 +37,6 @@ export const linesOver = {
   "src/renderer/chrome/src/pages/SettingsPage.tsx": 494,
   "src/renderer/chrome/src/routinesView.ts": 424,
   "src/renderer/common/components/Mascot.tsx": 563,
-  "src/shared/ipc.ts": 1348,
   "src/shared/library.ts": 466,
   "tests/browser.spec.ts": 1894,
   "tests/features/map.ts": 1025,
