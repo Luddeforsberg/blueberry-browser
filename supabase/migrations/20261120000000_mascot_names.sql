@@ -10,7 +10,8 @@
 -- The old names keep working for apps, runners and phone pages from before, until each is redeployed: `cloud_flock` is a
 -- view with `security_invoker`, so the table's row-level security still decides what each caller reads, and the old
 -- functions are `security invoker` wrappers that call the new ones, so they can do nothing the caller couldn't do
--- through the new name. Each keeps its old grants: select or execute to `authenticated` only.
+-- through the new name. Each keeps its old grants: select or execute to `authenticated` only. What they read back has a
+-- look's old palette id, as 20261119000000_berry_palettes.sql calls them, since a client from before reads only those.
 --
 -- Order: apply 20261119000000_berry_palettes.sql and this, then deploy the site (the phone page reads `cloud_mascots`),
 -- then redeploy the runner (`relay_mascots`), then ship the app (`sync_cloud_mascots`, and the new palette ids). The
@@ -62,7 +63,10 @@ $$;
 -- --- The old names, until every client has moved ---
 
 create view public.cloud_flock with (security_invoker = true) as
-  select owner, id, position, name, palette, accessory, instructions, sites, tools, from_gallery, updated_at
+  select owner, id, position, name,
+    case palette when 'blueberry' then 'kingfisher' when 'lingon' then 'robin' when 'cloudberry' then 'canary'
+    when 'gooseberry' then 'parakeet' when 'raspberry' then 'flamingo' when 'currant' then 'jackdaw' else palette end as palette,
+    accessory, instructions, sites, tools, from_gallery, updated_at
   from public.cloud_mascots;
 comment on view public.cloud_flock is 'The old name of cloud_mascots, for clients from before 20261120000000_mascot_names.sql.';
 revoke all on table public.cloud_flock from public, anon, authenticated;
@@ -76,7 +80,13 @@ comment on function public.sync_cloud_flock(jsonb) is 'The old name of sync_clou
 create or replace function public.relay_flock(p_secret text)
 returns table (id text, name text, palette text, accessory text, instructions text, sites jsonb, tools jsonb, from_gallery boolean)
 language sql stable security invoker set search_path = ''
-as $$ select * from public.relay_mascots(p_secret) $$;
+as $$
+  select id, name,
+    case palette when 'blueberry' then 'kingfisher' when 'lingon' then 'robin' when 'cloudberry' then 'canary'
+    when 'gooseberry' then 'parakeet' when 'raspberry' then 'flamingo' when 'currant' then 'jackdaw' else palette end,
+    accessory, instructions, sites, tools, from_gallery
+  from public.relay_mascots(p_secret)
+$$;
 comment on function public.relay_flock(text) is 'The old name of relay_mascots, for clients from before 20261120000000_mascot_names.sql.';
 
 do $$

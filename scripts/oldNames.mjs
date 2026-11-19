@@ -27,7 +27,7 @@ const entries = (until, text, why, files) => files.map((file) => ({ file, text, 
 // test only. Kept for good, since old data can turn up at any time.
 const migrated = (text, why, ...files) => entries(null, text, why, files);
 // An old Supabase name that supabase/migrations/20261120000000_mascot_names.sql keeps answering for clients from before,
-// named only where a test shows it still works. They go when the wrappers do, as step 10 of docs/quality-plan.md says.
+// named only in tests. They go when the wrappers do, as step 10 of docs/quality-plan.md says.
 const wrapped = (text, ...files) => entries("wrappers", text, WRAPPED, files);
 // The public site's address, which the user picks a new one for. docs/quality-plan.md has the switch.
 const address = (text, why, ...files) => entries("address", text, why, files);

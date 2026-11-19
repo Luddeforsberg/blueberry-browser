@@ -1,7 +1,7 @@
 import { PGlite } from "@electric-sql/pglite";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 // 20261120000000_mascot_names.sql in real Postgres as Supabase's roles, on top of every migration before it: the new
 // names, and the old ones that clients from before still call, which must do and refuse exactly the same.
@@ -23,9 +23,10 @@ const MIGRATIONS = readdirSync(join(__dirname, "migrations"))
   .sort();
 const BEFORE = MIGRATIONS.slice(0, MIGRATIONS.indexOf(RENAME));
 
+// What each name reads back for Scout's lingon: the old names give the old palette id, the only one a client from before reads.
 const NAMES = {
-  new: { table: "cloud_mascots", sync: "sync_cloud_mascots", param: "p_mascots", relay: "relay_mascots" },
-  old: { table: "cloud_flock", sync: "sync_cloud_flock", param: "p_birds", relay: "relay_flock" },
+  new: { table: "cloud_mascots", sync: "sync_cloud_mascots", param: "p_mascots", relay: "relay_mascots", lingon: "lingon" },
+  old: { table: "cloud_flock", sync: "sync_cloud_flock", param: "p_birds", relay: "relay_flock", lingon: "robin" },
 };
 const SCOUT = {
   id: "m-1",
@@ -137,19 +138,24 @@ describe("the mascots' names on the server", () => {
     expect(definers.rows).toEqual([]);
   });
 
-  for (const [which, { table, sync, param, relay }] of Object.entries(NAMES)) {
+  for (const [which, { table, sync, param, relay, lingon }] of Object.entries(NAMES)) {
     const share = (uid: string | null, mascots: unknown) =>
       as(uid, `select public.${sync}(${param} => '${JSON.stringify(mascots)}'::jsonb) as kept`);
 
     describe(`by the ${which} names`, () => {
+      beforeEach(async () => {
+        await share(ALICE, [SCOUT]);
+      });
+
       it("keeps each owner's mascots to that owner, replaced whole on every sync", async () => {
         expect(await share(ALICE, [SCOUT, { ...SCOUT, id: "m-2", name: "Penny", palette: "flamingo" }])).toEqual([{ kept: 2 }]);
         expect(await share(ALICE, [SCOUT])).toEqual([{ kept: 1 }]);
         expect(await share(BOB, [{ ...SCOUT, id: "b-1" }])).toEqual([{ kept: 1 }]);
         // Each name reads the same rows: only the reader's own.
-        for (const name of [NAMES.new.table, NAMES.old.table]) {
+        for (const names of Object.values(NAMES)) {
+          const name = names.table;
           expect(await as(ALICE, `select id, name, position, palette, sites, tools from public.${name}`)).toEqual([
-            { id: "m-1", name: "Scout", position: 0, palette: "lingon", sites: ["webhallen.com"], tools: ["visit", "click"] },
+            { id: "m-1", name: "Scout", position: 0, palette: names.lingon, sites: ["webhallen.com"], tools: ["visit", "click"] },
           ]);
           expect(await as(BOB, `select id from public.${name}`)).toEqual([{ id: "b-1" }]);
           expect(await as(RUNNER, `select id from public.${name}`)).toEqual([]);
@@ -159,7 +165,7 @@ describe("the mascots' names on the server", () => {
       it("refuses what it refused before", async () => {
         await expect(as(null, `select id from public.${table}`)).rejects.toThrow(/permission denied/);
         for (const write of [
-          `insert into public.${table} (id, position, name, palette, accessory, instructions) values ('x', 0, 'X', 'robin', 'cap', 'Y')`,
+          `insert into public.${table} (id, position, name, accessory, instructions) values ('x', 0, 'X', 'cap', 'Y')`,
           `update public.${table} set name = 'Taken'`,
           `delete from public.${table}`,
         ]) {
@@ -177,7 +183,7 @@ describe("the mascots' names on the server", () => {
 
       it("gives the relay its owner's mascots only with the grant's runner and secret", async () => {
         expect(await as(RUNNER, `select id, name, palette from public.${relay}('${SECRET}')`)).toEqual([
-          { id: "m-1", name: "Scout", palette: "lingon" },
+          { id: "m-1", name: "Scout", palette: lingon },
         ]);
         for (const uid of [ALICE, BOBS_RUNNER, BOB]) {
           await expect(as(uid, `select * from public.${relay}('${SECRET}')`)).rejects.toThrow(/Not a grant of this runner/);
