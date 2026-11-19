@@ -10,6 +10,7 @@ import {
 } from "./cloudJobs";
 import type { ChatStep } from "../../shared/library";
 import { BERRY } from "../../shared/mascots";
+import { defined } from "../../shared/testing";
 
 const SCOUT = { id: "m-1", name: "Scout", instructions: "Find flights.", sites: ["sas.se"], tools: ["visit"], fromGallery: false };
 
@@ -125,7 +126,7 @@ describe("what a job writes to its row", () => {
     const long = Array.from({ length: 500 }, (_, index) => ({ text: `${index} ${"🫐".repeat(400)}`, done: false }));
     const fitted = fitJobUpdate({ steps: long }).steps!;
     expect(stepsBytes(fitted)).toBeLessThanOrEqual(100_000);
-    expect(fitted[0].text).toBe("Earlier steps (cut short)");
+    expect(defined(fitted[0]).text).toBe("Earlier steps (cut short)");
     expect(fitted.at(-1)!.text.startsWith("499 ")).toBe(true);
     expect(fitted.slice(1).every(({ text }) => length(text) === 300 && text.endsWith(" (cut short)"))).toBe(true);
   });
@@ -168,7 +169,7 @@ describe("what a job writes to its row", () => {
     expect(stepsBytes(steps.map(({ text, done }) => ({ text, done })))).toBeLessThanOrEqual(100_000);
     const fitted = fitJobUpdate({ steps }).steps!;
     expect(stepsBytes(fitted)).toBeLessThanOrEqual(100_000);
-    expect(fitted[0].text).toBe("Earlier steps (cut short)");
+    expect(defined(fitted[0]).text).toBe("Earlier steps (cut short)");
     expect(fitted.at(-1)).toEqual(steps.at(-1));
   });
 

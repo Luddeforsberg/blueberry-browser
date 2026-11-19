@@ -5,6 +5,7 @@ import { BERRY } from "../../shared/mascots";
 import type { EndedReply } from "../chats/Chats";
 import type { GalleryServer } from "../account/galleryServer";
 import { MacJobs, RELAY_FROM } from "./MacJobs";
+import { defined } from "../../shared/testing";
 
 const ANA = "ana@example.com";
 const SCOUT = { id: "scout", name: "Scout", instructions: "Finds prices.", sites: ["tea.example"], tools: ["visit"], fromGallery: false };
@@ -89,7 +90,7 @@ describe("MacJobs", () => {
     await jobs.tick();
     expect(presence).toEqual([true]);
     expect(host.start).toHaveBeenCalledTimes(1);
-    expect(host.start.mock.calls[0][1]).toMatchObject({
+    expect(defined(host.start.mock.calls[0])[1]).toMatchObject({
       mascot: { id: "scout", sites: ["tea.example"], tools: ["visit"] },
       askAtLeast: "risky",
       from: RELAY_FROM,
@@ -107,7 +108,7 @@ describe("MacJobs", () => {
     expect(rows.get("job-1")).toMatchObject({ status: "done", reply: "It's £4.", error: null });
     // Then the next, as Berry.
     await jobs.tick();
-    expect(host.start.mock.calls[1][1].mascot).toBe(BERRY);
+    expect(defined(host.start.mock.calls[1])[1].mascot).toBe(BERRY);
   });
 
   it("reports only the reply it started, not one the user asks for in the chat afterwards", async () => {
