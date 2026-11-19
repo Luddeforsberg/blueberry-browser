@@ -135,7 +135,7 @@ const rules = [
   onlyFrom(
     "codeEntry.ts",
     file("codeEntry"),
-    ["chats/Chats.ts"],
+    ["chats/Handoffs.ts"],
     "A code goes from a reply through Chats.enterCode alone: no tool can reach it.",
   ),
   onlyFrom(
@@ -147,14 +147,14 @@ const rules = [
   onlyFrom(
     "the phone",
     file("Phone"),
-    ["phone/TelegramChannel.ts", "window/Window.ts", "chats/Chats.ts"],
+    ["phone/TelegramChannel.ts", "window/Window.ts", "chats/Handoffs.ts"],
     "MCP and the tools can't reach the phone.",
   ),
   onlyFrom("the desktop mascot", folder("desktop"), ["desktop", "window/Window.ts"], "No tool can reach the desktop mascot."),
   onlyFrom(
     "memory",
     folder("memory"),
-    ["memory", "chats/Chats.ts", "window/Window.ts"],
+    ["memory", "chats/jobMemory.ts", "window/Window.ts"],
     "No tool or mascot can reach what a mascot remembers.",
   ),
   onlyFrom(
@@ -180,6 +180,7 @@ const rules = [
     file("Attachments", "attachmentPrompt"),
     [
       "chats/Chats.ts",
+      "chats/modelMessages.ts",
       "chats/ChatStore.ts",
       "chats/Attachments.test.ts",
       "chats/Chats.attachments.test.ts",
