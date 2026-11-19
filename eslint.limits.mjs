@@ -7,11 +7,6 @@ export const linesOver = {
   "src/main/window/Layout.test.ts": 494,
   "src/main/window/Layout.ts": 467,
   "src/main/tabs/Tab.ts": 756,
-  "tests/browser.spec.ts": 1894,
-  "tests/features/map.ts": 1025,
-  "tests/mascotOnPage.spec.ts": 681,
-  "tests/phone.spec.ts": 473,
-  "tests/publishing.spec.ts": 423,
 };
 
 // The most complex function in the file, against 20.
