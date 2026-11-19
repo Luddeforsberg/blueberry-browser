@@ -33,10 +33,14 @@ if (statements) throw new Error(`${INDEX} may only re-export by name, but has: $
 sources.sort((a, b) => (a.name < b.name ? -1 : 1));
 
 const bundle = async ({ name, from }) => {
-  const { outputFiles } = await build({
+  const { outputFiles, metafile } = await build({
     ...options,
+    metafile: true,
     stdin: { contents: `export { ${name} as default } from "./${from}";`, resolveDir: root, sourcefile: `${name}.ts`, loader: "ts" },
   });
+  // Lint stops most imports from outside src/page, and this stops the rest, at any depth, before any of it reaches a page.
+  const outside = Object.keys(metafile.inputs).filter((input) => input !== `${name}.ts` && !input.startsWith("src/page/"));
+  if (outside.length) throw new Error(`${name}: code that runs in a page may only come from src/page, but has ${outside.join(", ")}`);
   // Printed again, which drops the comments the bundler adds to name each source file, and only comments.
   const { code: text } = await transform(outputFiles[0].text, { ...printing, loader: "js", format: "esm" });
   const ending = /\nexport \{\n {2}(\w+) as default\n\};\n$/;
