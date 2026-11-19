@@ -214,7 +214,7 @@ export class Gallery {
 
   private load(): Saved {
     try {
-      const { install, author } = JSON.parse(readFileSync(this.file, "utf8"));
+      const { install, author } = JSON.parse(readFileSync(this.file, "utf8")) as Record<string, unknown>;
       if (typeof install === "string") return { install, author: typeof author === "string" ? author : "" };
     } catch {
       // A new one follows. It only means this install could count once more.

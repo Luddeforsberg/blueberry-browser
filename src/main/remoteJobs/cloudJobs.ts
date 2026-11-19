@@ -46,7 +46,8 @@ const kindOf = (kind: unknown): { kind?: StepKind } => (isStepKind(kind) ? { kin
 
 export const stepsFromRow = (input: unknown): ChatStep[] =>
   (Array.isArray(input) ? input : [])
-    .filter((step) => typeof step?.text === "string")
+    .map((step: unknown) => (step ?? {}) as Record<string, unknown>)
+    .filter((step) => typeof step.text === "string")
     .slice(-MAX_STEPS)
     .map((step) => ({ text: String(step.text).slice(0, MAX_STEP_TEXT), done: step.done === true, ...kindOf(step.kind) }));
 

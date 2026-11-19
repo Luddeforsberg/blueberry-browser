@@ -40,6 +40,11 @@ export default tseslint.config(
       "@typescript-eslint/switch-exhaustiveness-check": ["error", { considerDefaultExhaustiveForUnions: true }],
       "@typescript-eslint/no-floating-promises": "error",
       "@typescript-eslint/no-misused-promises": "error",
+      "@typescript-eslint/no-unsafe-argument": "error",
+      "@typescript-eslint/no-unsafe-assignment": "error",
+      "@typescript-eslint/no-unsafe-call": "error",
+      "@typescript-eslint/no-unsafe-member-access": "error",
+      "@typescript-eslint/no-unsafe-return": "error",
     },
   },
   {
@@ -47,6 +52,30 @@ export default tseslint.config(
     // value. A link's words that aren't one string, and a model's prompt that isn't text (docs/quality-plan.md, step 20).
     files: ["src/renderer/chrome/src/components/Markdown.tsx", "src/main/suggestions/suggestionProposals.ts"],
     rules: { "@typescript-eslint/no-base-to-string": "off" },
+  },
+  {
+    // Held back from the any rules: tests, fakes and evals take what the code under test, a fake or a model sent back as
+    // the type they expect, and a wrong guess fails the test anyway.
+    files: ["tests/**", "evals/**", "supabase/**", "**/*.test.ts", "**/*Testing.ts"],
+    rules: {
+      "@typescript-eslint/no-unsafe-argument": "off",
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-call": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/no-unsafe-return": "off",
+    },
+  },
+  {
+    // Held back: each takes what it reads as the type it was written as, with no parser to check it, and a parser would
+    // drop what doesn't fit. JSON the stores wrote to their own SQLite columns, Telegram's answers, and what a tab's
+    // page script returns, which runInPage<T> hands on as its caller's T (docs/quality-plan.md, step 20).
+    files: [
+      "src/main/chats/ChatStore.ts",
+      "src/main/routines/RoutineStore.ts",
+      "src/main/phone/TelegramChannel.ts",
+      "src/main/tabs/TabPage.ts",
+    ],
+    rules: { "@typescript-eslint/no-unsafe-assignment": "off", "@typescript-eslint/no-unsafe-return": "off" },
   },
   {
     files: ["**/*.{ts,tsx}"],

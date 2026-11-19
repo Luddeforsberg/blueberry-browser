@@ -27,7 +27,11 @@ export const nextZoom = (percent: number, direction: 1 | -1): number => {
 // A site at 100% isn't stored, so resetting one removes it.
 export const sanitizeSiteZoom = (raw: unknown, fallback: SiteZoomLevels = {}): SiteZoomLevels => {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return fallback;
-  return Object.fromEntries(Object.entries(raw).filter(([, percent]) => percent !== 100 && ZOOM_LEVELS.includes(percent)));
+  return Object.fromEntries(
+    Object.entries(raw as Record<string, unknown>).filter(
+      (entry): entry is [string, number] => typeof entry[1] === "number" && entry[1] !== 100 && ZOOM_LEVELS.includes(entry[1]),
+    ),
+  );
 };
 
 interface ZoomTab {

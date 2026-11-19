@@ -13,7 +13,7 @@ export interface Saved {
 
 export const readTelegramFile = (file: string): Saved | null => {
   try {
-    const { token, botName, chatId } = JSON.parse(readFileSync(file, "utf8"));
+    const { token, botName, chatId } = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
     if (typeof token !== "string" || !safeStorage.isEncryptionAvailable()) return null;
     return {
       token: safeStorage.decryptString(Buffer.from(token, "base64")),

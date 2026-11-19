@@ -100,10 +100,10 @@ const bytes = (text: string) => new TextEncoder().encode(text).length;
 // Only the user's and the mascot's messages, newest kept, each cut to length, and dropped from the oldest until it fits.
 export const fitHistory = (input: unknown): HistoryMessage[] => {
   const messages = (Array.isArray(input) ? input : [])
-    .filter(
-      (message): message is HistoryMessage =>
-        (message?.role === "user" || message?.role === "assistant") && typeof message.content === "string",
-    )
+    .filter((message: unknown): message is HistoryMessage => {
+      const { role, content } = (message ?? {}) as Record<string, unknown>;
+      return (role === "user" || role === "assistant") && typeof content === "string";
+    })
     .slice(-MAX_HISTORY)
     .map(({ role, content }) => ({ role, content: content.slice(0, MAX_HISTORY_TEXT) }));
   while (messages.length > 0 && bytes(JSON.stringify(messages)) > MAX_HISTORY_BYTES) messages.shift();
@@ -123,7 +123,9 @@ export interface ConversationJob {
 // What the next message in a conversation carries: the history of the job before it, then that job's prompt and what
 // came of it, as the app saves a runner chat's reply. A job with neither words nor steps left nothing to say.
 export const followUpHistory = (last: ConversationJob): HistoryMessage[] => {
-  const steps = (Array.isArray(last.steps) ? last.steps : []).filter((step): step is { text: string } => typeof step?.text === "string");
+  const steps = (Array.isArray(last.steps) ? last.steps : []).filter(
+    (step: unknown): step is { text: string } => typeof ((step ?? {}) as Record<string, unknown>).text === "string",
+  );
   const reply = typeof last.reply === "string" ? last.reply : "";
   return fitHistory([
     ...fitHistory(last.history),

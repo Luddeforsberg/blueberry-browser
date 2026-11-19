@@ -74,10 +74,10 @@ export class AppIcon {
 
   // The kept icon, if it was drawn for what's chosen now. Otherwise the shipped one stays until the chrome draws.
   private restore(): void {
-    let drawnFor: Partial<AppIconChoice>;
+    let drawnFor: Record<string, unknown>;
     let bytes: Buffer;
     try {
-      drawnFor = JSON.parse(readFileSync(this.drawnFor, "utf8")) ?? {};
+      drawnFor = (JSON.parse(readFileSync(this.drawnFor, "utf8")) ?? {}) as Record<string, unknown>;
       bytes = readFileSync(this.picture);
     } catch {
       return;

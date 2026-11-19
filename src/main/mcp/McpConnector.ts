@@ -319,13 +319,13 @@ export class McpConnector {
 
   private load(): Saved {
     try {
-      const { on, token, port } = JSON.parse(readFileSync(this.file, "utf8"));
+      const { on, token, port } = JSON.parse(readFileSync(this.file, "utf8")) as Record<string, unknown>;
       const plain =
         typeof token === "string" && safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(Buffer.from(token, "base64")) : null;
       return {
         on: on === true && plain !== null,
         token: plain,
-        port: Number.isInteger(port) && port > 0 && port < 65_536 ? port : DEFAULT_PORT,
+        port: typeof port === "number" && Number.isInteger(port) && port > 0 && port < 65_536 ? port : DEFAULT_PORT,
       };
     } catch {
       return { on: false, token: null, port: DEFAULT_PORT };

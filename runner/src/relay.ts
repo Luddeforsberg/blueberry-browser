@@ -114,7 +114,7 @@ export const relayApp = (config: RelayConfig, supabase: { url: string; key: stri
 
   app.post("/sign-in", express.urlencoded({ extended: false, limit: "10kb" }), async (req, res) => {
     res.setHeader("cache-control", "no-store");
-    const result = await auth.signIn(req.body ?? {}, req.ip ?? "unknown");
+    const result = await auth.signIn((req.body ?? {}) as Record<string, unknown>, req.ip ?? "unknown");
     if ("redirect" in result) return res.redirect(302, result.redirect);
     return res.status(200).type("html").send(result.page);
   });

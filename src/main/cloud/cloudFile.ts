@@ -17,7 +17,7 @@ export const EMPTY: Saved = { apiKey: null, projectId: null, contextId: null, se
 
 export const readCloudFile = (file: string): Saved => {
   try {
-    const saved = JSON.parse(readFileSync(file, "utf8"));
+    const saved = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
     const open = (value: unknown) =>
       typeof value === "string" && safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(Buffer.from(value, "base64")) : null;
     const text = (value: unknown) => (typeof value === "string" && value.length <= MAX_FIELD_LENGTH ? value : null);
