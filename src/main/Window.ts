@@ -56,6 +56,7 @@ import { confirmCloudLogin, readSiteCookies } from "./cloudLoginAccess";
 import { suggestLoginSites } from "./cloudLogins";
 import { computeLayout, MIN_WINDOW, TAB_ROW_HEIGHT, TOOLBAR_HEIGHT, type Layout } from "./Layout";
 import { sendToRenderer } from "./ipc";
+import { withTabAt } from "./tabOrder";
 import type {
   ChromeRegion,
   EventChannels,
@@ -1034,7 +1035,9 @@ export class Window {
     // The chat's own title, whoever asked, or the tab says "Chat" until the thread next changes.
     const chatTitle = page === "chat" && param ? this.chatStore.chat(param)?.title : undefined;
     const tab = new InternalTab(`tab-${++this.tabCounter}`, page, param, chatTitle ?? options.title);
-    this.tabsMap.set(tab.id, tab);
+    // A job's tabs go under its chat, even one it opened before the chat's own tab opened.
+    const firstOfJob = this.entries.findIndex((entry) => page === "chat" && this.chats.jobChatOf(entry.id) === param);
+    this.tabsMap = withTabAt(this.tabsMap, tab, firstOfJob === -1 ? this.tabCount : firstOfJob);
     this.switchActiveTab(tab.id);
     return tab;
   }
@@ -1288,13 +1291,9 @@ export class Window {
   }
 
   moveTab(tabId: string, toIndex: number): boolean {
-    const entries = this.entries;
-    const from = entries.findIndex((tab) => tab.id === tabId);
-    if (from === -1) return false;
-
-    const [tab] = entries.splice(from, 1);
-    entries.splice(Math.max(0, Math.min(toIndex, entries.length)), 0, tab);
-    this.tabsMap = new Map(entries.map((entry) => [entry.id, entry]));
+    const tab = this.tabsMap.get(tabId);
+    if (!tab) return false;
+    this.tabsMap = withTabAt(this.tabsMap, tab, toIndex);
     this.notifyTabs();
     return true;
   }
