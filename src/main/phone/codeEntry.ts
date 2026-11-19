@@ -33,6 +33,8 @@ export const enterCodeInTab = async (
   const target: CodeTarget = chooseCodeField(fields, code, hasPasswordField);
   if (!target) return "no-field";
   const indexes = target.kind === "one" ? [target.index] : target.indexes;
+  const [first] = indexes;
+  if (first === undefined) return "no-field";
   const startingUrl = tab.url;
   // The tab may have just gone back to the job, which mustn't find half a code, but one the user is in is left alone.
   const wipe = () => (tab.heldForUser ? run(clearCodeFields(indexes)) : tab.runInPage(clearCodeFields(indexes)));
@@ -42,11 +44,12 @@ export const enterCodeInTab = async (
   };
 
   await run(watchCodeSubmit);
-  if (!(await run<boolean>(focusCodeField(indexes[0])))) return "no-field";
+  if (!(await run<boolean>(focusCodeField(first)))) return "no-field";
   try {
     for (const [at, character] of [...code].entries()) {
       if (!stillOurs()) return await interrupted();
-      const box = target.kind === "one" ? indexes[0] : indexes[at];
+      const box = target.kind === "one" ? first : indexes[at];
+      if (box === undefined) throw new Error("There's no box for every character");
       // A row of boxes usually moves along by itself. If not, or a page took the focus anywhere else, it's put right
       // first, because a real key goes wherever the focus is.
       if ((await run<number>(codeFieldFocus)) !== box && !(await run<boolean>(focusCodeField(box, target.kind === "boxes"))))
