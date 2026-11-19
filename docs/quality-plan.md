@@ -96,7 +96,7 @@ This is the `foundations` audit of the preview branch at `581637f`. The full rep
     - Later: only the runner's reach is checked through other files, so an Electron-free folder could still reach Electron through a runtime import of an Electron folder (`settings/PermissionPromptView.ts` imports `window/chromeView.ts`). A `typeof import("…")` in a type isn't caught.
 13. Page code out of template strings (high). Done.
 14. Split `browserTools.ts` (high, Codex). Done: 13 files in `tools/`, with the ask-first rules alone in `askFirst.ts`. The tool list the model sees is identical before and after.
-15. Split `Chats.ts` (high, Codex).
+15. Split `Chats.ts` (high, Codex). Done: `Chats` keeps every public method and hands each to one of 10 parts in `chats/`, which nothing outside `chats/` may import.
 16. Split `Window.ts` (medium).
 17. Split `ipc.ts` (low).
 18. The other files over 400 lines.
