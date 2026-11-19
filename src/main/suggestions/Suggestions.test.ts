@@ -3,6 +3,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { describe, expect, it, vi } from "vitest";
 import { Suggestions } from "./Suggestions";
+import { defined } from "../../shared/testing";
 
 const MINUTE = 60_000;
 const NOW = new Date(2026, 9, 31, 18, 0).getTime();
@@ -61,7 +62,7 @@ describe("asking the model for suggestions", () => {
     write.mockResolvedValueOnce(CARD);
     const before = await newTabAt(0);
     expect(before).toEqual([expect.objectContaining({ kind: "routine", why: expect.stringContaining("Hacker News") })]);
-    expect(write.mock.calls[0][1]).toMatch(/^<browsing_digest>\n\{.*\}\n<\/browsing_digest>$/s);
+    expect(defined(write.mock.calls[0])[1]).toMatch(/^<browsing_digest>\n\{.*\}\n<\/browsing_digest>$/s);
     expect(await newTabAt(1)).toEqual([
       expect.objectContaining({ kind: "prompt", title: "Shall I pick five stories for you?", why: "You read Hacker News most days" }),
     ]);
@@ -126,7 +127,7 @@ describe("what the user did with a card", () => {
     const { write, newTabAt, suggestions } = setup();
     write.mockResolvedValueOnce(CARD);
     await newTabAt(0);
-    const [card] = await newTabAt(1);
+    const card = defined((await newTabAt(1))[0]);
     suggestions.dismiss(card.id);
     // The model's card is gone, and so is the old rules' card on the same site.
     expect(await newTabAt(2)).toEqual([]);
@@ -134,7 +135,7 @@ describe("what the user did with a card", () => {
     write.mockResolvedValueOnce(CARD);
     suggestions.historyImported();
     await newTabAt(3);
-    const sent = write.mock.calls[1][1];
+    const sent = defined(write.mock.calls[1])[1];
     expect(sent).toContain('"dismissed":true');
     expect(sent).toContain("Shall I pick five stories for you?");
     // The same card again doesn't get past the check.
@@ -145,7 +146,7 @@ describe("what the user did with a card", () => {
     const { file, write, newTabAt, suggestions } = setup();
     write.mockResolvedValueOnce(CARD);
     await newTabAt(0);
-    const [card] = await newTabAt(1);
+    const card = defined((await newTabAt(1))[0]);
     suggestions.used(card.id);
     expect(JSON.parse(readFileSync(file, "utf8")).feedback).toEqual([expect.objectContaining({ verdict: "used", line: card.title })]);
   });

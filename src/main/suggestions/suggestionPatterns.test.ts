@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { findPatterns, isShareable, nameOfSite, topPatterns, type PatternVisit } from "./suggestionPatterns";
+import { defined } from "../../shared/testing";
 
 const NOW = new Date(2026, 9, 31, 18, 0).getTime();
 
@@ -22,31 +23,31 @@ describe("sites", () => {
   });
 
   it("makes a routine of the same hour, finished before they look", () => {
-    const [pattern] = findPatterns([hn(1), hn(2, 8, 40), hn(3, 8, 20), hn(5)], [], NOW);
+    const pattern = defined(findPatterns([hn(1), hn(2, 8, 40), hn(3, 8, 20), hn(5)], [], NOW)[0]);
     expect(pattern.kind).toBe("routine");
     expect(pattern.schedule).toEqual({ kind: "daily", time: "08:15" });
     expect(pattern.why).toBe("You’ve opened Hacker News around 8:30 on 4 of the last 6 days");
   });
 
   it("offers a prompt when the hours are scattered", () => {
-    const [pattern] = findPatterns([hn(1, 7), hn(2, 12), hn(3, 21)], [], NOW);
+    const pattern = defined(findPatterns([hn(1, 7), hn(2, 12), hn(3, 21)], [], NOW)[0]);
     expect(pattern.kind).toBe("prompt");
     expect(pattern.why).toBe("You’ve checked Hacker News on 3 of the last 4 days");
   });
 
   it("makes a weekly routine of the same weekday", () => {
     const visits = [7, 14, 21].map((daysAgo) => hn(daysAgo, daysAgo));
-    const [pattern] = findPatterns(visits, [], on(0, 18));
+    const pattern = defined(findPatterns(visits, [], on(0, 18))[0]);
     expect(pattern.schedule?.kind).toBe("weekly");
   });
 
   it("doesn't call the same hour on one weekday a daily habit", () => {
-    const [pattern] = findPatterns([hn(7), hn(14), hn(21)], [], NOW);
+    const pattern = defined(findPatterns([hn(7), hn(14), hn(21)], [], NOW)[0]);
     expect(pattern.schedule).toMatchObject({ kind: "weekly", time: "08:15" });
   });
 
   it("sees a habit around midnight as one hour", () => {
-    const [pattern] = findPatterns([hn(1, 23, 50), hn(2, 0, 5), hn(3, 23, 55), hn(4, 0, 10)], [], NOW);
+    const pattern = defined(findPatterns([hn(1, 23, 50), hn(2, 0, 5), hn(3, 23, 55), hn(4, 0, 10)], [], NOW)[0]);
     expect(pattern.kind).toBe("routine");
     expect(pattern.schedule?.kind).toBe("daily");
   });
@@ -81,9 +82,9 @@ describe("sites", () => {
 
   it("doesn't keep a title from an address with a query", () => {
     const search = (daysAgo: number) => visit("https://shop.example.com/find?q=rash+cream", "rash cream - Shop", on(daysAgo, 12 + daysAgo));
-    const [pattern] = findPatterns([search(1), search(2), search(3)], [], NOW);
+    const pattern = defined(findPatterns([search(1), search(2), search(3)], [], NOW)[0]);
     expect(pattern.pageTitles).toEqual([]);
-    expect(pattern.sites[0].label).toBe("shop.example.com");
+    expect(defined(pattern.sites[0]).label).toBe("shop.example.com");
   });
 });
 
@@ -95,7 +96,7 @@ describe("sites used together", () => {
 
   it("needs three days", () => {
     expect(findPatterns([...pair(1), ...pair(2)], [], NOW).filter(({ sites }) => sites.length === 2)).toEqual([]);
-    const [together] = findPatterns([...pair(1), ...pair(2), ...pair(3)], [], NOW).filter(({ sites }) => sites.length === 2);
+    const together = defined(findPatterns([...pair(1), ...pair(2), ...pair(3)], [], NOW).filter(({ sites }) => sites.length === 2)[0]);
     expect(together.kind).toBe("mascot");
     expect(together.sites.map(({ host }) => host)).toEqual(["github.com", "linear.app"]);
   });
@@ -116,7 +117,7 @@ describe("similar chats", () => {
 
   it("needs three that are alike", () => {
     expect(findPatterns([], flights.slice(0, 2), NOW)).toEqual([]);
-    const [pattern] = findPatterns([], flights, NOW);
+    const pattern = defined(findPatterns([], flights, NOW)[0]);
     expect(pattern.kind).toBe("prompt");
     expect(pattern.why).toBe("You’ve asked something like this 3 times");
   });
@@ -127,6 +128,8 @@ describe("similar chats", () => {
   });
 
   it("keeps different requests apart", () => {
-    expect(findPatterns([], [flights[0], chat("d", "Summarise this contract"), chat("e", "Write a birthday poem")], NOW)).toEqual([]);
+    expect(findPatterns([], [defined(flights[0]), chat("d", "Summarise this contract"), chat("e", "Write a birthday poem")], NOW)).toEqual(
+      [],
+    );
   });
 });
