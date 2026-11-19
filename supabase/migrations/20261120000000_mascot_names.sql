@@ -33,6 +33,9 @@ declare
   kept integer;
 begin
   if me is null then raise exception 'Not signed in' using errcode = '42501'; end if;
+  -- Two syncs at once would each delete before the other inserts, and leave both lists. Accepting a runner link takes
+  -- this lock too, so the account can't become a runner between the check and the write.
+  perform public.lock_cloud_account(me);
   if public.cloud_runner_for() is not null then raise exception 'A runner has no mascots' using errcode = '42501'; end if;
   if jsonb_typeof(p_mascots) <> 'array' or jsonb_array_length(p_mascots) > 100 then
     raise exception 'Not a list of mascots' using errcode = 'P0001';

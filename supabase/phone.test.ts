@@ -98,6 +98,7 @@ describe("the phone page's database rules", () => {
   });
 
   it("refuses a mascot that couldn't have come from the app", async () => {
+    await sync(ALICE, [SCOUT]);
     await expect(sync(ALICE, [{ ...SCOUT, tools: ["visit", "pay"] }])).rejects.toThrow(/tools_shape/);
     await expect(sync(ALICE, [{ ...SCOUT, id: "berry" }])).rejects.toThrow(/id_shape/);
     await expect(sync(ALICE, [{ ...SCOUT, palette: "red" }])).rejects.toThrow(/look_shape/);

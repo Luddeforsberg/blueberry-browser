@@ -2,6 +2,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { PALETTES } from "../src/shared/mascots";
 
 // 20261120000000_mascot_names.sql in real Postgres as Supabase's roles, on top of every migration before it: the new
 // names, and the old ones that clients from before still call, which must do and refuse exactly the same.
@@ -89,6 +90,8 @@ describe("the mascots' names on the server", () => {
     ).rows;
 
   let ALICE = "";
+  // Shared a mascot before the rename, and has nothing else written to her, so no test can change what she kept.
+  let KEEPER = "";
   let RUNNER = "";
   let BOB = "";
   let BOBS_RUNNER = "";
@@ -98,12 +101,12 @@ describe("the mascots' names on the server", () => {
     db = new PGlite();
     await db.exec(SUPABASE_STANDINS);
     for (const file of BEFORE) await db.exec(readFileSync(join(__dirname, "migrations", file), "utf8"));
-    [ALICE, RUNNER, BOB, BOBS_RUNNER] = [await newUser(), await newUser(), await newUser(), await newUser()];
+    [ALICE, RUNNER, BOB, BOBS_RUNNER, KEEPER] = [await newUser(), await newUser(), await newUser(), await newUser(), await newUser()];
     await link(ALICE, RUNNER);
     await link(BOB, BOBS_RUNNER);
     SECRET = String(await one(ALICE, "select public.create_relay_grant()"));
     // A mascot shared before the rename, under the old name, and who could do what then.
-    await as(ALICE, `select public.sync_cloud_flock('${JSON.stringify([{ ...SCOUT, id: "kept", palette: "robin" }])}'::jsonb)`);
+    await as(KEEPER, `select public.sync_cloud_flock('${JSON.stringify([{ ...SCOUT, id: "kept", palette: "robin" }])}'::jsonb)`);
     before.table = await tableGrants("cloud_flock");
     before.sync = await functionGrants("sync_cloud_flock(jsonb)");
     before.relay = await functionGrants("relay_flock(text)");
@@ -116,7 +119,7 @@ describe("the mascots' names on the server", () => {
   afterAll(() => db.close());
 
   it("keeps the rows, row-level security, policy and grants the old table had, on the new name", async () => {
-    expect(await as(ALICE, "select id, palette from public.cloud_mascots")).toEqual([{ id: "kept", palette: "robin" }]);
+    expect(await as(KEEPER, "select id, palette from public.cloud_mascots")).toEqual([{ id: "kept", palette: "robin" }]);
     expect(await tableGrants("cloud_mascots")).toBe(before.table);
     expect(await policies("cloud_mascots")).toEqual(before.policies);
     expect(
@@ -136,6 +139,16 @@ describe("the mascots' names on the server", () => {
     // The wrappers can't do more than their caller: neither runs as its owner.
     const definers = await db.query("select proname from pg_proc where proname in ('sync_cloud_flock', 'relay_flock') and prosecdef");
     expect(definers.rows).toEqual([]);
+  });
+
+  it("gives a client from before every look's old palette id, whichever id each was written with", async () => {
+    const old = PALETTES.map(({ oldId }, i) => ({ id: `p-${i}`, palette: oldId }));
+    for (const written of ["id", "oldId"] as const) {
+      const all = PALETTES.map((palette, i) => ({ ...SCOUT, id: `p-${i}`, name: `Pip ${i}`, palette: palette[written] }));
+      await as(ALICE, `select public.sync_cloud_mascots('${JSON.stringify(all)}'::jsonb)`);
+      expect(await as(ALICE, "select id, palette from public.cloud_flock order by position"), written).toEqual(old);
+      expect(await as(RUNNER, `select id, palette from public.relay_flock('${SECRET}')`), written).toEqual(old);
+    }
   });
 
   for (const [which, { table, sync, param, relay, lingon }] of Object.entries(NAMES)) {
