@@ -76,7 +76,7 @@ This is the `foundations` audit of the preview branch at `581637f`. The full rep
 5. Compiler flags that cost 0 errors (low). Done.
 6. `knip` (low). Done.
 7. Size and complexity limits, with a list of exceptions that only shrinks (low). Done.
-8. Code-only rename, plus a check against "bird" and "flock" (low).
+8. Code-only rename, plus a check against "bird" and "flock" (low). Done.
 9. Renames in saved formats, with migrations (medium). Done. mascots.json still writes the old palette ids (`storedPalette`), because an older version run on the same computer drops a mascot with a new id, and its next save loses it.
 10. Server and model-facing renames (high, Codex).
     - Later, the user's call: write the new palette ids to mascots.json once going back to an older version no longer matters. Server writes switch in step 10 itself, after its migration is applied.
