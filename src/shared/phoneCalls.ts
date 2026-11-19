@@ -29,14 +29,27 @@ export const fetchWithin = async (
   }
 };
 
-// Asking while one is out gets that one rather than starting another, so nothing that wakes the page, such as it coming
-// back to the front, can set a second round of polling going.
+// Never two at once, so nothing that wakes the page, such as it coming back to the front, can set a second round of
+// polling going. A call made while one is out gets one more run after it, shared with every other call made meanwhile,
+// since the one that's out may have read before what the caller just did, such as sending a follow-up.
 export const oneAtATime = <T>(work: () => Promise<T>): (() => Promise<T>) => {
   let out: Promise<T> | null = null;
-  return () =>
-    (out ??= work().finally(() => {
+  let again: Promise<T> | null = null;
+  const run = (): Promise<T> =>
+    (out = work().finally(() => {
       out = null;
     }));
+  return () => {
+    if (!out) return run();
+    const settled = out.then(
+      () => undefined,
+      () => undefined,
+    );
+    return (again ??= settled.then(() => {
+      again = null;
+      return run();
+    }));
+  };
 };
 
 // Whether to ask again if a runner is linked: never asked, or not for a while.

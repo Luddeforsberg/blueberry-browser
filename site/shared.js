@@ -257,9 +257,21 @@ var fetchWithin = async (url, init, ms = CALL_DEADLINE_MS, fetcher = fetch) => {
 };
 var oneAtATime = (work) => {
   let out = null;
-  return () => out ??= work().finally(() => {
+  let again = null;
+  const run = () => out = work().finally(() => {
     out = null;
   });
+  return () => {
+    if (!out) return run();
+    const settled = out.then(
+      () => void 0,
+      () => void 0
+    );
+    return again ??= settled.then(() => {
+      again = null;
+      return run();
+    });
+  };
 };
 var runnerLinkDue = (checkedAt, now) => checkedAt === null || now - checkedAt >= RUNNER_LINK_EVERY_MS;
 
