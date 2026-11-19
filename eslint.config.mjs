@@ -48,6 +48,7 @@ export default tseslint.config(
       "@typescript-eslint/no-unsafe-enum-comparison": "error",
       "@typescript-eslint/no-unsafe-unary-minus": "error",
       "@typescript-eslint/restrict-plus-operands": "error",
+      "@typescript-eslint/unbound-method": "error",
     },
   },
   {
@@ -67,6 +68,11 @@ export default tseslint.config(
       "@typescript-eslint/no-unsafe-member-access": "off",
       "@typescript-eslint/no-unsafe-return": "off",
     },
+  },
+  {
+    // A test hands a mocked method to expect to see how it was called, and a mock has no `this` to lose.
+    files: ["**/*.test.ts"],
+    rules: { "@typescript-eslint/unbound-method": "off" },
   },
   {
     // Held back: each takes what it reads as the type it was written as, with no parser to check it, and a parser would
