@@ -70,11 +70,12 @@ export class Chats {
   ) {
     const parts: ChatParts = {
       store,
-      streamReply,
-      generateTitle,
+      // Called on Chats, as they always were, wherever the call now is.
+      streamReply: streamReply.bind(this),
+      generateTitle: generateTitle.bind(this),
       browser,
       events,
-      mascotOf,
+      mascotOf: (id) => this.mascotOf(id),
       memory,
       cloud,
       runner,
