@@ -2,7 +2,7 @@
 // becomes one function expression with only what it uses, and main calls it with its arguments as JSON, so no value is
 // ever written into the code. `pnpm run page:build` writes the file. With `--check` it only fails if the file isn't what
 // this would write, which `electron-vite build` and `pnpm run runner:build` run first.
-import { build } from "esbuild";
+import { build, transform } from "esbuild";
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,18 +11,9 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const INDEX = "src/page/index.ts";
 const OUT = "src/main/pageCode.ts";
 
-const options = {
-  absWorkingDir: root,
-  bundle: true,
-  write: false,
-  format: "esm",
-  platform: "browser",
-  // Electron's Chromium and the cloud's Chrome run anything new, so nothing is rewritten for an older browser.
-  target: "esnext",
-  charset: "utf8",
-  legalComments: "none",
-  logLevel: "silent",
-};
+// Electron's Chromium and the cloud's Chrome run anything new, so nothing is rewritten for an older browser.
+const printing = { target: "esnext", charset: "utf8", legalComments: "none", logLevel: "silent" };
+const options = { ...printing, absWorkingDir: root, bundle: true, write: false, format: "esm", platform: "browser" };
 
 // Each entry is bundled from the module it's in, not through the index, which would bring every module's top-level code.
 const index = readFileSync(join(root, INDEX), "utf8").replace(/\r\n/g, "\n");
@@ -46,17 +37,12 @@ const bundle = async ({ name, from }) => {
     ...options,
     stdin: { contents: `export { ${name} as default } from "./${from}";`, resolveDir: root, sourcefile: `${name}.ts`, loader: "ts" },
   });
-  const text = outputFiles[0].text;
+  // Printed again, which drops the comments the bundler adds to name each source file, and only comments.
+  const { code: text } = await transform(outputFiles[0].text, { ...printing, loader: "js", format: "esm" });
   const ending = /\nexport \{\n {2}(\w+) as default\n\};\n$/;
   const local = text.match(ending)?.[1];
   if (!local) throw new Error(`${name}: esbuild's output didn't end in the one default export this expects`);
-  // The comments esbuild adds name each source file, which isn't the same on every machine.
-  const body = text
-    .replace(ending, "\n")
-    .split("\n")
-    .filter((line) => !/^\s*\/\/ /.test(line))
-    .join("\n")
-    .trim();
+  const body = text.replace(ending, "\n").trim();
   return `(() => {\n${body}\nreturn ${local};\n})()`;
 };
 

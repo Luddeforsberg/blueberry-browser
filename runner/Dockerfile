@@ -9,6 +9,8 @@ ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1
 RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY src ./src
 COPY runner ./runner
+# runner:build first checks that src/main/pageCode.ts is what src/page builds to.
+COPY scripts/buildPage.mjs ./scripts/
 RUN pnpm run runner:build
 ENV NODE_ENV=production
 CMD ["node", "runner/dist/index.cjs"]
