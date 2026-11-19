@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { fitJobUpdate } from "../src/main/remoteJobs/cloudJobs";
 import type { ChatStep } from "../src/shared/library";
+import { defined } from "../src/shared/testing";
 
 // Relay jobs on the owner's Mac, in real Postgres as Supabase's roles, on top of every migration before it.
 const SUPABASE_STANDINS = `
@@ -37,7 +38,7 @@ describe("relay jobs on the Mac", () => {
       await db.exec("reset role");
     }
   };
-  const one = async (uid: string | null, sql: string) => Object.values((await as(uid, sql))[0])[0];
+  const one = async (uid: string | null, sql: string) => Object.values(defined((await as(uid, sql))[0]))[0];
   let users = 0;
   const newUser = async () => {
     const id = `00000000-0000-4000-8000-${String(++users).padStart(12, "0")}`;
@@ -217,19 +218,20 @@ describe("relay jobs on the Mac", () => {
     for (const job of [cloud, mac]) {
       for (const character of ["a", "🫐"]) {
         await write(job, { reply: character.repeat(40_000) });
-        expect((await saved(job)).reply).toBe(40_000);
+        expect(defined(await saved(job)).reply).toBe(40_000);
         await expect(write(job, { reply: character.repeat(40_001) })).rejects.toThrow(/reply_shape/);
         await write(job, fitJobUpdate({ reply: character.repeat(40_001) }));
-        expect((await saved(job)).reply).toBe(40_000);
+        expect(defined(await saved(job)).reply).toBe(40_000);
       }
       await expect(write(job, { error: "x".repeat(501) })).rejects.toThrow(/error_shape/);
       await expect(write(job, { steps: longSteps })).rejects.toThrow(/steps_shape/);
       await write(job, fitJobUpdate({ steps: longSteps, error: "x".repeat(501) }));
       expect(await saved(job)).toMatchObject({ error: 500, steps: expect.any(Number) });
       // The last write that fits is just under the limit, so the estimate isn't far off it.
-      const bytes = (
-        await db.query<{ bytes: number }>("select octet_length(steps::text) as bytes from public.cloud_jobs where id = $1", [job])
-      ).rows[0].bytes;
+      const bytes = defined(
+        (await db.query<{ bytes: number }>("select octet_length(steps::text) as bytes from public.cloud_jobs where id = $1", [job]))
+          .rows[0],
+      ).bytes;
       expect(bytes).toBeGreaterThan(98_000);
     }
   });

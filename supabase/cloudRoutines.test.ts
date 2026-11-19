@@ -2,6 +2,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { defined } from "../src/shared/testing";
 
 // Routines that run with the Mac off, in real Postgres as Supabase's roles, on top of every migration before them.
 const SUPABASE_STANDINS = `
@@ -49,13 +50,14 @@ describe("routines in the cloud", () => {
     as<{ id: string }>(
       uid,
       `select public.sync_cloud_routine('${key}', 'Check the prices', ${MASCOT}, 'risky', null, ${schedule}, 'Europe/Stockholm', ${paused}, ${first}) as id`,
-    ).then(([row]) => row.id);
+    ).then(([row]) => defined(row).id);
   const due = (runner: string) =>
     as<{ id: string; next_run_at: string }>(runner, "select id, next_run_at from public.runner_due_routines()");
   const startRun = async (runner: string, routine: string, dueAt: string, next = "now() + interval '1 day'") =>
-    (await as<{ id: string | null }>(runner, `select public.runner_start_routine('${routine}', '${dueAt}', ${next}) as id`))[0].id;
+    defined((await as<{ id: string | null }>(runner, `select public.runner_start_routine('${routine}', '${dueAt}', ${next}) as id`))[0]).id;
   const dueAt = async (routine: string) =>
-    (await db.query<{ at: string }>("select next_run_at::text as at from public.cloud_routines where id = $1", [routine])).rows[0].at;
+    defined((await db.query<{ at: string }>("select next_run_at::text as at from public.cloud_routines where id = $1", [routine])).rows[0])
+      .at;
 
   let ALICE = "";
   let RUNNER = "";
