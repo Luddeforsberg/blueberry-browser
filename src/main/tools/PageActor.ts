@@ -1,28 +1,23 @@
 import type { WebContentsView } from "electron";
 import { actorCommand, ifThere, installActor, type ActorCommand, type ActorLook } from "./pageActorScript";
 import type { MascotLook } from "../../shared/library";
+import { flightMs, landingFor, MASCOT_SIZE, TYPE_MAX_MS, type Landing, type Place, type Spot } from "./actorMotion";
+
+export { flightMs, landingFor, typingChunks, typingPauseMs, type Landing, type Spot } from "./actorMotion";
 
 // The mascot on the page. It only shows what a job is doing and when: it never decides where input goes or whether it
 // happens. Every call here is a no-op unless the user can see this tab, in front of them or as the picture of it in the
 // chat, so a job nobody's watching pays nothing, not even the waiting. `actorOn` in `toolContext.ts` asks `showing`
 // first, and the tools take the path they always took if the answer is no.
 
-// Drawing size on screen. `.pose` is positioned from where the feet are, which is what everything here measures.
-const MASCOT_SIZE = 56;
 // Its size in a picture of the page, which is much smaller than the page, so it's drawn larger there to still be a mascot.
 const MASCOT_SIZE_IN_PICTURE = 42;
 // How long the picture is worth updating quickly after the mascot last did anything. The longest thing it does is a flight.
 const LIVELY_MS = 760;
-const FEET_X = 57 / 120;
 
 // How long a page gets to answer. Being late only means the mascot is out of step, so nothing ever waits on a stuck page.
 const PAGE_ANSWER_MS = 400;
 
-// Flight time grows with distance, within what a fraction of a second allows.
-const FLIGHT_BASE_MS = 200;
-const FLIGHT_MS_PER_PIXEL = 0.35;
-const FLIGHT_MAX_MS = 520;
-const ENTRY_MS = 520;
 const MARKER_MS = 130;
 const CARRY_MS = 240;
 const LEAVE_MS = 340;
@@ -31,10 +26,6 @@ const PECK_LEAD_MS = 70;
 const HOP_MS = 180;
 // A first look before the read comes back, so reading is seen even when the answer is instant.
 const READ_MS = 320;
-
-// Letters arrive one tick at a time. Longer text gets bigger chunks rather than more time.
-const TYPE_TICK_MS = 34;
-const TYPE_MAX_MS = 1300;
 
 // After the user's own click or key, the mascot stays away this long, even in a page a job can go on reading.
 const QUIET_AFTER_USER_MS = 5000;
@@ -54,70 +45,10 @@ export interface ActorOptions {
   windowShowing: boolean;
 }
 
-// Where an element is, in the top page's pixels, from `spotOf`.
-export interface Spot {
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-  // Where a click would go.
-  x: number;
-  y: number;
-  viewWidth: number;
-  viewHeight: number;
-  // Its label, unless it's a secret field or holds what's typed in it, so never anything the user typed.
-  name?: string;
-  secret?: boolean;
-}
-
-// "ask" stands where "land" would, and faces the user there until they answer.
-export type Landing = "land" | "perch" | "look" | "ask";
-
 // Where the element a waiting card is about is now, looked up again each time, since the page may have moved.
 export type FindAsked = () => Promise<{ spot: Spot; ref?: string } | null>;
 
 export const WAITING_WORDS = "Waiting for you";
-
-interface Place {
-  x: number;
-  y: number;
-  // 1 faces right, -1 faces left.
-  turn: 1 | -1;
-}
-
-// Where the feet go. Over a short target it stands on the top edge, so it hides none of the label, and leans in to peck.
-// Over a tall one, near the point. It faces into the page wherever the left side is too tight.
-export const landingFor = ({ left, top, width, height, x, y, viewWidth }: Spot, kind: Landing, size = MASCOT_SIZE): Place => {
-  if (kind === "perch") {
-    // Sat on the edge at the far end, clear of the letters coming in from the start.
-    const seat = left + width - Math.min(width * 0.25, size);
-    return { x: Math.max(size * 0.6, Math.min(seat, viewWidth - size * 0.6)), y: Math.max(size * 0.7, top), turn: 1 };
-  }
-  const reach = size * 0.42;
-  const turn: 1 | -1 = x - reach - size * FEET_X < 0 ? -1 : x + reach + size * 0.6 > viewWidth && x > viewWidth / 2 ? -1 : 1;
-  const edge = height <= size * 1.5 ? top + Math.min(height * 0.2, 6) : y - size * 0.3;
-  return { x: x - turn * reach, y: Math.max(size * 0.9, edge), turn };
-};
-
-export const flightMs = (from: { x: number; y: number } | null, to: { x: number; y: number }): number => {
-  if (!from) return ENTRY_MS;
-  return Math.round(Math.min(FLIGHT_MAX_MS, FLIGHT_BASE_MS + Math.hypot(to.x - from.x, to.y - from.y) * FLIGHT_MS_PER_PIXEL));
-};
-
-// A short text one letter at a time, and a long one in as many chunks as fit, so 5000 characters take no longer than 40.
-export const typingChunks = (text: string): string[] => {
-  const letters = [...text];
-  const size = Math.max(1, Math.ceil(letters.length / Math.floor(TYPE_MAX_MS / TYPE_TICK_MS)));
-  const chunks: string[] = [];
-  for (let at = 0; at < letters.length; at += size) chunks.push(letters.slice(at, at + size).join(""));
-  return chunks;
-};
-
-// Not metronomic: a bit of variation between ticks, and a small pause after a word.
-export const typingPauseMs = (chunk: string): number => {
-  const jitter = TYPE_TICK_MS * (0.7 + Math.random() * 0.6);
-  return /\s$/.test(chunk) ? jitter * 1.6 : jitter;
-};
 
 interface ActorTab {
   readonly isVisible: boolean;

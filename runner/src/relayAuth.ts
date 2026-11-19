@@ -1,18 +1,18 @@
-import { createCipheriv, createDecipheriv, createHash, createHmac, hkdfSync, randomBytes, randomUUID, timingSafeEqual } from "crypto";
+import { randomBytes, randomUUID, timingSafeEqual } from "crypto";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { dirname } from "path";
 import type { Response } from "express";
 import type { OAuthRegisteredClientsStore } from "@modelcontextprotocol/sdk/server/auth/clients.js";
-import {
-  InvalidClientMetadataError,
-  InvalidGrantError,
-  InvalidTargetError,
-  InvalidTokenError,
-} from "@modelcontextprotocol/sdk/server/auth/errors.js";
+import { InvalidGrantError, InvalidTargetError, InvalidTokenError } from "@modelcontextprotocol/sdk/server/auth/errors.js";
 import type { AuthorizationParams, OAuthServerProvider } from "@modelcontextprotocol/sdk/server/auth/provider.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import type { OAuthClientInformationFull, OAuthTokenRevocationRequest, OAuthTokens } from "@modelcontextprotocol/sdk/shared/auth.js";
 import { ServerError, Unreachable, type GalleryServer } from "../../src/main/account/galleryServer";
+import { signedClients } from "./relayClients";
+import { b64, hash, keysFrom, mac, newToken, seal, unseal, unsigned, signed, type Keys } from "./relayCrypto";
+import { appName, signInPage } from "./relaySignInPage";
+
+export { redirectAllowed } from "./relayClients";
 
 // OAuth for the relay, so ChatGPT and Claude start jobs as the user, never as the runner. The user signs in on a page
 // served here with their Blueberry email and password, which go to Supabase and nowhere else: never to a log or the
@@ -30,76 +30,10 @@ export const IDLE_LIMIT_MS = 30 * 24 * 60 * 60_000;
 export const AGE_LIMIT_MS = 90 * 24 * 60 * 60_000;
 const MAX_GRANTS = 20;
 const MAX_CODES = 50;
-const MAX_REDIRECTS = 5;
 // A light limit on the owner's sign-in tries, per address and in all. Anyone else is refused before it counts.
 const TRIES_WINDOW_MS = 15 * 60_000;
 const TRIES_PER_ADDRESS = 10;
 const TRIES_IN_ALL = 30;
-
-// Where a sign-in may send its code: ChatGPT and Claude, or an app on the same computer as the browser.
-const REDIRECT_HOSTS = ["chatgpt.com", "claude.ai", "claude.com"];
-const LOOPBACK = ["localhost", "127.0.0.1", "[::1]"];
-
-export const redirectAllowed = (uri: string): boolean => {
-  try {
-    const { protocol, hostname } = new URL(uri);
-    if (protocol === "http:") return LOOPBACK.includes(hostname);
-    return protocol === "https:" && (REDIRECT_HOSTS.includes(hostname) || LOOPBACK.includes(hostname));
-  } catch {
-    return false;
-  }
-};
-
-const appName = (uri: string): string => {
-  const host = new URL(uri).hostname;
-  return host === "chatgpt.com" ? "ChatGPT" : host.startsWith("claude") ? "Claude" : "An app on your computer";
-};
-
-const b64 = (data: Buffer | string) => Buffer.from(data).toString("base64url");
-const hash = (token: string) => createHash("sha256").update(token).digest("base64url");
-const newToken = (kind: string) => `bb_${kind}_${randomBytes(32).toString("base64url")}`;
-
-const keysFrom = (secret: string) => ({
-  sign: Buffer.from(hkdfSync("sha256", secret, "blueberry-relay", "sign", 32)),
-  seal: Buffer.from(hkdfSync("sha256", secret, "blueberry-relay", "seal", 32)),
-});
-type Keys = ReturnType<typeof keysFrom>;
-
-const mac = (keys: Keys, text: string) => createHmac("sha256", keys.sign).update(text).digest();
-const signed = (keys: Keys, data: object) => {
-  const body = b64(JSON.stringify(data));
-  return `${body}.${b64(mac(keys, body))}`;
-};
-const unsigned = (keys: Keys, text: unknown): Record<string, unknown> | null => {
-  if (typeof text !== "string" || text.length > 8000) return null;
-  const [body, tag, extra] = text.split(".");
-  if (!body || !tag || extra !== undefined) return null;
-  const given = Buffer.from(tag, "base64url");
-  const wanted = mac(keys, body);
-  if (given.length !== wanted.length || !timingSafeEqual(given, wanted)) return null;
-  try {
-    return JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
-  } catch {
-    return null;
-  }
-};
-
-const seal = (keys: Keys, text: string): string => {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", keys.seal, iv);
-  const sealed = Buffer.concat([cipher.update(text, "utf8"), cipher.final()]);
-  return b64(Buffer.concat([iv, cipher.getAuthTag(), sealed]));
-};
-const unseal = (keys: Keys, text: string): string | null => {
-  try {
-    const all = Buffer.from(text, "base64url");
-    const decipher = createDecipheriv("aes-256-gcm", keys.seal, all.subarray(0, 12));
-    decipher.setAuthTag(all.subarray(12, 28));
-    return Buffer.concat([decipher.update(all.subarray(28)), decipher.final()]).toString("utf8");
-  } catch {
-    return null;
-  }
-};
 
 // One connection from ChatGPT or Claude, standing for a grant in the database.
 interface Grant {
@@ -158,42 +92,7 @@ export class RelayAuth implements OAuthServerProvider {
   // --- Clients, signed instead of stored ---
 
   get clientsStore(): OAuthRegisteredClientsStore {
-    return {
-      getClient: (clientId) => {
-        const data = unsigned(this.keys, clientId);
-        if (!data || data.t !== "client" || !Array.isArray(data.r)) return undefined;
-        const method = data.m === "none" ? "none" : "client_secret_post";
-        return {
-          client_id: clientId,
-          redirect_uris: data.r.map(String),
-          token_endpoint_auth_method: method,
-          grant_types: ["authorization_code", "refresh_token"],
-          response_types: ["code"],
-          ...(typeof data.n === "string" ? { client_name: data.n } : {}),
-          ...(method === "none" ? {} : { client_secret: b64(mac(this.keys, `secret:${clientId}`)), client_secret_expires_at: 0 }),
-        };
-      },
-      registerClient: (client) => {
-        const uris = client.redirect_uris.map(String);
-        if (uris.length === 0 || uris.length > MAX_REDIRECTS || !uris.every((uri) => uri.length <= 500 && redirectAllowed(uri))) {
-          throw new InvalidClientMetadataError("Only ChatGPT, Claude or an app on this computer may connect here.");
-        }
-        const method = client.token_endpoint_auth_method === "none" ? "none" : "client_secret_post";
-        const name = typeof client.client_name === "string" ? client.client_name.slice(0, 100) : undefined;
-        const clientId = signed(this.keys, {
-          t: "client",
-          r: uris,
-          m: method,
-          ...(name ? { n: name } : {}),
-          at: Math.floor(this.now() / 1000),
-          k: randomUUID(),
-        });
-        return {
-          ...this.clientsStore.getClient(clientId)!,
-          client_id_issued_at: Math.floor(this.now() / 1000),
-        } as OAuthClientInformationFull;
-      },
-    };
+    return signedClients(this.keys, () => this.now());
   }
 
   // --- The sign-in page ---
@@ -466,35 +365,3 @@ export class RelayAuth implements OAuthServerProvider {
     }
   }
 }
-
-const escape = (text: string) => text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-
-// A plain page with nothing but the form. Everything put in it is escaped.
-const signInPage = ({ app, request, problem }: { app: string; request: string | null; problem?: string }): string => `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Connect to Blueberry</title>
-<style>
-:root{color-scheme:light dark;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-body{margin:0;min-height:100vh;display:grid;place-items:center;background:Canvas;color:CanvasText}
-main{width:min(360px,calc(100vw - 32px))}
-h1{font-size:20px;margin:0 0 8px}
-p{font-size:14px;line-height:1.45;opacity:.8;margin:0 0 16px}
-label{display:block;font-size:13px;margin:12px 0 4px}
-input{box-sizing:border-box;width:100%;font:inherit;padding:8px 10px;border:1px solid #8886;border-radius:8px}
-button{margin-top:16px;width:100%;font:inherit;font-weight:600;padding:9px;border:0;border-radius:8px;background:#3d4fd6;color:#fff}
-.problem{color:#b45309;opacity:1}
-</style></head><body><main>
-<h1>Connect to Blueberry</h1>
-<p>${escape(app)} wants to give jobs to your mascots in the cloud. They still ask you, in Blueberry or on your phone, before anything risky, and it can't answer for you.</p>
-${problem ? `<p class="problem" role="alert">${escape(problem)}</p>` : ""}
-${
-  request
-    ? `<form method="post" action="/sign-in">
-<input type="hidden" name="request" value="${escape(request)}">
-<label for="email">Blueberry email</label><input id="email" name="email" type="email" autocomplete="username" required>
-<label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required>
-<button type="submit">Sign in and connect</button>
-</form>`
-    : ""
-}
-</main></body></html>`;
