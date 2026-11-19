@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { mascotSnapshot } from "../src/main/cloudJobs";
+import { mascotSnapshot } from "../src/main/remoteJobs/cloudJobs";
 import { BERRY } from "../src/shared/mascots";
 import { findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";

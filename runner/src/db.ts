@@ -1,7 +1,13 @@
-import type { ReplyMessage } from "../../src/main/agent";
-import { actionApprovalFromRow, fitJobUpdate, historyFromRow, type ApprovalToAsk, type CloudJobStatus } from "../../src/main/cloudJobs";
+import type { ReplyMessage } from "../../src/main/chats/agent";
+import {
+  actionApprovalFromRow,
+  fitJobUpdate,
+  historyFromRow,
+  type ApprovalToAsk,
+  type CloudJobStatus,
+} from "../../src/main/remoteJobs/cloudJobs";
 import type { ActionApproval } from "../../src/shared/ipc";
-import { GalleryServer, type ServerSession } from "../../src/main/galleryServer";
+import { GalleryServer, type ServerSession } from "../../src/main/account/galleryServer";
 import type { ChatStep } from "../../src/shared/library";
 import type { PushDb, PushSubscriptionRow } from "./push";
 import type { DueRoutine, RoutineDb } from "./routines";

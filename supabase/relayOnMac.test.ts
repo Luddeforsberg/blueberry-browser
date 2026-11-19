@@ -2,7 +2,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { fitJobUpdate } from "../src/main/cloudJobs";
+import { fitJobUpdate } from "../src/main/remoteJobs/cloudJobs";
 import type { ChatStep } from "../src/shared/library";
 
 // Relay jobs on the owner's Mac, in real Postgres as Supabase's roles, on top of every migration before it.

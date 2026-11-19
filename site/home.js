@@ -1,7 +1,7 @@
 import "./theme.js";
 import { DRAWINGS } from "./mascots.js";
 
-// A few of the mascots that come with Blueberry, as they look in its Gallery (src/main/mascotCatalog.ts), and Berry.
+// A few of the mascots that come with Blueberry, as they look in its Gallery (src/main/mascots/mascotCatalog.ts), and Berry.
 const MASCOTS = [
   { name: "Berry", what: "Comes with every Blueberry.", palette: "blueberry", accessory: "none" },
   { name: "Prospector", what: "Finds companies that fit your customer.", palette: "lingon", accessory: "cap" },

@@ -334,7 +334,7 @@ var rowTime = (time, { now = Date.now(), going = false } = {}) => {
   return dayOf(now) - dayOf(time) < 7 ? weekday(time) : dayAndMonth(time);
 };
 
-// src/main/phoneReplies.ts
+// src/main/phone/phoneReplies.ts
 var MIN_CODE_LENGTH = 4;
 var MAX_CODE_LENGTH = 12;
 var plausibleCode = (text) => {

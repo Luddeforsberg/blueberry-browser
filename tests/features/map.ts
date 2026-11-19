@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { mascotSnapshot } from "../../src/main/cloudJobs";
+import { mascotSnapshot } from "../../src/main/remoteJobs/cloudJobs";
 import type { MascotProfile } from "../../src/shared/library";
 import type { InternalPage, Settings } from "../../src/shared/ipc";
 import { sharedMascotRows } from "../../src/shared/phone";

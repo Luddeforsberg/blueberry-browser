@@ -1,7 +1,7 @@
-import { modelConfig } from "../../src/main/agent";
-import { browserbase } from "../../src/main/browserbase";
-import { CloudSessions, type CloudBrowser } from "../../src/main/cloudBrowser";
-import { isLocalEndpoint, localChrome } from "../../src/main/localChrome";
+import { modelConfig } from "../../src/main/chats/agent";
+import { browserbase } from "../../src/main/cloud/browserbase";
+import { CloudSessions, type CloudBrowser } from "../../src/main/cloud/cloudBrowser";
+import { isLocalEndpoint, localChrome } from "../../src/main/cloud/localChrome";
 import { DbError, dbConfig, runnerSession, supabaseDb, type ClaimedJob } from "./db";
 import { runJob, sessionBrowser, UnreleasedBrowsers } from "./job";
 import { pushConfig, pusher } from "./push";

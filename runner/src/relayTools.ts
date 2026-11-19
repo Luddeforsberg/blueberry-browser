@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { approvalFromRow, stepsFromRow, type CloudJobStatus } from "../../src/main/cloudJobs";
-import { UNTRUSTED_NOTE, type McpTool, type McpToolResult } from "../../src/main/mcpTools";
+import { approvalFromRow, stepsFromRow, type CloudJobStatus } from "../../src/main/remoteJobs/cloudJobs";
+import { UNTRUSTED_NOTE, type McpTool, type McpToolResult } from "../../src/main/mcp/mcpTools";
 import type { MascotProfile } from "../../src/shared/library";
 import { BERRY, NOWHERE, narrowSites } from "../../src/shared/mascots";
-import { agentSummary, sitesFromApp } from "../../src/main/mcpMascots";
+import { agentSummary, sitesFromApp } from "../../src/main/mcp/mcpMascots";
 import { mascotSnapshot } from "../../src/shared/phone";
 import type { RelayWhere } from "./db";
 

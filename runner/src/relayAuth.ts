@@ -12,7 +12,7 @@ import {
 import type { AuthorizationParams, OAuthServerProvider } from "@modelcontextprotocol/sdk/server/auth/provider.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import type { OAuthClientInformationFull, OAuthTokenRevocationRequest, OAuthTokens } from "@modelcontextprotocol/sdk/shared/auth.js";
-import { ServerError, Unreachable, type GalleryServer } from "../../src/main/galleryServer";
+import { ServerError, Unreachable, type GalleryServer } from "../../src/main/account/galleryServer";
 
 // OAuth for the relay, so ChatGPT and Claude start jobs as the user, never as the runner. The user signs in on a page
 // served here with their Blueberry email and password, which go to Supabase and nowhere else: never to a log or the

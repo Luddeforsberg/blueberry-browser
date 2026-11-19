@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { streamReply as agentReply, type StreamReply } from "../../src/main/agent";
-import { isLiveView } from "../../src/main/browserbase";
-import { Chats, type ChatCloud, type ChatStoreLike, type TaskProgress } from "../../src/main/Chats";
-import { approvalToAsk, mascotFromSnapshot } from "../../src/main/cloudJobs";
-import type { CloudSessions } from "../../src/main/cloudBrowser";
+import { streamReply as agentReply, type StreamReply } from "../../src/main/chats/agent";
+import { isLiveView } from "../../src/main/cloud/browserbase";
+import { Chats, type ChatCloud, type ChatStoreLike, type TaskProgress } from "../../src/main/chats/Chats";
+import { approvalToAsk, mascotFromSnapshot } from "../../src/main/remoteJobs/cloudJobs";
+import type { CloudSessions } from "../../src/main/cloud/cloudBrowser";
 import type { ChatApproval } from "../../src/shared/library";
 import type { ClaimedJob, JobUpdate, RunnerDb } from "./db";
 import type { PushKind } from "./push";

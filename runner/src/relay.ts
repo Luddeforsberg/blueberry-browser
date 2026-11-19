@@ -4,7 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { mcpAuthRouter, getOAuthProtectedResourceMetadataUrl } from "@modelcontextprotocol/sdk/server/auth/router.js";
 import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js";
-import { GalleryServer } from "../../src/main/galleryServer";
+import { GalleryServer } from "../../src/main/account/galleryServer";
 import { mascotsFromSharedRows } from "../../src/shared/phone";
 import { DbError, type RelayDb } from "./db";
 import { RelayAuth } from "./relayAuth";

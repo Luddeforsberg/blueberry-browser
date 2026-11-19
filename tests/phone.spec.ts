@@ -7,7 +7,7 @@ import { homedir } from "node:os";
 import { extname, join } from "node:path";
 import { normalize } from "node:path/posix";
 import webpush from "web-push";
-import { mascotFromSnapshot, mascotSnapshot } from "../src/main/cloudJobs";
+import { mascotFromSnapshot, mascotSnapshot } from "../src/main/remoteJobs/cloudJobs";
 import type { MascotProfile } from "../src/shared/library";
 import { sharedMascotRows, followUpHistory, type ConversationJob } from "../src/shared/phone";
 import { FAKE_KEY, startFakeSupabase } from "./fakeSupabase";

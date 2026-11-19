@@ -3,7 +3,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Response } from "express";
-import { ServerError, type ServerSession } from "../../src/main/galleryServer";
+import { ServerError, type ServerSession } from "../../src/main/account/galleryServer";
 import { AGE_LIMIT_MS, IDLE_LIMIT_MS, RelayAuth, redirectAllowed, type RelayAuthOptions } from "./relayAuth";
 
 const OWNER = "owner@example.com";

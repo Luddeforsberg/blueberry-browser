@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mascotFromSnapshot } from "../main/cloudJobs";
+import { mascotFromSnapshot } from "../main/remoteJobs/cloudJobs";
 import type { MascotProfile } from "./library";
 import { BERRY } from "./mascots";
 import {

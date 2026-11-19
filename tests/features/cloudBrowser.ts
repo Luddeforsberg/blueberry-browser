@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findChrome } from "../../src/main/localChrome";
+import { findChrome } from "../../src/main/cloud/localChrome";
 import type { Site } from "./site";
 
 // The cloud browser for a cloud tab: a headless Chrome on this computer, as tests/cloudTab.spec.ts uses, started here

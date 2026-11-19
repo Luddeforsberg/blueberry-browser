@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { mascotSnapshot } from "../src/main/cloudJobs";
+import { mascotSnapshot } from "../src/main/remoteJobs/cloudJobs";
 import { BERRY } from "../src/shared/mascots";
 import { findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
