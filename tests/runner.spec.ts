@@ -134,7 +134,7 @@ test("a job on the runner keeps going without the app's agent, waits on Needs yo
     await chrome.waitForTimeout(500);
     await shoot(chrome, "chat-waiting-light-horizontal");
     await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ appearance: "system", layoutMode: "vertical" }));
-    const job = defined((await supabase.cloudRows("select id, status from public.cloud_jobs"))[0]);
+    const job = defined((await supabase.cloudRows<{ id: string; status: string }>("select id, status from public.cloud_jobs"))[0]);
     expect(job.status).toBe("waiting");
     const steps = await chrome.evaluate(async () => {
       const [chat] = (await window.chromeAPI.library.getLibrary()).chats;

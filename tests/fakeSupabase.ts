@@ -279,7 +279,7 @@ export const startFakeSupabase = async ({ cloudJobs = false }: { cloudJobs?: boo
       await cloud?.db.query("insert into auth.users values ($1, $2)", [id, email]);
     },
     // What's in the cloud jobs' tables, as the database sees it.
-    cloudRows: async (sql: string) => (await cloud!.db.query<Record<string, unknown>>(sql)).rows,
+    cloudRows: async <T = Record<string, unknown>>(sql: string) => (await cloud!.db.query<T>(sql)).rows,
     close: () => {
       server.close();
       void cloud?.db.close();

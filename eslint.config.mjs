@@ -34,6 +34,7 @@ export default tseslint.config(
       "@typescript-eslint/no-duplicate-type-constituents": "error",
       "@typescript-eslint/no-redundant-type-constituents": "error",
       "@typescript-eslint/no-unnecessary-type-assertion": "error",
+      "@typescript-eslint/restrict-template-expressions": "error",
     },
   },
   {
