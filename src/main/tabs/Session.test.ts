@@ -3,6 +3,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { describe, expect, it } from "vitest";
 import { sanitizeSession, savedEntries, SessionStore, type Session } from "./Session";
+import { defined } from "../../shared/testing";
 
 const tempFile = () => join(mkdtempSync(join(tmpdir(), "blueberry-session-")), "session.json");
 
@@ -56,11 +57,11 @@ describe("savedEntries", () => {
 
     const atEnd = savedEntries(entries, 50);
     expect(atEnd.entries).toHaveLength(26);
-    expect(atEnd.entries[atEnd.index].url).toBe("https://a.example/50");
+    expect(defined(atEnd.entries[atEnd.index]).url).toBe("https://a.example/50");
 
     const atStart = savedEntries(entries, 0);
     expect(atStart.entries).toHaveLength(50);
-    expect(atStart.entries[atStart.index].url).toBe("https://a.example/0");
+    expect(defined(atStart.entries[atStart.index]).url).toBe("https://a.example/0");
 
     expect(savedEntries(entries.slice(0, 50), 0).entries).toHaveLength(50);
   });

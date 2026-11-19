@@ -261,9 +261,9 @@ export class WebPage {
       return;
     }
     // From the end, so removing one doesn't move those still to come. The current page refuses to go.
-    const entries = navigationHistory.getAllEntries();
-    for (let at = entries.length - 1; at >= 0; at--) {
-      if (entries[at].url === url) navigationHistory.removeEntryAtIndex(at);
+    const entries = [...navigationHistory.getAllEntries().entries()].reverse();
+    for (const [at, entry] of entries) {
+      if (entry.url === url) navigationHistory.removeEntryAtIndex(at);
     }
   }
 
