@@ -1,7 +1,7 @@
 import { PGlite } from "@electric-sql/pglite";
 import { randomUUID } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 
@@ -145,7 +145,7 @@ export const startFakeSupabase = async ({ cloudJobs = false }: { cloudJobs?: boo
     return { access_token: token, refresh_token: refresh, expires_in: 3600, user: { id, email } };
   };
 
-  const server = createServer(async (request, response) => {
+  const respond = async (request: IncomingMessage, response: ServerResponse) => {
     let text = "";
     for await (const part of request) text += part;
     const url = new URL(request.url ?? "/", "http://fake");
@@ -250,7 +250,8 @@ export const startFakeSupabase = async ({ cloudJobs = false }: { cloudJobs?: boo
       );
     }
     return answer(404, { message: "Not here" });
-  });
+  };
+  const server = createServer((request, response) => void respond(request, response));
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 

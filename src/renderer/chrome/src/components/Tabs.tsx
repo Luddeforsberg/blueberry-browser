@@ -214,8 +214,10 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
               tab={tab}
               mode={mode}
               phase={phase}
-              onActivate={() => !tab.isActive && switchTab(tab.id)}
-              onClose={() => closeTab(tab.id)}
+              onActivate={() => {
+                if (!tab.isActive) void switchTab(tab.id);
+              }}
+              onClose={() => void closeTab(tab.id)}
               onPress={(event) => {
                 if (event.button !== 0) return;
                 // Like other browsers, a press selects the tab, so a drag moves the page you see.
@@ -270,7 +272,7 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
           <button
             type="button"
             aria-label="New tab"
-            onClick={() => createTab()}
+            onClick={() => void createTab()}
             className={cn(
               "flex items-center gap-2 h-8 rounded-row text-14 text-ink-2 app-region-no-drag",
               "press hover:bg-hover outline-none focus-visible:ring-2 focus-visible:ring-focus",

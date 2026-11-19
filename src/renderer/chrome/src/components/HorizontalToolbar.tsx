@@ -207,7 +207,7 @@ const BookmarksBar: React.FC = () => {
               <button
                 type="button"
                 onPointerDown={(event) => start(event, site, "bookmarks")}
-                onClick={() => createTab(site.url)}
+                onClick={() => void createTab(site.url)}
                 onContextMenu={(event) => savedSiteMenu(event, site)}
                 className={cn(SAVED_SITE, "text-ink-2", drag?.site.id === site.id && "opacity-40", FOCUS)}
               >
@@ -271,7 +271,7 @@ export const HorizontalToolbar: React.FC = () => {
           Icon={ChevronLeft}
           label="Back"
           shortcut={SHORTCUTS.back}
-          onClick={goBack}
+          onClick={() => void goBack()}
           active={activeTab?.canGoBack ?? false}
           className={BUTTON}
         />
@@ -279,18 +279,18 @@ export const HorizontalToolbar: React.FC = () => {
           Icon={ChevronRight}
           label="Forward"
           shortcut={SHORTCUTS.forward}
-          onClick={goForward}
+          onClick={() => void goForward()}
           active={activeTab?.canGoForward ?? false}
           className={BUTTON}
         />
         {activeTab?.isLoading ? (
-          <ToolBarButton Icon={X} label="Stop loading" onClick={stop} className={BUTTON} />
+          <ToolBarButton Icon={X} label="Stop loading" onClick={() => void stop()} className={BUTTON} />
         ) : (
           <ToolBarButton
             Icon={RotateCw}
             label="Reload"
             shortcut={SHORTCUTS.reload}
-            onClick={reload}
+            onClick={() => void reload()}
             active={activeTab !== null && !activeTab.page}
             className={BUTTON}
           />

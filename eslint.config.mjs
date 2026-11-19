@@ -39,6 +39,7 @@ export default tseslint.config(
       // A switch with a default has said what happens to the rest, so only one with neither fails.
       "@typescript-eslint/switch-exhaustiveness-check": ["error", { considerDefaultExhaustiveForUnions: true }],
       "@typescript-eslint/no-floating-promises": "error",
+      "@typescript-eslint/no-misused-promises": "error",
     },
   },
   {

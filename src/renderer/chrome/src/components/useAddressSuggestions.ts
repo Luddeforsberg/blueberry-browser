@@ -71,7 +71,7 @@ export const useAddressSuggestions = ({ editing, value, setValue, field, input, 
       return;
     }
     let live = true;
-    const timer = window.setTimeout(async () => {
+    const suggest = async () => {
       const history = await window.chromeAPI.address.suggestHistory(typed);
       if (!live) return;
       const { tabs, saved, ask } = latest.current;
@@ -80,7 +80,8 @@ export const useAddressSuggestions = ({ editing, value, setValue, field, input, 
       setCompletion(found.completion);
       setSelected(found.completion ? 0 : null);
       if (found.completion) setValue(typed + found.completion.slice(typed.length));
-    }, DEBOUNCE_MS);
+    };
+    const timer = window.setTimeout(() => void suggest(), DEBOUNCE_MS);
     return () => {
       live = false;
       window.clearTimeout(timer);

@@ -107,7 +107,7 @@ export const Choice = <T extends string>({
   pictureClassName?: string;
 }) => {
   const group = useRef<HTMLDivElement>(null);
-  const pictures = options.every((option) => option.picture);
+  const pictures = options.every((option) => Boolean(option.picture));
   const anyChosen = options.some((option) => option.value === value);
   const step = (by: number) => {
     const at = options.findIndex((option) => option.value === value);
