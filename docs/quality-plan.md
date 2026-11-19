@@ -107,8 +107,8 @@ This is the `foundations` audit of the preview branch at `581637f`. The full rep
 
 ## Found on the way, each its own PR
 - **Done:** the phone page showed what it had just sent a poll later, because `oneAtATime` handed a fresh load the poll already out (`e0d2ee5`).
+- **Done:** a chat's tab opened after its job's first tab when the job was quick, so the tab the job kept could land above the chat. `Window.openPage` now puts the chat's tab before its job's tabs (`bc1d573`). If the whole job ends before the chat's tab opens, the kept tab still lands above it.
 - **`riskyWord` matches too broadly.** The page code's risky-word check has always used `[^p{L}]` where `[^\p{L}]` was meant, since a backslash was lost in the old template, so a risky word counts next to almost any letter and Berry asks more often than it should (for example before clicking "Bookmarks"). Fixing it makes Berry ask less, so the user merges it.
 - **`scrollPage` can answer before its scroll starts.** On the first smooth scroll of a freshly loaded page, the scroll sometimes hasn't begun within `SMOOTH_SCROLL_START_MS` (120 ms), so the "page didn't move" check answers with the old position while the page goes on to scroll. Seen twice in Electron, with a second call 30 to 50 ms after the first. The earlier suspicion, that a scroll's `scrollend` ends the next call early, doesn't happen in Chromium: a second smooth scroll replaces the first, and only one `scrollend` fires.
 - **`supabase/phone.test.ts`'s push test depends on the order,** and fails when shuffled (`--sequence.shuffle --sequence.seed=2`), since an earlier test leaves a subscription behind.
-- **`NewTabPage.ask` sends, then opens the chat's tab,** so a job's tab can land on either side of it in the sidebar.
 - **The runner's Docker image** has the page-code generator now (Build 32), checked by copying the Dockerfile's files by hand. Build the real image once Docker is available.
