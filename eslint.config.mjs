@@ -33,6 +33,7 @@ export default tseslint.config(
       "@typescript-eslint/no-array-delete": "error",
       "@typescript-eslint/no-duplicate-type-constituents": "error",
       "@typescript-eslint/no-redundant-type-constituents": "error",
+      "@typescript-eslint/no-unnecessary-type-assertion": "error",
     },
   },
   {

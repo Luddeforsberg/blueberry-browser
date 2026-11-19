@@ -34,11 +34,7 @@ test("while a card waits it stands on what the card is about, and stays put if i
     ]);
     const approval = () => chrome.evaluate((id) => window.chromeAPI.library.getChat(id).then((chat) => chat?.approval?.id), chatId);
     const answer = (asked: string | undefined, allow: boolean) =>
-      chrome.evaluate(([id, one, yes]) => window.chromeAPI.chat.decide(id as string, one as string, yes as boolean), [
-        chatId,
-        asked,
-        allow,
-      ] as const);
+      chrome.evaluate(([id, one, yes]) => window.chromeAPI.chat.decide(id, one as string, yes), [chatId, asked, allow] as const);
     await expect.poll(approval).toBeTruthy();
     await expect.poll(() => stateIn(app, "/two")).toMatchObject({ pose: "asking", words: "Waiting for you", flying: false });
     const { x, y } = (await stateIn(app, "/two"))!.spot!;
