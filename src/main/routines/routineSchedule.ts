@@ -8,7 +8,8 @@ const MAX_SITES = 20;
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-// A time with no minutes, which only a damaged file could hold, gives NaN minutes, as it always has.
+// A time with no minutes, which only a damaged file could hold, gives NaN for them: what `Date` and the arithmetic
+// made of the missing value before.
 export const clock = (time: string): [hour: number, minute: number] => {
   const [hour = NaN, minute = NaN] = time.split(":").map(Number);
   return [hour, minute];
