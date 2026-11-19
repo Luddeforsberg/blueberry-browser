@@ -54,6 +54,9 @@ export const lastExchange = ({ messages }: Pick<ChatThread, "messages">): { prom
 
 const NAMES = ["Pip", "Scout", "Juno", "Wren", "Otis", "Margot", "Figaro", "Mabel", "Ziggy", "Clementine", "Rook", "Nimbus"];
 
+const pickName = (names: readonly string[]): string | undefined => names[Math.floor(Math.random() * names.length)];
+
+// Only ever given a list from the app's own tables with entries left after taking one out.
 const oneOf = <T>(list: readonly T[]): T => list[Math.floor(Math.random() * list.length)] ?? missing("a pick from an empty list");
 
 const randomLook = () => ({
@@ -77,7 +80,7 @@ export const blankMascot = (): MascotFormValues => ({
 export const surprise = (values: MascotFormValues, taken: string[]): MascotFormValues => ({
   ...values,
   ...randomLook(),
-  name: oneOf(NAMES.filter((name) => name !== values.name && !taken.includes(name))) ?? values.name,
+  name: pickName(NAMES.filter((name) => name !== values.name && !taken.includes(name))) ?? values.name,
 });
 
 export const mascotForm = ({ id, name, look, instructions, sites, tools, worksInCloud = false }: MascotProfile): MascotFormValues => ({

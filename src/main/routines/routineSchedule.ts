@@ -8,13 +8,13 @@ const MAX_SITES = 20;
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-// A time is checked as HH:MM before it's kept.
+// A time with no minutes, which only a damaged file could hold, gives NaN minutes, as it always has.
 export const clock = (time: string): [hour: number, minute: number] => {
-  const [hour, minute] = time.split(":").map(Number);
-  return [hour ?? missing(`the hour in ${time}`), minute ?? missing(`the minutes in ${time}`)];
+  const [hour = NaN, minute = NaN] = time.split(":").map(Number);
+  return [hour, minute];
 };
 
-// A day is checked to be 0 to 6 before it's kept.
+// A day is checked to be 0 to 6 when it's saved. One read from a damaged file fails the list, as it always has.
 const weekday = (day: number): string => WEEKDAYS[day] ?? missing(`a weekday numbered ${day}`);
 
 const daysInMonth = (year: number, month: number): number => new Date(year, month + 1, 0).getDate();
@@ -65,8 +65,9 @@ export const scheduleLabel = (schedule: RoutineSchedule): string => {
     case "weekly": {
       const days = [...schedule.days].sort((a, b) => a - b);
       if (days.length === WEEKDAYS.length) return `Daily at ${schedule.time}`;
-      const [only] = days;
-      if (only !== undefined && days.length === 1) return `${weekday(only)}s at ${schedule.time}`;
+      const [only = -1] = days;
+      // One day past Saturday, from a damaged file, has always read "undefineds" rather than failing the list.
+      if (days.length === 1) return `${String(WEEKDAYS[only])}s at ${schedule.time}`;
       return `${days.map((day) => weekday(day).slice(0, 3)).join(", ")} at ${schedule.time}`;
     }
     case "monthly":

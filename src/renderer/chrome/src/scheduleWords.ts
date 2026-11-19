@@ -1,6 +1,5 @@
 import type { RoutineSchedule } from "@shared/library";
 import type { RoutineFormValues } from "./routinesView";
-import { missing } from "@shared/missing";
 
 // Part of routinesView.ts: how often and when, in words.
 
@@ -31,7 +30,8 @@ const ordinal = (day: number) => {
   return `${day}${tens >= 11 && tens <= 13 ? "th" : (suffixes[day % 10] ?? "th")}`;
 };
 
-const listed = (words: string[]) => (words.length < 2 ? words.join("") : `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`);
+const listed = (words: (string | undefined)[]) =>
+  words.length < 2 ? words.join("") : `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`;
 
 // The schedule read back as a sentence, each part that was chosen marked, as in "Every **weekday** at **09:00**".
 export type SentencePart = { text: string; chosen?: boolean };
@@ -61,8 +61,7 @@ export const scheduleSentence = ({
       if (days.length === 7) return [{ text: "Every " }, { text: "day", chosen: true }, ...at];
       // Monday first, as the week reads.
       const sorted = [...days].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7));
-      const names = sorted.map((each) => DAY_NAMES[each] ?? missing(`a weekday numbered ${each}`));
-      return [{ text: "Every " }, { text: listed(names) || "week", chosen: true }, ...at];
+      return [{ text: "Every " }, { text: listed(sorted.map((each) => DAY_NAMES[each])) || "week", chosen: true }, ...at];
     }
     case "monthly":
       return [{ text: "On the " }, { text: ordinal(day), chosen: true }, { text: " of every month" }, ...at];

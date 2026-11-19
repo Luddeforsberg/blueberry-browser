@@ -96,6 +96,7 @@ export const useTabDrag = (tabIds: string[], axis: "x" | "y", onMove: (tabId: st
         const slots = [...list.children].filter((child) => !child.hasAttribute("data-folding")).map(slotOf);
         const [first, second] = slots;
         const own = slots[from];
+        // A tab that closes while the press is held can leave too few. Then nothing moves, as before.
         if (!first || !second || !own) return;
         const gap = second.start - first.start - first.size;
         current = { tabId, order, from, to: from, offset: 0, slots, room: own.size + gap, settling: false };
