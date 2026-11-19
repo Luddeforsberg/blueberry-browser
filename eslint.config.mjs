@@ -21,6 +21,11 @@ export default tseslint.config(
     },
   },
   {
+    // Type-aware rules read each file's types from the tsconfig that holds it, so every TypeScript file is in one.
+    files: ["**/*.{ts,tsx}"],
+    languageOptions: { parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname } },
+  },
+  {
     files: ["**/*.{ts,tsx}"],
     plugins: {
       "react-hooks": eslintPluginReactHooks,
