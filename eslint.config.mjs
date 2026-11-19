@@ -6,7 +6,7 @@ import eslintPluginReactRefresh from "eslint-plugin-react-refresh";
 import { complexityOver, linesOver, paramsOver } from "./eslint.limits.mjs";
 
 export default tseslint.config(
-  { ignores: ["**/node_modules", "**/dist", "**/out", "site/**", "src/main/pageActorArt.ts"] },
+  { ignores: ["**/node_modules", "**/dist", "**/out", "site/**", "src/main/pageActorArt.ts", "src/main/pageCode.ts"] },
   // A rule that's wrong for some code is changed here, where it can be seen, never turned off in a comment.
   { linterOptions: { noInlineConfig: true, reportUnusedDisableDirectives: "error" } },
   tseslint.configs.recommended,
@@ -71,6 +71,31 @@ export default tseslint.config(
       "max-params": ["error", 4],
       "max-depth": ["error", 4],
       "max-nested-callbacks": ["error", 4],
+    },
+  },
+  // What runs in web pages is bundled from src/page alone, so it imports nothing from outside it: no package, and no
+  // relative path that climbs out. src/page/index.ts can't climb at all, and a file one folder down only one level.
+  ...[
+    ["src/page/*.ts", "^(?!\\./)"],
+    ["src/page/*/*.ts", "^(?!\\./|\\.\\./(?!\\.\\./))"],
+  ].map(([files, outside]) => ({
+    files: [files],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        { patterns: [{ regex: outside, message: "Code that runs in a page imports only from src/page." }] },
+      ],
+    },
+  })),
+  {
+    // Everything else reaches page code through src/main/pageCode.ts, as the strings scripts/buildPage.mjs bundles, and
+    // only borrows its types.
+    files: ["src/main/**/*.ts", "src/shared/**/*.ts", "src/renderer/**/*.{ts,tsx}", "runner/**/*.ts", "tests/**/*.ts", "evals/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        { patterns: [{ regex: "(^|/)page/", allowTypeImports: true, message: "Run page code through src/main/pageCode.ts." }] },
+      ],
     },
   },
   ...Object.entries(linesOver).map(([file, max]) => ({ files: [file], rules: { "max-lines": ["error", max] } })),

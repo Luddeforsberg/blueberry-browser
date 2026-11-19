@@ -1,5 +1,5 @@
 import type { WebContentsView } from "electron";
-import { actorCommand, ifThere, installActor, type ActorLook } from "./pageActorScript";
+import { actorCommand, ifThere, installActor, type ActorCommand, type ActorLook } from "./pageActorScript";
 import type { MascotLook } from "../shared/library";
 
 // The mascot on the page. It only shows what a job is doing and when: it never decides where input goes or whether it
@@ -226,7 +226,7 @@ export class PageActor {
     return Date.now() < this.lastTouched + QUIET_AFTER_USER_MS;
   }
 
-  private async draw(name: string, args: { words?: string; [other: string]: unknown } = {}): Promise<boolean> {
+  private async draw(name: ActorCommand, args: { words?: string; [other: string]: unknown } = {}): Promise<boolean> {
     if (!this.showing) return false;
     if (args.words !== undefined) this._saying = args.words;
     this.livelyUntil = Date.now() + LIVELY_MS;

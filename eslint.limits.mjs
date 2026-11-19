@@ -27,8 +27,6 @@ export const linesOver = {
   "src/main/browserTools.ts": 1395,
   "src/main/mascotMemory.test.ts": 416,
   "src/main/mcpTools.ts": 634,
-  "src/main/pageActorScript.ts": 699,
-  "src/main/pageScripts.ts": 761,
   "src/renderer/chrome/src/DesktopPanel.tsx": 705,
   "src/renderer/chrome/src/components/ChatMessage.tsx": 822,
   "src/renderer/chrome/src/components/Composer.tsx": 648,
