@@ -1,7 +1,7 @@
 import type { View } from "electron";
 import { createChromeView, type ChromeView } from "./chromeView";
 import { sendToRenderer } from "./ipc";
-import { suggestionsRect } from "./Layout";
+import { suggestionsRect } from "./floatingPlaces";
 import type { AddressSuggestion, AddressSuggestionsRequest, Rect, ThemeState } from "../../shared/ipc";
 import type { MascotLook } from "../../shared/library";
 import { ACCESSORIES, PALETTES } from "../../shared/mascots";

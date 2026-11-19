@@ -1,7 +1,7 @@
 import type { View } from "electron";
 import { createChromeView, type ChromeView } from "./chromeView";
 import { sendToRenderer } from "./ipc";
-import { tooltipRect } from "./Layout";
+import { tooltipRect } from "./floatingPlaces";
 import type { Rect, ThemeState, TooltipRequest } from "../../shared/ipc";
 
 const MAX_WORDS = 200;

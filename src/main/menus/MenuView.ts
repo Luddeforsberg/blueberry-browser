@@ -1,7 +1,8 @@
 import { webContents as allContents, type WebContents, type WebContentsView } from "electron";
 import { createChromeView, type ChromeView } from "../window/chromeView";
 import { sendToRenderer } from "../window/ipc";
-import { menuPlacement, type MenuSheetBox, type Rect } from "../window/Layout";
+import { menuPlacement, type MenuSheetBox } from "../window/floatingPlaces";
+import type { Rect } from "../window/Layout";
 import { AskBook, buildMenu, MenuBook, type EditRole, type OwnMenuItem } from "./ownMenu";
 import type { AskCard, MenuAnchor, MenuEntry, MenuPlacement, MenuViewState, ThemeState } from "../../shared/ipc";
 

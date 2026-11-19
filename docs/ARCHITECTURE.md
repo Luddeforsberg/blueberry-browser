@@ -44,7 +44,7 @@ Views stack by order, so CSS in the chrome can never draw over a page. That's wh
 
 Every chrome view loads the same React renderer in [src/renderer/chrome](../src/renderer/chrome), with a `view` parameter saying which part to draw ([src/main/window/chromeView.ts](../src/main/window/chromeView.ts)). Internal pages, such as the new tab page, Your mascots, Routines, Needs you and Settings, open as tabs with no web view, drawn by the chrome on the same card a web page sits on.
 
-[src/main/window/Layout.ts](../src/main/window/Layout.ts) is the only place that decides where regions go. `computeLayout` turns the window size, layout mode and panel widths into rectangles. `Panels` places the tab views with them and sends the same rectangles to the chrome renderer, which draws each region there. Nothing else hard-codes a size.
+[src/main/window/Layout.ts](../src/main/window/Layout.ts), with [floatingPlaces.ts](../src/main/window/floatingPlaces.ts) for the views that float over the window and [desktopPlaces.ts](../src/main/window/desktopPlaces.ts) for the drop on the desktop, is the only place that decides where regions go. `computeLayout` turns the window size, layout mode and panel widths into rectangles. `Panels` places the tab views with them and sends the same rectangles to the chrome renderer, which draws each region there. Nothing else hard-codes a size.
 
 ## The browser itself
 
