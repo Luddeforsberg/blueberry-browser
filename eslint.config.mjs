@@ -36,6 +36,8 @@ export default tseslint.config(
       "@typescript-eslint/no-unnecessary-type-assertion": "error",
       "@typescript-eslint/restrict-template-expressions": "error",
       "@typescript-eslint/no-base-to-string": "error",
+      // A switch with a default has said what happens to the rest, so only one with neither fails.
+      "@typescript-eslint/switch-exhaustiveness-check": ["error", { considerDefaultExhaustiveForUnions: true }],
     },
   },
   {
