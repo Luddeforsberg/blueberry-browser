@@ -25,6 +25,7 @@ export const chatFeatures: Feature[] = [
         open: async (drive) => {
           await drive.chrome.evaluate(async () => {
             const [chrome] = await window.chromeAPI.browser.importSources();
+            if (!chrome) throw new Error("No browser to import from");
             await window.chromeAPI.browser.importHistory(chrome.id);
             await window.chromeAPI.browser.createTab();
           });

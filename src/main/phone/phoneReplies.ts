@@ -43,9 +43,9 @@ export const bindReply = <T extends OpenRequest>(text: string, replyTo: string |
   const named = replyTo === null ? null : open.find(({ handle }) => handle === replyTo);
   if (named === undefined) return { refused: "closed" };
   if (named && !takesReply(named)) return { refused: "not-by-reply" };
-  if (named === null && takers.length === 0) return { refused: open.length > 0 ? "not-by-reply" : "nothing-waiting" };
-  if (named === null && takers.length > 1) return { refused: "which-one" };
   const target = named ?? takers[0];
+  if (!target) return { refused: open.length > 0 ? "not-by-reply" : "nothing-waiting" };
+  if (named === null && takers.length > 1) return { refused: "which-one" };
   return target.kind === "question" && plausibleCode(text) !== null ? { refused: "looks-like-a-code" } : { to: target };
 };
 
@@ -79,8 +79,8 @@ export const chooseCodeField = (fields: readonly CodeField[], code: string, hasP
     tier.length === code.length && tier.every(({ field }) => box(field))
       ? { kind: "boxes", indexes: tier.map(({ index }) => index) }
       : null;
-  const oneOf = (tier: typeof indexed): CodeTarget =>
-    tier.length === 1 && canHold(tier[0].field) ? { kind: "one", index: tier[0].index } : null;
+  const oneOf = ([only, ...others]: typeof indexed): CodeTarget =>
+    only && others.length === 0 && canHold(only.field) ? { kind: "one", index: only.index } : null;
 
   const otherThing = ({ field }: (typeof indexed)[number]) => OTHER_THINGS.test(field.words) || OTHER_AUTOCOMPLETE.test(field.autocomplete);
   const marked = indexed.filter(({ field }) => field.autocomplete.split(/\s+/).includes("one-time-code"));

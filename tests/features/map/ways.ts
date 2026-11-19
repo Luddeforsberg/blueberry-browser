@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 import type { InternalPage } from "../../../src/shared/ipc";
 import { findView } from "../../app";
 import type { Drive } from "../driver";
+import { defined } from "../../../src/shared/testing";
 
 // The ways in that every feature shares, the same calls the end-to-end tests make.
 
@@ -27,7 +28,7 @@ export const threeTabs = async (drive: Drive) => {
     ["travel.example", "/flights"],
     ["news.example", "/news"],
   ])
-    await createTab(drive, drive.site.url(host, path));
+    await createTab(drive, drive.site.url(defined(host), path));
   await seen(drive.chrome, "Morning News");
 };
 

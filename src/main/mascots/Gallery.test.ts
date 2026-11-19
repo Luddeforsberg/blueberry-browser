@@ -6,6 +6,7 @@ import type { Account } from "../account/Account";
 import { Gallery } from "./Gallery";
 import type { GalleryServer } from "../account/galleryServer";
 import { MascotStore } from "./MascotStore";
+import { defined } from "../../shared/testing";
 
 vi.mock("electron", () => ({}));
 
@@ -148,7 +149,7 @@ describe("Gallery.add", () => {
     const { gallery, mascots } = start(limited, open);
     await gallery.list();
     for (const version of ["0".repeat(32), "", undefined, null, 7]) expect(gallery.add(ID, version, null)).toMatchObject({ ok: false });
-    expect(gallery.add("00000000-0000-4000-8000-000000000009", (await gallery.list()).entries[0].version, null)).toMatchObject({
+    expect(gallery.add("00000000-0000-4000-8000-000000000009", defined((await gallery.list()).entries[0]).version, null)).toMatchObject({
       ok: false,
     });
     expect(copied(mascots)).toEqual([]);

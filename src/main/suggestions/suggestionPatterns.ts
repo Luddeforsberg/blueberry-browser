@@ -1,5 +1,6 @@
 import type { RoutineSchedule, SuggestionKind } from "../../shared/library";
 import { normaliseSite } from "../../shared/mascots";
+import { missing } from "../../shared/missing";
 import { replaceControlCharacters } from "../library/controlCharacters";
 
 // What the user repeats, found with plain code. The bar is "you've done this three times", so a short session is enough.
@@ -162,7 +163,7 @@ const scheduleTime = (minutes: number): string => {
 
 const DAY_MINUTES = 24 * 60;
 
-const median = (values: number[]): number => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
+const median = (values: number[]): number => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)] ?? missing("a median");
 
 // The hour of the day that holds the most different days, if most of the visits fall in it.
 const habitualTime = (visits: PatternVisit[]): { minutes: number; days: number } | null => {
@@ -283,10 +284,10 @@ const togetherPatterns = (sites: SiteVisits[], visits: PatternVisit[], now: numb
   ordered.forEach((visit, at) => {
     const site = siteOf.get(visit);
     if (!site) return;
-    for (let next = at + 1; next < ordered.length && ordered[next].visitedAt - visit.visitedAt <= TOGETHER_MINUTES * 60_000; next++) {
-      const other = siteOf.get(ordered[next]);
+    for (let n = at + 1, next = ordered[n]; next && next.visitedAt - visit.visitedAt <= TOGETHER_MINUTES * 60_000; next = ordered[++n]) {
+      const other = siteOf.get(next);
       if (!other || other === site) continue;
-      const [a, b] = [site, other].sort((x, y) => x.host.localeCompare(y.host));
+      const [a, b] = site.host.localeCompare(other.host) > 0 ? [other, site] : [site, other];
       const key = `${a.host}+${b.host}`;
       const pair = pairs.get(key) ?? { a, b, days: new Set<string>(), newest: 0, oldest: visit.visitedAt };
       pair.days.add(dayOf(visit.visitedAt));

@@ -109,11 +109,11 @@ export const useRowMotion = (row: RefObject<HTMLElement | null>, phase: DrawnRow
     const opening = phase === "opening";
     const padNames = axis === "height" ? ["padding-top", "padding-bottom"] : ["padding-left", "padding-right"];
     const computed = getComputedStyle(element);
-    const pads = padNames.map((name) => parseFloat(computed.getPropertyValue(name)) || 0);
+    const pads = padNames.map((name) => ({ name, size: parseFloat(computed.getPropertyValue(name)) || 0 }));
     const set = (at: { size: number; margin: number; opacity: number; padded: number }) => {
       style.setProperty(sizeName, `${at.size}px`);
       style.setProperty(marginName, `${at.margin}px`);
-      padNames.forEach((name, index) => style.setProperty(name, `${pads[index] * at.padded}px`));
+      pads.forEach(({ name, size }) => style.setProperty(name, `${size * at.padded}px`));
       style.opacity = `${at.opacity}`;
     };
     style.transition = "none";

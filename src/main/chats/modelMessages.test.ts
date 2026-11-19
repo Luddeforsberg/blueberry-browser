@@ -6,6 +6,7 @@ import { ChatStore } from "./ChatStore";
 import type { ReplyMessage, StreamReply } from "./agent";
 import type { Tab } from "../tabs/Tab";
 import { SCREENSHOT, send, setup, tab } from "./chatsTesting";
+import { defined } from "../../shared/testing";
 
 vi.mock("./agent", async (importOriginal) => {
   const { ModelConfigError } = await importOriginal<typeof import("./agent")>();
@@ -34,12 +35,12 @@ describe("Chats", () => {
     send(chats, id, "second");
     await ended;
 
-    const [, second] = sent;
+    const second = defined(sent[1]);
     expect(second.map((message) => message.role)).toEqual(["user", "assistant", "user"]);
-    expect(second[0].content).toBe("first");
-    expect(JSON.stringify(second[2].content)).toContain(SCREENSHOT);
-    expect(JSON.stringify(second[2].content)).toContain("page text");
-    expect(JSON.stringify(second[2].content)).toContain("second");
+    expect(defined(second[0]).content).toBe("first");
+    expect(JSON.stringify(defined(second[2]).content)).toContain(SCREENSHOT);
+    expect(JSON.stringify(defined(second[2]).content)).toContain("page text");
+    expect(JSON.stringify(defined(second[2]).content)).toContain("second");
   });
 
   it("never saves the page", async () => {
@@ -125,7 +126,7 @@ describe("Chats", () => {
       const ended = new Promise<void>((resolve) => (onEnd = () => resolve()));
       chats.send(null, "What's this?", { seePage: true, mascotId });
       await ended;
-      return JSON.stringify(sent[0].at(-1)!.content);
+      return JSON.stringify(defined(sent[0]).at(-1)!.content);
     };
 
     it("goes without a picture while the page has the frame, and says so", async () => {
@@ -177,7 +178,7 @@ describe("Chats", () => {
     send(chats, null, "first");
     await ended;
 
-    expect(JSON.stringify(sent[0][0].content)).toContain("first");
-    expect(JSON.stringify(sent[0][0].content)).not.toContain("image_url");
+    expect(JSON.stringify(defined(sent[0]?.[0]).content)).toContain("first");
+    expect(JSON.stringify(defined(sent[0]?.[0]).content)).not.toContain("image_url");
   });
 });

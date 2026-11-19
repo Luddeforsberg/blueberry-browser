@@ -90,8 +90,9 @@ const sendsForm = (form: HTMLFormElement | null | undefined): boolean =>
 const clickRisk = (el: AnyElement): ElementRisk => {
   const name = nameOf(el);
   if (!name) return { reason: "unnamed" };
-  const word = name.match(riskyWord);
-  if (word) return { reason: "risky-word", mark: word[2] };
+  // The word is the second group, which takes part in every match.
+  const mark = name.match(riskyWord)?.[2];
+  if (mark !== undefined) return { reason: "risky-word", mark };
   if (isSecret(el)) return { reason: "secret-field" };
   if (isTransparent(el)) return { reason: "hidden" };
   const role = roleOf(el);

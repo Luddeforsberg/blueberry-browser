@@ -11,6 +11,7 @@ import {
   MAX_HISTORY,
   mascotSnapshot,
 } from "./phone";
+import { defined } from "./testing";
 
 const SCOUT: MascotProfile = {
   id: "m-1",
@@ -45,9 +46,9 @@ describe("the mascots on the phone", () => {
   it("reads back what it shared, with Berry first, and sends a snapshot the runner accepts", () => {
     const mascots = mascotsFromSharedRows(sharedMascotRows([BERRY, SCOUT]));
     expect(mascots.map(({ id }) => id)).toEqual(["berry", "m-1"]);
-    expect(mascots[1].look).toEqual(SCOUT.look);
-    expect(mascotFromSnapshot(mascotSnapshot(mascots[0]))).toEqual(BERRY);
-    expect(mascotFromSnapshot(mascotSnapshot(mascots[1]))).toMatchObject({
+    expect(defined(mascots[1]).look).toEqual(SCOUT.look);
+    expect(mascotFromSnapshot(mascotSnapshot(defined(mascots[0])))).toEqual(BERRY);
+    expect(mascotFromSnapshot(mascotSnapshot(defined(mascots[1])))).toMatchObject({
       id: "m-1",
       sites: ["webhallen.com"],
       tools: ["visit", "click"],
@@ -78,7 +79,7 @@ describe("the mascots on the phone", () => {
     expect(mascots.map(({ id }) => id)).toEqual(["berry", "m-1"]);
     expect(mascotsFromSharedRows(undefined)).toEqual([BERRY]);
     // A tool it doesn't know is dropped, so the mascot can only do less.
-    expect(mascotsFromSharedRows([{ ...row, tools: ["visit", "pay"] }])[1].tools).toEqual(["visit"]);
+    expect(defined(mascotsFromSharedRows([{ ...row, tools: ["visit", "pay"] }])[1]).tools).toEqual(["visit"]);
   });
 });
 

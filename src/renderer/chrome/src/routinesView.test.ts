@@ -14,6 +14,7 @@ import {
   withStepsPieces,
   type RoutineFormValues,
 } from "./routinesView";
+import { defined } from "@shared/testing";
 
 const form = (instructions: string, value: string) =>
   recordedForm({ name: "Job", instructions, sites: [], changes: [{ label: "Search", value }] });
@@ -66,7 +67,7 @@ describe("what might change", () => {
   it("stays marked while text is typed before it", () => {
     const values = form("Search for usb", "usb");
     const typed = withStepsPieces(values, [{ text: "Then search for " }, { text: "usb", row: 0 }]);
-    expect(typed.recorded?.[0].at).toBe(16);
+    expect(defined(typed.recorded?.[0]).at).toBe(16);
     expect(marked(typed)).toBe("usb");
   });
 

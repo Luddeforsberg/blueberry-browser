@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReplyMessage, StreamReply } from "./agent";
 import { send, setup, timed } from "./chatsTesting";
+import { defined } from "../../shared/testing";
 
 vi.mock("./agent", async (importOriginal) => {
   const { ModelConfigError } = await importOriginal<typeof import("./agent")>();
@@ -22,9 +23,9 @@ describe("Chats", () => {
   describe("page tools", () => {
     const stepping = (texts: string[], words: string[]): StreamReply =>
       async function* (_, __, { onStep }) {
-        yield words[0];
+        yield defined(words[0]);
         for (const text of texts) onStep(text)();
-        yield words[1];
+        yield defined(words[1]);
       };
 
     it("saves the steps with the reply, and tells the model about them next time", async () => {
@@ -47,7 +48,7 @@ describe("Chats", () => {
       ended = replyEnded();
       send(chats, id, "second", false);
       await ended;
-      expect(sent[0][1].content).toBe("<steps>\n- Read a.com\n</steps>\n\nLet me look.\n\nFound it.");
+      expect(defined(sent[0]?.[1]).content).toBe("<steps>\n- Read a.com\n</steps>\n\nLet me look.\n\nFound it.");
     });
 
     // As the agent streams a job: words, taken back as a status line once the model calls a tool, a step, then the answer.
@@ -142,7 +143,7 @@ describe("Chats", () => {
       ended = replyEnded();
       send(chats, id, "second", false);
       await ended;
-      expect(sent[0][1].content).toBe("<steps>\n- Clicked something on shop.example\n</steps>\n\nDone.");
+      expect(defined(sent[0]?.[1]).content).toBe("<steps>\n- Clicked something on shop.example\n</steps>\n\nDone.");
     });
 
     it("shows a step while it runs, and saves it as over when stopped with no words yet", async () => {

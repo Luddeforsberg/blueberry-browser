@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { PALETTES } from "../src/shared/mascots";
+import { defined } from "../src/shared/testing";
 
 // 20261120000000_mascot_names.sql in real Postgres as Supabase's roles, on top of every migration before it: the new
 // names, and the old ones that clients from before still call, which must do and refuse exactly the same.
@@ -52,7 +53,7 @@ describe("the mascots' names on the server", () => {
       await db.exec("reset role");
     }
   };
-  const one = async (uid: string | null, sql: string) => Object.values((await as(uid, sql))[0])[0];
+  const one = async (uid: string | null, sql: string) => Object.values(defined((await as(uid, sql))[0]))[0];
   let users = 0;
   const newUser = async () => {
     const id = `00000000-0000-4000-8000-${String(++users).padStart(12, "0")}`;
@@ -67,13 +68,15 @@ describe("the mascots' names on the server", () => {
 
   // Who may do what to a table or function, as Postgres answers it, so the old name's before and after can be compared.
   const tableGrants = async (table: string) =>
-    (
-      await db.query<{ grants: string }>(
-        `select string_agg(r || ':' || p || '=' || has_table_privilege(r, $1, p)::text, ',' order by r, p) as grants
+    defined(
+      (
+        await db.query<{ grants: string }>(
+          `select string_agg(r || ':' || p || '=' || has_table_privilege(r, $1, p)::text, ',' order by r, p) as grants
          from unnest($2::text[]) r, unnest($3::text[]) p`,
-        [`public.${table}`, ROLES, PRIVILEGES],
-      )
-    ).rows[0].grants;
+          [`public.${table}`, ROLES, PRIVILEGES],
+        )
+      ).rows[0],
+    ).grants;
   const functionGrants = async (signature: string) =>
     (
       await db.query<{ anon: boolean; authenticated: boolean }>(

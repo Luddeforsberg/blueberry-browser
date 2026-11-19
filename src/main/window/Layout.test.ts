@@ -103,7 +103,7 @@ describe("computeLayout", () => {
       [1, 1],
       [240, 44],
       [100, 30],
-    ]) {
+    ] satisfies [number, number][]) {
       const layout = computeLayout({ width, height }, both);
 
       for (const rect of [

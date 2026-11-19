@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { RoutineStore } from "./RoutineStore";
 import { daily, flush, MINUTE, NOW, save, setup, started, runOnFakeClock } from "./routinesTesting";
+import { defined } from "../../shared/testing";
 
 runOnFakeClock();
 
@@ -11,21 +12,21 @@ describe("a run", () => {
     started(routines);
     routines.runNow(id);
 
-    runs[0].progress({ steps: [{ text: "Read a page", done: false }], approval: null, tokens: 0 });
+    defined(runs[0]).progress({ steps: [{ text: "Read a page", done: false }], approval: null, tokens: 0 });
     expect(routines.list()[0]).toMatchObject({ status: "running", lastResult: "Working on it" });
     expect(store.latestRun(id)?.steps).toEqual([{ text: "Read a page", done: false }]);
 
-    runs[0].progress({ steps: [{ text: "Read a page", done: true }], approval: { id: "a", text: "Delete it" }, tokens: 0 });
+    defined(runs[0]).progress({ steps: [{ text: "Read a page", done: true }], approval: { id: "a", text: "Delete it" }, tokens: 0 });
     expect(routines.list()[0]).toMatchObject({ status: "needs-approval", latestRun: { approval: { text: "Delete it" } } });
     expect(events.onAttention).toHaveBeenLastCalledWith(expect.anything(), "needs-approval");
     events.onAttention.mockClear();
-    runs[0].progress({ steps: [], approval: { id: "a", text: "Delete it" }, tokens: 0 });
+    defined(runs[0]).progress({ steps: [], approval: { id: "a", text: "Delete it" }, tokens: 0 });
     expect(events.onAttention).not.toHaveBeenCalled();
 
-    runs[0].progress({ steps: [{ text: "Read a page", done: true }], approval: null, tokens: 0 });
-    expect(routines.list()[0].status).toBe("running");
+    defined(runs[0]).progress({ steps: [{ text: "Read a page", done: true }], approval: null, tokens: 0 });
+    expect(defined(routines.list()[0]).status).toBe("running");
 
-    runs[0].end({ text: "Found **three** things\nand more", tabIds: ["tab-7"] });
+    defined(runs[0]).end({ text: "Found **three** things\nand more", tabIds: ["tab-7"] });
     await flush();
     expect(events.closeTab).toHaveBeenCalledWith("tab-7");
     expect(routines.list()[0]).toMatchObject({ status: "finished", lastResult: "Today: Found three things" });
@@ -38,17 +39,17 @@ describe("a run", () => {
     started(routines);
 
     routines.runNow(id);
-    runs[0].end({ error: "No key", text: "" });
+    defined(runs[0]).end({ error: "No key", text: "" });
     await flush();
     expect(routines.list()[0]).toMatchObject({ status: "failed", latestRun: { error: "No key" } });
     expect(events.onAttention).toHaveBeenLastCalledWith(expect.anything(), "failed");
     events.onAttention.mockClear();
 
     routines.runNow(id);
-    expect(routines.stop(runs[1].id)).toBe(true);
+    expect(routines.stop(defined(runs[1]).id)).toBe(true);
     expect(routines.stop("not-a-run")).toBe(false);
-    expect(stoppedIds).toEqual([runs[1].id]);
-    runs[1].end({ stopped: true, text: "" });
+    expect(stoppedIds).toEqual([defined(runs[1]).id]);
+    defined(runs[1]).end({ stopped: true, text: "" });
     await flush();
     expect(routines.list()[0]).toMatchObject({ status: "stopped", latestRun: { seen: true } });
     expect(events.onAttention).not.toHaveBeenCalled();
@@ -60,15 +61,15 @@ describe("a run", () => {
     const id = save(first.routines, daily());
     first.routines.start();
     first.routines.runNow(id);
-    first.started[0].progress({
+    defined(first.started[0]).progress({
       steps: [{ text: "Read a page", done: false }],
       approval: { id: "a", text: "Click the button “Pay”" },
       tokens: 300,
     });
 
     first.routines.shutdown();
-    expect(first.stoppedIds).toEqual([first.started[0].id]);
-    first.started[0].end({ stopped: true });
+    expect(first.stoppedIds).toEqual([defined(first.started[0]).id]);
+    defined(first.started[0]).end({ stopped: true });
     await flush();
 
     const run = store.latestRun(id);
@@ -90,7 +91,7 @@ describe("a run", () => {
 
     const next = setup(store);
     started(next.routines);
-    expect(next.routines.list()[0].status).toBe("interrupted");
+    expect(defined(next.routines.list()[0]).status).toBe("interrupted");
     expect(next.routines.runNow(id)).toBe(true);
   });
 
@@ -101,8 +102,8 @@ describe("a run", () => {
     routines.runNow(id);
 
     expect(routines.delete(id)).toBe(true);
-    expect(stoppedIds).toEqual([runs[0].id]);
-    runs[0].end({ stopped: true, tabIds: ["tab-1"] });
+    expect(stoppedIds).toEqual([defined(runs[0]).id]);
+    defined(runs[0]).end({ stopped: true, tabIds: ["tab-1"] });
     await flush();
 
     expect(events.closeTab).toHaveBeenCalledWith("tab-1");
@@ -116,16 +117,16 @@ describe("a run", () => {
     const id = save(routines, daily());
     started(routines);
     routines.runNow(id);
-    runs[0].end();
+    defined(runs[0]).end();
     await flush();
     vi.setSystemTime(NOW + MINUTE);
     routines.runNow(id);
-    runs[1].end({ stopped: true });
+    defined(runs[1]).end({ stopped: true });
     await flush();
 
     expect(routines.list()[0]).toMatchObject({ status: "stopped", unseen: true, latestRun: { seen: true } });
     routines.markSeen();
-    expect(routines.list()[0].unseen).toBe(false);
+    expect(defined(routines.list()[0]).unseen).toBe(false);
   });
 
   it("marks what ended as seen, and keeps only the newest history", async () => {
@@ -136,7 +137,7 @@ describe("a run", () => {
     for (let index = 0; index < 51; index++) {
       vi.setSystemTime(NOW + index * MINUTE);
       routines.runNow(id);
-      runs[index].end();
+      defined(runs[index]).end();
       await flush();
     }
     expect(store.runs(id)).toHaveLength(50);

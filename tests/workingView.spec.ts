@@ -48,7 +48,11 @@ test.describe("the working view", () => {
     model = await startFakeModel();
     site = await startSite();
     app = await launchApp(undefined, { modelEnv: model.env });
-    await app.evaluate(({ BaseWindow }, { width, height }) => BaseWindow.getAllWindows()[0].setSize(width, height), WIDE);
+    await app.evaluate(({ BaseWindow }, { width, height }) => {
+      const [main] = BaseWindow.getAllWindows();
+      if (!main) throw new Error("No window");
+      return main.setSize(width, height);
+    }, WIDE);
     chrome = await findView(app, "view=chrome");
   });
 
@@ -270,7 +274,11 @@ test.describe("the working view", () => {
     await expect(chrome.getByText("Just words")).toBeVisible();
     await expect(view()).toHaveCount(0);
 
-    await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].setSize(900, 700));
+    await app.evaluate(({ BaseWindow }) => {
+      const [main] = BaseWindow.getAllWindows();
+      if (!main) throw new Error("No window");
+      return main.setSize(900, 700);
+    });
     const { finish } = await startJob(chrome, model, `${site.origin}/job`);
     await expect(chrome.getByRole("button", { name: /Go to the tab on/ })).toBeVisible();
     await expect(view()).toHaveCount(0);

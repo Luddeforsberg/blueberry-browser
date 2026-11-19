@@ -27,7 +27,11 @@ test.describe("a job's tabs", () => {
     model = await startFakeModel();
     site = await startSite();
     app = await launchApp(undefined, { modelEnv: model.env });
-    await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].setSize(1400, 860));
+    await app.evaluate(({ BaseWindow }) => {
+      const [main] = BaseWindow.getAllWindows();
+      if (!main) throw new Error("No window");
+      return main.setSize(1400, 860);
+    });
     chrome = await findView(app, "view=chrome");
   });
 

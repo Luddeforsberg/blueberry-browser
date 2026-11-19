@@ -5,6 +5,7 @@ import { Chats } from "./Chats";
 import { ChatStore } from "./ChatStore";
 import type { StreamReply } from "./agent";
 import { replying, send, setup, tab } from "./chatsTesting";
+import { defined } from "../../shared/testing";
 
 vi.mock("./agent", async (importOriginal) => {
   const { ModelConfigError } = await importOriginal<typeof import("./agent")>();
@@ -121,17 +122,17 @@ describe("Chats", () => {
       });
       await vi.waitFor(() => expect(seen).toHaveLength(1));
       release();
-      expect(seen[0].tools).toEqual(expect.arrayContaining(["open_tab", "read_page"]));
-      expect(seen[0].tools).not.toContain("click");
-      expect(seen[0].tools).not.toContain("type_text");
+      expect(defined(seen[0]).tools).toEqual(expect.arrayContaining(["open_tab", "read_page"]));
+      expect(defined(seen[0]).tools).not.toContain("click");
+      expect(defined(seen[0]).tools).not.toContain("type_text");
       // Asked at least as much as the job says, though the setting here is Never ask.
-      expect(seen[0].asks).toBe("risky");
+      expect(defined(seen[0]).asks).toBe("risky");
       // Berry with fewer tools is limited too.
       chats.send(null, "Look", { seePage: false, mascotId: null, tools: [], from: "ChatGPT or Claude" });
       await vi.waitFor(() => expect(seen).toHaveLength(2));
-      expect(seen[1].tools).not.toContain("click");
-      expect(seen[1].tools).not.toContain("open_tab");
-      expect(seen[1].asks).toBe("never");
+      expect(defined(seen[1]).tools).not.toContain("click");
+      expect(defined(seen[1]).tools).not.toContain("open_tab");
+      expect(defined(seen[1]).asks).toBe("never");
     });
 
     it("refuses a mascot that isn't here", () => {

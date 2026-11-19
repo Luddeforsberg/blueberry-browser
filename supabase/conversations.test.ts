@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { defined } from "../src/shared/testing";
 
 // Conversations of cloud jobs, in real Postgres as Supabase's roles, on top of every migration before it.
 const SUPABASE_STANDINS = `
@@ -49,15 +50,18 @@ describe("conversations of cloud jobs", () => {
       )
     ).rows[0]?.id ?? null;
   const start = async (uid: string, conversation: string | null = null, history = "[]", after?: string | null) =>
-    (
-      await as<{ id: string }>(
-        uid,
-        `select public.start_cloud_job('Go on', '${history}', ${MASCOT}, 'risky', null, ${quoted(conversation)}, ${quoted(after === undefined && conversation ? await newestOf(conversation) : (after ?? null))}) as id`,
-      )
-    )[0].id;
+    defined(
+      (
+        await as<{ id: string }>(
+          uid,
+          `select public.start_cloud_job('Go on', '${history}', ${MASCOT}, 'risky', null, ${quoted(conversation)}, ${quoted(after === undefined && conversation ? await newestOf(conversation) : (after ?? null))}) as id`,
+        )
+      )[0],
+    ).id;
   const conversationOf = async (id: string) =>
-    (await db.query<{ conversation_id: string | null }>("select conversation_id from public.cloud_jobs where id = $1", [id])).rows[0]
-      .conversation_id;
+    defined(
+      (await db.query<{ conversation_id: string | null }>("select conversation_id from public.cloud_jobs where id = $1", [id])).rows[0],
+    ).conversation_id;
   const finish = (id: string, status = "done") => db.query("update public.cloud_jobs set status = $2 where id = $1", [id, status]);
 
   let ALICE = "";
@@ -85,7 +89,9 @@ describe("conversations of cloud jobs", () => {
     const unused = randomUUID();
     expect(await conversationOf(await start(ALICE, unused))).toBe(unused);
     // The old five-argument call, from an app that hasn't updated, still starts one of its own.
-    const old = (await as<{ id: string }>(ALICE, `select public.start_cloud_job('Old', '[]', ${MASCOT}, 'risky', null) as id`))[0].id;
+    const old = defined(
+      (await as<{ id: string }>(ALICE, `select public.start_cloud_job('Old', '[]', ${MASCOT}, 'risky', null) as id`))[0],
+    ).id;
     expect(await conversationOf(old)).toBe(old);
   });
 

@@ -80,10 +80,11 @@ export class RunnerDiscovery {
     // Checked again, since a message may have been sent from here while it asked.
     if (this.forgotten.includes(conversationId) || found?.[1].active) return;
     const fresher = newJobs(rows, found?.[1].jobIds ?? []);
-    if (fresher.length === 0) return;
+    const [oldest] = fresher;
+    if (!oldest) return;
     if (!found) {
-      const mascotId = (fresher[0].mascot as { id?: unknown } | null)?.id;
-      const chatId = this.hooks.adopt?.({ prompt: fresher[0].prompt, mascotId: typeof mascotId === "string" ? mascotId : null });
+      const mascotId = (oldest.mascot as { id?: unknown } | null)?.id;
+      const chatId = this.hooks.adopt?.({ prompt: oldest.prompt, mascotId: typeof mascotId === "string" ? mascotId : null });
       if (!chatId) return;
       found = [chatId, fresh({ account, conversationId, jobIds: [], jobId: null, active: false })];
       this.entries.set(...found);

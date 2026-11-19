@@ -5,6 +5,7 @@ import type { StreamReply } from "./agent";
 import type { PageTool } from "../tools/browserTools";
 import type { Tab } from "../tabs/Tab";
 import { send, tab } from "./chatsTesting";
+import { defined } from "../../shared/testing";
 
 vi.mock("./agent", async (importOriginal) => {
   const { ModelConfigError } = await importOriginal<typeof import("./agent")>();
@@ -55,7 +56,7 @@ describe("Chats", () => {
         );
         send(chats, null, "Check my orders", false);
         await vi.waitFor(() => expect(chats.waiting()).toHaveLength(1));
-        const [{ id, approval }] = chats.waiting();
+        const { id, approval } = defined(chats.waiting()[0]);
         return {
           chats,
           store,
@@ -204,7 +205,7 @@ describe("Chats", () => {
 
       send(chats, null, "sign in for me", false);
       await vi.waitFor(() => expect(chats.waiting()).toHaveLength(1));
-      const [{ id, approval }] = chats.waiting();
+      const { id, approval } = defined(chats.waiting()[0]);
       const looking = send(chats, null, "What's open?");
       await vi.waitFor(() => expect(chats.isRunning(looking!.id)).toBe(false));
       const read = () => other.find((tool) => tool.name === "read_page")!.run({ tabId: "tab-own" });

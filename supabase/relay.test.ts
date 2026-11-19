@@ -2,6 +2,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { defined } from "../src/shared/testing";
 
 // The relay's grants and functions, in real Postgres as Supabase's roles, on top of every migration before it.
 const SUPABASE_STANDINS = `
@@ -31,7 +32,7 @@ describe("the relay's grants", () => {
       await db.exec("reset role");
     }
   };
-  const one = async (uid: string | null, sql: string) => Object.values((await as(uid, sql))[0])[0];
+  const one = async (uid: string | null, sql: string) => Object.values(defined((await as(uid, sql))[0]))[0];
   let users = 0;
   const newUser = async () => {
     const id = `00000000-0000-4000-8000-${String(++users).padStart(12, "0")}`;

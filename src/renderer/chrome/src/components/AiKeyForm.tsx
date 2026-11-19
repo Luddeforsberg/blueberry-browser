@@ -9,6 +9,7 @@ import { useShell } from "../contexts/useShell";
 import { Berry } from "./Berry";
 import { ServiceMark } from "./ServiceMark";
 import { SERVICES, type KeyTry, type Said } from "./useAiKey";
+import { missing } from "@shared/missing";
 
 // DESIGN.md section 10, First run, Give me a brain, and Settings > Connections > AI service: the two services as tiles
 // side by side, and one field under them for the chosen one's key. The key is only ever in that field until it's sent to
@@ -34,7 +35,7 @@ const KEY_AT_FAULT: Said[] = ["refused", "not-a-key"];
 const ServiceTiles: React.FC<{ keyTry: KeyTry }> = ({ keyTry }) => {
   const group = useRef<HTMLDivElement>(null);
   const step = (by: number) => {
-    const next = AI_SERVICES[(AI_SERVICES.indexOf(keyTry.service) + by + AI_SERVICES.length) % AI_SERVICES.length];
+    const next = AI_SERVICES[(AI_SERVICES.indexOf(keyTry.service) + by + AI_SERVICES.length) % AI_SERVICES.length] ?? missing("a service");
     keyTry.choose(next);
     group.current?.querySelectorAll<HTMLElement>('[role="radio"]')[AI_SERVICES.indexOf(next)]?.focus();
   };

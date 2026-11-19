@@ -2,6 +2,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { defined } from "../src/shared/testing";
 
 // What the runner can read of its owner's approvals, in real Postgres as Supabase's roles, on top of every migration.
 const SUPABASE_STANDINS = `
@@ -36,7 +37,7 @@ describe("the runner's view of approvals", () => {
       await db.exec("reset role");
     }
   };
-  const one = async (uid: string | null, sql: string) => Object.values((await as(uid, sql))[0])[0];
+  const one = async (uid: string | null, sql: string) => Object.values(defined((await as(uid, sql))[0]))[0];
   let users = 0;
   const newUser = async () => {
     const id = `00000000-0000-4000-8000-${String(++users).padStart(12, "0")}`;
@@ -84,7 +85,9 @@ describe("the runner's view of approvals", () => {
     const { job, approval } = await asked();
     expect(await one(ALICE, `select public.decide_cloud_approval('${approval}', true, 'Blue')`)).toBe(true);
     await as(RUNNER, `select public.runner_update_job('${job}', 'done', p_reply => 'Ordered it in blue')`);
-    expect((await db.query<{ status: string }>("select status from public.cloud_jobs where id = $1", [job])).rows[0].status).toBe("done");
+    expect(defined((await db.query<{ status: string }>("select status from public.cloud_jobs where id = $1", [job])).rows[0]).status).toBe(
+      "done",
+    );
     expect(await seen(RUNNER)).toEqual([]);
     expect(await decisionOf(RUNNER, approval)).toEqual([]);
     // Alice still has hers.

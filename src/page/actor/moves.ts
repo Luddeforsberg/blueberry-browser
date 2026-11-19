@@ -3,7 +3,7 @@ import type { Core } from "./core";
 import type { Line } from "./line";
 import type { Motion } from "./motion";
 import type { Presence } from "./presence";
-import type { Actor } from "./stage";
+import { poseOf, type Actor } from "./stage";
 
 export type Kit = Core & Line & Motion & Presence;
 
@@ -81,7 +81,7 @@ export const makeMoves = (a: Actor, kit: Kit) => {
       ],
       timing,
     );
-    a.stage.poses[String(a.pose)]
+    poseOf(a.stage, String(a.pose))
       .querySelector("[data-part=head]")
       ?.animate([{ transform: "rotate(0deg)" }, { transform: "rotate(46deg)", offset: 0.42 }, { transform: "rotate(0deg)" }], timing);
     setTimeout(() => ripple({ x, y }), 80);
@@ -155,7 +155,7 @@ export const makeMoves = (a: Actor, kit: Kit) => {
     if (!begin() || quietMotion() || a.look.plain) return !a.covered;
     setPose("sitting");
     a.nod =
-      a.stage.poses[String(a.pose)]
+      poseOf(a.stage, String(a.pose))
         .querySelector("[data-part=head]")
         ?.animate([{ transform: "rotate(0deg)" }, { transform: "rotate(9deg)", offset: 0.5 }, { transform: "rotate(0deg)" }], {
           duration: 240,

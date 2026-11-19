@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PALETTES } from "../src/shared/mascots";
+import { defined } from "../src/shared/testing";
 
 // The palette ids on the two tables that store a look, before and after 20261119000000_berry_palettes.sql, in real
 // Postgres. The tables' other rules are in gallery.test.ts and phone.test.ts.
@@ -55,9 +56,9 @@ describe("a look's palette on the server", () => {
   });
 
   it("takes the old and the new ids after it, and keeps the rows it had", async () => {
-    const before = (await db.query<{ count: number }>("select count(*)::int as count from public.mascots")).rows[0].count;
+    const before = defined((await db.query<{ count: number }>("select count(*)::int as count from public.mascots")).rows[0]).count;
     await db.exec(migration("20261119000000_berry_palettes.sql"));
-    expect((await db.query<{ count: number }>("select count(*)::int as count from public.mascots")).rows[0].count).toBe(before);
+    expect(defined((await db.query<{ count: number }>("select count(*)::int as count from public.mascots")).rows[0]).count).toBe(before);
     for (const { id, oldId } of PALETTES) {
       for (const palette of [id, oldId]) {
         await expect(publish(palette)).resolves.toBeTruthy();

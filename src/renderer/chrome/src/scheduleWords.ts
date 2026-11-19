@@ -30,7 +30,8 @@ const ordinal = (day: number) => {
   return `${day}${tens >= 11 && tens <= 13 ? "th" : (suffixes[day % 10] ?? "th")}`;
 };
 
-const listed = (words: string[]) => (words.length < 2 ? words.join("") : `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`);
+const listed = (words: (string | undefined)[]) =>
+  words.length < 2 ? words.join("") : `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`;
 
 // The schedule read back as a sentence, each part that was chosen marked, as in "Every **weekday** at **09:00**".
 export type SentencePart = { text: string; chosen?: boolean };

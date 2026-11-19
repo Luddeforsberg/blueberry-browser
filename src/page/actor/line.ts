@@ -31,7 +31,7 @@ const crowded = (left: number, top: number, width: number, height: number): numb
   return count;
 };
 
-const overlaps = ([left, top, width, height]: number[], box: Box): boolean =>
+const overlaps = ([left, top, width, height]: [number, number, number, number], box: Box): boolean =>
   left < box.right && left + width > box.left && top < box.bottom && top + height > box.top;
 
 // The mascot's line: a few words beside it, placed over as little as can be.
@@ -55,18 +55,20 @@ export const makeLine = (a: Actor, { size, rectOf }: Core) => {
     const self = { left: spot.x - reach, top: spot.y - size(), right: spot.x + reach, bottom: spot.y };
     const above = spot.y - size() - height - gap;
     const beside = spot.y - size() * 0.75;
+    const onScreen = (left: number, top: number): [number, number] => [onScreenX(left), onScreenY(top)];
+    const first = onScreen(spot.x - width / 2, above);
     const places = [
-      [spot.x - width / 2, above],
-      [spot.x - reach, above],
-      [spot.x + reach - width, above],
-      [spot.x + reach + gap, beside],
-      [spot.x - reach - gap - width, beside],
-      [spot.x - width / 2, Math.max(spot.y, box?.bottom ?? spot.y) + gap],
-    ].map(([left, top]) => [onScreenX(left), onScreenY(top)]);
-    let best = places[0];
+      first,
+      onScreen(spot.x - reach, above),
+      onScreen(spot.x + reach - width, above),
+      onScreen(spot.x + reach + gap, beside),
+      onScreen(spot.x - reach - gap - width, beside),
+      onScreen(spot.x - width / 2, Math.max(spot.y, box?.bottom ?? spot.y) + gap),
+    ];
+    let best = first;
     let bestScore = Infinity;
     places.forEach(([left, top], order) => {
-      const at = [left, top, width, height];
+      const at: [number, number, number, number] = [left, top, width, height];
       const inTheWay = (box && overlaps(at, box) ? 100 : 0) + (overlaps(at, self) ? 100 : 0);
       const score = inTheWay + crowded(left, top, width, height) * 10 + order;
       if (score < bestScore) {

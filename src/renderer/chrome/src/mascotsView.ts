@@ -1,6 +1,7 @@
 import type { ChatThread, MascotAccessory, MascotDraft, MascotPalette, MascotProfile, MascotTool } from "@shared/library";
 import { ACCESSORIES, BERRY, MASCOT_TOOLS, PALETTES } from "@shared/mascots";
 import { mascotsParam, type MascotsPlace, type MascotPart } from "@shared/mascotsPlaces";
+import { missing } from "@shared/missing";
 
 export interface MascotFormValues {
   // Null for a new mascot.
@@ -46,13 +47,17 @@ export const blankPublish = (): PublishValues => ({
 // The last thing asked and the answer it got, so the two go together. Nothing else in the chat comes along.
 export const lastExchange = ({ messages }: Pick<ChatThread, "messages">): { prompt: string; answer: string } | null => {
   const answerAt = messages.findLastIndex((message) => message.role === "assistant");
+  const answer = messages[answerAt];
   const prompt = messages.slice(0, Math.max(answerAt, 0)).findLast((message) => message.role === "user");
-  return prompt ? { prompt: prompt.content, answer: messages[answerAt].content } : null;
+  return prompt && answer ? { prompt: prompt.content, answer: answer.content } : null;
 };
 
 const NAMES = ["Pip", "Scout", "Juno", "Wren", "Otis", "Margot", "Figaro", "Mabel", "Ziggy", "Clementine", "Rook", "Nimbus"];
 
-const oneOf = <T>(list: readonly T[]): T => list[Math.floor(Math.random() * list.length)];
+const pickName = (names: readonly string[]): string | undefined => names[Math.floor(Math.random() * names.length)];
+
+// Only ever given a list from the app's own tables with entries left after taking one out.
+const oneOf = <T>(list: readonly T[]): T => list[Math.floor(Math.random() * list.length)] ?? missing("a pick from an empty list");
 
 const randomLook = () => ({
   // Not Berry's, so a new one starts out as itself.
@@ -75,7 +80,7 @@ export const blankMascot = (): MascotFormValues => ({
 export const surprise = (values: MascotFormValues, taken: string[]): MascotFormValues => ({
   ...values,
   ...randomLook(),
-  name: oneOf(NAMES.filter((name) => name !== values.name && !taken.includes(name))) ?? values.name,
+  name: pickName(NAMES.filter((name) => name !== values.name && !taken.includes(name))) ?? values.name,
 });
 
 export const mascotForm = ({ id, name, look, instructions, sites, tools, worksInCloud = false }: MascotProfile): MascotFormValues => ({
@@ -128,8 +133,7 @@ export const dockFaces = <T>(mascots: T[], room: number, busy: (mascot: T) => bo
   const shown = mascots.slice(0, Math.max(1, room - 1));
   for (const mascot of mascots.slice(shown.length)) {
     if (!busy(mascot)) continue;
-    let at = shown.length - 1;
-    while (at > 0 && busy(shown[at])) at--;
+    const at = shown.findLastIndex((each, index) => index > 0 && !busy(each));
     if (at > 0) shown[at] = mascot;
   }
   return { shown, more: mascots.length - shown.length };

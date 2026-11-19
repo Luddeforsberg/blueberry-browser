@@ -11,6 +11,7 @@ import { BERRY } from "@shared/mascots";
 import { SuggestionItem } from "../../components/SuggestionItem";
 import { Section } from "./Section";
 import { SAMPLE_TABS, MANY_TABS, sampleAdd, SAMPLE_MASCOT, SAMPLE_ROWS, MENU_SAMPLES, ASK_SAMPLES } from "./gallerySamples";
+import { missing } from "@shared/missing";
 
 // The prompt box, our menus and Asking first, the + menu and suggestions.
 export const ComposerSections: React.FC = () => (
@@ -77,7 +78,7 @@ export const ComposerSections: React.FC = () => (
             add={sampleAdd()}
             attachment={
               <div className="flex flex-wrap gap-1.5">
-                <TabChip tab={SAMPLE_TABS[0]} onRemove={() => undefined} />
+                <TabChip tab={SAMPLE_TABS[0] ?? missing("a sample tab")} onRemove={() => undefined} />
                 <FileChip file={{ kind: "picture", name: "boarding-pass.png", fact: null, thumbnail: null }} onRemove={() => undefined} />
                 <FileChip file={{ kind: "pdf", name: "itinerary.pdf", fact: "3 pages", thumbnail: null }} onRemove={() => undefined} />
                 <FileChip
@@ -95,7 +96,11 @@ export const ComposerSections: React.FC = () => (
                   problem={ATTACHMENT_WORDS.video}
                   onRemove={() => undefined}
                 />
-                <TabChip tab={SAMPLE_TABS[1]} problem={ATTACHMENT_WORDS.tabToCloud} onRemove={() => undefined} />
+                <TabChip
+                  tab={SAMPLE_TABS[1] ?? missing("a second sample tab")}
+                  problem={ATTACHMENT_WORDS.tabToCloud}
+                  onRemove={() => undefined}
+                />
               </div>
             }
           />
@@ -222,7 +227,7 @@ export const ComposerSections: React.FC = () => (
           ))}
         </ul>
         <ul aria-label="Its prompt in the box">
-          <SuggestionItem row={SAMPLE_ROWS[SAMPLE_ROWS.length - 1]} used onPress={() => undefined} />
+          <SuggestionItem row={SAMPLE_ROWS.at(-1) ?? missing("a sample row")} used onPress={() => undefined} />
         </ul>
       </div>
     </Section>

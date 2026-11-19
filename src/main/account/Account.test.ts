@@ -4,6 +4,7 @@ import { join } from "path";
 import { describe, expect, it, vi } from "vitest";
 import { Account } from "./Account";
 import { GalleryServer, ServerError, Unreachable, type ServerSession } from "./galleryServer";
+import { defined } from "../../shared/testing";
 
 vi.mock("electron", () => ({
   safeStorage: {
@@ -128,7 +129,7 @@ describe("Account", () => {
           answers.push((answer) => (answer instanceof Error ? reject(answer) : resolve(answer))),
         ),
     );
-    return { signIn, answer: (index: number, session: ServerSession | Error) => answers[index](session) };
+    return { signIn, answer: (index: number, session: ServerSession | Error) => defined(answers[index])(session) };
   };
 
   it("stays signed out when a sign-in that was on its way comes back afterwards, and ends that session there", async () => {

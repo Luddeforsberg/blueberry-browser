@@ -3,6 +3,7 @@ import { useFrame } from "./motion";
 import { pipFrames } from "./pipPatterns";
 import type { Mood } from "./moods";
 import { EYE } from "./mascotColours";
+import { missing } from "@shared/missing";
 
 // Part of the mascot's drawing (Mascot.tsx): its eyes and mouth in each mood.
 
@@ -51,7 +52,11 @@ const WorkingFace: React.FC<{ still: boolean; small: boolean }> = ({ still, smal
             cy={cy}
             r={small ? 2.6 : 2.1}
             fill={EYE}
-            opacity={still ? WORKING_STILL : off + (1 - off) * frames[frame][row * 3 + column]}
+            opacity={
+              still
+                ? WORKING_STILL
+                : off + (1 - off) * (frames[frame]?.[row * 3 + column] ?? missing(`pip ${row * 3 + column} of frame ${frame}`))
+            }
           />
         )),
       )}

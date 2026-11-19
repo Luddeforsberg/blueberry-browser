@@ -29,7 +29,10 @@ const useIconOnly = (ref: React.RefObject<HTMLElement | null>, row: boolean, hel
     if (held) return;
     const item = ref.current;
     if (!row || !item) return setIconOnly(false);
-    const observer = new ResizeObserver(([entry]) => setIconOnly(entry.borderBoxSize[0].inlineSize < ICON_ONLY_WIDTH));
+    const observer = new ResizeObserver(([entry]) => {
+      const width = entry?.borderBoxSize[0]?.inlineSize;
+      if (width !== undefined) setIconOnly(width < ICON_ONLY_WIDTH);
+    });
     observer.observe(item);
     return () => observer.disconnect();
   }, [ref, row, held]);
@@ -156,8 +159,10 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
   const heads = (tab: TabInfo) => tab.page === "chat" && !!tab.pageParam && jobs.includes(tab.pageParam);
   const tabs = allTabs.filter((tab) => !tab.jobChatId && !heads(tab));
   // A drag counts places in this list, and the window in all of them.
-  const moveShown = (tabId: string, toIndex: number) =>
-    moveTab(tabId, toIndex < tabs.length ? allTabs.indexOf(tabs[toIndex]) : allTabs.length - 1);
+  const moveShown = (tabId: string, toIndex: number) => {
+    const there = tabs[toIndex];
+    return moveTab(tabId, there ? allTabs.indexOf(there) : allTabs.length - 1);
+  };
   const { start, itemProps } = useTabDrag(
     tabs.map((tab) => tab.id),
     vertical ? "y" : "x",

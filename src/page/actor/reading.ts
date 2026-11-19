@@ -9,7 +9,7 @@ interface Stop {
 }
 
 // What's in view that someone would read, top to bottom, at most four of them far enough apart to hop between.
-const stopsInView = (margin: number): Stop[] => {
+const stopsInView = (margin: number): [Stop, ...Stop[]] => {
   const blocks = [...document.querySelectorAll<HTMLElement>("h1,h2,h3,p,li,td,dt,dd,blockquote,figcaption,label")]
     .map((el) => ({ el, box: el.getBoundingClientRect() }))
     .filter(
@@ -25,11 +25,16 @@ const stopsInView = (margin: number): Stop[] => {
     .sort((a, b) => a.box.top - b.box.top);
   const stops: Stop[] = [];
   for (const { box } of blocks) {
-    if (stops.length < 4 && (stops.length === 0 || box.top - stops[stops.length - 1].top > margin * 1.6)) stops.push(box);
+    const last = stops.at(-1);
+    if (stops.length < 4 && (!last || box.top - last.top > margin * 1.6)) stops.push(box);
   }
-  if (stops.length === 0)
-    stops.push({ left: innerWidth - margin * 2, top: margin * 1.5 }, { left: innerWidth - margin * 2, top: innerHeight / 2 });
-  return stops;
+  const [first, ...rest] = stops;
+  if (!first)
+    return [
+      { left: innerWidth - margin * 2, top: margin * 1.5 },
+      { left: innerWidth - margin * 2, top: innerHeight / 2 },
+    ];
+  return [first, ...rest];
 };
 
 export interface FrameSpot {
@@ -97,8 +102,10 @@ export const makeRead = (a: Actor, kit: Kit) => {
     const job = a.reading;
     let at = 0;
     const next = (): void => {
-      if (job !== a.reading || at >= stops.length) return;
-      const to = onLeft(stops[at++]);
+      const stop = stops[at];
+      if (job !== a.reading || !stop) return;
+      at++;
+      const to = onLeft(stop);
       const far = Math.hypot(to.x - (a.spot?.x ?? to.x), to.y - (a.spot?.y ?? to.y));
       setPose(far > margin * 4 ? "flying" : "looking");
       setFacing(far > margin * 4 && to.x < (a.spot?.x ?? 0) ? -1 : 1);

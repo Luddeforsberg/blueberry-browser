@@ -107,3 +107,10 @@ export const buildStage = (look: ActorLook, art: { poses: Record<string, ArtNode
   }
   return { host, sky, mascot, flip, body, line, poses };
 };
+
+// The drawing for a pose. Every pose the mascot takes is one buildStage drew for its look.
+export const poseOf = (stage: Stage, name: string): Element => {
+  const pose = stage.poses[name];
+  if (!pose) throw new Error("No drawing for the pose " + name);
+  return pose;
+};

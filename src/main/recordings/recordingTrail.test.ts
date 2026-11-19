@@ -3,6 +3,7 @@ import { createPageTools } from "../tools/browserTools";
 import { draftFromReply, MAX_STEPS, plainDraft, searchIn, siteOfHost, sitesOf, Trail, trailAddress, trailForModel } from "./recordingTrail";
 import type { Tab } from "../tabs/Tab";
 import { narrowSites } from "../../shared/mascots";
+import { defined } from "../../shared/testing";
 
 const trail = (site = "shop.example") => {
   const made = new Trail();
@@ -113,7 +114,7 @@ describe("the trail", () => {
     const { note, made } = trail();
     note({ type: "typed", label: "Order number", value: "123" });
     note({ type: "enter", label: "Order number" });
-    expect(trailForModel(made.steps).steps[0].did).toBe("typed and pressed Enter");
+    expect(defined(trailForModel(made.steps).steps[0]).did).toBe("typed and pressed Enter");
   });
 
   it("keeps the site a click led to, as the routine will need it", () => {
@@ -128,7 +129,7 @@ describe("the trail", () => {
     note({ type: "click", label: "Cheap cable", role: "link" });
     made.went("https://shop.example/product/1?ref=x", { now: 100_000 + 11_000 });
     expect(made.steps).toHaveLength(1);
-    expect(made.steps[0].path).toBe("shop.example/product/1");
+    expect(defined(made.steps[0]).path).toBe("shop.example/product/1");
     went("https://shop.example/elsewhere");
     expect(made.steps).toHaveLength(2);
   });

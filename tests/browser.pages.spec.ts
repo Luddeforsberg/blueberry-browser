@@ -15,11 +15,12 @@ import {
   chatInSidebar,
   showChats,
 } from "./browserSetup";
+import { defined } from "../src/shared/testing";
 
 setUpBrowserApp();
 
 test("the app starts on the new tab page, and typing an address opens it in that tab", async () => {
-  const [first] = await getTabs();
+  const first = defined((await getTabs())[0]);
   expect(first).toMatchObject({ page: "new-tab", isActive: true });
   await expect(chrome.getByRole("heading", { name: "Where to?" })).toBeVisible();
 
@@ -136,6 +137,9 @@ test("the new tab page has no chat panel, and it comes back on the next page", a
   expect((await chrome.evaluate(() => window.chromeAPI.layout.getLayout())).chatOpen).toBe(false);
 
   const { id } = await activeTab();
-  await chrome.evaluate(([tabId, url]) => window.chromeAPI.browser.navigateTab(tabId, url), [id, `${origin}/next`]);
+  await chrome.evaluate(([tabId, url]) => window.chromeAPI.browser.navigateTab(tabId, url), [id, `${origin}/next`] satisfies [
+    string,
+    string,
+  ]);
   await expect(panel).toBeVisible();
 });

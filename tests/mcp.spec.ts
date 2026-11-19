@@ -5,6 +5,7 @@ import { createServer, request } from "node:http";
 import type { AddressInfo } from "node:net";
 import { findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
+import { defined } from "../src/shared/testing";
 
 const connect = async (url: string, token: string) => {
   const client = new Client({ name: "test", version: "1.0.0" });
@@ -31,7 +32,7 @@ const statusWithHost = (url: string, host: string, token: string) =>
     sent.end("{}");
   });
 
-const textOf = (result: Awaited<ReturnType<Client["callTool"]>>) => (result.content as Array<{ text: string }>)[0].text;
+const textOf = (result: Awaited<ReturnType<Client["callTool"]>>) => defined((result.content as Array<{ text: string }>)[0]).text;
 const jsonOf = (result: Awaited<ReturnType<Client["callTool"]>>) => JSON.parse(textOf(result).replace(/^[^[{]*/, ""));
 
 // The real token, as Copy puts it on the clipboard. The clipboard is swapped first, so a test never touches the real one.
@@ -64,15 +65,15 @@ test("Claude gives Berry a job over MCP, can't allow its action, and the user do
     const { url, snippets } = await chrome.evaluate(() => window.chromeAPI.mcp.setOn(true));
     expect(url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/mcp$/);
     // The renderer never gets the token.
-    expect(snippets[0].text).toContain("Bearer ••••••••");
+    expect(defined(snippets[0]).text).toContain("Bearer ••••••••");
     const token = await copiedToken(app);
 
     // Without the token, or through another name for this computer, it's refused.
     expect((await fetch(url!, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).status).toBe(401);
     const port = new URL(url!).port;
-    expect(await statusWithHost(url!, `evil.example:${port}`, token)).toBe(403);
+    expect(await statusWithHost(url!, `evil.example:${port}`, defined(token))).toBe(403);
 
-    const client = await connect(url!, token);
+    const client = await connect(url!, defined(token));
     const { tools } = await client.listTools();
     expect(tools.map(({ name }) => name)).toEqual(
       expect.arrayContaining(["list_agents", "run_browser_task", "get_task", "respond_to_task", "read_page"]),
@@ -96,7 +97,7 @@ test("Claude gives Berry a job over MCP, can't allow its action, and the user do
     // The chat says where it came from, and the user allows it on Needs you.
     const library = await chrome.evaluate(() => window.chromeAPI.library.getLibrary());
     expect(library.chats.find(({ id }) => id === taskId)).toMatchObject({ from: "Claude Code" });
-    const [waiting] = library.needsYou;
+    const waiting = defined(library.needsYou[0]);
     expect(waiting).toMatchObject({ id: taskId, from: "Claude Code" });
     await chrome.evaluate(({ id, approvalId }) => window.chromeAPI.chat.decide(id, approvalId, true), {
       id: waiting.id,
@@ -128,7 +129,7 @@ test("Claude gives Berry a job over MCP, can't allow its action, and the user do
 
     // Revoking means the old token no longer works.
     await chrome.evaluate(() => window.chromeAPI.mcp.revoke());
-    await expect(connect(url!, token)).rejects.toThrow();
+    await expect(connect(url!, defined(token))).rejects.toThrow();
     expect(await copiedToken(app)).not.toBe(token);
 
     await chrome.evaluate(() => window.chromeAPI.mcp.setOn(false));

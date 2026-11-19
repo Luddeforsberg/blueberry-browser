@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { HistoryEntry } from "@shared/ipc";
 import { foldVisits, groupByDay } from "./historyDays";
+import { defined } from "@shared/testing";
 
 const at = (year: number, month: number, day: number, hour = 12): HistoryEntry => ({
   id: hour,
@@ -27,13 +28,13 @@ describe("groupByDay", () => {
   });
 
   it("shows the year only for another year", () => {
-    const [day] = groupByDay([at(2025, 12, 31)], NOW);
+    const day = defined(groupByDay([at(2025, 12, 31)], NOW)[0]);
     expect(day.date).toBe("31 December 2025");
-    expect(groupByDay([at(2026, 10, 1)], NOW)[0].date).toBe("1 October");
+    expect(defined(groupByDay([at(2026, 10, 1)], NOW)[0]).date).toBe("1 October");
   });
 
   it("knows yesterday across a month boundary", () => {
-    const [day] = groupByDay([at(2026, 9, 30)], new Date(2026, 9, 1, 12).getTime());
+    const day = defined(groupByDay([at(2026, 9, 30)], new Date(2026, 9, 1, 12).getTime())[0]);
     expect(day.label).toBe("Yesterday");
   });
 });

@@ -5,6 +5,7 @@ import { ChatStore } from "./ChatStore";
 import type { ReplyMessage, StreamReply } from "./agent";
 import type { PageTool } from "../tools/browserTools";
 import type { Tab } from "../tabs/Tab";
+import { defined } from "../../shared/testing";
 
 // What the tests of attachments share: tabs to attach, and a `Chats` whose replies stay open until they're let go. Each
 // test file mocks "./agent" itself, before this loads it, and calls `resetReplies` before each test.
@@ -95,7 +96,8 @@ export const setup = ({ tabs = [], active = null, stream = holding, runner, clou
 
 export const tool = (name: string) => tools.find((candidate) => candidate.name === name)!;
 export const contentOf = (messages: ReplyMessage[]) => JSON.stringify(messages.map(({ content }) => content));
-export const listed = async () => JSON.parse((await tool("list_tabs").run({})).split("\n\n")[0]).map(({ id }: { id: string }) => id);
+export const listed = async () =>
+  JSON.parse(defined((await tool("list_tabs").run({})).split("\n\n")[0])).map(({ id }: { id: string }) => id);
 
 export const resetReplies = () => {
   sent = [];

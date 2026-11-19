@@ -295,7 +295,7 @@ var siteParts = (text) => {
   return parts.filter((part) => part.text);
 };
 var withSiteNames = (text) => siteParts(text).map((part) => part.text).join("");
-var asContinuation = (text) => /^[A-Z][a-z]/.test(text) ? text[0].toLowerCase() + text.slice(1) : text;
+var asContinuation = (text) => /^[A-Z][a-z]/.test(text) ? text.charAt(0).toLowerCase() + text.slice(1) : text;
 
 // src/renderer/chrome/src/shortWords.ts
 var DAY_MS = 864e5;

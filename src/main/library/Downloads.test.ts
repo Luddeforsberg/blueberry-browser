@@ -4,6 +4,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { describe, expect, it, vi } from "vitest";
 import { Downloads, safeFilename, uniquePath, type DownloadsDeps } from "./Downloads";
+import { defined } from "../../shared/testing";
 
 class FakeItem extends EventEmitter {
   savePath = "";
@@ -144,20 +145,20 @@ describe("Downloads", () => {
     const { downloads } = setup();
     const item = new FakeItem();
     downloads.track(item);
-    const { id } = downloads.list[0];
+    const { id } = defined(downloads.list[0]);
 
     expect(await downloads.act(id, "pause")).toBe(true);
     expect(item.paused).toBe(true);
-    expect(downloads.list[0].state).toBe("paused");
+    expect(defined(downloads.list[0]).state).toBe("paused");
     expect(await downloads.act(id, "pause")).toBe(false);
     expect(await downloads.act(id, "resume")).toBe(true);
-    expect(downloads.list[0].state).toBe("progressing");
+    expect(defined(downloads.list[0]).state).toBe("progressing");
     expect(await downloads.act(id, "remove")).toBe(false);
 
     expect(await downloads.act(id, "cancel")).toBe(true);
     expect(item.cancelled).toBe(true);
     item.emit("done", {}, "cancelled");
-    expect(downloads.list[0].state).toBe("cancelled");
+    expect(defined(downloads.list[0]).state).toBe("cancelled");
     expect(await downloads.act(id, "cancel")).toBe(false);
     expect(await downloads.act(id, "resume")).toBe(false);
     expect(await downloads.act("nobody", "open")).toBe(false);
@@ -177,7 +178,7 @@ describe("Downloads", () => {
     const { downloads, deps } = setup();
     const item = new FakeItem();
     downloads.track(item);
-    const { id, path } = downloads.list[0];
+    const { id, path } = defined(downloads.list[0]);
     expect(await downloads.act(id, "open")).toBe(false);
 
     writeFileSync(path, "done");
@@ -190,11 +191,11 @@ describe("Downloads", () => {
 
     rmSync(path);
     expect(await downloads.act(id, "open")).toBe(false);
-    expect(downloads.list[0].missing).toBe(true);
+    expect(defined(downloads.list[0]).missing).toBe(true);
     expect(deps.openPath).toHaveBeenCalledTimes(1);
 
     writeFileSync(path, "back");
-    expect((await downloads.refresh())[0].missing).toBe(false);
+    expect(defined((await downloads.refresh())[0]).missing).toBe(false);
   });
 
   it("opens the folder files are saved to, even when it's gone", async () => {
@@ -220,7 +221,7 @@ describe("Downloads", () => {
       ["finished.txt", "completed", false],
     ]);
     expect(restarted.list[1]).toMatchObject({ source: "files.example.com", receivedBytes: 100 });
-    expect((await restarted.refresh())[1].missing).toBe(true);
+    expect(defined((await restarted.refresh())[1]).missing).toBe(true);
   });
 
   it("survives a corrupt file and drops entries it can't trust", () => {

@@ -8,6 +8,7 @@ import { useShell } from "../contexts/useShell";
 import { openMascots } from "../mascotsView";
 import { Berry } from "./Berry";
 import { useAssistantName } from "./useAssistantName";
+import { missing } from "@shared/missing";
 
 const MAX_SHOWN = 2;
 
@@ -70,7 +71,7 @@ export const RememberedFacts: React.FC<{ used: MemoryFact[] }> = ({ used }) => {
               <li key={fact.id}>{line(fact)}</li>
             ))}
           </ul>
-          <ChangeIt mascotId={used[0].mascotId}>Change</ChangeIt>
+          <ChangeIt mascotId={(used[0] ?? missing("a fact kept in mind")).mascotId}>Change</ChangeIt>
         </>
       )}
     </div>

@@ -16,7 +16,7 @@ const keptIcon = async (app: Awaited<ReturnType<typeof launchApp>>, profile: str
         // BGRA, a row at a time. The square starts about a tenth in.
         const at = (128 * width + 40) * 4;
         const pixels = image.toBitmap();
-        return { width, height, brightness: Math.round((pixels[at] + pixels[at + 1] + pixels[at + 2]) / 3) };
+        return { width, height, brightness: Math.round((pixels.readUInt8(at) + pixels.readUInt8(at + 1) + pixels.readUInt8(at + 2)) / 3) };
       },
       join(profile, "app-icon.png"),
     );

@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { findView, launchApp } from "./app";
 import { startFakeModel, type FakeModel } from "./fakeModel";
+import { defined } from "../src/shared/testing";
 
 let server: Server;
 let origin: string;
@@ -68,7 +69,7 @@ const createRoutine = async (chrome: Page) => {
   const saved = chrome.getByRole("region", { name: "Saved as a routine" });
   await expect(saved).toContainText("Every Saturday at 07:30, Berry will check the prices");
   await expect.poll(() => model.titleRequests.length).toBe(1);
-  expect(JSON.stringify(model.titleRequests[0].messages)).toContain("Check the prices");
+  expect(JSON.stringify(defined(model.titleRequests[0]).messages)).toContain("Check the prices");
   await saved.getByRole("button", { name: "Done" }).click();
   await expect(chrome.getByRole("heading", { name: "Flight watch" })).toBeVisible();
   await expect(chrome.getByText("Every Saturday at 07:30").first()).toBeVisible();

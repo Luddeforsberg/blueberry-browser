@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { ChatStore } from "../src/main/chats/ChatStore";
 import { HistoryStore } from "../src/main/library/HistoryStore";
 import type { Visit } from "../src/shared/ipc";
+import { missing } from "../src/shared/missing";
 
 const DAY_MS = 86_400_000;
 const MINUTE_MS = 60_000;
@@ -33,8 +34,8 @@ export const demoVisits = (now = Date.now()): Visit[] => {
     ["https://github.com/acme/checkout/issues", "Issues · acme/checkout · GitHub"],
   ];
   [1, 2, 3, 4].forEach((daysAgo, index) => {
-    const [address, title] = repositoryPages[index];
-    const [next, nextTitle] = repositoryPages[index + 1];
+    const [address, title] = repositoryPages[index] ?? missing(`repository page ${index}`);
+    const [next, nextTitle] = repositoryPages[index + 1] ?? missing(`repository page ${index + 1}`);
     visits.push(
       visit(address, title, at(now, daysAgo, 11 + index, 5)),
       visit("https://linear.app/acme/team/CHK/active", "Checkout team · Active issues · Linear", at(now, daysAgo, 11 + index, 12)),
@@ -43,12 +44,14 @@ export const demoVisits = (now = Date.now()): Visit[] => {
     );
   });
   // A flat hunt, checked at odd hours, so it has no habit of time.
-  [
-    [1, 21, 10],
-    [2, 7, 45],
-    [4, 12, 30],
-    [5, 18, 20],
-  ].forEach(([daysAgo, hour, minute]) => {
+  (
+    [
+      [1, 21, 10],
+      [2, 7, 45],
+      [4, 12, 30],
+      [5, 18, 20],
+    ] satisfies [number, number, number][]
+  ).forEach(([daysAgo, hour, minute]) => {
     visits.push(
       visit("https://www.hemnet.se/bostader", "Bostäder till salu i Södermalm, Stockholm | Hemnet", at(now, daysAgo, hour, minute)),
     );

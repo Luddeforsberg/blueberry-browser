@@ -4,6 +4,7 @@ import { BERRY } from "../src/shared/mascots";
 import { findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
 import { startFakeSupabase } from "./fakeSupabase";
+import { defined } from "../src/shared/testing";
 
 // A job from ChatGPT or Claude, started through the relay's own database function, runs in Blueberry on this Mac once
 // Settings allows it: it shows as a chat from them, runs with the fake model, and its reply lands in the job's row. With
@@ -74,7 +75,7 @@ test("a relay job runs as a chat on this Mac only while the switch is on, and it
 
     model.replyWith(REPLY);
     const jobId = await startJob("auto");
-    expect((await supabase.cloudRows(`select target from public.cloud_jobs where id = '${jobId}'`))[0].target).toBe("mac");
+    expect(defined((await supabase.cloudRows(`select target from public.cloud_jobs where id = '${jobId}'`))[0]).target).toBe("mac");
 
     // It's a chat here, from them, with no page, and its reply lands in the row.
     await expect
@@ -102,11 +103,15 @@ test("a relay job runs as a chat on this Mac only while the switch is on, and it
     await toggle.click();
     await expect.poll(async () => (await supabase.cloudRows("select enabled from public.cloud_mac_presence"))[0]?.enabled).toBe(false);
     expect(await startJob("mac")).toBeNull();
-    const [{ id: waiting }] = await supabase.cloudRows(
-      `insert into public.cloud_jobs (owner, prompt, mascot, target, conversation_id) select id, 'Not now', '{"id":"berry"}'::jsonb, 'mac', gen_random_uuid() from auth.users where email = '${EMAIL}' returning id`,
+    const { id: waiting } = defined(
+      (
+        await supabase.cloudRows(
+          `insert into public.cloud_jobs (owner, prompt, mascot, target, conversation_id) select id, 'Not now', '{"id":"berry"}'::jsonb, 'mac', gen_random_uuid() from auth.users where email = '${EMAIL}' returning id`,
+        )
+      )[0],
     );
     await new Promise((resolve) => setTimeout(resolve, 7_000));
-    expect((await supabase.cloudRows(`select status from public.cloud_jobs where id = '${waiting}'`))[0].status).toBe("queued");
+    expect(defined((await supabase.cloudRows(`select status from public.cloud_jobs where id = '${waiting}'`))[0]).status).toBe("queued");
     expect(
       (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).chats.filter(({ from }) => from === "ChatGPT or Claude"),
     ).toHaveLength(1);

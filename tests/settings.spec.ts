@@ -32,7 +32,10 @@ test("the account menu changes the theme and opens Settings, whose sections and 
     await expect(menu).toHaveCount(0);
     await expect(chrome.getByRole("form", { name: "Sign in" })).toBeVisible();
 
-    await chrome.evaluate(([email, password]) => window.chromeAPI.account.signIn(email, password), [EMAIL, PASSWORD]);
+    await chrome.evaluate(([email, password]) => window.chromeAPI.account.signIn(email, password), [EMAIL, PASSWORD] satisfies [
+      string,
+      string,
+    ]);
     const button = sidebar.getByRole("button", { name: `Account, ${EMAIL}` });
     await expect(button).toHaveText("A");
 

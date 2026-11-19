@@ -50,8 +50,8 @@ export const siteOfHost = (hostname: string): string => {
   const host = hostname.toLowerCase().replace(/^www\./, "");
   if (/^[\d.]+$/.test(host) || host.startsWith("[") || !host.includes(".")) return host;
   const parts = host.split(".");
-  const last = parts.length - 1;
-  const keep = parts.length > 2 && parts[last].length === 2 && SECOND_LEVEL.test(parts[last - 1]) ? 3 : 2;
+  const [secondLevel, topLevel] = parts.slice(-2);
+  const keep = parts.length > 2 && topLevel?.length === 2 && secondLevel !== undefined && SECOND_LEVEL.test(secondLevel) ? 3 : 2;
   const site = parts.slice(-keep).join(".");
   return MANY_PRODUCTS.includes(site) ? host : site;
 };

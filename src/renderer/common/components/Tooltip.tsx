@@ -5,6 +5,7 @@ import { shortcutKeys } from "@shared/shortcuts";
 import { cn } from "../lib/utils";
 import motion from "../motion.json";
 import { GRACE_MS, IDLE, REST_MS, placeTip, slidesFrom, stepTip, type Box, type TipEvent, type TipState } from "./tooltipState";
+import { missing } from "@shared/missing";
 
 // DESIGN.md section 8, A tooltip: one near-black pill for the whole view, which waits for the pointer to rest, then
 // follows it along a row of controls. The system's own tooltip isn't used anywhere in the chrome, and a lint rule
@@ -69,7 +70,8 @@ export const TipPill: React.FC<{ tip: TipShowing; on: boolean; fixed?: boolean }
   const key = keyOf(tip);
   const [labels, setLabels] = useState([{ key, tip: tip as TipWords }]);
   // New words: sliding, the old ones stay a moment to cross over, and appearing, they're simply replaced.
-  if (labels[labels.length - 1].key !== key) setLabels(tip.slide ? [...labels.slice(-1), { key, tip }] : [{ key, tip }]);
+  if ((labels.at(-1) ?? missing("a tooltip's words")).key !== key)
+    setLabels(tip.slide ? [...labels.slice(-1), { key, tip }] : [{ key, tip }]);
   useEffect(() => {
     if (labels.length < 2) return;
     const timer = window.setTimeout(() => setLabels((shown) => shown.slice(-1)), ms.move);

@@ -77,7 +77,11 @@ const fitSteps = (steps: ChatStep[]): ChatStep[] => {
   if (fitted.length <= MAX_STEPS && bytes <= MAX_STEPS_BYTES) return fitted;
   bytes = 2 + stepBytes(EARLIER_STEPS);
   let first = fitted.length;
-  while (first > 0 && fitted.length - first < MAX_STEPS - 1 && bytes + sizes[first - 1] <= MAX_STEPS_BYTES) bytes += sizes[--first];
+  for (const size of [...sizes].reverse()) {
+    if (fitted.length - first >= MAX_STEPS - 1 || bytes + size > MAX_STEPS_BYTES) break;
+    bytes += size;
+    first--;
+  }
   return [EARLIER_STEPS, ...fitted.slice(first)];
 };
 

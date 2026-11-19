@@ -185,7 +185,7 @@ export class Phone {
 
   private onChoice({ handle, data, acknowledge }: IncomingChoice): void {
     const [action, id] = data.split(":");
-    const request = this.requests.get(id);
+    const request = id === undefined ? undefined : this.requests.get(id);
     if (!request || request.handle !== handle || request.kind !== "approval" || (action !== "allow" && action !== "deny")) {
       acknowledge("That’s already been answered.");
       return;

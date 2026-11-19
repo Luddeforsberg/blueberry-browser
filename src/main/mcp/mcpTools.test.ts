@@ -5,6 +5,7 @@ import type { StreamReply } from "../chats/agent";
 import { createMcpTools, UNTRUSTED_NOTE, type McpHost, type McpTab } from "./mcpTools";
 import type { MascotProfile, MemoryFact, Routine, RoutineRun } from "../../shared/library";
 import { BERRY } from "../../shared/mascots";
+import { defined } from "../../shared/testing";
 
 vi.mock("../chats/agent", async (importOriginal) => {
   const { ModelConfigError } = await importOriginal<typeof import("../chats/agent")>();
@@ -149,7 +150,7 @@ describe("MCP tools", () => {
 
     // The user can, in Blueberry.
     const ended = replyEnded();
-    const [waiting] = chats.waiting();
+    const waiting = defined(chats.waiting()[0]);
     chats.decide(waiting.id, waiting.approval.id, true);
     await ended;
     expect(allowed).toBe(true);

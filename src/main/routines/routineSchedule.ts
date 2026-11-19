@@ -1,5 +1,6 @@
 import type { RoutineDraft, RoutineSchedule } from "../../shared/library";
 import { normaliseSite } from "../../shared/mascots";
+import { missing } from "../../shared/missing";
 
 const MAX_NAME_LENGTH = 100;
 const MAX_INSTRUCTIONS_LENGTH = 5000;
@@ -7,10 +8,14 @@ const MAX_SITES = 20;
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-const clock = (time: string): [hour: number, minute: number] => {
-  const [hour, minute] = time.split(":").map(Number);
+// A time with no minutes, which only a damaged file could hold, gives NaN minutes, as it always has.
+export const clock = (time: string): [hour: number, minute: number] => {
+  const [hour = NaN, minute = NaN] = time.split(":").map(Number);
   return [hour, minute];
 };
+
+// A day is checked to be 0 to 6 when it's saved. One read from a damaged file fails the list, as it always has.
+const weekday = (day: number): string => WEEKDAYS[day] ?? missing(`a weekday numbered ${day}`);
 
 const daysInMonth = (year: number, month: number): number => new Date(year, month + 1, 0).getDate();
 
@@ -60,8 +65,10 @@ export const scheduleLabel = (schedule: RoutineSchedule): string => {
     case "weekly": {
       const days = [...schedule.days].sort((a, b) => a - b);
       if (days.length === WEEKDAYS.length) return `Daily at ${schedule.time}`;
-      if (days.length === 1) return `${WEEKDAYS[days[0]]}s at ${schedule.time}`;
-      return `${days.map((day) => WEEKDAYS[day].slice(0, 3)).join(", ")} at ${schedule.time}`;
+      const [only = -1] = days;
+      // One day past Saturday, from a damaged file, has always read "undefineds" rather than failing the list.
+      if (days.length === 1) return `${String(WEEKDAYS[only])}s at ${schedule.time}`;
+      return `${days.map((day) => weekday(day).slice(0, 3)).join(", ")} at ${schedule.time}`;
     }
     case "monthly":
       return `${ordinal(schedule.day)} of each month at ${schedule.time}`;
@@ -98,7 +105,7 @@ const MAX_WORDS_NAME = 40;
 export const nameFromWords = (instructions: string): string => {
   const line = instructions
     .trim()
-    .split("\n")[0]
+    .replace(/\n[\s\S]*/, "")
     .trim()
     .replace(/[.:;,!?]+$/, "");
   if (line.length <= MAX_WORDS_NAME) return line;

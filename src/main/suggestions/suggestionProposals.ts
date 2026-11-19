@@ -2,7 +2,7 @@ import { createHash } from "crypto";
 import type { MascotDraft, RoutineSchedule, SuggestionWords } from "../../shared/library";
 import { ACCESSORIES, BERRY, PALETTES, normaliseSite, paletteOf, parseMascotDraft, siteAllowed } from "../../shared/mascots";
 import type { Digest, Evidence, Feedback } from "./suggestionDigest";
-import { parseDraft } from "../routines/routineSchedule";
+import { clock, parseDraft } from "../routines/routineSchedule";
 import { areSimilar, nameOfSite, plainText, wordsOf, type Pattern } from "./suggestionPatterns";
 
 // What the model proposes, and the checks every proposal has to pass before it's a card. The model decides what to
@@ -126,7 +126,7 @@ const minutesOf = (at: number) => {
 // weekly one, over more than one week, or a few evenings of the same job would pass for a habit.
 export const scheduleFits = (schedule: RoutineSchedule, times: number[]): boolean => {
   if (schedule.kind !== "daily" && schedule.kind !== "weekly") return false;
-  const [hours, minutes] = schedule.time.split(":").map(Number);
+  const [hours, minutes] = clock(schedule.time);
   const at = hours * 60 + minutes;
   const near = (time: number) => {
     const after = (((minutesOf(time) - at) % DAY_MINUTES) + DAY_MINUTES) % DAY_MINUTES;

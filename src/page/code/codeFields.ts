@@ -86,15 +86,17 @@ export const codeFieldsChanged = ({ indexes }: { indexes: number[] }): boolean =
 const SUBMIT_WORDS = /verify|submit|continue|confirm|next|sign in|log in|fortsätt|bekräfta|verifiera|logga in|nästa/i;
 
 export const pressCodeSubmit = ({ indexes }: { indexes: number[] }): "none" | "clicked" | "submitted" => {
-  const el: HTMLInputElement | undefined = code.fields[indexes[indexes.length - 1]];
+  const last = indexes.at(-1);
+  const el = last === undefined ? undefined : code.fields[last];
   const root = el?.form ?? el?.ownerDocument;
   if (!el || !root) return "none";
   const shown = (button: PageElement): boolean => button.getBoundingClientRect().width > 0 && !button.disabled;
   const inForm = el.form
     ? [...root.querySelectorAll<PageElement>("button:not([type=button]):not([type=reset]), input[type=submit]")].filter(shown)
     : [];
-  if (inForm.length === 1) {
-    inForm[0].click();
+  const [onlyInForm] = inForm;
+  if (onlyInForm && inForm.length === 1) {
+    onlyInForm.click();
     return "clicked";
   }
   if (el.form) {
@@ -104,8 +106,9 @@ export const pressCodeSubmit = ({ indexes }: { indexes: number[] }): "none" | "c
   const named = [...root.querySelectorAll<PageElement>("button, input[type=submit], [role=button]")].filter(
     (button) => shown(button) && SUBMIT_WORDS.test(button.innerText || button.value || ""),
   );
-  if (named.length !== 1) return "none";
-  named[0].click();
+  const [onlyNamed] = named;
+  if (!onlyNamed || named.length !== 1) return "none";
+  onlyNamed.click();
   return "clicked";
 };
 

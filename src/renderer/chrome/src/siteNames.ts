@@ -28,4 +28,4 @@ export const withSiteNames = (text: string) =>
     .join("");
 
 // "Open x" as the second half of "I'd like to open x". Only the first letter changes, and "URL" stays as it is.
-export const asContinuation = (text: string) => (/^[A-Z][a-z]/.test(text) ? text[0].toLowerCase() + text.slice(1) : text);
+export const asContinuation = (text: string) => (/^[A-Z][a-z]/.test(text) ? text.charAt(0).toLowerCase() + text.slice(1) : text);

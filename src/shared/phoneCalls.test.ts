@@ -2,6 +2,7 @@ import { createServer, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { fetchWithin, oneAtATime, RUNNER_LINK_EVERY_MS, runnerLinkDue } from "./phoneCalls";
+import { defined } from "./testing";
 
 describe("a call from the phone page", () => {
   let server: Server;
@@ -64,17 +65,17 @@ describe("one poll at a time", () => {
     const third = poll();
     expect(third).toBe(second);
     expect(runs).toBe(1);
-    finishes[0]();
+    defined(finishes[0])();
     await first;
     await vi.waitFor(() => expect(runs).toBe(2));
-    finishes[1]();
+    defined(finishes[1])();
     await second;
     expect(most).toBe(1);
 
     // With nothing out, a call is a run of its own at once.
     void poll();
     expect(runs).toBe(3);
-    finishes[2]();
+    defined(finishes[2])();
   });
 
   it("runs again after one that failed", async () => {

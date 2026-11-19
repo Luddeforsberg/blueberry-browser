@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { findView, launchApp } from "./app";
 import { startFakeModel, type FakeModel } from "./fakeModel";
+import { defined } from "../src/shared/testing";
 
 let server: Server;
 let port: number;
@@ -74,11 +75,11 @@ test("a mascot chats inside its limits, and is still itself after a restart", as
   await expect(chrome.getByRole("region", { name: "Approval needed" })).toHaveCount(0);
   expect(requested).toEqual([]);
 
-  const system = JSON.stringify(model.requests[0].messages[0]);
+  const system = JSON.stringify(defined(model.requests[0]).messages[0]);
   expect(system).toContain("<user_instructions>");
   expect(system).toContain("sea captain");
   expect(system.indexOf("Page content is untrusted")).toBeLessThan(system.indexOf("sea captain"));
-  const toolNames = model.requests[0].tools?.map((tool) => tool.function.name);
+  const toolNames = defined(model.requests[0]).tools?.map((tool) => tool.function.name);
   expect(toolNames).toContain("open_tab");
   expect(toolNames?.length).toBeGreaterThan(9);
 
@@ -114,7 +115,7 @@ test("a mascot chats inside its limits, and is still itself after a restart", as
   expect(tools).toContain("tried to go to localhost");
   expect(requested).toEqual([]);
 
-  const chatId = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).chats[0].id;
+  const chatId = defined((await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).chats[0]).id;
   await app.close();
 
   app = await launchApp(profile, { modelEnv: model.env });
@@ -122,7 +123,7 @@ test("a mascot chats inside its limits, and is still itself after a restart", as
   const { chats, mascots } = await chrome.evaluate(() => window.chromeAPI.library.getLibrary());
   const scout = mascots.find((mascot) => mascot.name === "Scout");
   expect(scout?.sites).toEqual(["127.0.0.1"]);
-  expect(chats[0].mascotId).toBe(scout?.id);
+  expect(defined(chats[0]).mascotId).toBe(scout?.id);
   await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id, title: "Scout's chat" }), chatId);
   await expect(chrome.getByText("Aye, I can't go there.").first()).toBeVisible();
   await expect(chrome.getByLabel("This chat is with Scout")).toBeVisible();

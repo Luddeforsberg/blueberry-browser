@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildDigest, searchQuery, type DigestInput } from "./suggestionDigest";
+import { defined } from "../../shared/testing";
 
 const NOW = new Date(2026, 10, 2, 18, 0).getTime();
 const at = (daysAgo: number, hour: number, minute = 0) => {
@@ -31,8 +32,8 @@ describe("sessions", () => {
       ],
     });
     expect(sessions).toHaveLength(2);
-    expect(sessions[0]).toMatchObject({ id: "s1", pages: [{ site: "news.ycombinator.com", title: "Hacker News" }] });
-    expect(sessions[1]).toMatchObject({
+    expect(sessions?.[0]).toMatchObject({ id: "s1", pages: [{ site: "news.ycombinator.com", title: "Hacker News" }] });
+    expect(sessions?.[1]).toMatchObject({
       id: "s2",
       minutes: 39,
       pages: [{ site: "kayak.com" }, { site: "skyscanner.se" }, { site: "momondo.se" }],
@@ -43,7 +44,7 @@ describe("sessions", () => {
     const { sessions } = data({
       visits: [0, 1, 2].map((minute) => visit("https://news.ycombinator.com/", "Hacker News", at(1, 8, minute))),
     });
-    expect(sessions[0].pages).toEqual([{ site: "news.ycombinator.com", title: "Hacker News", times: 3 }]);
+    expect(defined(sessions?.[0]).pages).toEqual([{ site: "news.ycombinator.com", title: "Hacker News", times: 3 }]);
   });
 
   it("leaves out anything older than two weeks", () => {
@@ -93,7 +94,7 @@ describe("exclusions", () => {
 
   it("keeps the site but not the title of an address with a query", () => {
     const { sessions } = data({ visits: [visit("https://shop.example/order?id=55", "Order 55 for Mira", at(1, 8))] });
-    expect(sessions[0].pages).toEqual([{ site: "shop.example" }]);
+    expect(defined(sessions?.[0]).pages).toEqual([{ site: "shop.example" }]);
   });
 
   it("leaves out a private chat title", () => {
@@ -130,7 +131,7 @@ describe("search queries", () => {
     });
     const { searches, sessions } = digest.data as Record<string, Array<Record<string, unknown>>>;
     expect(searches).toEqual([expect.objectContaining({ id: "q1", query: "best usb-c hub", times: 3, days: 3 })]);
-    expect(sessions[0].pages).toEqual([{ searched: "best usb-c hub" }]);
+    expect(defined(sessions?.[0]).pages).toEqual([{ searched: "best usb-c hub" }]);
     expect(digest.evidence.get("q1")?.hosts).toEqual([]);
     expect(digest.allHosts).toEqual([]);
   });
@@ -210,8 +211,8 @@ describe("chats, routines, the mascots and feedback", () => {
       expect.objectContaining({ id: "c1", title: "Cheap flights to Lisbon", outcome: "failed" }),
       expect.not.objectContaining({ outcome: expect.anything() }),
     ]);
-    expect(routines[0]).toMatchObject({ id: "r1", name: "Price watch", lastRuns: [{ result: "failed" }, { result: "failed" }] });
+    expect(routines?.[0]).toMatchObject({ id: "r1", name: "Price watch", lastRuns: [{ result: "failed" }, { result: "failed" }] });
     expect(mascots).toEqual([{ id: "m1", name: "Ada", sites: ["github.com"] }]);
-    expect(feedback[0]).toMatchObject({ id: "f1", dismissed: true, line: "Shall I read Hacker News?" });
+    expect(feedback?.[0]).toMatchObject({ id: "f1", dismissed: true, line: "Shall I read Hacker News?" });
   });
 });

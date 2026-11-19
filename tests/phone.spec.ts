@@ -8,6 +8,7 @@ import { mascotFromSnapshot, mascotSnapshot } from "../src/main/remoteJobs/cloud
 import { sharedMascotRows, followUpHistory, type ConversationJob } from "../src/shared/phone";
 import { FAKE_KEY, startFakeSupabase } from "./fakeSupabase";
 import { BROWSER, CHROME, PENNY, SCOUT, SHOP, restApi, serveSite } from "./phoneSetup";
+import { defined } from "../src/shared/testing";
 
 // The phone page, served from site/ as Netlify would, in Chrome at a phone's size, against the real migrations in
 // Postgres under the fake REST layer. The runner's side is played by its own REST calls as its own user, so every rule
@@ -209,6 +210,7 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     const [second] = await supabase.cloudRows(
       `select id, conversation_id, history, mascot, status from public.cloud_jobs where prompt = '${FOLLOW_UP}'`,
     );
+    if (!second) throw new Error("The follow-up wasn't sent");
     expect(second).toMatchObject({ conversation_id: first, status: "queued" });
     expect(second.history).toEqual(followUpHistory(before as unknown as ConversationJob));
     expect(second.history).toEqual([
@@ -293,6 +295,7 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     // That refusal is the one other error the console may show.
     expect(problems.splice(0)).toEqual(["Failed to load resource: the server responded with a status of 409 (Conflict)"]);
     const [third] = await supabase.cloudRows(`select conversation_id, history from public.cloud_jobs where prompt = '${THIRD}'`);
+    if (!third) throw new Error("The third message wasn't sent");
     expect(third.conversation_id).toBe(first);
     expect((third.history as unknown[]).slice(-2)).toEqual([
       { role: "user", content: FROM_MAC },
@@ -301,7 +304,7 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     await page.unrouteAll();
     expect((await rpc(runner, "runner_claim_job"))[0].prompt).toBe(THIRD);
     await rpc(runner, "runner_update_job", {
-      p_job: (await supabase.cloudRows(`select id from public.cloud_jobs where prompt = '${THIRD}'`))[0].id,
+      p_job: defined((await supabase.cloudRows(`select id from public.cloud_jobs where prompt = '${THIRD}'`))[0]).id,
       p_status: "done",
       p_reply: "Ordered.",
     });
@@ -312,11 +315,11 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     await shoot(page, "home-conversation");
 
     // A chip puts a job sent before back in the box, and never sends it.
-    const [{ n: jobsBefore }] = await supabase.cloudRows("select count(*)::int as n from public.cloud_jobs");
+    const { n: jobsBefore } = defined((await supabase.cloudRows("select count(*)::int as n from public.cloud_jobs"))[0]);
     await page.getByRole("button", { name: `Put “${THIRD}” in the box, for Scout` }).click();
     await expect(page.locator(".box-words")).toHaveText(THIRD);
     await page.waitForTimeout(500);
-    expect((await supabase.cloudRows("select count(*)::int as n from public.cloud_jobs"))[0].n).toBe(jobsBefore);
+    expect(defined((await supabase.cloudRows("select count(*)::int as n from public.cloud_jobs"))[0]).n).toBe(jobsBefore);
 
     // 4. Start a job as a shared mascot, from the sheet the box raises, with the snapshot the runner accepts.
     await page.getByRole("button", { name: /^Who goes/ }).click();
@@ -330,6 +333,7 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     const [sent] = await supabase.cloudRows(
       "select mascot, context_id, status from public.cloud_jobs where prompt = 'What changed on news.example today?'",
     );
+    if (!sent) throw new Error("The job wasn't sent");
     expect(sent).toMatchObject({ context_id: "ctx-ana", status: "queued" });
     expect(mascotFromSnapshot(sent.mascot)).toMatchObject({ id: "m-penny", sites: ["news.example"], tools: ["visit"] });
 
@@ -338,7 +342,9 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     await expect
       .poll(
         async () =>
-          (await supabase.cloudRows("select status from public.cloud_jobs where prompt = 'What changed on news.example today?'"))[0].status,
+          defined(
+            (await supabase.cloudRows("select status from public.cloud_jobs where prompt = 'What changed on news.example today?'"))[0],
+          ).status,
       )
       .toBe("stopped");
 

@@ -12,7 +12,11 @@ test("a mascot that works in the cloud starts the box on Cloud, and it can still
   const model = await startFakeModel();
   const app = await launchApp(undefined, { modelEnv: { ...model.env, BLUEBERRY_CLOUD_LOCAL: "1", BLUEBERRY_CLOUD_CHROME: CHROME } });
   try {
-    await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].setSize(1400, 860));
+    await app.evaluate(({ BaseWindow }) => {
+      const [main] = BaseWindow.getAllWindows();
+      if (!main) throw new Error("No window");
+      return main.setSize(1400, 860);
+    });
     const chrome = await findView(app, "view=chrome");
     await chrome.evaluate(() =>
       window.chromeAPI.mascots.save(null, {
@@ -56,10 +60,18 @@ test("a mascot that works in the cloud starts the box on Cloud, and it can still
     await choose("Scout");
     await expect(send("Send to the cloud")).toBeVisible();
 
-    await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].setSize(720, 760));
+    await app.evaluate(({ BaseWindow }) => {
+      const [main] = BaseWindow.getAllWindows();
+      if (!main) throw new Error("No window");
+      return main.setSize(720, 760);
+    });
     await chrome.waitForTimeout(400);
     await chrome.screenshot({ path: join(SHOTS, "3-on-narrow-width.png") });
-    await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].setSize(1400, 860));
+    await app.evaluate(({ BaseWindow }) => {
+      const [main] = BaseWindow.getAllWindows();
+      if (!main) throw new Error("No window");
+      return main.setSize(1400, 860);
+    });
 
     // Sent like that, the chat is a cloud chat, with a cloud mark in the list.
     model.replyWith("Found one");

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { menuPlacement, promptRect, PROMPT_WIDTH, suggestionsRect, tabPreviewRect, TAB_PREVIEW } from "./floatingPlaces";
+import { defined } from "../../shared/testing";
 
 describe("promptRect", () => {
   const page = { x: 240, y: 48, width: 680, height: 744 };
@@ -95,7 +96,7 @@ describe("menuPlacement", () => {
   // Where a sheet ended up in the area.
   const where = (placed: ReturnType<typeof menuPlacement>, path: string) => {
     if (!placed) throw new Error("Not placed");
-    const at = placed.sheets[path];
+    const at = defined(placed.sheets[path]);
     return { x: placed.view.x + at.x, y: placed.view.y + at.y };
   };
 

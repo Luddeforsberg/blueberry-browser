@@ -274,9 +274,9 @@ export class TabStrip {
 
     if (this.activeTabId === tabId) {
       this.activeTabId = null;
-      const remainingTabs = Array.from(this.tabsMap.keys());
-      if (remainingTabs.length > 0) {
-        this.switchActiveTab(remainingTabs[0]);
+      const [firstTab] = this.tabsMap.keys();
+      if (firstTab !== undefined) {
+        this.switchActiveTab(firstTab);
       }
     }
 

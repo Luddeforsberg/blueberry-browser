@@ -19,6 +19,7 @@
     "noImplicitOverride": true,
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
+    "noUncheckedIndexedAccess": true,
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {

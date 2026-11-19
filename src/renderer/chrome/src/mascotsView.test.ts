@@ -70,3 +70,13 @@ describe("who the dock shows", () => {
     expect(await faces(["a", "b"], 0)).toEqual({ shown: ["a"], more: 1 });
   });
 });
+
+describe("Surprise me", () => {
+  it("keeps the name once every suggested name is taken", async () => {
+    const view = await load();
+    const taken = ["Pip", "Scout", "Juno", "Wren", "Otis", "Margot", "Figaro", "Mabel", "Ziggy", "Clementine", "Rook", "Nimbus"];
+    const values = { ...view.blankMascot(), name: "Bramble" };
+    const surprised = view.surprise(values, taken);
+    expect(surprised.name).toBe("Bramble");
+  });
+});

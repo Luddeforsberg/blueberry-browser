@@ -4,6 +4,7 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
+import { defined } from "../src/shared/testing";
 
 declare global {
   var fakeShortcuts: Map<string, () => void>;
@@ -282,7 +283,7 @@ test("dragging the drop takes it to the nearest edge, and it's saved there", asy
     await desktop.mouse.move(grab.x, grab.y);
     await desktop.mouse.down();
     await desktop.mouse.move(grab.x - 30, grab.y);
-    await expect.poll(() => desktop.evaluate(() => innerWidth)).toBeGreaterThan(smallWindow[0]);
+    await expect.poll(() => desktop.evaluate(() => innerWidth)).toBeGreaterThan(defined(smallWindow[0]));
     // Let go at the far top, as the app sees the pointer.
     await app.evaluate(({ screen }) => {
       const { workArea } = screen.getPrimaryDisplay();

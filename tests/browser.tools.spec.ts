@@ -14,6 +14,7 @@ import {
   askBeforeActing,
   askInPanel,
 } from "./browserSetup";
+import { defined } from "../src/shared/testing";
 
 setUpBrowserApp();
 
@@ -30,7 +31,8 @@ test("Berry reads a page with a tool and shows the step, and only where it can s
   await panel.getByRole("button", { name: `1 step on ${site}` }).click();
   await expect(panel.getByRole("list", { name: "Steps" }).getByText(`Searched ${site}`)).toBeVisible();
 
-  const [offered, answered] = model.requests;
+  const offered = defined(model.requests[0]);
+  const answered = defined(model.requests[1]);
   expect(offered.tools?.map((tool) => tool.function.name)).toContain("find_in_page");
   const toolMessage = answered.messages.at(-1);
   expect(toolMessage?.role).toBe("tool");
@@ -115,7 +117,7 @@ test("real input in a tab behind the chat, a card naming another site's frame, a
   const answer = chrome.getByRole("textbox", { name: "Message" });
   await expect(answer).toHaveAttribute("placeholder", "Answer Berry, or pick one above");
   await answer.fill("Blue");
-  await chrome.waitForFunction(([since, arm]) => performance.now() - since >= arm, [askedAt, ARM_MS]);
+  await chrome.waitForFunction(([since, arm]) => performance.now() - since >= arm, [askedAt, ARM_MS] satisfies [number, number]);
   await answer.press("Enter");
 
   await expect.poll(() => JSON.stringify(model.requests.at(-1)?.messages)).toContain("The user answered: Blue");
@@ -199,7 +201,8 @@ test("real keys, going back, and closing only a tab Berry opened", async () => {
 
 const placedView = (url: string) =>
   app.evaluate(({ BaseWindow }, address) => {
-    const window = BaseWindow.getAllWindows()[0];
+    const [window] = BaseWindow.getAllWindows();
+    if (!window) throw new Error("No window");
     const view = window.contentView.children.find(
       (child) => "webContents" in child && (child as Electron.WebContentsView).webContents.getURL() === address,
     );

@@ -26,6 +26,7 @@ import {
 import { Tooltip } from "@common/components/Tooltip";
 import { api, STEPS, QUESTIONS, asProfile, blocked, type Set } from "./mascotStepRules";
 import { Answer } from "./MascotAnswers";
+import { missing } from "@shared/missing";
 
 // DESIGN.md section 10, Your mascots: making one is four questions, one at a time, each a card set into a shell like the
 // prompt box, with the mascot being made standing on it. Changing one part later is the same card, alone.
@@ -121,7 +122,7 @@ export const NewMascot: React.FC<{ tabId: string }> = ({ tabId }) => {
     return <MadeCard mascot={mascots.find(({ id }) => id === making.madeId) ?? { ...asProfile(making.values), id: making.madeId }} />;
 
   const { values, step } = making;
-  const part = STEPS[step];
+  const part = STEPS[step] ?? missing(`mascot step ${step}`);
   const set: Set = (patch) => setMaking({ ...making, values: { ...values, ...patch } });
   const others = mascots.map((mascot) => mascot.name);
   const off = blocked(part, values);

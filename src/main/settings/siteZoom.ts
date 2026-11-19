@@ -15,7 +15,8 @@ export const siteKey = (url: string): string | null => {
 
 export const zoomPercent = (levels: SiteZoomLevels, url: string): number => {
   const key = siteKey(url);
-  return key !== null && Object.hasOwn(levels, key) ? levels[key] : 100;
+  const level = key !== null && Object.hasOwn(levels, key) ? levels[key] : undefined;
+  return level ?? 100;
 };
 
 export const nextZoom = (percent: number, direction: 1 | -1): number => {

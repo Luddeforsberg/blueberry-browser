@@ -108,7 +108,11 @@ test("a cloud job shows in the working view beside its chat, and pressing the pi
   const model = await startFakeModel();
   const app = await launchApp(undefined, { modelEnv: { ...model.env, BLUEBERRY_CLOUD_LOCAL: "1", BLUEBERRY_CLOUD_CHROME: CHROME } });
   try {
-    await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].setSize(1500, 900));
+    await app.evaluate(({ BaseWindow }) => {
+      const [main] = BaseWindow.getAllWindows();
+      if (!main) throw new Error("No window");
+      return main.setSize(1500, 900);
+    });
     const chrome = await findView(app, "view=chrome");
     model.callTools({ name: "open_tab", args: { url: shop } });
     model.replyWith("Had a look");

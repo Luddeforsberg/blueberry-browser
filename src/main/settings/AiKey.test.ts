@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { tryAiKey } from "./aiKeyTry";
+import { defined } from "../../shared/testing";
 
 const encryption = vi.hoisted(() => ({ available: true }));
 vi.mock("electron", () => ({
@@ -106,14 +107,14 @@ describe("tryAiKey", () => {
   it("sends one short message to the service's cheap model with the key", async () => {
     const fetch = answering(200, ANSWERS.openai);
     expect(await tryAiKey("openai", KEY, { fetch, env: {} })).toBe("works");
-    const [url, init] = fetch.mock.calls[0];
+    const [url, init] = defined(fetch.mock.calls[0]);
     expect(url).toBe("https://api.openai.com/v1/chat/completions");
     expect(init?.headers).toMatchObject({ authorization: `Bearer ${KEY}` });
     expect(JSON.parse(String(init?.body))).toMatchObject({ model: "gpt-6-luna" });
 
     const anthropic = answering(200, ANSWERS.anthropic);
     expect(await tryAiKey("anthropic", KEY, { fetch: anthropic, env: { ANTHROPIC_BASE_URL: "http://127.0.0.1:9/" } })).toBe("works");
-    const [anthropicUrl, anthropicInit] = anthropic.mock.calls[0];
+    const [anthropicUrl, anthropicInit] = defined(anthropic.mock.calls[0]);
     expect(anthropicUrl).toBe("http://127.0.0.1:9/v1/messages");
     expect(anthropicInit?.headers).toMatchObject({ "x-api-key": KEY });
   });
@@ -122,10 +123,10 @@ describe("tryAiKey", () => {
     const env = { OPENAI_BASE_URL: "https://elsewhere.example/v1", ANTHROPIC_BASE_URL: "https://elsewhere.example" };
     const openai = answering(200, ANSWERS.openai);
     await tryAiKey("openai", KEY, { fetch: openai, env, ownAddressOnly: true });
-    expect(openai.mock.calls[0][0]).toBe("https://api.openai.com/v1/chat/completions");
+    expect(defined(openai.mock.calls[0])[0]).toBe("https://api.openai.com/v1/chat/completions");
     const anthropic = answering(200, ANSWERS.anthropic);
     await tryAiKey("anthropic", KEY, { fetch: anthropic, env, ownAddressOnly: true });
-    expect(anthropic.mock.calls[0][0]).toBe("https://api.anthropic.com/v1/messages");
+    expect(defined(anthropic.mock.calls[0])[0]).toBe("https://api.anthropic.com/v1/messages");
   });
 
   it.each([

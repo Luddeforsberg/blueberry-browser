@@ -56,7 +56,7 @@ const sameKey = (url: string) => shownAddress(url).toLowerCase().replace(/\/$/, 
 const startsWord = (haystack: string, word: string): boolean => {
   let at = haystack.indexOf(word);
   while (at !== -1) {
-    if (at === 0 || !/[\p{L}\p{N}]/u.test(haystack[at - 1])) return true;
+    if (at === 0 || !/[\p{L}\p{N}]/u.test(haystack.charAt(at - 1))) return true;
     at = haystack.indexOf(word, at + 1);
   }
   return false;

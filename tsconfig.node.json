@@ -23,6 +23,7 @@
     "noImplicitOverride": true,
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
+    "noUncheckedIndexedAccess": true,
     "types": ["electron-vite/node"]
   }
 }

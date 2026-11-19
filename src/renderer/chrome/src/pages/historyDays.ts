@@ -60,7 +60,7 @@ export const siteOf = (url: string) => {
 export interface VisitRun {
   key: string;
   site: string;
-  entries: HistoryEntry[];
+  entries: [HistoryEntry, ...HistoryEntry[]];
 }
 
 export const foldVisits = (entries: HistoryEntry[]): VisitRun[] => {

@@ -24,8 +24,8 @@ const FALLBACK_PRICE: [number, number, number] = [10, 1, 50];
 
 export const costOf = (calls: ModelCall[]): number =>
   calls.reduce((total, call) => {
-    const match = Object.keys(PRICES).find((name) => call.model.startsWith(name));
-    const [input, cached, output] = match ? PRICES[match] : FALLBACK_PRICE;
+    const price = Object.entries(PRICES).find(([name]) => call.model.startsWith(name))?.[1];
+    const [input, cached, output] = price ?? FALLBACK_PRICE;
     const fresh = call.inputTokens - call.cachedTokens;
     return total + (fresh * input + call.cachedTokens * cached + call.outputTokens * output) / 1_000_000;
   }, 0);

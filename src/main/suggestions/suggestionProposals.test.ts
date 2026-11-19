@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildDigest } from "./suggestionDigest";
 import { fallbackWords, scheduleFits, verifyProposals, type Existing } from "./suggestionProposals";
 import { findPatterns } from "./suggestionPatterns";
+import { defined } from "../../shared/testing";
 
 const NOW = new Date(2026, 10, 2, 18, 0).getTime();
 const at = (daysAgo: number, hour: number, minute = 0) => {
@@ -38,11 +39,11 @@ const verify = (...cards: object[]) => verifyProposals(JSON.stringify({ cards })
 
 describe("verifying a proposal", () => {
   it("keeps one whose evidence and sites check out", () => {
-    const [kept] = verify(prompt({}));
+    const kept = defined(verify(prompt({}))[0]);
     expect(kept.card).toMatchObject({ kind: "prompt", title: "Shall I line up the three cheapest fares?" });
     expect(kept.sites).toEqual(["kayak.com", "skyscanner.se", "momondo.se"]);
     expect(kept.sources).toContain("site:kayak.com");
-    expect(verify(prompt({ why: "You compared Stockholm to Lisbon on three sites." }))[0].why).toBe(
+    expect(defined(verify(prompt({ why: "You compared Stockholm to Lisbon on three sites." }))[0]).why).toBe(
       "You compared Stockholm to Lisbon on three sites",
     );
   });
@@ -55,7 +56,7 @@ describe("verifying a proposal", () => {
   });
 
   it("only keeps sites from its evidence", () => {
-    const [kept] = verify(prompt({ sites: ["kayak.com", "evil.example", "news.ycombinator.com"] }));
+    const kept = defined(verify(prompt({ sites: ["kayak.com", "evil.example", "news.ycombinator.com"] }))[0]);
     expect(kept.sites).toEqual(["kayak.com"]);
   });
 
@@ -96,16 +97,18 @@ describe("verifying a proposal", () => {
   });
 
   it("keeps a schedule that matches when they look", () => {
-    const [kept] = verify({
-      kind: "routine",
-      line: "Want the Arsenal score by 7:30 on Mondays?",
-      why: "You checked Arsenal on Flashscore on 2 Monday mornings",
-      evidence: scores,
-      sites: ["flashscore.com"],
-      name: "Monday scores",
-      instructions: "Open Flashscore and tell me Arsenal's last result.",
-      schedule: { kind: "weekly", days: [1], time: "07:30" },
-    });
+    const kept = defined(
+      verify({
+        kind: "routine",
+        line: "Want the Arsenal score by 7:30 on Mondays?",
+        why: "You checked Arsenal on Flashscore on 2 Monday mornings",
+        evidence: scores,
+        sites: ["flashscore.com"],
+        name: "Monday scores",
+        instructions: "Open Flashscore and tell me Arsenal's last result.",
+        schedule: { kind: "weekly", days: [1], time: "07:30" },
+      })[0],
+    );
     expect(kept.card.kind === "routine" && kept.card.draft.schedule).toEqual({ kind: "weekly", days: [1], time: "07:30" });
     expect(kept.card.kind === "routine" && kept.card.draft.sites).toEqual(["flashscore.com"]);
   });
@@ -126,7 +129,7 @@ describe("verifying a proposal", () => {
       instructions: "Open shop.example and list the deals.",
       schedule: { kind: "daily", time: "08:00" },
     };
-    const [kept] = verifyProposals(JSON.stringify({ cards: [card] }), mixed, NONE);
+    const kept = defined(verifyProposals(JSON.stringify({ cards: [card] }), mixed, NONE)[0]);
     expect(kept.card.kind).toBe("prompt");
   });
 
@@ -146,24 +149,26 @@ describe("verifying a proposal", () => {
       { kind: "once", at: NOW },
       undefined,
     ]) {
-      const [kept] = verify({ ...routine, schedule });
+      const kept = defined(verify({ ...routine, schedule })[0]);
       expect(kept.card).toMatchObject({ kind: "prompt", prompt: "Open Flashscore and tell me Arsenal's last result." });
     }
   });
 
   it("gives a mascot only its evidence's sites and going to pages", () => {
-    const [kept] = verify({
-      kind: "mascot",
-      line: "I'm Gull, and I'll hunt Lisbon fares.",
-      why: "You compared fares on three sites",
-      evidence: [flights],
-      name: "Gull",
-      instructions: "Find me the cheapest fares.",
-      palette: "jackdaw",
-      accessory: "cape",
-      tools: ["click", "type"],
-      sites: ["evil.example"],
-    });
+    const kept = defined(
+      verify({
+        kind: "mascot",
+        line: "I'm Gull, and I'll hunt Lisbon fares.",
+        why: "You compared fares on three sites",
+        evidence: [flights],
+        name: "Gull",
+        instructions: "Find me the cheapest fares.",
+        palette: "jackdaw",
+        accessory: "cape",
+        tools: ["click", "type"],
+        sites: ["evil.example"],
+      })[0],
+    );
     expect(kept.card.kind === "mascot" && kept.card.draft).toMatchObject({
       sites: ["kayak.com", "skyscanner.se", "momondo.se"],
       tools: ["visit"],
@@ -195,7 +200,10 @@ describe("verifying a proposal", () => {
     ];
     expect(verifyProposals(JSON.stringify({ cards: [prompt({})] }), digest, { ...NONE, feedback })).toEqual([]);
     expect(
-      verifyProposals(JSON.stringify({ cards: [prompt({})] }), digest, { ...NONE, feedback: [{ ...feedback[0], verdict: "used" }] }),
+      verifyProposals(JSON.stringify({ cards: [prompt({})] }), digest, {
+        ...NONE,
+        feedback: [{ ...defined(feedback[0]), verdict: "used" }],
+      }),
     ).toHaveLength(1);
     const card = {
       kind: "mascot",
@@ -253,7 +261,7 @@ describe("the fallback", () => {
   it("words the old rules' cards in code, with their schedule and sites", () => {
     const visits = [1, 2, 3].map((daysAgo) => visit("https://news.ycombinator.com/", "Hacker News", at(daysAgo, 8, 30)));
     const [pattern] = findPatterns(visits, [], NOW);
-    const words = fallbackWords(pattern, null);
+    const words = fallbackWords(defined(pattern), null);
     expect(words).toMatchObject({
       kind: "routine",
       title: "Want Hacker News read for you first?",

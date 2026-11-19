@@ -38,12 +38,14 @@ const tabs = () => chrome.evaluate(() => window.chromeAPI.browser.getTabs());
 const activeTab = async () => (await tabs()).find((tab) => tab.isActive);
 
 const listVisible = () =>
-  app.evaluate(({ BaseWindow }) =>
-    BaseWindow.getAllWindows()[0].contentView.children.some(
+  app.evaluate(({ BaseWindow }) => {
+    const [main] = BaseWindow.getAllWindows();
+    if (!main) throw new Error("No window");
+    return main.contentView.children.some(
       (view) =>
         "webContents" in view && (view as Electron.WebContentsView).webContents.getURL().includes("view=suggestions") && view.getVisible(),
-    ),
-  );
+    );
+  });
 
 const editAddress = async () => {
   await chrome.getByRole("button", { name: "Address" }).click();

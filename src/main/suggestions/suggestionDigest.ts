@@ -126,8 +126,10 @@ const numbersIn = (text: string): number[] => (text.match(/\d+/g) ?? []).map(Num
 const dayOf = (at: number): string => new Date(at).toDateString();
 
 type Step = { host: string; title: string | null; at: number } | { query: string; at: number };
+// Each session starts with the step that opened it.
+type Session = [Step, ...Step[]];
 
-const sessionsOf = (visits: PatternVisit[], now: number): Step[][] => {
+const sessionsOf = (visits: PatternVisit[], now: number): Session[] => {
   const steps = visits
     .filter(({ visitedAt }) => visitedAt <= now && now - visitedAt <= DIGEST_WINDOW_MS)
     .flatMap((visit): Step[] => {
@@ -137,10 +139,11 @@ const sessionsOf = (visits: PatternVisit[], now: number): Step[][] => {
       return host ? [{ host, title: shareableTitle(visit), at: visit.visitedAt }] : [];
     })
     .sort((a, b) => a.at - b.at);
-  const sessions: Step[][] = [];
+  const sessions: Session[] = [];
   steps.forEach((step) => {
     const last = sessions.at(-1);
-    if (last && step.at - last[last.length - 1].at <= SESSION_GAP_MS) last.push(step);
+    const lastStep = last?.at(-1);
+    if (last && lastStep && step.at - lastStep.at <= SESSION_GAP_MS) last.push(step);
     else sessions.push([step]);
   });
   return sessions;
@@ -164,8 +167,9 @@ export const buildDigest = ({ visits, chats, routines, mascots, feedback, now }:
       if (last && "site" in last && last.site === step.host && (last.title ?? null) === step.title) last.times = (last.times ?? 1) + 1;
       else pages.push({ site: step.host, ...(step.title ? { title: step.title } : {}) });
     });
-    const start = steps[0].at;
-    const minutes = Math.round((steps[steps.length - 1].at - start) / 60_000);
+    const [first, ...rest] = steps;
+    const start = first.at;
+    const minutes = Math.round(((rest.at(-1) ?? first).at - start) / 60_000);
     const hosts = [...new Set(steps.flatMap((step) => ("host" in step ? [step.host] : [])))];
     const shown = pages.slice(0, MAX_PAGES_PER_SESSION);
     const text = [...hosts, ...shown.map((page) => ("searched" in page ? page.searched : (page.title ?? "")))].join(" \n ");

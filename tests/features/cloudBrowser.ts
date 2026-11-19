@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { findChrome } from "../../src/main/cloud/localChrome";
 import type { Site } from "./site";
+import { defined } from "../../src/shared/testing";
 
 // The cloud browser for a cloud tab: a headless Chrome on this computer, as tests/cloudTab.spec.ts uses, started here
 // rather than by the app so it gets the same host rules and its addresses read shop.example. The app is pointed at it
@@ -48,7 +49,7 @@ export async function startCloudBrowser(site: Site): Promise<{ env: Record<strin
       clearTimeout(timer);
       child.stderr.removeAllListeners("data");
       child.stderr.resume();
-      resolve(found[1]);
+      resolve(defined(found[1]));
     });
   }).catch(async (error) => {
     await close();

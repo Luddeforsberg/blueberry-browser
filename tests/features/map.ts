@@ -78,5 +78,5 @@ export const FEATURES: Feature[] = [...chatFeatures, ...windowFeatures, ...pageF
 export const featureNamed = (name: string): Feature | undefined => FEATURES.find((feature) => feature.name === name);
 
 // The layouts a feature is pictured in by `baseline`.
-export const layoutsOf = (feature: Feature): LayoutMode[] =>
+export const layoutsOf = (feature: Feature): [LayoutMode, ...LayoutMode[]] =>
   feature.layouts === "both" ? ["vertical", "horizontal"] : feature.layouts === "none" ? ["vertical"] : [feature.layouts];

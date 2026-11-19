@@ -4,6 +4,7 @@ import { join } from "path";
 import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it, vi } from "vitest";
 import { ChatStore } from "./ChatStore";
+import { defined } from "../../shared/testing";
 
 describe("ChatStore", () => {
   it("keeps chats and their messages in order across opening the file again", () => {
@@ -51,7 +52,7 @@ describe("ChatStore", () => {
     expect(store.summaries().map((chat) => chat.id)).toEqual([second, first]);
 
     store.addMessage(first, { role: "user", content: "again" });
-    expect(store.summaries()[0].id).toBe(first);
+    expect(defined(store.summaries()[0]).id).toBe(first);
   });
 
   it("waits for a title on new chats, and a settled one stays", () => {

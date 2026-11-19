@@ -71,7 +71,12 @@ test("a page's popup is a real one, shown as a tab, and closing itself goes back
     const page = await openFixture();
     const opener = (await activeTab()).id;
     const count = (await getTabs()).length;
-    const bounds = () => app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].getBounds());
+    const bounds = () =>
+      app.evaluate(({ BaseWindow }) => {
+        const [main] = BaseWindow.getAllWindows();
+        if (!main) throw new Error("No window");
+        return main.getBounds();
+      });
     const before = await bounds();
 
     await page.evaluate(() =>
@@ -132,7 +137,11 @@ test("activating the app with a window open doesn't start a second one", async (
 test("the app reopens after its last window closes", async () => {
   test.skip(process.platform !== "darwin", "Only macOS keeps running with no windows");
 
-  await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].close());
+  await app.evaluate(({ BaseWindow }) => {
+    const [main] = BaseWindow.getAllWindows();
+    if (!main) throw new Error("No window");
+    return main.close();
+  });
   await expect.poll(() => app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows().length)).toBe(0);
 
   const windows = await app.evaluate(({ app, BaseWindow }) => {

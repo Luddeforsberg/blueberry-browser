@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { Response } from "express";
 import { ServerError, type ServerSession } from "../../src/main/account/galleryServer";
 import { AGE_LIMIT_MS, IDLE_LIMIT_MS, RelayAuth, redirectAllowed, type RelayAuthOptions } from "./relayAuth";
+import { defined } from "../../src/shared/testing";
 
 const OWNER = "owner@example.com";
 const RESOURCE = new URL("https://relay.example/mcp");
@@ -52,7 +53,7 @@ const formFor = async (auth: RelayAuth) => {
   await auth.authorize(client, { redirectUri: REDIRECT, codeChallenge: "challenge", state: "s" }, res);
   return {
     client,
-    request: /name="request" value="([^"]+)"/.exec(html)![1].replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n))),
+    request: defined(/name="request" value="([^"]+)"/.exec(html)![1]).replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n))),
   };
 };
 
