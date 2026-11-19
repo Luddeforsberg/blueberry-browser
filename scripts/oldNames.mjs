@@ -39,15 +39,15 @@ const ALLOWED = [
   ...migrated(
     "birdOnPages",
     "The old key in settings.json.",
-    "src/main/SettingsStore.ts",
-    "src/main/SettingsStore.test.ts",
+    "src/main/settings/SettingsStore.ts",
+    "src/main/settings/SettingsStore.test.ts",
     "tests/session.spec.ts",
   ),
   ...migrated(
     '"flock"',
     "The mascots' page's old id, saved with its tab in session.json.",
-    "src/main/Session.ts",
-    "src/main/Session.test.ts",
+    "src/main/tabs/Session.ts",
+    "src/main/tabs/Session.test.ts",
     "tests/session.spec.ts",
   ),
   ...migrated(

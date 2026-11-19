@@ -1,4 +1,4 @@
-import { nextRun, parseSchedule } from "../../src/main/routineSchedule";
+import { nextRun, parseSchedule } from "../../src/main/routines/routineSchedule";
 
 // Routines that run with the Mac off. The owner's app keeps them in Supabase, and this starts a job for each one that's
 // due, which the runner then takes like any other job, with the same checks on its mascot. It only ever learns a routine's

@@ -1,4 +1,4 @@
-// Bundles the code main runs in web pages, from src/page, into src/main/pageCode.ts. Each export of src/page/index.ts
+// Bundles the code main runs in web pages, from src/page, into src/main/tools/pageCode.ts. Each export of src/page/index.ts
 // becomes one function expression with only what it uses, and main calls it with its arguments as JSON, so no value is
 // ever written into the code. `pnpm run page:build` writes the file. With `--check` it only fails if the file isn't what
 // this would write, which `electron-vite build` and `pnpm run runner:build` run first.
@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const INDEX = "src/page/index.ts";
-const OUT = "src/main/pageCode.ts";
+const OUT = "src/main/tools/pageCode.ts";
 
 // Electron's Chromium and the cloud's Chrome run anything new, so nothing is rewritten for an older browser.
 const printing = { target: "esnext", charset: "utf8", legalComments: "none", logLevel: "silent" };
@@ -59,7 +59,7 @@ export interface PageScript<Args> {
   readonly takes?: (args: Args) => void;
 }
 
-type Entries = typeof import("../page/index");
+type Entries = typeof import("../../page/index");
 // What a script takes: its one argument, or nothing.
 type ArgsOf<F extends (...args: never[]) => unknown> = Parameters<F> extends [infer Args] ? Args : undefined;
 `;

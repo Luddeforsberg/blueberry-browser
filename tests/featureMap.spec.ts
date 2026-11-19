@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { findChrome } from "../src/main/localChrome";
+import { findChrome } from "../src/main/cloud/localChrome";
 import { DEFAULT_LOOK, driveFeature } from "./features/driver";
 import { FEATURES, layoutsOf } from "./features/map";
 import { phoneBrowserMissing } from "./features/phone";

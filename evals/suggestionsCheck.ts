@@ -6,12 +6,12 @@
 //   pnpm dlx tsx evals/suggestionsCheck.ts /tmp/blueberry-suggestions-check
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { ChatStore } from "../src/main/ChatStore";
-import { HistoryStore } from "../src/main/HistoryStore";
-import { RoutineStore } from "../src/main/RoutineStore";
-import { Suggestions } from "../src/main/Suggestions";
-import { hasModel, writeWithCheapModel } from "../src/main/agent";
-import { scheduleLabel } from "../src/main/routineSchedule";
+import { ChatStore } from "../src/main/chats/ChatStore";
+import { HistoryStore } from "../src/main/library/HistoryStore";
+import { RoutineStore } from "../src/main/routines/RoutineStore";
+import { Suggestions } from "../src/main/suggestions/Suggestions";
+import { hasModel, writeWithCheapModel } from "../src/main/chats/agent";
+import { scheduleLabel } from "../src/main/routines/routineSchedule";
 import type { Routine } from "../src/shared/library";
 import type { Visit } from "../src/shared/ipc";
 

@@ -4,7 +4,7 @@ import { defineConfig, externalizeDepsPlugin } from "electron-vite";
 import react from "@vitejs/plugin-react";
 import type { Plugin } from "vite";
 
-// The page code main injects is bundled from src/page into src/main/pageCode.ts by `pnpm run page:build`. A build stops if
+// The page code main injects is bundled from src/page into src/main/tools/pageCode.ts by `pnpm run page:build`. A build stops if
 // that file isn't what src/page builds to, so an app never runs page code nobody reviewed.
 const pageCodeCurrent: Plugin = {
   name: "page-code-current",

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { GalleryServer, ServerSession } from "../../src/main/galleryServer";
+import type { GalleryServer, ServerSession } from "../../src/main/account/galleryServer";
 import { runnerSession, supabaseDb, type DbConfig } from "./db";
 
 const CONFIG: DbConfig = {

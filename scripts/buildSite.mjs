@@ -1,5 +1,5 @@
 // Writes what comes from the app: in site/, so the public page has the same drawing, the same words for permissions and
-// the same checks on a row, and src/main/pageActorArt.ts, for the mascot on web pages. Run with `pnpm run site:build` after
+// the same checks on a row, and src/main/tools/pageActorArt.ts, for the mascot on web pages. Run with `pnpm run site:build` after
 // changing any of them.
 import { build } from "esbuild";
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -24,7 +24,7 @@ await build({
       `export { asContinuation, withSiteNames } from "./src/renderer/chrome/src/siteNames";`,
       // Times written the one way the app writes them.
       `export { finishedWhen, rowTime } from "./src/renderer/chrome/src/shortWords";`,
-      `export { plausibleCode } from "./src/main/phoneReplies";`,
+      `export { plausibleCode } from "./src/main/phone/phoneReplies";`,
     ].join("\n"),
     resolveDir: root,
     loader: "ts",
@@ -50,7 +50,7 @@ await build({
       export { PALETTES };
       export { PIP_MARKS, PIP_PATTERNS, pipOpacities, STEP_PIPS } from "./src/renderer/common/components/pipPatterns";
       const pose = (mood, accessory, size = 120) => renderToStaticMarkup(createElement(Mascot, { mood, size, still: true, anyLook: true, look: { palette: "currant", accessory } }));
-      // What the mascot on a web page is drawn from, by \`src/main/pageActorScript.ts\`.
+      // What the mascot on a web page is drawn from, by \`src/main/tools/pageActorScript.ts\`.
       export const actorArt = Object.fromEntries(ACCESSORIES.map(({ id }) => [id, {
         flying: pose("fetching", id),
         rest: pose("rest", id),
@@ -185,7 +185,7 @@ const block = (selector) => {
 const eyes = tokens.match(/(?:\[data-mascot="[a-z]+"\],?\s*)+\{[^}]*\}/g).map((rule) => rule.replace(/\s+/g, " "));
 const sheet = [`.sky { ${block(":root")} }`, `.sky.dark { ${block(".dark")} }`, ...eyes, ...rules].join("\n");
 writeFileSync(
-  join(root, "src/main/pageActorArt.ts"),
+  join(root, "src/main/tools/pageActorArt.ts"),
   `${NOTE}export type ArtNode = [tag: string, attributes: Record<string, string>, ...children: ArtNode[]];\n\nexport const ACTOR_ART = ${JSON.stringify(tree)} as unknown as Record<string, Record<string, ArtNode>>;\n\nexport const ACTOR_ART_SHEET = ${JSON.stringify(sheet)};\n\n// Every berry, by the palette id a look draws it with, so a page gets only its own one's parts.\nexport const ACTOR_BERRIES: string[] = ${JSON.stringify(PALETTES.map(({ id }) => id))};\n`,
 );
 

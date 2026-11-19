@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { demoVisits, seedChats } from "../evals/seedHistory";
-import { HistoryStore } from "../src/main/HistoryStore";
+import { HistoryStore } from "../src/main/library/HistoryStore";
 import { findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
 import { DEMO_LINES, REFUSED_LINES, demoProposals } from "./suggestionReplies";

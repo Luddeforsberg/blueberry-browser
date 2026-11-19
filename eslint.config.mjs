@@ -6,7 +6,7 @@ import eslintPluginReactRefresh from "eslint-plugin-react-refresh";
 import { complexityOver, linesOver, paramsOver } from "./eslint.limits.mjs";
 
 export default tseslint.config(
-  { ignores: ["**/node_modules", "**/dist", "**/out", "site/**", "src/main/pageActorArt.ts", "src/main/pageCode.ts"] },
+  { ignores: ["**/node_modules", "**/dist", "**/out", "site/**", "src/main/tools/pageActorArt.ts", "src/main/tools/pageCode.ts"] },
   // A rule that's wrong for some code is changed here, where it can be seen, never turned off in a comment.
   { linterOptions: { noInlineConfig: true, reportUnusedDisableDirectives: "error" } },
   tseslint.configs.recommended,
@@ -95,7 +95,7 @@ export default tseslint.config(
     },
   },
   {
-    // Everything else reaches page code through src/main/pageCode.ts, as the strings scripts/buildPage.mjs bundles, and
+    // Everything else reaches page code through src/main/tools/pageCode.ts, as the strings scripts/buildPage.mjs bundles, and
     // only borrows its types.
     files: [
       "src/main/**/*.ts",
@@ -109,7 +109,7 @@ export default tseslint.config(
     rules: {
       "@typescript-eslint/no-restricted-imports": [
         "error",
-        { patterns: [{ regex: "(^|/)page(/|$)", allowTypeImports: true, message: "Run page code through src/main/pageCode.ts." }] },
+        { patterns: [{ regex: "(^|/)page(/|$)", allowTypeImports: true, message: "Run page code through src/main/tools/pageCode.ts." }] },
       ],
     },
   },

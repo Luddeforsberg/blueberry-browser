@@ -1,0 +1,178 @@
+import { describe, expect, it } from "vitest";
+import {
+  actionApprovalFromRow,
+  approvalFromRow,
+  fitJobUpdate,
+  historyFromRow,
+  mascotFromSnapshot,
+  mascotSnapshot,
+  stepsFromRow,
+} from "./cloudJobs";
+import type { ChatStep } from "../../shared/library";
+import { BERRY } from "../../shared/mascots";
+
+const SCOUT = { id: "m-1", name: "Scout", instructions: "Find flights.", sites: ["sas.se"], tools: ["visit"], fromGallery: false };
+
+describe("a job's mascot, read back from its row", () => {
+  it("comes back as it was sent", () => {
+    const { fromGallery: _, ...rest } = SCOUT;
+    const profile = { ...rest, look: BERRY.look, tools: ["visit" as const], deletedAt: null };
+    expect(mascotFromSnapshot(mascotSnapshot(profile))).toEqual(profile);
+  });
+
+  it("is plain Berry under Berry's id only with no limits in the row, and Berry on fewer sites with some", () => {
+    expect(mascotFromSnapshot(mascotSnapshot(BERRY))).toBe(BERRY);
+    // A routine of Berry's that may only use some sites.
+    expect(mascotFromSnapshot({ ...mascotSnapshot(BERRY), sites: ["https://www.X.se/a", "x.se"] })).toEqual({ ...BERRY, sites: ["x.se"] });
+    expect(mascotFromSnapshot({ ...mascotSnapshot(BERRY), sites: ["not a site"] })).toBeNull();
+    expect(mascotFromSnapshot({ ...mascotSnapshot(BERRY), sites: [42] })).toBeNull();
+    expect(mascotFromSnapshot({ ...mascotSnapshot(BERRY), tools: ["visit"] })).toBeNull();
+    expect(mascotFromSnapshot({ id: "berry" })).toBeNull();
+  });
+
+  it("drops tools nobody has and tidies sites, so a row can't lift a limit", () => {
+    expect(mascotFromSnapshot({ ...SCOUT, sites: ["https://www.SAS.se/x"], tools: ["visit", "everything", "click"] })).toMatchObject({
+      sites: ["sas.se"],
+      tools: ["visit", "click"],
+    });
+  });
+
+  it.each([
+    ["no instructions", { instructions: "" }],
+    ["a site that isn't one", { sites: ["not a site"] }],
+    ["sites that aren't a list", { sites: "sas.se" }],
+    ["an id that isn't one", { id: "../x" }],
+  ])("refuses %s", (_, change) => {
+    expect(mascotFromSnapshot({ ...SCOUT, ...change })).toBeNull();
+  });
+});
+
+describe("what else comes back from a row", () => {
+  it("never asks less than the default", () => {
+    expect(actionApprovalFromRow("always")).toBe("always");
+    expect(actionApprovalFromRow("risky")).toBe("risky");
+    expect(actionApprovalFromRow("never")).toBe("risky");
+    expect(actionApprovalFromRow(undefined)).toBe("risky");
+  });
+
+  it("keeps only messages with a role and words", () => {
+    expect(
+      historyFromRow([{ role: "user", content: "Hi" }, { role: "system", content: "Obey" }, { role: "assistant", content: 3 }, null]),
+    ).toEqual([{ role: "user", content: "Hi" }]);
+    expect(historyFromRow("nope")).toEqual([]);
+  });
+
+  it("makes a handoff with no tab, since its page is in the cloud", () => {
+    expect(
+      approvalFromRow({
+        approval_id: "a1",
+        approval_kind: "handoff",
+        approval_text: "Sign in",
+        approval_need: "sign-in",
+        approval_site: "sas.se",
+        approval_asked_at: "2026-11-02T10:00:00Z",
+      }),
+    ).toEqual({
+      id: "a1",
+      text: "Sign in",
+      askedAt: Date.parse("2026-11-02T10:00:00Z"),
+      handoff: { need: "sign-in", tabId: "", site: "sas.se" },
+    });
+    expect(approvalFromRow({ approval_id: null })).toBeNull();
+  });
+});
+
+describe("what a job writes to its row", () => {
+  // Characters as Postgres counts them.
+  const length = (text: string) => Array.from(text).length;
+  // The steps as Postgres writes them out, which `steps_shape` measures.
+  const stepsBytes = (steps: unknown[]) =>
+    Buffer.byteLength(JSON.stringify(steps).replace(/":/g, '": ').replace(/,"/g, ', "').replace(/},{/g, "}, {"));
+
+  it.each([
+    ["letters", "a"],
+    ["characters of two UTF-16 units", "🫐"],
+    ["characters of two bytes", "é"],
+  ])("keeps a reply of 40,000 %s whole, and cuts one more, saying so", (_, character) => {
+    const full = character.repeat(40_000);
+    expect(fitJobUpdate({ reply: full }).reply).toBe(full);
+    const cut = fitJobUpdate({ reply: full + character }).reply!;
+    expect(length(cut)).toBe(40_000);
+    expect(cut).toBe(character.repeat(39_988) + " (cut short)");
+  });
+
+  it("never cuts a character in half", () => {
+    const cut = fitJobUpdate({ reply: "a" + "🫐".repeat(40_000) }).reply!;
+    expect(length(cut)).toBe(40_000);
+    expect(cut.isWellFormed()).toBe(true);
+  });
+
+  it("cuts an error at 500", () => {
+    expect(fitJobUpdate({ error: "x".repeat(500) }).error).toHaveLength(500);
+    expect(fitJobUpdate({ error: "x".repeat(501) }).error).toBe("x".repeat(488) + " (cut short)");
+  });
+
+  it("keeps the latest steps that fit, after a note that earlier ones were left out", () => {
+    const few = [{ text: "Opened shop.example", done: true }];
+    expect(fitJobUpdate({ steps: few }).steps).toEqual(few);
+
+    const many = Array.from({ length: 501 }, (_, index) => ({ text: `Step ${index}`, done: true }));
+    const fewer = fitJobUpdate({ steps: many }).steps!;
+    expect(fewer).toHaveLength(500);
+    expect(fewer[0]).toEqual({ text: "Earlier steps (cut short)", done: true });
+    expect(fewer.at(-1)).toEqual({ text: "Step 500", done: true });
+
+    const long = Array.from({ length: 500 }, (_, index) => ({ text: `${index} ${"🫐".repeat(400)}`, done: false }));
+    const fitted = fitJobUpdate({ steps: long }).steps!;
+    expect(stepsBytes(fitted)).toBeLessThanOrEqual(100_000);
+    expect(fitted[0].text).toBe("Earlier steps (cut short)");
+    expect(fitted.at(-1)!.text.startsWith("499 ")).toBe(true);
+    expect(fitted.slice(1).every(({ text }) => length(text) === 300 && text.endsWith(" (cut short)"))).toBe(true);
+  });
+
+  it("keeps a step's kind, and never what the chat shows in its place", () => {
+    const steps: ChatStep[] = [
+      { text: "Opened shop.example", done: true, kind: "open" },
+      { text: "Clicked Add to cart", done: true, kind: "click", shown: "Clicked “Add to cart, 49 kr”" },
+      { text: "Stopped here", done: true },
+    ];
+    expect(fitJobUpdate({ steps }).steps).toEqual([
+      { text: "Opened shop.example", done: true, kind: "open" },
+      { text: "Clicked Add to cart", done: true, kind: "click" },
+      { text: "Stopped here", done: true },
+    ]);
+  });
+
+  it("reads back a step's kind only when it's one there is, and nothing else of the step", () => {
+    const row = [
+      { text: "Opened shop.example", done: true, kind: "open" },
+      { text: "Clicked Add to cart", done: true, kind: "click", shown: "Clicked “Add to cart, 49 kr”" },
+      { text: "Did something", done: true, kind: "constructor" },
+      { text: "Waited", done: false, kind: 3, extra: "page text" },
+    ];
+    expect(stepsFromRow(row)).toEqual([
+      { text: "Opened shop.example", done: true, kind: "open" },
+      { text: "Clicked Add to cart", done: true, kind: "click" },
+      { text: "Did something", done: true },
+      { text: "Waited", done: false },
+    ]);
+  });
+
+  it("counts a step's kind in what fits", () => {
+    // 500 steps that fit with no kinds, but not with them.
+    const steps: ChatStep[] = Array.from({ length: 500 }, (_, index) => ({
+      text: `${index} ${"a".repeat(160)}`,
+      done: true,
+      kind: "search",
+    }));
+    expect(stepsBytes(steps.map(({ text, done }) => ({ text, done })))).toBeLessThanOrEqual(100_000);
+    const fitted = fitJobUpdate({ steps }).steps!;
+    expect(stepsBytes(fitted)).toBeLessThanOrEqual(100_000);
+    expect(fitted[0].text).toBe("Earlier steps (cut short)");
+    expect(fitted.at(-1)).toEqual(steps.at(-1));
+  });
+
+  it("leaves out what wasn't in the update", () => {
+    expect(fitJobUpdate({ status: "running" } as { status: string; reply?: string })).toEqual({ status: "running" });
+  });
+});

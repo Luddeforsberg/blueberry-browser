@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { StreamReply } from "../../src/main/agent";
-import type { ChatCloud } from "../../src/main/Chats";
-import { mascotSnapshot } from "../../src/main/cloudJobs";
+import type { StreamReply } from "../../src/main/chats/agent";
+import type { ChatCloud } from "../../src/main/chats/Chats";
+import { mascotSnapshot } from "../../src/main/remoteJobs/cloudJobs";
 import { BERRY } from "../../src/shared/mascots";
 import { dbConfig, type ClaimedJob, type Decision, type JobUpdate, type RunnerDb } from "./db";
 import { NO_ANSWER, runJob, SHUT_DOWN, UnreleasedBrowsers, type JobBrowser } from "./job";

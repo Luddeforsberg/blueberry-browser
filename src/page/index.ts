@@ -1,5 +1,5 @@
 // Every script main runs in a page. `scripts/buildPage.mjs` bundles each export here by itself, with only what it uses,
-// into src/main/pageCode.ts, and main calls it with its arguments as JSON. Nothing here may import Node or Electron, and
+// into src/main/tools/pageCode.ts, and main calls it with its arguments as JSON. Nothing here may import Node or Electron, and
 // everything it does must work under a page's strict CSP and Trusted Types.
 export { listElements, describeElement, spotOf } from "./tools/elements";
 export { aimClick, inputLanded, scriptedClick, aimHover, isHovered, scriptedHover, planDrag } from "./tools/click";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeSettings } from "../main/SettingsStore";
+import { sanitizeSettings } from "../main/settings/SettingsStore";
 import { firstJobRows, firstJobsFor, firstRunStart, firstRunSteps } from "./firstRun";
 
 describe("the first run", () => {

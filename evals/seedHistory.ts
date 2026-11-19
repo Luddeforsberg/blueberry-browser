@@ -3,8 +3,8 @@
 // by accident. See evals/README.md.
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { ChatStore } from "../src/main/ChatStore";
-import { HistoryStore } from "../src/main/HistoryStore";
+import { ChatStore } from "../src/main/chats/ChatStore";
+import { HistoryStore } from "../src/main/library/HistoryStore";
 import type { Visit } from "../src/shared/ipc";
 
 const DAY_MS = 86_400_000;
