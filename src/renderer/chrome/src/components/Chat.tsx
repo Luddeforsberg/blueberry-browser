@@ -10,7 +10,7 @@ import { useFollowReply } from "./useFollowReply";
 import { chatRoutine } from "../routinesView";
 import { MemoryOffers } from "./MemoryInChat";
 import { PageChip } from "./AttachmentChips";
-import { ChatComposer } from "./Composer";
+import { ChatComposer } from "./ChatComposer";
 import { answerInBox } from "./answerInBox";
 import { siteAllowed } from "@shared/mascots";
 

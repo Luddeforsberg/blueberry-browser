@@ -7,7 +7,7 @@ import { useFollowReply } from "../components/useFollowReply";
 import { chatRoutine } from "../routinesView";
 import { useAssistantName } from "../components/useAssistantName";
 import { MemoryOffers } from "../components/MemoryInChat";
-import { ChatComposer } from "../components/Composer";
+import { ChatComposer } from "../components/ChatComposer";
 import { useMascots, useLibrary } from "../contexts/useLibrary";
 import { WorkingStrip, WorkingView } from "../components/WorkingView";
 import { useWorkView } from "../components/useWorkView";

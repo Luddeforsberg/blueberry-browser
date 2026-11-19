@@ -1,22 +1,19 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Check, Eye, Lock, X } from "lucide-react";
+import { Check, Lock, X } from "lucide-react";
 import { PasswordInput } from "./PasswordInput";
-import type { ActionApproval, Appearance, LayoutMode } from "@shared/ipc";
 import { BERRY } from "@shared/mascots";
 import { firstJobsFor, firstRunStart, firstRunSteps, type FirstRunStep } from "@shared/firstRun";
-import { Button } from "@common/components/Button";
 import { BIG_CARD, BIG_SHELL } from "@common/components/cardShell";
-import { Choice, Switch } from "@common/components/Controls";
-import { LABEL, StatusPill } from "@common/components/StatusPill";
 import { cn } from "@common/lib/utils";
 import { useShell } from "../contexts/useShell";
 import { AiKeyForm } from "./AiKeyForm";
 import { useKeyTry } from "./useAiKey";
-import { Berry, BerrySpot } from "./Berry";
+import { BerrySpot } from "./Berry";
 import { SourceRows } from "./HistoryImport";
 import { useHistoryImport } from "./useHistoryImport";
-import { FIELD, StepCard, StepNav } from "./StepCard";
-import { WindowPicture } from "./WindowPicture";
+import { StepCard, StepNav } from "./StepCard";
+import { LINK, Primary, LinkNav, Under, Says, Field, INPUT } from "./FirstRunParts";
+import { MakeItYours, MiniWindow, WhatICanSee } from "./FirstRunSettings";
 
 // DESIGN.md section 10, First run: Berry and one card in an empty window, a step at a time, in the card that makes a
 // mascot. Every step's answer is real: an account on the server, the look, a key the service has answered with, history
@@ -24,138 +21,6 @@ import { WindowPicture } from "./WindowPicture";
 // step that isn't.
 
 const api = window.chromeAPI;
-
-const LINK =
-  "text-ink underline decoration-line underline-offset-[3px] rounded-row outline-none hover:decoration-ink-3 focus-visible:ring-2 focus-visible:ring-focus";
-
-// The filled button names its key while Enter presses it.
-const Primary: React.FC<{ disabled?: boolean; onClick: () => void; children: React.ReactNode }> = ({ disabled, onClick, children }) => (
-  <Button disabled={disabled} onClick={onClick}>
-    {children}
-    {!disabled && (
-      <kbd
-        aria-hidden
-        className="h-4 min-w-4 px-1 grid place-items-center rounded-[5px] bg-ground/15 font-mono text-[10.5px] font-medium text-ground/80"
-      >
-        ↵
-      </kbd>
-    )}
-  </Button>
-);
-
-// A link on one side of the shell and the filled button on the other, for the steps that have no Back.
-const LinkNav: React.FC<{ link?: React.ReactNode; children: React.ReactNode }> = ({ link, children }) => (
-  <div className="h-[46px] pl-3 pr-1.5 flex items-center justify-between text-13">
-    <span>{link}</span>
-    {children}
-  </div>
-);
-
-// Under the card, outside its shell: a way past the step, and what that means.
-const Under: React.FC<{ onPress: () => void; label: string; children: React.ReactNode }> = ({ onPress, label, children }) => (
-  <p className="w-[520px] max-w-full mx-auto mt-2.5 px-2 flex justify-between gap-3.5 text-13 text-ink-3">
-    <button type="button" onClick={onPress} className={LINK}>
-      {label}
-    </button>
-    <span className="text-right">{children}</span>
-  </p>
-);
-
-// Berry saying how something went, with a pill.
-const Says: React.FC<{ pill?: string; children: React.ReactNode }> = ({ pill, children }) => (
-  <p role="status" className="my-1 mx-0.5 flex items-center gap-2.5 text-14 text-left">
-    <span aria-hidden className="flex shrink-0">
-      <Berry size={20} mood="delivered" still />
-    </span>
-    <span className="flex-1">{children}</span>
-    {pill && <StatusPill tone="on">{pill}</StatusPill>}
-  </p>
-);
-
-const Field: React.FC<{ label: string; problem?: string | null; hint?: string; children: React.ReactNode }> = ({
-  label,
-  problem,
-  hint,
-  children,
-}) => (
-  <div className="mt-3 text-left">
-    <label className="block">
-      <span className={cn("block mb-[5px] mx-0.5", LABEL)}>{label}</span>
-      {children}
-    </label>
-    {problem ? (
-      <p role="alert" className="mt-[7px] mx-0.5 text-13 text-ask">
-        {problem}
-      </p>
-    ) : (
-      hint && <p className="mt-[7px] mx-0.5 text-13 text-ink-3">{hint}</p>
-    )}
-  </div>
-);
-
-const INPUT = cn(FIELD, "h-10 px-3 text-14 shadow-[inset_0_0_0_1px_var(--line)]");
-
-// A small drawing of the window as it is now, beside Make it yours. It follows the real window, which changes too.
-const MiniWindow: React.FC<{ tabs: LayoutMode }> = ({ tabs }) => {
-  const page = (
-    <span className="flex-1 rounded-[8px] bg-sheet shadow-[0_0_0_1px_var(--line)] flex flex-col items-center justify-center gap-1.5">
-      <span className="flex items-center gap-[5px]">
-        <Berry size={12} still />
-        <b className="w-[46px] h-[7px] rounded-[3px] bg-ink" />
-      </span>
-      <span className="w-[120px] h-[26px] rounded-[7px] bg-ground shadow-[0_0_0_1px_var(--line)]" />
-      <span className="w-24 h-[5px] rounded-[2px] bg-dot" />
-      <span className="w-[70px] h-[5px] rounded-[2px] bg-dot" />
-    </span>
-  );
-  const bar = (on: number, count: number, className: string) =>
-    Array.from({ length: count }, (_, index) => (
-      <i key={index} className={cn("h-2.5 rounded-[4px]", className, index === on ? "bg-sheet shadow-chip" : "bg-dot")} />
-    ));
-  return (
-    <div aria-hidden className="w-[270px] h-[178px] p-[7px] flex gap-[7px] rounded-[11px] bg-ground shadow-up">
-      {tabs === "vertical" ? (
-        <>
-          <span className="w-[62px] flex flex-col gap-[5px]">
-            <span className="h-[11px] p-[1.5px] rounded-[4px] bg-tray">
-              <i className="block w-[27px] h-full rounded-[3px] bg-sheet" />
-            </span>
-            {bar(2, 4, "")}
-            <span className="mt-auto h-4 px-1 flex items-center gap-[3px] rounded-[6px] bg-tray">
-              {[0, 1, 2].map((index) => (
-                <Berry key={index} size={10} still />
-              ))}
-            </span>
-          </span>
-          {page}
-        </>
-      ) : (
-        <span className="flex-1 flex flex-col gap-[5px]">
-          <span className="flex gap-1">{bar(2, 4, "flex-1")}</span>
-          <span className="h-[11px] flex items-center gap-[3px]">
-            <i className="flex-1 h-[9px] rounded-[4px] bg-tray" />
-            <Berry size={10} still />
-            <Berry size={10} still />
-          </span>
-          {page}
-        </span>
-      )}
-    </div>
-  );
-};
-
-// What I can see: one of the settings under Up to you, its name and a line on the left and its control on the right.
-const Setting: React.FC<{ id: string; title: string; line: string; children: React.ReactNode }> = ({ id, title, line, children }) => (
-  <div className="py-[11px] flex items-center gap-4 text-left [&+&]:border-t [&+&]:border-line">
-    <span className="flex-1 min-w-0">
-      <span id={id} className="block text-14 font-medium text-ink">
-        {title}
-      </span>
-      <span className="block text-13 text-ink-2">{line}</span>
-    </span>
-    {children}
-  </div>
-);
 
 const SOURCE_FACTS = [
   { Icon: Check, text: "Addresses, page titles and visit times, from the last 90 days" },
@@ -414,27 +279,7 @@ const Steps: React.FC<{ start: Start }> = ({ start }) => {
           </div>
         }
       >
-        <p className={cn("mt-1 mb-2", LABEL)}>Theme</p>
-        <Choice<Appearance>
-          label="Theme"
-          value={settings.appearance}
-          onChange={(appearance) => updateSettings({ appearance })}
-          options={[
-            { value: "light", label: "Light", picture: <WindowPicture mode="light" /> },
-            { value: "dark", label: "Dark", picture: <WindowPicture mode="dark" /> },
-            { value: "system", label: "System", picture: <WindowPicture mode="system" /> },
-          ]}
-        />
-        <p className={cn("mt-4 mb-2", LABEL)}>Tabs</p>
-        <Choice<LayoutMode>
-          label="Tabs"
-          value={settings.layoutMode}
-          onChange={(layoutMode) => updateSettings({ layoutMode })}
-          options={[
-            { value: "vertical", label: "On the side", picture: <WindowPicture tabs="side" /> },
-            { value: "horizontal", label: "On top", picture: <WindowPicture tabs="top" /> },
-          ]}
-        />
+        <MakeItYours settings={settings} updateSettings={updateSettings} />
       </StepCard>
     );
   }
@@ -509,33 +354,7 @@ const Steps: React.FC<{ start: Start }> = ({ start }) => {
       hint="One thing is always true. The rest are real settings, here or later."
       nav={nav(<Primary onClick={finish}>Start browsing</Primary>)}
     >
-      <p className="py-3 px-3.5 flex gap-[11px] rounded-[14px] bg-card-2 text-13 leading-[20px] text-ink-2 text-left">
-        <Eye aria-hidden className="mt-0.5 size-4 shrink-0 text-ink" strokeWidth={1.75} />
-        <span>
-          <b className="font-medium text-ink">I read a page only when you ask,</b> and the chat always shows which one. That part isn’t a
-          setting.
-        </span>
-      </p>
-      <p className={cn("mt-3.5 text-left", LABEL)}>Up to you</p>
-      <Setting id="see-ask" title="Ask before I act" line="When risky is before I delete, send or buy.">
-        {/* Never is only in Settings, where what it risks is said. */}
-        <Choice<ActionApproval>
-          label="Ask before I act"
-          value={settings.actionApproval}
-          onChange={(actionApproval) => updateSettings({ actionApproval })}
-          options={[
-            { value: "risky", label: "When risky" },
-            { value: "always", label: "Always" },
-          ]}
-          className="bg-card-2"
-        />
-      </Setting>
-      <Setting id="see-suggestions" title="Suggestions from your history" line="A summary of it goes to the AI service.">
-        <Switch labelledBy="see-suggestions" checked={settings.suggestions} onChange={(suggestions) => updateSettings({ suggestions })} />
-      </Setting>
-      <Setting id="see-memory" title="Offers to remember what you tell me" line="Only what you say yes to is kept, on this computer.">
-        <Switch labelledBy="see-memory" checked={settings.memoryOffers} onChange={(memoryOffers) => updateSettings({ memoryOffers })} />
-      </Setting>
+      <WhatICanSee settings={settings} updateSettings={updateSettings} />
     </StepCard>
   );
 };
