@@ -1,7 +1,8 @@
 import type { BaseWindow, WebContents } from "electron";
 import { createChromeView, type ChromeView } from "../window/chromeView";
 import { sendToRenderer } from "../window/ipc";
-import { promptRect, PROMPT_DEFAULT_HEIGHT, type Rect } from "../window/Layout";
+import { promptRect, PROMPT_DEFAULT_HEIGHT } from "../window/floatingPlaces";
+import type { Rect } from "../window/Layout";
 import type { SitePermissions } from "./SitePermissions";
 import type { PermissionPrompt } from "../../shared/ipc";
 

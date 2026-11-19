@@ -1,7 +1,8 @@
 import type { View } from "electron";
 import { createChromeView, type ChromeView } from "../window/chromeView";
 import { sendToRenderer } from "../window/ipc";
-import { TAB_PREVIEW, tabPreviewRect, type Layout } from "../window/Layout";
+import { TAB_PREVIEW, tabPreviewRect } from "../window/floatingPlaces";
+import type { Layout } from "../window/Layout";
 import { Tab } from "./Tab";
 import type { Rect, TabPreviewRequest, ThemeState } from "../../shared/ipc";
 

@@ -191,6 +191,12 @@ const rules = [
     "No tool can reach the desktop mascot.",
   ),
   onlyFrom(
+    "the parts of DesktopBerry",
+    file("DesktopParts", "DropWindow", "ComposerPanel", "JobNews", "desktopWindows"),
+    ["desktop"],
+    "Everything outside desktop/ goes through DesktopBerry.",
+  ),
+  onlyFrom(
     "memory",
     folder("memory"),
     ["memory", "chats/jobMemory.ts", "window/Window.ts", "window/WindowParts.ts", "window/makeChats.ts"],
@@ -210,7 +216,7 @@ const rules = [
       "window/SavedSites.ts",
       "window/PageCommands.ts",
       "window/EventManager.ts",
-      "desktop/DesktopBerry.ts",
+      "desktop/DesktopParts.ts",
     ],
     "No page, tool, mascot, MCP app or phone can open, read or answer a menu or an Asking first card.",
   ),
@@ -279,6 +285,12 @@ const rules = [
       "window/makeViews.ts",
     ],
     "Only the permission prompt answers a site's request: Berry's tools only reach tabs.",
+  ),
+  onlyFrom(
+    "the parts of Tab",
+    file("WebPage", "TabPage", "NavigationLimits", "WorkingStyle"),
+    ["tabs"],
+    "Everything outside tabs/ goes through Tab, so a tab held for the user refuses every call from a job.",
   ),
   onlyFrom(
     "the cloud's settings and live view",
