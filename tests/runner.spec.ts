@@ -86,8 +86,8 @@ test("a job on the runner keeps going without the app's agent, waits on Needs yo
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
-    runner.stdout?.on("data", (part: Buffer) => (runnerLog += part));
-    runner.stderr?.on("data", (part: Buffer) => (runnerLog += part));
+    runner.stdout?.on("data", (part: Buffer) => (runnerLog += part.toString()));
+    runner.stderr?.on("data", (part: Buffer) => (runnerLog += part.toString()));
 
     // The runner accepts on start, and Settings says so.
     await expect
