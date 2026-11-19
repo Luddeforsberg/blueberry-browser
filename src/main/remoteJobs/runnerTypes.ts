@@ -48,7 +48,19 @@ export interface RunnerJobsHooks {
   routinesSettled?: () => void;
 }
 
-export const fresh = (account: string, conversationId: string, jobIds: string[], jobId: string | null, active: boolean): Entry => ({
+export const fresh = ({
+  account,
+  conversationId,
+  jobIds,
+  jobId,
+  active,
+}: {
+  account: string;
+  conversationId: string;
+  jobIds: string[];
+  jobId: string | null;
+  active: boolean;
+}): Entry => ({
   account,
   conversationId,
   jobIds,

@@ -24,7 +24,17 @@ export const loadRunnerJobs = (file: string, { entries, forgotten, routinesThere
       const known = Array.isArray(jobIds) ? jobIds.filter(id) : id(jobId) ? [jobId] : [];
       // A chat saved before conversations is one under its job's id, which is what the server makes of it too.
       const conversation = id(conversationId) ? conversationId : id(jobId) ? jobId : null;
-      if (conversation) entries.set(chatId, fresh(account, conversation, known, id(jobId) ? jobId : null, id(jobId) && active === true));
+      if (conversation)
+        entries.set(
+          chatId,
+          fresh({
+            account,
+            conversationId: conversation,
+            jobIds: known,
+            jobId: id(jobId) ? jobId : null,
+            active: id(jobId) && active === true,
+          }),
+        );
     });
     if (Array.isArray(saved?.forgotten)) forgotten.push(...saved.forgotten.filter(id).slice(-MAX_FORGOTTEN));
     if (Array.isArray(saved?.routinesInCloud))

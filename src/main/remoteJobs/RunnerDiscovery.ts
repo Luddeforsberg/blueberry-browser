@@ -85,7 +85,7 @@ export class RunnerDiscovery {
       const mascotId = (fresher[0].mascot as { id?: unknown } | null)?.id;
       const chatId = this.hooks.adopt?.({ prompt: fresher[0].prompt, mascotId: typeof mascotId === "string" ? mascotId : null });
       if (!chatId) return;
-      found = [chatId, fresh(account, conversationId, [], null, false)];
+      found = [chatId, fresh({ account, conversationId, jobIds: [], jobId: null, active: false })];
       this.entries.set(...found);
     }
     this.apply(...found, fresher);

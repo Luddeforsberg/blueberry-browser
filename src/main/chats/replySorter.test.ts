@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ReplySorter } from "./replySorter";
+import { ReplySorter } from "./agent";
 
 describe("ReplySorter", () => {
   it("streams a message's words as the answer while it calls no tool", () => {

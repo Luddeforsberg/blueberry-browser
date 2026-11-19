@@ -215,7 +215,13 @@ export class RunnerJobs implements ChatRunner {
     const earlierEntry = this.entries.get(chatId);
     if (earlierEntry && earlierEntry.account !== account) return OTHER_ACCOUNT(earlierEntry.account);
     // It shows as going at once, while it's sent, in the same conversation as the chat's earlier jobs.
-    const entry = fresh(account, earlierEntry?.conversationId ?? randomUUID(), earlierEntry?.jobIds ?? [], null, true);
+    const entry = fresh({
+      account,
+      conversationId: earlierEntry?.conversationId ?? randomUUID(),
+      jobIds: earlierEntry?.jobIds ?? [],
+      jobId: null,
+      active: true,
+    });
     this.entries.set(chatId, entry);
     const fail = (problem: string) => {
       entry.active = false;

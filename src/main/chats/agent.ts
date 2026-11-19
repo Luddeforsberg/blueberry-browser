@@ -10,6 +10,8 @@ import type { ChatThreadMessage, StepKind } from "../../shared/library";
 import { createModel } from "./modelConfig";
 import { ReplySorter } from "./replySorter";
 
+export { ReplySorter };
+
 export { ModelConfigError, SERVICE_ADDRESS, hasModel, modelConfig, modelsFor, setSavedKeyReader, type SavedKey } from "./modelConfig";
 export { generateTitle, writeWithCheapModel } from "./cheapModel";
 

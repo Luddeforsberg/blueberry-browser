@@ -300,9 +300,10 @@ export class CdpTab implements PageTarget {
     });
   }
 
-  async sendAgentInput(event: AgentInput): Promise<void> {
-    if (this.closed) throw new Error("The page is closed");
-    await this.input.send(event);
+  // Not async itself, so the promise is the helper's own and settles exactly when it did before the split.
+  sendAgentInput(event: AgentInput): Promise<void> {
+    if (this.closed) return Promise.reject(new Error("The page is closed"));
+    return this.input.send(event);
   }
 
   // Resolves once the new page has started, like the window's tabs. `settled` waits for the rest.
@@ -344,7 +345,7 @@ export class CdpTab implements PageTarget {
   }
 
   // Only while a limit is on does every new document wait to be checked, so a page with no limit loads as fast as any.
-  async withNavigationLimit<T>(allows: (url: string) => boolean, act: () => Promise<T>): Promise<{ result: T; refused: string[] }> {
+  withNavigationLimit<T>(allows: (url: string) => boolean, act: () => Promise<T>): Promise<{ result: T; refused: string[] }> {
     return this.limits.withNavigationLimit(allows, act);
   }
 
