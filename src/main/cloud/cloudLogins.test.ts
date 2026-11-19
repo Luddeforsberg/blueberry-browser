@@ -14,6 +14,7 @@ import {
   type CookieJar,
   type StoredCookie,
 } from "./cloudLogins";
+import { defined } from "../../shared/testing";
 
 const cookie = (domain: string, name = "sid", more: Partial<StoredCookie> = {}): StoredCookie => ({
   name,
@@ -212,7 +213,7 @@ describe("CloudLogins", () => {
     logins.mark("example.com", false);
     expect(logins.logins[0]).toMatchObject({ status: "signed-out", checkedAt: expect.any(Number) });
     logins.mark("example.com", true);
-    expect(logins.logins[0].status).toBe("checked");
+    expect(defined(logins.logins[0]).status).toBe("checked");
     await logins.bring("example.com");
     expect(logins.logins[0]).toMatchObject({ status: "brought", checkedAt: null });
   });

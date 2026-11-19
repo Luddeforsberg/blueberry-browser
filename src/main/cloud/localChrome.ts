@@ -55,12 +55,12 @@ const launch = (executable: string): Promise<{ endpoint: string; process: ChildP
     child.on("error", () => fail("The local browser couldn't be started."));
     child.stderr?.on("data", (part: Buffer) => {
       said += part.toString();
-      const found = /DevTools listening on (ws:\/\/\S+)/.exec(said);
-      if (!found) return;
+      const endpoint = /DevTools listening on (ws:\/\/\S+)/.exec(said)?.[1];
+      if (!endpoint) return;
       clearTimeout(timer);
       child.stderr?.removeAllListeners("data");
       child.stderr?.resume();
-      resolve({ endpoint: found[1], process: child, profile });
+      resolve({ endpoint, process: child, profile });
     });
   });
 };

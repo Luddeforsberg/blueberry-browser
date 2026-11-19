@@ -3,6 +3,7 @@ import type { Browser, BrowserContext } from "playwright-core";
 import { browserbase, BROWSERBASE_REGION, type BrowserbaseSaved } from "./browserbase";
 import type { CdpTab } from "../tools/CdpTab";
 import { CloudSessions, type CloudBrowser } from "./cloudBrowser";
+import { defined } from "../../shared/testing";
 
 // Against a stubbed fetch, shaped from Browserbase's API reference. Nothing here has talked to the real service.
 
@@ -60,7 +61,7 @@ describe("Browserbase", () => {
       "POST https://api.browserbase.com/v1/sessions",
     ]);
     expect(calls.every(({ key }) => key === "bb_test")).toBe(true);
-    expect(calls[1].body).toMatchObject({
+    expect(defined(calls[1]).body).toMatchObject({
       projectId: "proj",
       keepAlive: true,
       region: BROWSERBASE_REGION,
@@ -105,7 +106,7 @@ describe("Browserbase", () => {
       "GET https://api.browserbase.com/v1/sessions/sess-1",
       "POST https://api.browserbase.com/v1/sessions",
     ]);
-    expect(gone.calls[1].body).toMatchObject({ browserSettings: { context: { id: "ctx-1" } } });
+    expect(defined(gone.calls[1]).body).toMatchObject({ browserSettings: { context: { id: "ctx-1" } } });
   });
 
   it("finds the live view for a page, without Browserbase's navbar", async () => {
