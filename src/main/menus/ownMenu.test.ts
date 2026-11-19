@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { AskBook, buildMenu, MenuBook, toElectronMenu, type OwnMenuItem } from "./ownMenu";
 import type { MenuEntry } from "../../shared/ipc";
+import { defined } from "../../shared/testing";
 
 const rows = (entries: MenuEntry[]) => entries.map((entry) => (entry.kind === "rule" ? "-" : entry.label));
 const row = (entries: MenuEntry[], label: string) => {
@@ -90,16 +91,18 @@ describe("buildMenu", () => {
 
 describe("toElectronMenu", () => {
   it("keeps what the menu bar needs: roles, keys, switches and submenus", () => {
-    const [edit] = toElectronMenu([
-      {
-        label: "Edit",
-        submenu: [
-          { label: "Copy", icon: "copy", accelerator: "CmdOrCtrl+C", role: "copy" },
-          { type: "separator" },
-          { id: "h", label: "Horizontal Tabs", type: "checkbox", checked: true, click: () => {} },
-        ],
-      },
-    ]);
+    const edit = defined(
+      toElectronMenu([
+        {
+          label: "Edit",
+          submenu: [
+            { label: "Copy", icon: "copy", accelerator: "CmdOrCtrl+C", role: "copy" },
+            { type: "separator" },
+            { id: "h", label: "Horizontal Tabs", type: "checkbox", checked: true, click: () => {} },
+          ],
+        },
+      ])[0],
+    );
     // Electron drops the submenu of an item typed "normal", and with it the menu bar and every shortcut in it.
     expect(edit.type).toBe("submenu");
     expect(edit.submenu).toEqual([
@@ -109,7 +112,7 @@ describe("toElectronMenu", () => {
     ]);
     // Our icon names mean nothing to Electron, which would read a string as a file.
     expect(edit.submenu).not.toContainEqual(expect.objectContaining({ icon: expect.anything() }));
-    expect(Array.isArray(edit.submenu) && typeof edit.submenu[2].click).toBe("function");
+    expect(Array.isArray(edit.submenu) && typeof defined(edit.submenu[2]).click).toBe("function");
   });
 });
 
