@@ -96,12 +96,13 @@ export class JobTools {
   // attached to this message, the first place a call that names no tab goes when there's no page.
   jobTools(chatId: string, run: Run, page: Tab | null, asked: string, attachedNow: readonly Tab[] = []): PageTool[] {
     const job = this.jobs.jobOf(chatId);
+    const lastAttached = attachedNow.at(-1);
     if (page) {
       job.current = page.id;
       // Sending the page with a message is the user handing it over.
       job.takenOver.delete(page.id);
-    } else if (attachedNow.length > 0) {
-      job.current = attachedNow[attachedNow.length - 1].id;
+    } else if (lastAttached) {
+      job.current = lastAttached.id;
     } else if (job.current && !job.own.has(job.current) && !job.takenOver.has(job.current) && !job.attached.has(job.current)) {
       // That was the page from an earlier message. This one came without it, so it's out of reach.
       job.current = [...job.own].at(-1) ?? null;

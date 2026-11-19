@@ -4,6 +4,7 @@ import { ChatStore } from "./ChatStore";
 import type { ReplyOptions, StreamReply } from "./agent";
 import type { Tab } from "../tabs/Tab";
 import { send, setup, tab } from "./chatsTesting";
+import { defined } from "../../shared/testing";
 
 vi.mock("./agent", async (importOriginal) => {
   const { ModelConfigError } = await importOriginal<typeof import("./agent")>();
@@ -73,7 +74,7 @@ describe("Chats", () => {
         reply,
         async () => null,
         {
-          activeTab: () => allTabs[0],
+          activeTab: () => defined(allTabs[0]),
           allTabs: () => allTabs,
           openBackgroundTab: () => {
             allTabs.push(opened);

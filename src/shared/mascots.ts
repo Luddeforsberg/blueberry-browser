@@ -144,7 +144,7 @@ export interface PermissionLine {
 }
 
 // What a mascot may do, for the Gallery. It reads the same `sites` and `tools` the tool layer enforces, and nothing else.
-export const permissionsInWords = ({ sites, tools }: Pick<MascotDraft, "sites" | "tools">): PermissionLine[] => {
+export const permissionsInWords = ({ sites, tools }: Pick<MascotDraft, "sites" | "tools">): [PermissionLine, ...PermissionLine[]] => {
   const visits = tools.includes("visit");
   const clicks = tools.includes("click");
   const types = tools.includes("type");

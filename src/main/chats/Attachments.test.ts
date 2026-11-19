@@ -4,6 +4,7 @@ import { join } from "path";
 import { describe, expect, it } from "vitest";
 import { ATTACHMENT_WORDS, MAX_FILE_BYTES, MAX_FILES, STAGED_FILE_MS } from "../../shared/attachments";
 import { Attachments, type PreparePicture } from "./Attachments";
+import { defined } from "../../shared/testing";
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
 const fakePicture: PreparePicture = (bytes) => ({ data: bytes, mime: "image/png", thumbnail: "data:image/png;base64,thumb" });
@@ -20,14 +21,14 @@ describe("Attachments", () => {
 
     const four = attachments.addFiles(
       [1, 2, 3, 4].map((n) => text(`${n}.txt`)),
-      [one[0].id],
+      [defined(one[0]).id],
     );
     expect(four.every((chip) => chip.problem === null)).toBe(true);
-    const five = [one[0].id, ...four.map((chip) => chip.id)];
+    const five = [defined(one[0]).id, ...four.map((chip) => chip.id)];
     expect(five).toHaveLength(MAX_FILES);
     expect(attachments.peek(five)).toHaveLength(MAX_FILES);
 
-    const [sixth] = attachments.addFiles([text("6.txt")], five);
+    const sixth = defined(attachments.addFiles([text("6.txt")], five)[0]);
     expect(sixth.problem).toBe(ATTACHMENT_WORDS.tooMany);
     expect(attachments.peek([...five, sixth.id])).toBeNull();
     expect(attachments.peek([sixth.id])).toBeNull();
@@ -43,14 +44,14 @@ describe("Attachments", () => {
   });
 
   it("gives back only what a chip needs, never a file's contents", () => {
-    const [chip] = make().addFiles([text("notes.txt", "The secret plan")], []);
+    const chip = defined(make().addFiles([text("notes.txt", "The secret plan")], [])[0]);
     expect(JSON.stringify(chip)).not.toContain("secret");
     expect(Object.keys(chip).sort()).toEqual(["fact", "factInFull", "id", "kind", "name", "problem", "thumbnail"]);
   });
 
   it("refuses an id it never gave, one named twice and more than five, so nothing else can be sent", () => {
     const attachments = make();
-    const [a] = attachments.addFiles([text("a.txt")], []);
+    const a = defined(attachments.addFiles([text("a.txt")], [])[0]);
     expect(attachments.peek([])).toEqual([]);
     expect(attachments.peek([a.id])).toMatchObject([{ name: "a.txt", text: "some words" }]);
     expect(attachments.peek(["C:/Users/me/secret.txt"])).toBeNull();
@@ -64,7 +65,7 @@ describe("Attachments", () => {
     expect(program).toMatchObject({ name: "holiday.png", kind: null, problem: ATTACHMENT_WORDS.notAKind });
     const [picture] = make().addFiles([{ name: "notes.txt", bytes: new Uint8Array(PNG) }], []);
     expect(picture).toMatchObject({ kind: "picture", thumbnail: "data:image/png;base64,thumb", problem: null });
-    const [notBytes] = make().addFiles([{ name: "a.txt", bytes: "C:/a.txt" }], []);
+    const notBytes = defined(make().addFiles([{ name: "a.txt", bytes: "C:/a.txt" }], [])[0]);
     expect(notBytes.problem).toBe(ATTACHMENT_WORDS.unreadable);
   });
 
@@ -78,7 +79,7 @@ describe("Attachments", () => {
     expect(chips.map(({ name, problem }) => [name, problem])).toEqual([
       ["at-limit.txt", null],
       ["past.txt", ATTACHMENT_WORDS.tooBig],
-      [chips[2].name, ATTACHMENT_WORDS.unreadable],
+      [defined(chips[2]).name, ATTACHMENT_WORDS.unreadable],
     ]);
     expect(chips[0]).toMatchObject({ fact: ATTACHMENT_WORDS.cutShort, factInFull: ATTACHMENT_WORDS.cutShortInFull });
   });
@@ -86,7 +87,7 @@ describe("Attachments", () => {
   it("lets go of a file nobody sent after a while", () => {
     let now = 0;
     const attachments = make([], () => now);
-    const [a] = attachments.addFiles([text("a.txt")], []);
+    const a = defined(attachments.addFiles([text("a.txt")], [])[0]);
     now = STAGED_FILE_MS + 1;
     expect(attachments.peek([a.id])).toBeNull();
   });

@@ -15,8 +15,8 @@ export interface PageSnapshot {
   note?: string | undefined;
 }
 
-const ATTRIBUTE: Record<string, string> = { "&": "&amp;", '"': "&quot;", "<": "&lt;", ">": "&gt;" };
-const attribute = (text: string) => text.replace(/[&"<>]/g, (char) => ATTRIBUTE[char]).replace(/\s+/g, " ");
+const attribute = (text: string) =>
+  text.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\s+/g, " ");
 // A file can hold its own closing tag, to make what follows look like the user's words.
 const inside = (text: string, tag: string) => text.replace(new RegExp(`</(${tag})`, "gi"), "<\\/$1");
 

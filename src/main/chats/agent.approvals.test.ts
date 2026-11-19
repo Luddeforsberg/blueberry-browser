@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { PageTool } from "../tools/browserTools";
 import { shortenOldResults, streamReply } from "./agent";
 import { collect, NO_TOOLS } from "./agentTesting";
+import { defined } from "../../shared/testing";
 
 // A mascot's limits and the approvals a reply stops for, and the step limit that ends a long one.
 
@@ -292,8 +293,8 @@ describe("streamReply with an action that needs approval", () => {
       });
       const short = new ToolMessage({ tool_call_id: "s", content: "short" });
       const [first, second] = await shortenOldResults([picture, short, ...results(14)]);
-      expect(first.content).toContain("A page");
-      expect(JSON.stringify(first.content)).not.toContain("base64");
+      expect(defined(first).content).toContain("A page");
+      expect(JSON.stringify(defined(first).content)).not.toContain("base64");
       expect(second).toBe(short);
     });
   });
