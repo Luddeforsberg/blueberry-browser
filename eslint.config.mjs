@@ -24,6 +24,15 @@ export default tseslint.config(
     // Type-aware rules read each file's types from the tsconfig that holds it, so every TypeScript file is in one.
     files: ["**/*.{ts,tsx}"],
     languageOptions: { parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname } },
+    rules: {
+      "@typescript-eslint/await-thenable": "error",
+      "@typescript-eslint/only-throw-error": "error",
+      "@typescript-eslint/prefer-promise-reject-errors": "error",
+      "@typescript-eslint/no-for-in-array": "error",
+      "@typescript-eslint/no-implied-eval": "error",
+      "@typescript-eslint/no-array-delete": "error",
+      "@typescript-eslint/no-duplicate-type-constituents": "error",
+    },
   },
   {
     files: ["**/*.{ts,tsx}"],
