@@ -1,8 +1,8 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { safeStorage, type WebContents } from "electron";
 import type { CloudState, CloudView } from "../../shared/ipc";
-import { browserbase, isLiveView, type BrowserbaseSaved } from "./browserbase";
+import { browserbase, isLiveView } from "./browserbase";
+import { EMPTY, MAX_FIELD_LENGTH, readCloudFile, writeCloudFile, type Saved } from "./cloudFile";
 import type { CdpTab } from "../tools/CdpTab";
 import type { ChatCloud } from "../chats/Chats";
 import { CloudSessions, type CloudBrowser } from "./cloudBrowser";
@@ -15,18 +15,10 @@ import { localChrome } from "./localChrome";
 // to a tool, a chat or the disk. A cloud tab is an internal page in the window, drawn by the chrome, with its page in
 // the cloud browser behind it.
 
-const MAX_FIELD_LENGTH = 200;
 const NOT_SAFE = "This computer can't keep the key encrypted, so it wasn't saved.";
 const NOT_SAVED = "The key couldn't be saved.";
 // What a cloud tab may ask its page's viewport to be, in pixels.
 const FIT = { min: { width: 320, height: 200 }, max: { width: 3840, height: 2160 } };
-
-interface Saved extends BrowserbaseSaved {
-  apiKey: string | null;
-  projectId: string | null;
-}
-
-const EMPTY: Saved = { apiKey: null, projectId: null, contextId: null, sessionId: null };
 
 export interface CloudTabsHooks {
   chrome: () => WebContents;
@@ -350,34 +342,11 @@ export class CloudTabs implements ChatCloud {
   }
 
   private load(): Saved {
-    try {
-      const saved = JSON.parse(readFileSync(this.file, "utf8"));
-      const open = (value: unknown) =>
-        typeof value === "string" && safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(Buffer.from(value, "base64")) : null;
-      const text = (value: unknown) => (typeof value === "string" && value.length <= MAX_FIELD_LENGTH ? value : null);
-      return {
-        apiKey: open(saved.apiKey),
-        projectId: open(saved.projectId),
-        contextId: text(saved.contextId),
-        sessionId: text(saved.sessionId),
-      };
-    } catch {
-      return EMPTY;
-    }
+    return readCloudFile(this.file);
   }
 
   private save(): void {
-    try {
-      mkdirSync(dirname(this.file), { recursive: true });
-      const seal = (value: string | null) => value && safeStorage.encryptString(value).toString("base64");
-      const temp = `${this.file}.tmp`;
-      const { apiKey, projectId, contextId, sessionId } = this.saved;
-      writeFileSync(temp, JSON.stringify({ apiKey: seal(apiKey), projectId: seal(projectId), contextId, sessionId }), { mode: 0o600 });
-      renameSync(temp, this.file);
-    } catch {
-      this.problem = NOT_SAVED;
-      console.error("Couldn't save the cloud settings.");
-    }
+    if (!writeCloudFile(this.file, this.saved)) this.problem = NOT_SAVED;
   }
 
   // The window closed or the app is quitting. The session ends at the provider, from its saved id if need be, and

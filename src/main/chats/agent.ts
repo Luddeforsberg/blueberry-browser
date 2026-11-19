@@ -7,7 +7,13 @@ import type { PageTool } from "../tools/browserTools";
 import type { ActionApproval } from "../../shared/ipc";
 import type { AskWhy } from "../../shared/asking";
 import type { ChatThreadMessage, StepKind } from "../../shared/library";
-import { NO_KEY, type AiService } from "../../shared/aiKey";
+import { createModel } from "./modelConfig";
+import { ReplySorter } from "./replySorter";
+
+export { ReplySorter };
+
+export { ModelConfigError, SERVICE_ADDRESS, hasModel, modelConfig, modelsFor, setSavedKeyReader, type SavedKey } from "./modelConfig";
+export { generateTitle, writeWithCheapModel } from "./cheapModel";
 
 // Load environment variables from .env file
 dotenv.config({ path: join(__dirname, "../../.env") });
@@ -49,22 +55,6 @@ export type ReplyPart = string | { statusLine: string };
 export type StreamReply = (messages: ReplyMessage[], signal: AbortSignal, options: ReplyOptions) => AsyncIterable<ReplyPart>;
 
 export type GenerateTitle = (messages: ChatThreadMessage[]) => Promise<string | null>;
-
-const DEFAULT_MODELS = {
-  openai: "gpt-6.1-terra",
-  anthropic: "claude-sonnet-5-5",
-};
-
-// Cheap models, from the same provider as the chat so a conversation only goes to the one it's with.
-const TITLE_MODELS = {
-  openai: "gpt-6-luna",
-  anthropic: "claude-haiku-5-5",
-};
-
-const API_KEYS = {
-  openai: "OPENAI_API_KEY",
-  anthropic: "ANTHROPIC_API_KEY",
-};
 
 const SYSTEM_PROMPT =
   "You are the assistant built into Blueberry, a web browser. Be helpful, accurate and brief. " +
@@ -113,12 +103,6 @@ const ASK_FIRST_PROMPT =
 const DECLINED = "The user said no. Nothing happened. Don't try this another way unless they ask.";
 const CHANGED = "Nothing happened, because the page changed after the user allowed this. Look at the page again before trying again.";
 
-const TITLE_PROMPT =
-  "You name chats for a sidebar. Reply with a title of 2 to 5 words, in the language of the conversation, " +
-  "saying what it is about. Use no quotes and no ending punctuation. " +
-  "If it has no topic yet, such as only a greeting or small talk, reply with exactly NONE.";
-
-const MAX_RETRIES = 3;
 // A long job, such as 35 hops at about three calls each, takes a little over 100. Past that it has probably gone
 // wrong, and every step costs money, so the last call writes up what it has and the user can send a message to go on.
 const MAX_MODEL_CALLS = 120;
@@ -137,13 +121,6 @@ const KEEP_RESULTS_WHOLE = 8;
 const SHORTEN_BATCH = 8;
 const SHORTENED_LENGTH = 600;
 const SHORTENED_NOTE = "\n[Shortened to save space. Look at the page again if you need the rest.]";
-const MAX_TITLE_LENGTH = 60;
-const MAX_TITLE_MESSAGES = 10;
-const MAX_TITLE_MESSAGE_LENGTH = 1000;
-
-// A problem the user fixes in .env, so its message is worded for them.
-export class ModelConfigError extends Error {}
-
 const shortened = (message: BaseMessage, ToolMessage: typeof import("@langchain/core/messages").ToolMessage) => {
   const { content } = message;
   // A picture has nothing to keep, and it's the most expensive thing there is to send again.
@@ -159,72 +136,6 @@ export const shortenOldResults = async (messages: BaseMessage[]): Promise<BaseMe
   const count = Math.floor(Math.max(0, results.length - KEEP_RESULTS_WHOLE) / SHORTEN_BATCH) * SHORTEN_BATCH;
   const old = new Set(results.slice(0, count));
   return messages.map((message, at) => (old.has(at) ? shortened(message, ToolMessage) : message));
-};
-
-// The key the user saved in Settings, which comes before one in the .env file. Only the app sets this: the cloud runner
-// and the evals never do, so they use the .env file alone.
-export interface SavedKey {
-  service: AiService;
-  key: string;
-}
-let savedKey: () => SavedKey | null = () => null;
-// Each service's own address. With `ownAddressOnly`, which the packaged app sets, a saved key is only ever sent there,
-// whatever the environment says about another address. An unpackaged app keeps the environment's, which is how tests
-// point it at a stand-in.
-export const SERVICE_ADDRESS: Record<AiService, string> = { openai: "https://api.openai.com/v1", anthropic: "https://api.anthropic.com" };
-let savedKeyStaysHome = false;
-export const setSavedKeyReader = (read: () => SavedKey | null, { ownAddressOnly = false }: { ownAddressOnly?: boolean } = {}): void => {
-  savedKey = read;
-  savedKeyStaysHome = ownAddressOnly;
-};
-
-// The .env file's choice of models only applies to a key for its own provider.
-export const modelsFor = (provider: AiService, env: Record<string, string | undefined> = process.env) => {
-  const chosen = (env.LLM_PROVIDER?.toLowerCase() || "openai") === provider;
-  return {
-    model: (chosen && env.LLM_MODEL) || DEFAULT_MODELS[provider],
-    titleModel: (chosen && env.LLM_TITLE_MODEL) || TITLE_MODELS[provider],
-  };
-};
-
-export const modelConfig = (
-  env: Record<string, string | undefined> = process.env,
-  saved: SavedKey | null = savedKey(),
-  ownAddressOnly = savedKeyStaysHome,
-) => {
-  if (saved) return { provider: saved.service, apiKey: saved.key, ownAddressOnly, ...modelsFor(saved.service, env) };
-  const provider = env.LLM_PROVIDER?.toLowerCase() || "openai";
-  if (provider !== "openai" && provider !== "anthropic") {
-    throw new ModelConfigError(`LLM_PROVIDER in the .env file must be openai or anthropic, not "${provider}".`);
-  }
-  const apiKey = env[API_KEYS[provider]];
-  if (!apiKey) throw new ModelConfigError(NO_KEY);
-  return { provider, apiKey, ownAddressOnly: false, ...modelsFor(provider, env) };
-};
-
-// LangChain and the providers load on first use, so opening the browser never waits for them.
-const createModel = async (use: "model" | "titleModel" = "model"): Promise<BaseChatModel> => {
-  const { provider, apiKey, ownAddressOnly, [use]: model } = modelConfig();
-  // An address given here comes before any the client would take from the environment.
-  if (provider === "anthropic") {
-    const { ChatAnthropic } = await import("@langchain/anthropic");
-    return new ChatAnthropic({
-      apiKey,
-      model,
-      maxRetries: MAX_RETRIES,
-      ...(ownAddressOnly && { anthropicApiUrl: SERVICE_ADDRESS.anthropic }),
-    });
-  }
-  const { ChatOpenAI } = await import("@langchain/openai");
-  // Newer models only take tools through the Responses API. A custom address, such as the tests' fake model,
-  // may only speak the older one.
-  return new ChatOpenAI({
-    apiKey,
-    model,
-    maxRetries: MAX_RETRIES,
-    useResponsesApi: ownAddressOnly || !process.env.OPENAI_BASE_URL,
-    ...(ownAddressOnly && { configuration: { baseURL: SERVICE_ADDRESS.openai } }),
-  });
 };
 
 // The installed LangChain has no one shape for a PDF that both providers read: the older file block goes to Anthropic
@@ -244,32 +155,6 @@ export const systemPrompt = (withTools: boolean, userPresent: boolean): string =
 
 const callsTools = (message: Pick<AIMessageChunk, "tool_calls" | "tool_call_chunks">): boolean =>
   (message.tool_call_chunks?.length ?? 0) > 0 || (message.tool_calls?.length ?? 0) > 0;
-
-// Splits what the model writes into the answer and what it says on the way there. A message's words can only be told
-// apart once it calls a tool, and the answer has to stream as it's written, so they go out as the answer until then, and
-// are taken back as a status line when it does. A provider names the call before its arguments, so that's soon after.
-export class ReplySorter {
-  private said = "";
-  private calling = false;
-
-  // More of the model's message, and whether this part of it calls a tool.
-  chunk(text: string, calls: boolean): ReplyPart[] {
-    this.said += text;
-    if (!this.calling && !calls) return text ? [text] : [];
-    const changed = text !== "" || !this.calling;
-    this.calling = true;
-    return changed && this.said.trim() ? [{ statusLine: this.said.trim() }] : [];
-  }
-
-  // The message is whole, so the next words start another. One that was cut down to words after calling a tool, as the
-  // last call of a long job can be, is the answer after all.
-  ended(calls: boolean): ReplyPart[] {
-    const parts = calls ? this.chunk("", true) : this.calling && this.said ? [this.said] : [];
-    this.said = "";
-    this.calling = false;
-    return parts;
-  }
-}
 
 export async function* streamReply(
   messages: ReplyMessage[],
@@ -425,42 +310,3 @@ export async function* streamReply(
     input = new Command({ resume: decisions });
   }
 }
-
-// Whether there's a model to ask at all. Features that only add something stay quiet without one.
-export const hasModel = (): boolean => {
-  try {
-    modelConfig();
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-// One call to the cheap model, for what's too small to need the main one.
-export const writeWithCheapModel = async (system: string, data: string, model?: BaseChatModel): Promise<string> => {
-  const cheapModel = model ?? (await createModel("titleModel"));
-  const reply = await cheapModel.invoke([
-    ["system", system],
-    ["human", data],
-  ]);
-  return reply.text;
-};
-
-// Null until the conversation has a topic worth naming.
-export const generateTitle = async (messages: ChatThreadMessage[], model?: BaseChatModel): Promise<string | null> => {
-  const transcript = messages
-    .slice(0, MAX_TITLE_MESSAGES)
-    .map(({ role, content }) => `${role}: ${content.slice(0, MAX_TITLE_MESSAGE_LENGTH)}`)
-    .join("\n\n");
-  const titleModel = model ?? (await createModel("titleModel"));
-  const reply = await titleModel.invoke([
-    ["system", TITLE_PROMPT],
-    ["human", transcript],
-  ]);
-  const title = reply.text
-    .trim()
-    .replace(/^["'“”]+|["'“”.!?]+$/g, "")
-    .trim();
-  if (!title || title.toUpperCase() === "NONE") return null;
-  return title.length > MAX_TITLE_LENGTH ? `${title.slice(0, MAX_TITLE_LENGTH - 1).trimEnd()}…` : title;
-};

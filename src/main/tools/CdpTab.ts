@@ -1,6 +1,8 @@
 import type { CDPSession, Frame, Page } from "playwright-core";
 import type { TabLoadError, TabTrouble } from "../../shared/ipc";
 import type { AgentInput, PageFrame, PageTarget } from "./pageTarget";
+import { CdpInput } from "./cdpInput";
+import { CdpNavigationLimits } from "./cdpNavigationLimits";
 
 // A page in a browser reached over the Chrome DevTools Protocol, such as one in the cloud, behind the same interface as
 // the window's own tabs, so Berry's tools work on it unchanged. Plain Node: no Electron, so a runner without a window can
@@ -18,33 +20,6 @@ const LOAD_START_MS = 300;
 const LOAD_END_MS = 10_000;
 const SCREENCAST_QUALITY = 60;
 const SCREENCAST_WIDTH = 1280;
-
-// What `pageInput.ts` names keys, and what CDP needs to know about each.
-const KEYS: Record<string, { key: string; code: string; keyCode: number; text?: string }> = {
-  Enter: { key: "Enter", code: "Enter", keyCode: 13, text: "\r" },
-  Escape: { key: "Escape", code: "Escape", keyCode: 27 },
-  Tab: { key: "Tab", code: "Tab", keyCode: 9 },
-  Backspace: { key: "Backspace", code: "Backspace", keyCode: 8 },
-  Delete: { key: "Delete", code: "Delete", keyCode: 46 },
-  Space: { key: " ", code: "Space", keyCode: 32, text: " " },
-  Up: { key: "ArrowUp", code: "ArrowUp", keyCode: 38 },
-  Down: { key: "ArrowDown", code: "ArrowDown", keyCode: 40 },
-  Left: { key: "ArrowLeft", code: "ArrowLeft", keyCode: 37 },
-  Right: { key: "ArrowRight", code: "ArrowRight", keyCode: 39 },
-  Home: { key: "Home", code: "Home", keyCode: 36 },
-  End: { key: "End", code: "End", keyCode: 35 },
-  PageUp: { key: "PageUp", code: "PageUp", keyCode: 33 },
-  PageDown: { key: "PageDown", code: "PageDown", keyCode: 34 },
-};
-
-const keyOf = (name: string) => {
-  const known = KEYS[name] ?? (name === " " ? KEYS.Space : undefined);
-  if (known) return known;
-  const upper = name.toUpperCase();
-  return { key: name, code: "", keyCode: /^[A-Z0-9]$/.test(upper) ? upper.charCodeAt(0) : 0, text: name };
-};
-
-const SHIFT = 8;
 
 const withTimeout = async <T>(work: Promise<T>, ms: number, what: string): Promise<T> => {
   let timer: NodeJS.Timeout | undefined;
@@ -87,10 +62,8 @@ export class CdpTab implements PageTarget {
   private history: { entries: { id: number; url: string }[]; index: number } = { entries: [], index: 0 };
   private world: Promise<number> | null = null;
   private readonly frames = new WeakMap<Frame, PageFrame>();
-  private readonly navigationLimits = new Set<(url: string) => boolean>();
-  private readonly refusalListeners = new Set<Set<string>>();
-  private fetching: Promise<unknown> = Promise.resolve();
-  private pressed = false;
+  private readonly input: CdpInput;
+  private readonly limits: CdpNavigationLimits;
   private closed = false;
   private screencast: ((jpeg: string) => void) | null = null;
 
@@ -101,7 +74,10 @@ export class CdpTab implements PageTarget {
     private readonly mainFrameId: string,
     readonly targetId: string,
     private readonly events: CdpTabEvents,
-  ) {}
+  ) {
+    this.input = new CdpInput(session);
+    this.limits = new CdpNavigationLimits(session);
+  }
 
   // Takes charge of a page Playwright already has open.
   static async attach(id: string, page: Page, events: CdpTabEvents): Promise<CdpTab> {
@@ -152,7 +128,7 @@ export class CdpTab implements PageTarget {
     });
     session.on("Fetch.requestPaused", ({ requestId, request, frameId, resourceType }) => {
       const refused = resourceType === "Document" && isMain(frameId) && this.refusesNavigation(request.url);
-      if (refused) this.refusalListeners.forEach((listener) => listener.add(request.url));
+      if (refused) this.limits.refusalListeners.forEach((listener) => listener.add(request.url));
       // Aborted, so the page stays where it was, as a refused navigation does in the window's own tabs.
       const answer = refused
         ? session.send("Fetch.failRequest", { requestId, errorReason: "Aborted" })
@@ -324,39 +300,10 @@ export class CdpTab implements PageTarget {
     });
   }
 
-  async sendAgentInput(event: AgentInput): Promise<void> {
-    if (this.closed) throw new Error("The page is closed");
-    if (!("keyCode" in event)) {
-      if (event.type === "mouseDown") this.pressed = true;
-      const held = this.pressed;
-      if (event.type === "mouseUp") this.pressed = false;
-      await this.session.send("Input.dispatchMouseEvent", {
-        type: event.type === "mouseMove" ? "mouseMoved" : event.type === "mouseDown" ? "mousePressed" : "mouseReleased",
-        x: event.x,
-        y: event.y,
-        button: event.type === "mouseMove" && !held ? "none" : "left",
-        buttons: event.type === "mouseUp" || !held ? 0 : 1,
-        clickCount: event.type === "mouseMove" ? 0 : (event.clickCount ?? 1),
-      });
-      return;
-    }
-    const { key, code, keyCode, text } = keyOf(event.keyCode);
-    const modifiers = event.modifiers?.includes("shift") ? SHIFT : 0;
-    if (event.type === "char") {
-      // Only a key that types something has a character. Enter's is what submits a form.
-      if (!text) return;
-      const typed = modifiers && text.length === 1 ? text.toUpperCase() : text;
-      await this.session.send("Input.dispatchKeyEvent", { type: "char", text: typed, unmodifiedText: text, key, modifiers });
-      return;
-    }
-    await this.session.send("Input.dispatchKeyEvent", {
-      type: event.type === "keyDown" ? "rawKeyDown" : "keyUp",
-      key,
-      code,
-      windowsVirtualKeyCode: keyCode,
-      nativeVirtualKeyCode: keyCode,
-      modifiers,
-    });
+  // Not async itself, so the promise is the helper's own and settles exactly when it did before the split.
+  sendAgentInput(event: AgentInput): Promise<void> {
+    if (this.closed) return Promise.reject(new Error("The page is closed"));
+    return this.input.send(event);
   }
 
   // Resolves once the new page has started, like the window's tabs. `settled` waits for the rest.
@@ -388,44 +335,18 @@ export class CdpTab implements PageTarget {
   }
 
   refusesNavigation(url: string): boolean {
-    return [...this.navigationLimits].some((allows) => !allows(url));
+    return this.limits.refusesNavigation(url);
   }
 
   // For a navigation this tab caused somewhere it can't intercept itself, such as a popup it opened. True if a limit on
   // now refuses it, which every call holding a limit hears about.
   refuse(url: string): boolean {
-    if (!this.refusesNavigation(url)) return false;
-    this.refusalListeners.forEach((listener) => listener.add(url));
-    return true;
+    return this.limits.refuse(url);
   }
 
   // Only while a limit is on does every new document wait to be checked, so a page with no limit loads as fast as any.
-  async withNavigationLimit<T>(allows: (url: string) => boolean, act: () => Promise<T>): Promise<{ result: T; refused: string[] }> {
-    const limit = (url: string) => allows(url);
-    const refused = new Set<string>();
-    this.navigationLimits.add(limit);
-    this.refusalListeners.add(refused);
-    await this.setFetching();
-    try {
-      const result = await act();
-      return { result, refused: [...refused] };
-    } finally {
-      this.navigationLimits.delete(limit);
-      this.refusalListeners.delete(refused);
-      await this.setFetching();
-    }
-  }
-
-  private setFetching(): Promise<unknown> {
-    const on = this.navigationLimits.size > 0;
-    this.fetching = this.fetching
-      .then(() =>
-        on
-          ? this.session.send("Fetch.enable", { patterns: [{ urlPattern: "*", resourceType: "Document", requestStage: "Request" }] })
-          : this.session.send("Fetch.disable"),
-      )
-      .catch(() => {});
-    return this.fetching;
+  withNavigationLimit<T>(allows: (url: string) => boolean, act: () => Promise<T>): Promise<{ result: T; refused: string[] }> {
+    return this.limits.withNavigationLimit(allows, act);
   }
 
   // The page's viewport, set to the size the user sees it at.

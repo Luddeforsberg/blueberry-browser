@@ -1,22 +1,17 @@
 import { randomUUID } from "crypto";
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
-import { dirname } from "path";
 import type { Account } from "../account/Account";
 import { isLiveView } from "../cloud/browserbase";
 import type { ChatRunner, RunnerJobInput, RunnerProgress } from "../chats/Chats";
-import {
-  approvalFromRow,
-  FINISHED,
-  historyFromRow,
-  mascotSnapshot,
-  stepsFromRow,
-  type CloudJobStatus,
-  type CloudRoutineRow,
-} from "./cloudJobs";
+import { historyFromRow, mascotSnapshot } from "./cloudJobs";
 import { ServerError, type GalleryServer } from "../account/galleryServer";
 import type { RunnerState } from "../../shared/ipc";
-import type { ChatStep, MascotProfile } from "../../shared/library";
-import { sharedMascotRows } from "../../shared/phone";
+import { CloudSharing } from "./CloudSharing";
+import { RunnerDiscovery } from "./RunnerDiscovery";
+import { loadRunnerJobs, MAX_FORGOTTEN, saveRunnerJobs } from "./runnerJobsFile";
+import { RunnerPolls } from "./RunnerPolls";
+import { fresh, type Entry, type RunnerJobsHooks, type RunnerParts } from "./runnerTypes";
+
+export type { RunnerJobsHooks } from "./runnerTypes";
 
 // Chats whose jobs went to the cloud runner, which keeps going with this computer off. The jobs, their steps and their
 // approvals are rows in Supabase, read as the signed-in user, so nobody else's can come back. Only the user's own answer
@@ -28,16 +23,12 @@ import { sharedMascotRows } from "../../shared/phone";
 const POLL_MS = 2_000;
 // How often to look for conversations started or followed up elsewhere, while a linked runner has accepted.
 const DISCOVER_MS = 10_000;
-// Conversations deleted here, kept so a slow delete on the server can't bring one back as a chat started elsewhere.
-const MAX_FORGOTTEN = 500;
 
 const NOT_SET_UP = "This copy of Blueberry has no account server, so it can't send jobs to the cloud.";
 const SIGN_IN = "Sign in to your Blueberry account in Settings to send jobs to the cloud.";
 const NOT_TAKEN = "The cloud didn't take the job. Try again in a moment.";
 const TOO_MANY = "Five jobs are already waiting or going in the cloud. Try again when one is done.";
-const FAILED = "The job failed in the cloud.";
 const BUSY = "This chat already has a job going in the cloud, maybe sent from your phone. Send this again once it's done.";
-const GONE = "This job isn't on your account any more.";
 const NO_SUCH_RUNNER =
   "There's no Blueberry account with that email that can run your jobs. Create it in Supabase first, and don't use your own.";
 const LINK_FAILED = "That account couldn't be linked. Try again in a moment.";
@@ -49,78 +40,11 @@ const NO_RUNNER = "Jobs with your Mac off aren't linked any more, so this wasn't
 const SWITCHED = "You signed in to another account while this was being sent, so it wasn't sent. Send it again.";
 const OTHER_ACCOUNT = (email: string) => `This chat's jobs are on ${email}. Sign in to that account to go on with it.`;
 
-interface Entry {
-  // The account that sent it, by email. Only that account, signed in, sees anything of it.
-  account: string;
-  // The conversation its jobs are in, which the phone shows as one too.
-  conversationId: string;
-  // Every job of it this chat already has, so one sent from elsewhere can be told apart.
-  jobIds: string[];
-  // The newest job. Null while it's being sent.
-  jobId: string | null;
-  // Stopped or deleted while it was being sent, which is done as soon as its id comes back.
-  cancel: "stop" | "forget" | null;
-  active: boolean;
-  status: CloudJobStatus;
-  steps: ChatStep[];
-  reply: string;
-  error: string | null;
-  liveView: string | null;
-  approval: RunnerProgress["approval"];
-}
-
-export interface RunnerJobsHooks {
-  changed: (chatId: string) => void;
-  finished: (chatId: string, result: { reply: string; steps: ChatStep[]; error: string | null }) => void;
-  // The user's Browserbase Context, so the sites they brought along are signed in there too.
-  contextId: () => string | null;
-  runnerUpdated?: (state: RunnerState) => void;
-  // The mascots, shared with the phone page while a linked runner has accepted, so a job can be sent from there as any mascot.
-  mascots?: () => MascotProfile[];
-  // A conversation started elsewhere becomes a chat here, as the mascot its first job ran as. Says the chat's id.
-  adopt?: (first: { prompt: string; mascotId: string | null }) => string | null;
-  // A message sent in that chat from elsewhere, saved as the user's.
-  followedUp?: (chatId: string, prompt: string) => void;
-  // The routines that run in the cloud, as rows for it, kept there while a linked runner has accepted. Null leaves the
-  // cloud's alone, neither sent nor forgotten.
-  routines?: () => CloudRoutineRow[] | null;
-  // What `stillInCloud` or `cloudFailed` says about a routine changed.
-  routinesSettled?: () => void;
-}
-
-const fresh = (account: string, conversationId: string, jobIds: string[], jobId: string | null, active: boolean): Entry => ({
-  account,
-  conversationId,
-  jobIds,
-  jobId,
-  cancel: null,
-  active,
-  status: "queued",
-  steps: [],
-  reply: "",
-  error: null,
-  liveView: null,
-  approval: null,
-});
-
-type NewJob = Record<string, unknown> & { id: string; prompt: string };
-
-// A conversation's jobs, oldest first, that this chat doesn't have yet.
-const newJobs = (rows: Record<string, unknown>[], known: string[]): NewJob[] =>
-  rows.filter((row): row is NewJob => typeof row.id === "string" && typeof row.prompt === "string" && !known.includes(row.id));
-
-// How a job that's over ended, as the chat says it.
-const endError = (status: CloudJobStatus, error: string | null): string | null =>
-  status === "failed" ? (error ?? FAILED) : status === "stopped" ? error : null;
-
 export class RunnerJobs implements ChatRunner {
   private readonly entries = new Map<string, Entry>();
   // Answered here and on its way, so a poll that crosses it doesn't bring the card back.
   private readonly answered = new Set<string>();
-  private timer: ReturnType<typeof setTimeout> | null = null;
-  private polling = false;
   private readonly discoverTimer: ReturnType<typeof setInterval>;
-  private discovering = false;
   private readonly forgotten: string[] = [];
   // Who was signed in when the account last changed, so a change clears what the last one saw.
   private seenAccount: string | null;
@@ -128,22 +52,12 @@ export class RunnerJobs implements ChatRunner {
   private link: { email: string; accepted: boolean; relayUrl: string | null } | null = null;
   private linkProblem: string | null = null;
   private linkTimer: ReturnType<typeof setTimeout> | null = null;
-  // What was last shared, and by whom, so an unchanged list isn't sent again.
-  private sharedMascots: string | null = null;
-  // What was last sent of each routine, by key, and for which account. Its first time isn't part of it, as the server
-  // owns when it's due. `reconciled` is the set of keys last checked against the server's, null until that's worked.
-  private sharedRoutines: { account: string; rows: Map<string, string>; reconciled: string | null } | null = null;
-  private routinesSending: Promise<void> | null = null;
-  // Routines that may be in the cloud, by key: sent there, and not yet known to be gone. Saved, so one turned off before
-  // a restart stays held back here until the server confirms it's gone.
-  private readonly routinesThere = new Set<string>();
-  // Routines whose last send failed.
-  private readonly routinesFailed = new Set<string>();
-  private routinesAgain = false;
-  private mascotsSending: Promise<void> | null = null;
-  private mascotsAgain = false;
   // Quitting. Nothing that comes back after it is used, and nothing is asked again.
   private destroyed = false;
+  // Each does one part of the work, through what RunnerJobs hands it.
+  private readonly sharing: CloudSharing;
+  private readonly discovery: RunnerDiscovery;
+  private readonly polls: RunnerPolls;
 
   constructor(
     private readonly server: GalleryServer | null,
@@ -152,6 +66,25 @@ export class RunnerJobs implements ChatRunner {
     private readonly hooks: RunnerJobsHooks,
     private readonly pollMs = POLL_MS,
   ) {
+    const parts: RunnerParts = {
+      server,
+      hooks,
+      entries: this.entries,
+      forgotten: this.forgotten,
+      answered: this.answered,
+      pollMs: this.pollMs,
+      signedIn: () => this.signedIn,
+      mine: (entry): entry is Entry => this.mine(entry),
+      available: () => this.available(),
+      link: () => this.link,
+      destroyed: () => this.destroyed,
+      withToken: (account, call) => this.withToken(account, call),
+      save: () => this.save(),
+      schedule: () => this.schedule(),
+    };
+    this.sharing = new CloudSharing(parts);
+    this.discovery = new RunnerDiscovery(parts);
+    this.polls = new RunnerPolls(parts);
     this.seenAccount = this.signedIn;
     this.load();
     this.schedule();
@@ -199,8 +132,8 @@ export class RunnerJobs implements ChatRunner {
       if (this.destroyed) return this.runnerState;
       if (link && this.signedIn === account) this.link = link.found;
       // No runner has accepted, so nothing in the cloud can run a routine, and none needs holding back here.
-      if (link && this.signedIn === account && !link.found?.accepted && this.routinesThere.size > 0) {
-        this.routinesThere.clear();
+      if (link && this.signedIn === account && !link.found?.accepted && this.sharing.routinesThere.size > 0) {
+        this.sharing.routinesThere.clear();
         this.save();
         this.hooks.routinesSettled?.();
       }
@@ -240,116 +173,20 @@ export class RunnerJobs implements ChatRunner {
     return this.refreshLink();
   }
 
-  // Shares the mascots with the phone page, only while signed in with a runner that has accepted, and only if it changed.
-  // A mascot's name, look, instructions and limits go, and nothing it remembers. One send at a time, and a change that
-  // comes in meanwhile is sent after it, so an older list never lands after a newer one.
-  // Keeps the routines that run in the cloud there, one call per routine that changed or went, one round at a time.
-  async routinesChanged(): Promise<void> {
-    if (this.routinesSending) {
-      this.routinesAgain = true;
-      return this.routinesSending;
-    }
-    this.routinesSending = (async () => {
-      do {
-        this.routinesAgain = false;
-        await this.shareRoutines();
-      } while (this.routinesAgain);
-    })().finally(() => {
-      this.routinesSending = null;
-    });
-    return this.routinesSending;
+  routinesChanged(): Promise<void> {
+    return this.sharing.routinesChanged();
   }
 
-  private async shareRoutines(): Promise<void> {
-    const account = this.signedIn;
-    if (!account || !this.link?.accepted || !this.hooks.routines) return;
-    const rows = this.hooks.routines();
-    if (!rows) return;
-    if (this.sharedRoutines?.account !== account) this.sharedRoutines = { account, rows: new Map(), reconciled: null };
-    const shared = this.sharedRoutines;
-    const before = JSON.stringify([[...this.routinesThere].sort(), [...this.routinesFailed].sort()]);
-    for (const row of rows) {
-      const shape = JSON.stringify({ ...row, firstRunAt: null });
-      if (shared.rows.get(row.key) === shape) continue;
-      // Tried again on the next change or the next look at the link.
-      const synced = await this.withToken(account, (token) => this.server!.syncCloudRoutine(token, row).then(() => true));
-      if (this.destroyed) return;
-      if (synced) {
-        shared.rows.set(row.key, shape);
-        this.routinesThere.add(row.key);
-        this.routinesFailed.delete(row.key);
-      } else this.routinesFailed.add(row.key);
-    }
-    await this.reconcileRoutines(account, shared, rows);
-    if (this.destroyed) return;
-    [...this.routinesFailed].filter((key) => !rows.some((row) => row.key === key)).forEach((key) => this.routinesFailed.delete(key));
-    if (JSON.stringify([[...this.routinesThere].sort(), [...this.routinesFailed].sort()]) !== before) {
-      this.save();
-      this.hooks.routinesSettled?.();
-    }
-  }
-
-  private async reconcileRoutines(
-    account: string,
-    shared: NonNullable<RunnerJobs["sharedRoutines"]>,
-    rows: CloudRoutineRow[],
-  ): Promise<void> {
-    // Anything there that this no longer has goes, checked against the server's own keys, so one deleted or turned off
-    // while it couldn't be reached, or before a restart, still goes. Only when the keys here change, or until it's worked.
-    const keys = rows.map(({ key }) => key);
-    const local = JSON.stringify([...keys].sort());
-    if (shared.reconciled === local) return;
-    const there = await this.withToken(account, (token) => this.server!.myCloudRoutineKeys(token));
-    if (!there) return;
-    // Whatever the server doesn't have is known to be gone.
-    [...this.routinesThere].filter((key) => !there.includes(key)).forEach((key) => this.routinesThere.delete(key));
-    there.forEach((key) => this.routinesThere.add(key));
-    let gone = true;
-    for (const key of there.filter((key) => !keys.includes(key))) {
-      const forgotten = await this.withToken(account, (token) => this.server!.forgetCloudRoutine(token, key).then(() => true));
-      if (forgotten) {
-        shared.rows.delete(key);
-        this.routinesThere.delete(key);
-      } else gone = false;
-    }
-    if (gone) shared.reconciled = local;
-  }
-
-  // A routine that may still be in the cloud, where it could run. One turned off stays so until the server says it's gone.
   stillInCloud(key: string): boolean {
-    return this.routinesThere.has(key);
+    return this.sharing.stillInCloud(key);
   }
 
   cloudFailed(key: string): boolean {
-    return this.routinesFailed.has(key);
+    return this.sharing.cloudFailed(key);
   }
 
-  async mascotsChanged(): Promise<void> {
-    if (this.mascotsSending) {
-      this.mascotsAgain = true;
-      return this.mascotsSending;
-    }
-    this.mascotsSending = (async () => {
-      do {
-        this.mascotsAgain = false;
-        await this.shareMascots();
-      } while (this.mascotsAgain);
-    })().finally(() => {
-      this.mascotsSending = null;
-    });
-    return this.mascotsSending;
-  }
-
-  private async shareMascots(): Promise<void> {
-    const account = this.signedIn;
-    if (!account || !this.link?.accepted || !this.hooks.mascots) return;
-    const rows = sharedMascotRows(this.hooks.mascots());
-    const shared = JSON.stringify([account, rows]);
-    if (shared === this.sharedMascots) return;
-    this.sharedMascots = shared;
-    const sent = await this.withToken(account, (token) => this.server!.syncCloudMascots(token, rows).then(() => true));
-    // Tried again on the next change or the next look at the link.
-    if (!sent && this.sharedMascots === shared) this.sharedMascots = null;
+  mascotsChanged(): Promise<void> {
+    return this.sharing.mascotsChanged();
   }
 
   has(chatId: string): boolean {
@@ -378,7 +215,13 @@ export class RunnerJobs implements ChatRunner {
     const earlierEntry = this.entries.get(chatId);
     if (earlierEntry && earlierEntry.account !== account) return OTHER_ACCOUNT(earlierEntry.account);
     // It shows as going at once, while it's sent, in the same conversation as the chat's earlier jobs.
-    const entry = fresh(account, earlierEntry?.conversationId ?? randomUUID(), earlierEntry?.jobIds ?? [], null, true);
+    const entry = fresh({
+      account,
+      conversationId: earlierEntry?.conversationId ?? randomUUID(),
+      jobIds: earlierEntry?.jobIds ?? [],
+      jobId: null,
+      active: true,
+    });
     this.entries.set(chatId, entry);
     const fail = (problem: string) => {
       entry.active = false;
@@ -407,7 +250,7 @@ export class RunnerJobs implements ChatRunner {
       } catch (error) {
         // The conversation went on elsewhere since this chat last looked. That's brought in first, so this message comes
         // after it and carries it, and it's sent once more.
-        if (!(error instanceof ServerError && error.status === 409) || !(await this.catchUp(account, chatId, entry))) throw error;
+        if (!(error instanceof ServerError && error.status === 409) || !(await this.discovery.catchUp(account, chatId, entry))) throw error;
         jobId = await send();
       }
       if (!jobId) return fail(NOT_TAKEN);
@@ -494,9 +337,8 @@ export class RunnerJobs implements ChatRunner {
   destroy(): void {
     this.destroyed = true;
     clearInterval(this.discoverTimer);
-    if (this.timer) clearTimeout(this.timer);
+    this.polls.stop();
     if (this.linkTimer) clearTimeout(this.linkTimer);
-    this.timer = null;
     this.linkTimer = null;
   }
 
@@ -521,200 +363,18 @@ export class RunnerJobs implements ChatRunner {
   }
 
   private schedule(): void {
-    if (this.destroyed || this.timer || !this.server) return;
-    if (![...this.entries.values()].some((entry) => entry.active && entry.jobId && this.mine(entry))) return;
-    this.timer = setTimeout(() => {
-      this.timer = null;
-      void this.poll().finally(() => this.schedule());
-    }, this.pollMs);
+    this.polls.schedule();
   }
 
-  private async poll(): Promise<void> {
-    const account = this.signedIn;
-    if (this.polling || !account) return;
-    const going = [...this.entries].filter(([, entry]) => entry.active && entry.jobId && entry.account === account);
-    if (going.length === 0) return;
-    this.polling = true;
-    try {
-      const rows = await this.withToken(account, (token) =>
-        this.server!.cloudJobs(
-          token,
-          going.map(([, entry]) => entry.jobId!),
-        ),
-      );
-      // Someone else signed in while it was asking, so none of this is theirs.
-      if (rows && this.signedIn === account)
-        going.forEach(([chatId, entry]) =>
-          this.read(
-            chatId,
-            entry,
-            rows.find((row) => row.id === entry.jobId),
-          ),
-        );
-    } finally {
-      this.polling = false;
-    }
-  }
-
-  private read(chatId: string, entry: Entry, row: Record<string, unknown> | undefined): void {
-    // Asked as the account that sent it, so it was deleted.
-    if (!row) return this.finish(chatId, entry, GONE);
-    const status = typeof row.status === "string" ? (row.status as CloudJobStatus) : entry.status;
-    const approval = approvalFromRow(row);
-    const next: Omit<Entry, "account" | "conversationId" | "jobIds" | "jobId" | "cancel" | "active"> = {
-      status,
-      steps: stepsFromRow(row.steps),
-      reply: typeof row.reply === "string" ? row.reply : "",
-      error: typeof row.error === "string" ? row.error : null,
-      liveView: typeof row.live_view_url === "string" ? row.live_view_url : null,
-      approval: approval && !this.answered.has(approval.id) ? approval : null,
-    };
-    const same =
-      JSON.stringify(next) ===
-      JSON.stringify({
-        status: entry.status,
-        steps: entry.steps,
-        reply: entry.reply,
-        error: entry.error,
-        liveView: entry.liveView,
-        approval: entry.approval,
-      });
-    Object.assign(entry, next);
-    if (FINISHED.includes(status)) return this.finish(chatId, entry, endError(status, entry.error));
-    if (!same) this.hooks.changed(chatId);
-  }
-
-  private finish(chatId: string, entry: Entry, error: string | null): void {
-    entry.active = false;
-    entry.approval = null;
-    entry.liveView = null;
-    this.save();
-    this.hooks.finished(chatId, { reply: entry.reply, steps: entry.steps, error });
-  }
-
-  // Looks for conversations on the account that this computer didn't send, or that went on elsewhere: a job from the phone
-  // becomes a runner chat here, and a follow-up from there joins the chat it follows. Only while a linked runner has
-  // accepted, as the signed-in account, and never for a chat with a job going or being sent from here.
-  async discover(): Promise<void> {
-    const account = this.signedIn;
-    if (this.discovering || !account || !this.available()) return;
-    this.discovering = true;
-    try {
-      const listed = await this.withToken(account, (token) => this.server!.cloudConversationJobs(token));
-      if (!listed) return;
-      const conversations = new Map<string, string[]>();
-      listed.forEach(({ id, conversation_id: conversationId }) =>
-        conversations.set(conversationId, [...(conversations.get(conversationId) ?? []), id]),
-      );
-      for (const [conversationId, jobIds] of conversations) {
-        if (this.signedIn !== account) return;
-        const known = this.chatOf(account, conversationId)?.[1];
-        if (this.forgotten.includes(conversationId) || known?.active || (known && jobIds.every((id) => known.jobIds.includes(id))))
-          continue;
-        const rows = await this.withToken(account, (token) => this.server!.cloudConversation(token, conversationId));
-        if (rows && this.signedIn === account) this.take(account, conversationId, rows);
-      }
-    } finally {
-      this.discovering = false;
-    }
-  }
-
-  private chatOf(account: string, conversationId: string): [string, Entry] | undefined {
-    return [...this.entries].find(([, entry]) => entry.account === account && entry.conversationId === conversationId);
-  }
-
-  // A conversation's jobs, oldest first, as the server has them now. What's new to this computer is saved as the chat
-  // would have saved it, and a job still going is followed like one sent from here.
-  private take(account: string, conversationId: string, rows: Record<string, unknown>[]): void {
-    let found = this.chatOf(account, conversationId);
-    // Checked again, since a message may have been sent from here while it asked.
-    if (this.forgotten.includes(conversationId) || found?.[1].active) return;
-    const fresher = newJobs(rows, found?.[1].jobIds ?? []);
-    if (fresher.length === 0) return;
-    if (!found) {
-      const mascotId = (fresher[0].mascot as { id?: unknown } | null)?.id;
-      const chatId = this.hooks.adopt?.({ prompt: fresher[0].prompt, mascotId: typeof mascotId === "string" ? mascotId : null });
-      if (!chatId) return;
-      found = [chatId, fresh(account, conversationId, [], null, false)];
-      this.entries.set(...found);
-    }
-    this.apply(...found, fresher);
-  }
-
-  // While a message from here is being sent: brings in what was sent in the chat's conversation elsewhere since its newest
-  // job here. False if a job there is still going, so this one can't go yet, or it couldn't be read.
-  private async catchUp(account: string, chatId: string, entry: Entry): Promise<boolean> {
-    const rows = await this.withToken(account, (token) => this.server!.cloudConversation(token, entry.conversationId));
-    if (!rows || this.signedIn !== account || this.entries.get(chatId) !== entry) return false;
-    const fresher = newJobs(rows, entry.jobIds);
-    if (fresher.length === 0 || fresher.some((row) => !FINISHED.includes(row.status as CloudJobStatus))) return false;
-    this.apply(chatId, entry, fresher);
-    return true;
-  }
-
-  // Saves jobs new to this chat in order: each one's message, then how it ended, or follows the one still going.
-  private apply(chatId: string, entry: Entry, fresher: NewJob[]): void {
-    for (const row of fresher) {
-      entry.jobIds.push(row.id);
-      this.hooks.followedUp?.(chatId, row.prompt);
-      const status = (typeof row.status === "string" ? row.status : "failed") as CloudJobStatus;
-      if (FINISHED.includes(status)) {
-        this.hooks.finished(chatId, {
-          reply: typeof row.reply === "string" ? row.reply : "",
-          steps: stepsFromRow(row.steps),
-          error: endError(status, typeof row.error === "string" ? row.error : null),
-        });
-        continue;
-      }
-      // Only one in a conversation goes at a time, and it's the newest.
-      Object.assign(entry, { jobId: row.id, active: true, status, steps: [], reply: "", error: null, liveView: null, approval: null });
-      this.hooks.changed(chatId);
-      break;
-    }
-    this.save();
-    this.schedule();
+  discover(): Promise<void> {
+    return this.discovery.discover();
   }
 
   private load(): void {
-    try {
-      const saved = JSON.parse(readFileSync(this.file, "utf8"));
-      const id = (value: unknown): value is string => typeof value === "string" && value.length > 0 && value.length <= 100;
-      Object.entries(saved?.chats ?? {}).forEach(([chatId, value]) => {
-        const { account, jobId, active, conversationId, jobIds } = (value ?? {}) as Record<string, unknown>;
-        if (typeof account !== "string" || (jobId !== null && !id(jobId))) return;
-        const known = Array.isArray(jobIds) ? jobIds.filter(id) : id(jobId) ? [jobId] : [];
-        // A chat saved before conversations is one under its job's id, which is what the server makes of it too.
-        const conversation = id(conversationId) ? conversationId : id(jobId) ? jobId : null;
-        if (conversation)
-          this.entries.set(chatId, fresh(account, conversation, known, id(jobId) ? jobId : null, id(jobId) && active === true));
-      });
-      if (Array.isArray(saved?.forgotten)) this.forgotten.push(...saved.forgotten.filter(id).slice(-MAX_FORGOTTEN));
-      if (Array.isArray(saved?.routinesInCloud))
-        saved.routinesInCloud
-          .filter(id)
-          .slice(0, 100)
-          .forEach((key: string) => this.routinesThere.add(key));
-    } catch {
-      // Nothing sent there yet.
-    }
+    loadRunnerJobs(this.file, { entries: this.entries, forgotten: this.forgotten, routinesThere: this.sharing.routinesThere });
   }
 
   private save(): void {
-    try {
-      mkdirSync(dirname(this.file), { recursive: true });
-      const chats = Object.fromEntries(
-        [...this.entries]
-          .filter(([, entry]) => entry.jobIds.length > 0)
-          .map(([chatId, { account, conversationId, jobIds, jobId, active }]) => [
-            chatId,
-            { account, conversationId, jobIds, jobId, active: active && !!jobId },
-          ]),
-      );
-      const temp = `${this.file}.tmp`;
-      writeFileSync(temp, JSON.stringify({ chats, forgotten: this.forgotten, routinesInCloud: [...this.routinesThere] }));
-      renameSync(temp, this.file);
-    } catch {
-      console.error("Couldn't save which chats are on the runner.");
-    }
+    saveRunnerJobs(this.file, { entries: this.entries, forgotten: this.forgotten, routinesThere: this.sharing.routinesThere });
   }
 }

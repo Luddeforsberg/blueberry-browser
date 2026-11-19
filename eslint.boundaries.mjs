@@ -21,8 +21,10 @@ const ELECTRON_FOLDERS = main("window", "menus", "tabs", "desktop", "index.ts");
 const ELECTRON_ADAPTERS = main(
   "account/Account.ts",
   "cloud/CloudTabs.ts",
+  "cloud/cloudFile.ts",
   "cloud/cloudLoginAccess.ts",
   "phone/TelegramChannel.ts",
+  "phone/telegramFile.ts",
   "mcp/McpConnector.ts",
   "settings/AiKey.ts",
   "settings/sessionHandlers.ts",
@@ -150,7 +152,7 @@ const rules = [
       "window/makeAccount.ts",
       "window/SettingsChanges.ts",
     ],
-    "No tool, mascot, app or phone can reach the AI key: agent.ts gets it through setSavedKeyReader.",
+    "No tool, mascot, app or phone can reach the AI key: modelConfig.ts gets it through setSavedKeyReader.",
   ),
   onlyFrom(
     "history import",
@@ -168,6 +170,12 @@ const rules = [
     "the Telegram bot",
     file("TelegramChannel"),
     ["phone/TelegramChannel.test.ts", "window/Window.ts", "window/WindowParts.ts", "window/makeAccount.ts"],
+    "The bot's token never leaves main, Phone knows nothing about Telegram, and MCP can't reach it.",
+  ),
+  onlyFrom(
+    "the Telegram bot's file",
+    file("telegramFile"),
+    ["phone/TelegramChannel.ts"],
     "The bot's token never leaves main, Phone knows nothing about Telegram, and MCP can't reach it.",
   ),
   onlyFrom(
@@ -277,6 +285,18 @@ const rules = [
     file("CloudTabs"),
     ["cloud/CloudTabs.test.ts", "index.ts", "window/Window.ts", "window/WindowParts.ts", "window/makeCloud.ts"],
     "The cloud's key and live view go to the chrome only, never to a tool or a chat.",
+  ),
+  onlyFrom(
+    "the cloud's settings file",
+    file("cloudFile"),
+    ["cloud/CloudTabs.ts"],
+    "The cloud's key and live view go to the chrome only, never to a tool or a chat.",
+  ),
+  onlyFrom(
+    "the parts of RunnerJobs",
+    file("CloudSharing", "RunnerDiscovery", "RunnerPolls", "runnerJobsFile", "runnerTypes", "runnerJobsTesting"),
+    ["remoteJobs"],
+    "Everything outside remoteJobs/ goes through RunnerJobs, which holds the runner's link and whose session each call goes out with.",
   ),
 ];
 

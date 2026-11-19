@@ -1,9 +1,9 @@
 import { randomBytes } from "crypto";
 import { app, safeStorage, shell } from "electron";
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "fs";
-import { dirname } from "path";
+import { rmSync } from "fs";
 import type { PhoneState } from "../../shared/ipc";
 import type { IncomingChoice, IncomingReply, PhoneChannel, PhoneChoice } from "./Phone";
+import { readTelegramFile, writeTelegramFile, type Saved } from "./telegramFile";
 
 // The user's own Telegram bot, reached from here with long polling, so no server of ours is involved. The token only
 // ever goes in the address of these requests and, encrypted, into one file. Nothing logs either, and no error from a
@@ -62,12 +62,6 @@ interface Update {
   update_id: number;
   message?: Message;
   callback_query?: { id: string; from: { id: number }; message?: { message_id: number; chat: { id: number } }; data?: string };
-}
-
-interface Saved {
-  token: string;
-  botName: string | null;
-  chatId: number | null;
 }
 
 // Ends early on abort. Either way the other is undone, so a poller that backs off for long doesn't gather listeners.
@@ -376,34 +370,11 @@ export class TelegramChannel implements PhoneChannel {
   }
 
   private load(): Saved | null {
-    try {
-      const { token, botName, chatId } = JSON.parse(readFileSync(this.file, "utf8"));
-      if (typeof token !== "string" || !safeStorage.isEncryptionAvailable()) return null;
-      return {
-        token: safeStorage.decryptString(Buffer.from(token, "base64")),
-        botName: typeof botName === "string" ? botName : null,
-        chatId: typeof chatId === "number" ? chatId : null,
-      };
-    } catch {
-      return null;
-    }
+    return readTelegramFile(this.file);
   }
 
   private save(): void {
     if (this.token === null) return;
-    try {
-      mkdirSync(dirname(this.file), { recursive: true });
-      const temp = `${this.file}.tmp`;
-      writeFileSync(
-        temp,
-        JSON.stringify({ token: safeStorage.encryptString(this.token).toString("base64"), botName: this.botName, chatId: this.chatId }),
-        { mode: 0o600 },
-      );
-      renameSync(temp, this.file);
-      this.notSaved = false;
-    } catch {
-      this.notSaved = true;
-      console.error("Couldn't save the phone connection.");
-    }
+    this.notSaved = !writeTelegramFile(this.file, { token: this.token, botName: this.botName, chatId: this.chatId });
   }
 }
