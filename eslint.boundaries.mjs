@@ -135,7 +135,7 @@ const rules = [
   onlyFrom(
     "codeEntry.ts",
     file("codeEntry"),
-    ["chats/Chats.ts"],
+    ["chats/Handoffs.ts"],
     "A code goes from a reply through Chats.enterCode alone: no tool can reach it.",
   ),
   onlyFrom(
@@ -147,14 +147,14 @@ const rules = [
   onlyFrom(
     "the phone",
     file("Phone"),
-    ["phone/TelegramChannel.ts", "window/Window.ts", "chats/Chats.ts"],
+    ["phone/TelegramChannel.ts", "window/Window.ts", "chats/Handoffs.ts"],
     "MCP and the tools can't reach the phone.",
   ),
   onlyFrom("the desktop mascot", folder("desktop"), ["desktop", "window/Window.ts"], "No tool can reach the desktop mascot."),
   onlyFrom(
     "memory",
     folder("memory"),
-    ["memory", "chats/Chats.ts", "window/Window.ts"],
+    ["memory", "chats/jobMemory.ts", "window/Window.ts"],
     "No tool or mascot can reach what a mascot remembers.",
   ),
   onlyFrom(
@@ -177,7 +177,7 @@ const rules = [
   ),
   onlyFrom(
     "attachments",
-    file("Attachments", "attachmentPrompt"),
+    file("Attachments"),
     [
       "chats/Chats.ts",
       "chats/ChatStore.ts",
@@ -187,6 +187,32 @@ const rules = [
       "window/pictures.ts",
     ],
     "Attachments have no tool, and don't reach the phone, Telegram, MCP or the relay.",
+  ),
+  onlyFrom(
+    "what an attachment says to the model",
+    file("attachmentPrompt"),
+    ["chats/modelMessages.ts"],
+    "Attachments have no tool, and don't reach the phone, Telegram, MCP or the relay.",
+  ),
+  onlyFrom(
+    "the parts of Chats",
+    file(
+      "Replies",
+      "Jobs",
+      "Handoffs",
+      "JobTools",
+      "Approvals",
+      "RunnerChats",
+      "modelMessages",
+      "jobMemory",
+      "WorkView",
+      "chatTitles",
+      "chatTypes",
+      "chatsTesting",
+      "attachedTabsTesting",
+    ),
+    ["chats"],
+    "Everything outside chats/ goes through Chats, which decides who may answer, hand back or enter a code.",
   ),
   onlyFrom(
     "site permissions",
