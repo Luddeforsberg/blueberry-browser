@@ -152,7 +152,7 @@ const statusOf = (waiting: WaitingRun | undefined, running: boolean, ended: Task
 
 const FEATURES = [
   {
-    name: "The flock",
+    name: "The mascots",
     what: "Mascots the user made, each with instructions and limits on where it may go and what it may do. list_agents names them, and run_agent gives one a job.",
   },
   {
@@ -182,7 +182,7 @@ const FEATURES = [
   { name: "Routines", what: "Saved jobs on a schedule or on demand. list_routines and run_routine." },
   {
     name: "Memory",
-    what: "Things the user chose to let their birds remember about how they like things done. get_user_profile reads it. Nothing here can change it.",
+    what: "Things the user chose to let their mascots remember about how they like things done. get_user_profile reads it. Nothing here can change it.",
   },
   { name: "Browsing context", what: "Read-only: get_open_tabs, read_page, search_history, get_recent_activity and get_bookmarks." },
 ];
@@ -303,7 +303,7 @@ export const createMcpTools = (host: McpHost): McpTool[] => {
   const tools: McpTool[] = [
     {
       name: "list_agents",
-      title: "List the flock",
+      title: "List the mascots",
       description:
         "The user's mascots (agents) in Blueberry: each one's name, what it's for, the sites it may use and what it may do, in words. Berry is always first and has no limits.",
       shape: {},
@@ -613,7 +613,7 @@ export const createMcpTools = (host: McpHost): McpTool[] => {
     },
     {
       name: "get_user_profile",
-      title: "What the birds remember",
+      title: "What the mascots remember",
       description:
         "What the user chose to let their mascots remember about how they like things done, by mascot. The user wrote or approved every word. Read-only.",
       shape: {},

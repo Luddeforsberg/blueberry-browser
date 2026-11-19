@@ -93,9 +93,9 @@ export const createRelayTools = (host: RelayHost): McpTool[] => {
   return [
     {
       name: "list_agents",
-      title: "List the flock",
+      title: "List the mascots",
       description:
-        "The user's birds (agents) in Blueberry, as their Mac last shared them: each one's name, what it's for, and the sites it may use and what it may do, in words. Berry is always first and has no limits.",
+        "The user's mascots (agents) in Blueberry, as their Mac last shared them: each one's name, what it's for, and the sites it may use and what it may do, in words. Berry is always first and has no limits.",
       shape: {},
       readOnly: true,
       run: async () => {
@@ -105,17 +105,17 @@ export const createRelayTools = (host: RelayHost): McpTool[] => {
     },
     {
       name: "start_job",
-      title: "Give a bird a job",
+      title: "Give a mascot a job",
       description:
-        'Start a job for one of the user\'s birds, by name or id from list_agents, or Berry if you leave it out. `where` says where it runs. "cloud": in a browser in the cloud, signed in only to the sites the user brought there, and it keeps going with their computer off. "mac": in Blueberry on the user\'s own Mac, with their real tabs and sign-ins, only while it\'s open and they\'ve allowed it, and otherwise you get an error saying so. "auto", the default: the Mac if it\'s available, and the cloud if not. Either way it asks the user before anything risky. `sites` keeps it to those sites, and can only narrow what the bird may do. Returns a job id at once, and where it went: check on it with get_job.',
+        'Start a job for one of the user\'s mascots, by name or id from list_agents, or Berry if you leave it out. `where` says where it runs. "cloud": in a browser in the cloud, signed in only to the sites the user brought there, and it keeps going with their computer off. "mac": in Blueberry on the user\'s own Mac, with their real tabs and sign-ins, only while it\'s open and they\'ve allowed it, and otherwise you get an error saying so. "auto", the default: the Mac if it\'s available, and the cloud if not. Either way it asks the user before anything risky. `sites` keeps it to those sites, and can only narrow what the mascot may do. Returns a job id at once, and where it went: check on it with get_job.',
       shape: {
         task: z.string().min(1).max(MAX_TASK_LENGTH).describe("What to do, in plain words, as you'd ask a person."),
-        agent: z.string().max(100).optional().describe("The bird's name or id. Leave out for Berry."),
+        agent: z.string().max(100).optional().describe("The mascot's name or id. Leave out for Berry."),
         sites: z
           .array(z.string().max(200))
           .max(MAX_SITES)
           .optional()
-          .describe("Only these sites, such as example.com. Leave out for the bird's own."),
+          .describe("Only these sites, such as example.com. Leave out for the mascot's own."),
         where: z
           .enum(["auto", "mac", "cloud"])
           .optional()
@@ -130,7 +130,7 @@ export const createRelayTools = (host: RelayHost): McpTool[] => {
           .slice(0, MAX_TASK_LENGTH);
         if (!prompt) return failed("Say what the job is.", "Empty task");
         const mascot = findMascot(await host.mascots(), typeof agent === "string" ? agent : undefined);
-        if (!mascot) return failed(`There's no bird called ${String(agent)}. list_agents names them.`, "No such mascot");
+        if (!mascot) return failed(`There's no mascot called ${String(agent)}. list_agents names them.`, "No such mascot");
         const parsed = sitesFromApp(sites);
         if ("bad" in parsed) return failed(`“${parsed.bad}” doesn't look like a site. Try something like example.com.`, "Bad site");
         // Only ever narrower: a mascot kept to some sites can't be sent anywhere else.

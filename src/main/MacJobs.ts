@@ -20,8 +20,8 @@ const FINAL_TRIES = 5;
 // What the chat says it came from.
 export const RELAY_FROM = "ChatGPT or Claude";
 
-const NO_MASCOT = "That bird isn't in Blueberry on the Mac, so the job didn't start.";
-const BAD_MASCOT = "This job's bird didn't pass Blueberry's checks, so it didn't start.";
+const NO_MASCOT = "That mascot isn't in Blueberry on the Mac, so the job didn't start.";
+const BAD_MASCOT = "This job's mascot didn't pass Blueberry's checks, so it didn't start.";
 const OFF_BEFORE = "Jobs from ChatGPT and Claude were turned off on the Mac before this one started.";
 const QUIT_BEFORE = "Blueberry quit on the Mac before this job started.";
 const SWITCHED_OFF = "Jobs from ChatGPT and Claude were turned off on the Mac, so it stopped there.";

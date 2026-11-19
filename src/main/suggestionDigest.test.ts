@@ -177,7 +177,7 @@ describe("chats, routines, the mascots and feedback", () => {
   });
 
   it("say how each went, with ids", () => {
-    const { chats, routines, flock, feedback } = data({
+    const { chats, routines, mascots, feedback } = data({
       chats: [
         { id: "a", title: "Cheap flights to Lisbon", updatedAt: at(1, 9), outcome: "failed" },
         { id: "b", title: "Summarise the report", updatedAt: at(2, 9), outcome: "done" },
@@ -211,7 +211,7 @@ describe("chats, routines, the mascots and feedback", () => {
       expect.not.objectContaining({ outcome: expect.anything() }),
     ]);
     expect(routines[0]).toMatchObject({ id: "r1", name: "Price watch", lastRuns: [{ result: "failed" }, { result: "failed" }] });
-    expect(flock).toEqual([{ id: "m1", name: "Ada", sites: ["github.com"] }]);
+    expect(mascots).toEqual([{ id: "m1", name: "Ada", sites: ["github.com"] }]);
     expect(feedback[0]).toMatchObject({ id: "f1", dismissed: true, line: "Shall I read Hacker News?" });
   });
 });
