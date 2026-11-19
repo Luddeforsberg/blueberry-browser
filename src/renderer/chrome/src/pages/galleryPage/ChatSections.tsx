@@ -15,6 +15,7 @@ import { WorkingStrip, WorkingView } from "../../components/WorkingView";
 import { RecordingNotice, TrailNotes } from "../../components/ShowBerry";
 import { Section } from "./Section";
 import { SAMPLE_FACTS, SAMPLE_MASCOT, SAMPLE_RUNS, SAMPLE_FRAMES, SAMPLE_ASKING, WORK_SAMPLES } from "./gallerySamples";
+import { missing } from "@shared/missing";
 
 // A chat and what it shows: replies, Show Berry how, the working view, memory and routines.
 export const ChatSections: React.FC<{
@@ -139,7 +140,7 @@ export const ChatSections: React.FC<{
         ))}
       </div>
       <div className="mt-8 w-[560px]">
-        <WorkingStrip view={WORK_SAMPLES[0].view} mascot={BERRY} approval={null} />
+        <WorkingStrip view={(WORK_SAMPLES[0] ?? missing("a working sample")).view} mascot={BERRY} approval={null} />
       </div>
     </Section>
 
@@ -171,7 +172,12 @@ export const ChatSections: React.FC<{
         <MemoryOffersLine offers={[]} mascot={SAMPLE_MASCOT} kept onAnswer={() => undefined} />
         <RememberedFacts used={SAMPLE_FACTS.slice(0, 1)} />
         <RememberedFacts used={SAMPLE_FACTS} />
-        <RememberedFacts used={[...SAMPLE_FACTS, { ...SAMPLE_FACTS[0], id: "gallery-fact-3", text: "You never buy refurbished." }]} />
+        <RememberedFacts
+          used={[
+            ...SAMPLE_FACTS,
+            { ...(SAMPLE_FACTS[0] ?? missing("a sample fact")), id: "gallery-fact-3", text: "You never buy refurbished." },
+          ]}
+        />
         <MascotMemoryView mascot={SAMPLE_MASCOT} facts={[]} offers={[]} onBack={() => undefined} />
         <MascotMemoryView
           mascot={SAMPLE_MASCOT}

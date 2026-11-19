@@ -12,6 +12,7 @@ import { useAssistantName } from "./useAssistantName";
 import { Tooltip } from "@common/components/Tooltip";
 import { FOCUS } from "./chipClass";
 import { approvalWords, HANDOFF_TITLE } from "./approvalWords";
+import { missing } from "@shared/missing";
 
 // Part of the message layout (ChatMessage.tsx): the cards a job asks with, a question or a handoff.
 
@@ -59,7 +60,11 @@ export const QuestionCard: React.FC<{
   focusOnShow?: boolean;
 }> = ({ approval, name, onAnswer, onSkip, head, field, more, focusOnShow = false }) => {
   const answers = (approval.answers ?? []).slice(0, LETTERS.length);
-  const { region, on } = useCardKeys({ onPick: (index) => onAnswer(answers[index]), picks: answers.length, focusOnShow });
+  const { region, on } = useCardKeys({
+    onPick: (index) => onAnswer(answers[index] ?? missing(`answer ${index}`)),
+    picks: answers.length,
+    focusOnShow,
+  });
   const showKeys = on !== "none" && on !== "field";
   return (
     <CardInShell
@@ -91,7 +96,7 @@ export const QuestionCard: React.FC<{
                   FOCUS,
                 )}
               >
-                {showKeys && <Keycap>{LETTERS[index]}</Keycap>}
+                {showKeys && <Keycap>{LETTERS[index] ?? missing(`a letter for answer ${index}`)}</Keycap>}
                 <span className="min-w-0 truncate">{answer}</span>
               </button>
             </li>

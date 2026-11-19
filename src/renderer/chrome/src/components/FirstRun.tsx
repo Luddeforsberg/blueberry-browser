@@ -14,6 +14,7 @@ import { useHistoryImport } from "./useHistoryImport";
 import { StepCard, StepNav } from "./StepCard";
 import { LINK, Primary, LinkNav, Under, Says, Field, INPUT } from "./FirstRunParts";
 import { MakeItYours, MiniWindow, WhatICanSee } from "./FirstRunSettings";
+import { missing } from "@shared/missing";
 
 // DESIGN.md section 10, First run: Berry and one card in an empty window, a step at a time, in the card that makes a
 // mascot. Every step's answer is real: an account on the server, the look, a key the service has answered with, history
@@ -34,6 +35,9 @@ interface Start {
   browsers: boolean;
 }
 
+// It starts at a step there is, and goes on no further than the last.
+const stepAt = (steps: FirstRunStep[], at: number): FirstRunStep => steps[at] ?? missing(`first run step ${at}`);
+
 const Steps: React.FC<{ start: Start }> = ({ start }) => {
   const { settings, updateSettings } = useShell();
   const { steps, browsers } = start;
@@ -41,7 +45,7 @@ const Steps: React.FC<{ start: Start }> = ({ start }) => {
   const [from, setFrom] = useState<"next" | "back">("next");
   // Settings come back from main a moment later, so what's been passed is kept here as well.
   const passed = useRef(new Set(settings.firstRun));
-  const step = steps[at];
+  const step = stepAt(steps, at);
   const numbered: FirstRunStep[] = steps.filter((each) => each !== "meet");
   const label = step === "meet" ? "" : `${numbered.indexOf(step) + 1} / ${numbered.length}`;
 

@@ -8,6 +8,7 @@ import { cn } from "@common/lib/utils";
 import { Favicon } from "./Favicon";
 import { More, SettingsGroup, SettingsRow } from "./SettingsRow";
 import { useHistoryImport } from "./useHistoryImport";
+import { missing } from "@shared/missing";
 
 // What happens, in the one place both screens say it. The detail has to match `buildDigest` in suggestionDigest.ts.
 const IMPORT_NOTES = [
@@ -39,7 +40,7 @@ export const SourceRows: React.FC<{ history: HistoryImport; className?: string }
   if (!sources || !source) return null;
   const step = (by: number) => {
     if (busy) return;
-    const next = sources[(sources.indexOf(source) + by + sources.length) % sources.length];
+    const next = sources[(sources.indexOf(source) + by + sources.length) % sources.length] ?? missing("a browser to bring history from");
     choose(next.id);
     group.current?.querySelectorAll<HTMLElement>('[role="radio"]')[sources.indexOf(next)]?.focus();
   };

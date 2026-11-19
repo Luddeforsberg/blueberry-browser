@@ -88,8 +88,10 @@ const useJobHere = (tab: TabInfo | null) => {
   const { find } = useMascots();
   const working = !!tab?.berryWorking;
   // A job's own tab names its chat. On one of the user's tabs, it's the one running chat of that mascot, if there's one.
-  const running = chats.filter((chat) => chat.running && (chat.mascotId ?? BERRY_ID) === (tab?.workingMascotId ?? BERRY_ID));
-  const chatId = tab?.jobChatId ?? (working && running.length === 1 ? running[0].id : null);
+  const [running, ...alsoRunning] = chats.filter(
+    (chat) => chat.running && (chat.mascotId ?? BERRY_ID) === (tab?.workingMascotId ?? BERRY_ID),
+  );
+  const chatId = tab?.jobChatId ?? (working && running && alsoRunning.length === 0 ? running.id : null);
   const asking =
     needsYou.find((item) => !item.approval.handoff && (item.id === chatId || (item.tabId !== null && item.tabId === tab?.id))) ?? null;
   const turn = needsYou.find((item) => !!tab && item.approval.handoff?.tabId === tab.id) ?? null;

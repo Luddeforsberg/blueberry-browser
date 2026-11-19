@@ -2,6 +2,7 @@ import type { RecordedChange, RecordedDraft, Routine, RoutineDraft, RoutineSched
 import { routinesParam, type RoutinePart, type RoutinePlace } from "@shared/routinePlaces";
 import { withSiteNames } from "./siteNames";
 import { scheduleSentence, sentenceText } from "./scheduleWords";
+import { missing } from "@shared/missing";
 export { TIME_CHIPS, howOften, withHowOften, scheduleSentence, sentenceText, readBack, nextInWords } from "./scheduleWords";
 export type { HowOften } from "./scheduleWords";
 
@@ -115,8 +116,8 @@ const stepsText = ({ instructions, recorded = [] }: Pick<RoutineFormValues, "ins
 const sameKind = (char: string) => (/\p{L}/u.test(char) ? "\\p{L}" : /\p{N}/u.test(char) ? "\\p{N}" : null);
 const wholeValueAt = (text: string, value: string): number => {
   if (!value) return -1;
-  const before = sameKind(value[0]);
-  const after = sameKind(value[value.length - 1]);
+  const before = sameKind(value.charAt(0));
+  const after = sameKind(value.charAt(value.length - 1));
   const whole = `${before ? `(?<!${before})` : ""}${value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}${after ? `(?!${after})` : ""}`;
   if (value.includes("/")) return text.search(new RegExp(whole, "u"));
   for (const found of text.matchAll(new RegExp(`\\S*/[^\\s?]*|${whole}`, "gu"))) if (!found[0].includes("/")) return found.index ?? -1;
@@ -138,7 +139,9 @@ const askedFor = (instructions: string): RecordedChangeValue[] | undefined => {
   const asked: RecordedChange[] = [];
   let steps = instructions;
   for (let line = ASK_LINE.exec(steps); line; line = ASK_LINE.exec(steps)) {
-    asked.push({ label: line[1].charAt(0).toUpperCase() + line[1].slice(1), value: line[2] });
+    // Both groups take part in every match.
+    const label = line[1] ?? missing("an ask line's label");
+    asked.push({ label: label.charAt(0).toUpperCase() + label.slice(1), value: line[2] ?? missing("an ask line's value") });
     steps = steps.slice(line[0].length);
   }
   const rows = placed(
@@ -196,8 +199,8 @@ export const typedInto = (pieces: StepsPiece[], start: number, end: number, type
   const nextRows = [...rows.slice(0, start), ...Array<number | undefined>(typed.length).fill(into), ...after];
   return nextRows.reduce<StepsPiece[]>((built, row, at) => {
     const last = built.at(-1);
-    if (last && last.row === row) last.text += next[at];
-    else built.push(row === undefined ? { text: next[at] } : { text: next[at], row });
+    if (last && last.row === row) last.text += next.charAt(at);
+    else built.push(row === undefined ? { text: next.charAt(at) } : { text: next.charAt(at), row });
     return built;
   }, []);
 };

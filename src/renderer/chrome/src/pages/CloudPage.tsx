@@ -20,6 +20,7 @@ const useFitPage = (tabId: string, showing: boolean): React.RefObject<HTMLDivEle
     if (!showing || !element) return undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const observer = new ResizeObserver(([entry]) => {
+      if (!entry) return;
       const { width, height } = entry.contentRect;
       clearTimeout(timer);
       timer = setTimeout(() => void api().fit(tabId, Math.round(width), Math.round(height)), FIT_SETTLE_MS);

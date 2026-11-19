@@ -1,3 +1,5 @@
+import { missing } from "@shared/missing";
+
 // The app's icon as a PNG data address, `size` pixels square, from an AppIcon (components/AppIcon.tsx) on the page. Its
 // colours are tokens, which only the page can resolve, so each is written in as the page computed it before the drawing
 // goes to a canvas. As the systems' own icons are, the square is inset by about a tenth and stands on a soft shadow.
@@ -7,8 +9,10 @@ export async function iconPicture(svg: SVGSVGElement, size: number): Promise<str
   const copies = [copy, ...copy.querySelectorAll("*")];
   originals.forEach((element, at) => {
     const computed = getComputedStyle(element);
+    // A deep clone has every part the original has, in the same order.
+    const twin = copies[at] ?? missing(`the copy of part ${at}`);
     for (const property of ["fill", "stroke", "stop-color"]) {
-      if (element.getAttribute(property)?.includes("var(")) copies[at].setAttribute(property, computed.getPropertyValue(property));
+      if (element.getAttribute(property)?.includes("var(")) twin.setAttribute(property, computed.getPropertyValue(property));
     }
   });
   const inset = Math.round((size * 100) / 1024);

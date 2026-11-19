@@ -27,6 +27,7 @@ import { Tooltip } from "@common/components/Tooltip";
 import { PART_NAMES } from "./routineParts";
 import { STEPS, QUESTIONS, hintFor, blocked } from "./routineStepRules";
 import { Answer } from "./RoutineAnswers";
+import { missing } from "@shared/missing";
 export { ScheduleSentence, WhenAnswer } from "./RoutineAnswers";
 
 // DESIGN.md section 10, Routines: making one is four questions, one at a time, in the voice of the mascot that will do
@@ -108,7 +109,7 @@ export const NewRoutine: React.FC<{ tabId: string; routines: Routine[] }> = ({ t
   const { values, step, savedId } = making;
   if (savedId) return <SavedCard routine={routines.find((routine) => routine.id === savedId) ?? null} values={values} id={savedId} />;
 
-  const part = STEPS[step];
+  const part = STEPS[step] ?? missing(`routine step ${step}`);
   const off = blocked(part, values);
   const last = step === STEPS.length - 1;
 

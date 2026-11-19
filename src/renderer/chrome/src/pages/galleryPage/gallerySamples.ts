@@ -9,6 +9,7 @@ import { BERRY_ID } from "@shared/mascots";
 import type { SuggestionRow } from "../../newTabSuggestions";
 import type { WorkFrames } from "../../components/useWorkView";
 import type { RoutineRun } from "@shared/library";
+import { missing } from "@shared/missing";
 
 // Part of the component gallery (GalleryPage.tsx): the sample data its sections show.
 
@@ -96,7 +97,7 @@ export const SAMPLE_RUNS: RoutineRun[] = [
     ...SAMPLE_RUN,
     id: "run-1",
     status: "running",
-    steps: [SAMPLE_STEPS[0], { text: "Reading norrskenair.com", done: false }],
+    steps: [SAMPLE_STEPS[0] ?? missing("a sample step"), { text: "Reading norrskenair.com", done: false }],
     result: null,
     tokens: null,
   },
@@ -237,7 +238,7 @@ const sampleTab = (state: WorkTab["state"], site = "alderandmoss.se", current = 
   state,
   current,
 });
-const sampleWork = (tabs: WorkTab[], rest: Partial<WorkView> = {}): WorkView => ({
+const sampleWork = (tabs: WorkView["tabs"], rest: Partial<WorkView> = {}): WorkView => ({
   chatId: "sample",
   mascotId: BERRY_ID,
   tabs,

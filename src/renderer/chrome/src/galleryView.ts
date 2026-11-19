@@ -1,6 +1,6 @@
 import type { GalleryMascot, MascotPalette } from "@shared/library";
 // Relative because the unit tests have no alias for them.
-import { MAX_MASCOT_NAME, permissionsInWords } from "../../../shared/mascots";
+import { MAX_MASCOT_NAME, permissionsInWords, type PermissionLine } from "../../../shared/mascots";
 import { GALLERY_CATEGORIES } from "../../../shared/publishing";
 
 // What's typed in the search and the kind of job chosen. Which mascot is open lives in the tab's param
@@ -99,13 +99,14 @@ export interface GalleryFact {
 // The facts on a mascot's page. Where it goes and what it can do are `permissionsInWords`, read from the sites and tools
 // the tool layer enforces, never from what the entry says about itself. A starter has no count, so no Added.
 export const galleryFacts = (entry: GalleryMascot): GalleryFact[] => {
-  const [where, ...hands] = permissionsInWords(entry.draft).map(({ text, open }) => ({ text, limited: !open }));
+  const [where, ...hands] = permissionsInWords(entry.draft);
+  const line = ({ text, open }: PermissionLine) => ({ text, limited: !open });
   const plain = (text: string) => [{ text, limited: false }];
   return [
     { label: "Made by", lines: plain(entry.author) },
     ...(fromPeople(entry) ? [{ label: "Added" as const, lines: plain(counted(entry.addCount ?? 0, "time", "times")), mono: true }] : []),
-    { label: "Visits", lines: [where] },
-    { label: "Can", lines: hands },
+    { label: "Visits", lines: [line(where)] },
+    { label: "Can", lines: hands.map(line) },
     { label: "Kind of job", lines: plain(entry.category) },
   ];
 };

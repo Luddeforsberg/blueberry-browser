@@ -14,6 +14,7 @@ import { GalleryTile } from "../MascotGalleryPage";
 import { ACCESSORIES, BERRY_ID, PALETTES } from "@shared/mascots";
 import { Section } from "./Section";
 import { MOODS, PIP_WORDS, SAMPLE_MASCOT, SAMPLE_GALLERY_ENTRY } from "./gallerySamples";
+import { missing } from "@shared/missing";
 
 // Every berry in every mood, at each size where its detail changes, and in everything it can wear (DESIGN.md section 9).
 const BERRY_SIZES = [112, 64, 48, 40, 28, 22, 18, 14];
@@ -105,7 +106,12 @@ export const MascotSections: React.FC<{ still: boolean; setStill: React.Dispatch
             </div>
             <div className="mt-4 flex flex-wrap items-end gap-2.5">
               {ACCESSORIES.map(({ id }, index) => (
-                <Mascot key={id} look={{ palette: PALETTES[(index + 1) % PALETTES.length].id, accessory: id }} size={34} still={still} />
+                <Mascot
+                  key={id}
+                  look={{ palette: (PALETTES[(index + 1) % PALETTES.length] ?? missing("a palette")).id, accessory: id }}
+                  size={34}
+                  still={still}
+                />
               ))}
               {[14, 18, 20, 22, 26, 40].map((size) => (
                 <Mascot key={size} look={{ palette: "raspberry", accessory: "none" }} size={size} still={still} />

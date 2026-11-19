@@ -1,5 +1,6 @@
 import type { RoutineSchedule } from "@shared/library";
 import type { RoutineFormValues } from "./routinesView";
+import { missing } from "@shared/missing";
 
 // Part of routinesView.ts: how often and when, in words.
 
@@ -60,7 +61,8 @@ export const scheduleSentence = ({
       if (days.length === 7) return [{ text: "Every " }, { text: "day", chosen: true }, ...at];
       // Monday first, as the week reads.
       const sorted = [...days].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7));
-      return [{ text: "Every " }, { text: listed(sorted.map((each) => DAY_NAMES[each])) || "week", chosen: true }, ...at];
+      const names = sorted.map((each) => DAY_NAMES[each] ?? missing(`a weekday numbered ${each}`));
+      return [{ text: "Every " }, { text: listed(names) || "week", chosen: true }, ...at];
     }
     case "monthly":
       return [{ text: "On the " }, { text: ordinal(day), chosen: true }, { text: " of every month" }, ...at];

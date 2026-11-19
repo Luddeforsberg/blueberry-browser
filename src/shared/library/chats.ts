@@ -156,7 +156,8 @@ export type WorkOutcome = "done" | "stopped" | "failed";
 export interface WorkView {
   chatId: string;
   mascotId: string;
-  tabs: WorkTab[];
+  // Never none: a job with no tabs has no view.
+  tabs: [WorkTab, ...WorkTab[]];
   // What it's doing now, in the mascot's words. Null between steps, with nothing to say.
   doing: string | null;
   startedAt: number;

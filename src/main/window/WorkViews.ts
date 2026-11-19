@@ -147,13 +147,14 @@ export class WorkViews {
       current: entry.tab.id === job.currentId,
       ...(entry.cloud ? { cloud: true } : {}),
     }));
-    if (tabs.length === 0) return null;
+    const [first, ...rest] = tabs;
+    if (!first) return null;
     const current = localTabs(job).find(({ tab }) => tab.id === job.currentId);
     const saying = current?.state === "picture" ? current.tab.actor.saying : "";
     return {
       chatId,
       mascotId: job.mascotId,
-      tabs,
+      tabs: [first, ...rest],
       doing: job.outcome ? null : saying || (job.step && stepInPresentTense(job.step)),
       startedAt: job.startedAt,
       endedAt: job.endedAt,

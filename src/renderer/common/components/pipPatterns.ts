@@ -11,9 +11,11 @@ export const MOVING = {
   // One dot chases round the ring: thinking, and a tab loading.
   think: RING.map((_, step) => {
     const frame = Array<number>(9).fill(0);
-    frame[RING[step]] = 1;
-    frame[RING[(step + 7) % 8]] = 0.55;
-    frame[RING[(step + 6) % 8]] = 0.3;
+    RING.forEach((dot, at) => {
+      if (at === step) frame[dot] = 1;
+      if (at === (step + 7) % 8) frame[dot] = 0.55;
+      if (at === (step + 6) % 8) frame[dot] = 0.3;
+    });
     return frame;
   }),
   reading: Array.from({ length: 10 }, (_, step) => Array.from({ length: 9 }, (_, index) => (index < step ? 1 : index === step ? 0.55 : 0))),

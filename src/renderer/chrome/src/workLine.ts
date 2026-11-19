@@ -40,9 +40,10 @@ export const workEntries = (steps: readonly ChatStep[], said: readonly SaidOnThe
   const entries: WorkEntry[] = [];
   let run: Array<ChatStep & { kind: Grouped }> = [];
   const flush = () => {
-    if (run.length === 1) entries.push({ kind: "step", step: run[0] });
-    if (run.length > 1) {
-      entries.push({ kind: "group", steps: run, words: GROUP_WORDS[run[0].kind](run.length, siteOf(run[0])), stepKind: run[0].kind });
+    const [first, ...more] = run;
+    if (first && more.length === 0) entries.push({ kind: "step", step: first });
+    if (first && more.length > 0) {
+      entries.push({ kind: "group", steps: run, words: GROUP_WORDS[first.kind](run.length, siteOf(first)), stepKind: first.kind });
     }
     run = [];
   };

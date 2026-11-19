@@ -79,7 +79,8 @@ const placeCaret = (box: HTMLElement, offset: number) => {
 
 const draw = (box: HTMLElement, pieces: StepsPiece[], rows: RecordedChangeValue[]) => {
   const nodes = pieces.flatMap(({ text, row }): Node[] => {
-    if (row === undefined) return [document.createTextNode(text)];
+    const recorded = row === undefined ? undefined : rows[row];
+    if (row === undefined || !recorded) return [document.createTextNode(text)];
     const value = document.createElement("span");
     value.setAttribute(MARK, String(row));
     value.className = VALUE;
@@ -88,11 +89,11 @@ const draw = (box: HTMLElement, pieces: StepsPiece[], rows: RecordedChangeValue[
     button.type = "button";
     button.contentEditable = "false";
     button.setAttribute(SWITCH, String(row));
-    button.setAttribute("aria-label", `${rows[row].label}: ${said(rows[row])}`);
+    button.setAttribute("aria-label", `${recorded.label}: ${said(recorded)}`);
     button.className = SWITCHED;
     const words = document.createElement("span");
     words.className = SAYS;
-    words.textContent = said(rows[row]);
+    words.textContent = said(recorded);
     button.append(words);
     return [value, button];
   });
@@ -106,12 +107,18 @@ const draw = (box: HTMLElement, pieces: StepsPiece[], rows: RecordedChangeValue[
 };
 
 const samePieces = (a: StepsPiece[], b: StepsPiece[]) =>
-  a.length === b.length && a.every((piece, at) => piece.text === b[at].text && piece.row === b[at].row);
+  a.length === b.length && a.every((piece, at) => piece.text === b[at]?.text && piece.row === b[at]?.row);
 
 // Each switch in the box saying what its value's row says.
 const switchesMatch = (box: HTMLElement, rows: RecordedChangeValue[], marks: number) => {
   const switches = [...box.querySelectorAll<HTMLElement>(`[${SWITCH}]`)];
-  return switches.length === marks && switches.every((button) => button.textContent === said(rows[Number(button.getAttribute(SWITCH))]));
+  return (
+    switches.length === marks &&
+    switches.every((button) => {
+      const row = rows[Number(button.getAttribute(SWITCH))];
+      return row !== undefined && button.textContent === said(row);
+    })
+  );
 };
 
 export const MarkedSteps: React.FC<{ label: string; values: RoutineFormValues; onChange: (values: RoutineFormValues) => void }> = ({

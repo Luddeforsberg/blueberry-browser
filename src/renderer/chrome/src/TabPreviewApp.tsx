@@ -3,6 +3,7 @@ import type { TabPreviewShown } from "@shared/ipc";
 import { Pips } from "@common/components/Pips";
 import { cn } from "@common/lib/utils";
 import motion from "@common/motion.json";
+import { missing } from "@shared/missing";
 
 const { ms, ease } = motion;
 
@@ -31,7 +32,7 @@ const CardFace: React.FC<{ face: Face; className?: string }> = ({ face, classNam
 
 const TabPreviewCard: React.FC<{ shown: TabPreviewShown; on: boolean }> = ({ shown, on }) => {
   const [faces, setFaces] = useState<Face[]>([shown]);
-  const newest = faces[faces.length - 1];
+  const newest = faces.at(-1) ?? missing("a face");
   if (newest.tabId !== shown.tabId) setFaces(shown.slide ? [newest, shown] : [shown]);
   // The same tab again, such as with a fresh picture, is simply redrawn.
   else if (newest !== shown) setFaces([...faces.slice(0, -1), shown]);

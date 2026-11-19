@@ -43,9 +43,9 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
   useEffect(() => {
     const page = pageRef.current;
     if (!page) return undefined;
-    const observer = new ResizeObserver(([entry]) =>
-      setPageSize({ width: Math.round(entry.contentRect.width), height: Math.round(entry.contentRect.height) }),
-    );
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setPageSize({ width: Math.round(entry.contentRect.width), height: Math.round(entry.contentRect.height) });
+    });
     observer.observe(page);
     return () => observer.disconnect();
   }, [hasThread]);

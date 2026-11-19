@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { missing } from "@shared/missing";
 
 // How far the pointer travels before a press on a tab becomes a drag.
 export const DRAG_THRESHOLD = 4;
@@ -11,19 +12,22 @@ export interface Slot {
   size: number;
 }
 
+// A drag only starts with its own slot and another, and only ever asks for slots there are.
+const slotAt = (slots: readonly Slot[], index: number): Slot => slots[index] ?? missing(`tab slot ${index}`);
+
 // The dragged tab stays between the first tab's start and the last tab's end.
 export const clampOffset = (offset: number, from: number, slots: readonly Slot[]): number => {
-  const own = slots[from];
-  const last = slots[slots.length - 1];
-  return Math.min(Math.max(offset, slots[0].start - own.start), last.start + last.size - own.start - own.size);
+  const own = slotAt(slots, from);
+  const last = slotAt(slots, slots.length - 1);
+  return Math.min(Math.max(offset, slotAt(slots, 0).start - own.start), last.start + last.size - own.start - own.size);
 };
 
 // Once the dragged tab covers half of another tab, it takes that tab's place.
 export const dropIndex = (offset: number, from: number, slots: readonly Slot[]): number => {
-  const own = slots[from];
+  const own = slotAt(slots, from);
   const start = own.start + clampOffset(offset, from, slots);
   const end = start + own.size;
-  const middleOf = (index: number) => slots[index].start + slots[index].size / 2;
+  const middleOf = (index: number) => slotAt(slots, index).start + slotAt(slots, index).size / 2;
   let to = from;
   while (to < slots.length - 1 && end >= middleOf(to + 1)) to++;
   if (to === from) while (to > 0 && start <= middleOf(to - 1)) to--;
@@ -32,8 +36,11 @@ export const dropIndex = (offset: number, from: number, slots: readonly Slot[]):
 
 // How far the dragged tab moves to sit in its new place: the others keep their sizes, so going later its end lands
 // where that slot's end was, and going earlier its start lands where that slot's start was.
-export const settledOffset = (from: number, to: number, slots: readonly Slot[]): number =>
-  to > from ? slots[to].start + slots[to].size - slots[from].start - slots[from].size : slots[to].start - slots[from].start;
+export const settledOffset = (from: number, to: number, slots: readonly Slot[]): number => {
+  const there = slotAt(slots, to);
+  const own = slotAt(slots, from);
+  return to > from ? there.start + there.size - own.start - own.size : there.start - own.start;
+};
 
 interface Drag {
   tabId: string;
@@ -87,8 +94,11 @@ export const useTabDrag = (tabIds: string[], axis: "x" | "y", onMove: (tabId: st
         item.setPointerCapture(pointerId);
         // A tab still folding away after it closed isn't a place to drop.
         const slots = [...list.children].filter((child) => !child.hasAttribute("data-folding")).map(slotOf);
-        const gap = slots[1].start - slots[0].start - slots[0].size;
-        current = { tabId, order, from, to: from, offset: 0, slots, room: slots[from].size + gap, settling: false };
+        const [first, second] = slots;
+        const own = slots[from];
+        if (!first || !second || !own) return;
+        const gap = second.start - first.start - first.size;
+        current = { tabId, order, from, to: from, offset: 0, slots, room: own.size + gap, settling: false };
       }
       current = {
         ...current,

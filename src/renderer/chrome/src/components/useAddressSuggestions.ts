@@ -6,6 +6,7 @@ import { useMascots, useLibrary } from "../contexts/useLibrary";
 import { useShell } from "../contexts/useShell";
 import { addressSuggestions } from "../addressSuggestions";
 import { useAssistantName } from "./useAssistantName";
+import { missing } from "@shared/missing";
 
 // The list under the address field while it's being edited (DESIGN.md, Toolbar and the address field). The rows come
 // from this computer only: open tabs, saved sites and the history. Main draws them in a view over the page, and the
@@ -131,7 +132,7 @@ export const useAddressSuggestions = ({ editing, value, setValue, field, input, 
   const choose = (index: number | null) => {
     setSelected(index);
     setCompletion(null);
-    setValue(index === null ? (typed ?? "") : fill(rows[index]));
+    setValue(index === null ? (typed ?? "") : fill(rows[index] ?? missing(`suggestion ${index}`)));
   };
 
   const onChange = (event: React.ChangeEvent<HTMLInputElement>) => {

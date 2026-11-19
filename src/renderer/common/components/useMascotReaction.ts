@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { missing } from "@shared/missing";
 
 // `look` and `toss` are poses, drawn by Mascot. The rest are movement, played on the drawing as a whole.
 export type Reaction = "hop" | "look" | "toss" | "ruffle" | "turn" | "nudge";
@@ -112,7 +113,7 @@ export const useMascotReaction = (element: React.RefObject<SVGSVGElement | null>
       clicks.current = [];
       return play("turn");
     }
-    play(cycle[next.current++ % cycle.length]);
+    play(cycle[next.current++ % cycle.length] ?? missing(`a reaction for ${mood}`));
   }, [enabled, mood, play]);
 
   return { reaction, react };

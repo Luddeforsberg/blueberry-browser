@@ -1,6 +1,7 @@
 import React, { useLayoutEffect, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "../lib/utils";
+import { missing } from "@shared/missing";
 
 // DESIGN.md section 10, Settings: 34 by 20px. On is `focus` with a white knob, off is `sheet-2` with a hairline. The knob
 // takes the light sheet in either mode, which is white.
@@ -110,7 +111,7 @@ export const Choice = <T extends string>({
   const anyChosen = options.some((option) => option.value === value);
   const step = (by: number) => {
     const at = options.findIndex((option) => option.value === value);
-    const next = options[(at + by + options.length) % options.length];
+    const next = options[(at + by + options.length) % options.length] ?? missing("an option");
     onChange(next.value);
     group.current?.querySelectorAll<HTMLElement>('[role="radio"]')[options.indexOf(next)]?.focus();
   };
