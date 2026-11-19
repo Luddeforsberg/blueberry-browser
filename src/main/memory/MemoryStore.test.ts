@@ -7,6 +7,7 @@ import { MAX_FACTS_PER_MASCOT } from "../../shared/memory";
 import { publicRow } from "../../shared/publishing";
 import { parseMascotDraft } from "../../shared/mascots";
 import { MascotStore } from "../mascots/MascotStore";
+import { defined } from "../../shared/testing";
 
 describe("MemoryStore", () => {
   const made = (
@@ -30,7 +31,7 @@ describe("MemoryStore", () => {
     await offer(store);
     expect(store.state.facts).toEqual([]);
     expect(() => readFileSync(file)).toThrow();
-    const [shown] = store.state.offers;
+    const shown = defined(store.state.offers[0]);
     expect(store.decide(shown.id, true)).toEqual({ ok: true });
     expect(store.factsOf("m")).toMatchObject([{ text: shown.text, site: shown.site }]);
     expect(store.factsOf("other")).toEqual([]);
@@ -40,7 +41,7 @@ describe("MemoryStore", () => {
   it("forgets an offer it was told no to, and won't make it again in this session", async () => {
     const { store } = made();
     await offer(store);
-    store.decide(store.state.offers[0].id, false);
+    store.decide(defined(store.state.offers[0]).id, false);
     expect(store.state.facts).toEqual([]);
     await offer(store);
     expect(store.state.offers).toEqual([]);
@@ -65,10 +66,10 @@ describe("MemoryStore", () => {
     await offer(store);
     await offer(store, "other", "chat2");
     store.state.offers.map(({ id }) => id).forEach((id) => store.decide(id, true));
-    const [mine] = store.factsOf("m");
+    const mine = defined(store.factsOf("m")[0]);
     expect(store.edit(mine.id, "Your password is hunter2")).toMatchObject({ ok: false });
     expect(store.edit(mine.id, "You want​ the cheapest, always.")).toEqual({ ok: true });
-    expect(store.factsOf("m")[0].text).toBe("You want the cheapest, always.");
+    expect(defined(store.factsOf("m")[0]).text).toBe("You want the cheapest, always.");
     store.clear("m");
     expect(store.factsOf("m")).toEqual([]);
     expect(store.factsOf("other")).toHaveLength(1);
@@ -159,7 +160,7 @@ describe("forgetting while a proposal is on its way", () => {
     first.reply("You want the cheapest.");
     await asking;
     const second = first.store.propose(first.job);
-    first.store.decide(first.store.state.offers[0].id, false);
+    first.store.decide(defined(first.store.state.offers[0]).id, false);
     first.reply("You want the cheapest.");
     await second;
     expect(first.store.state.offers).toEqual([]);

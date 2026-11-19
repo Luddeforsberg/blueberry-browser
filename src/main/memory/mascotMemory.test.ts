@@ -3,6 +3,7 @@ import { parseProposals, proposalData, relevantFacts, sameFact, statesAHabit, wo
 import { memoryNote } from "../chats/mascotNote";
 import { factProblem, MAX_FACT_LENGTH } from "../../shared/memory";
 import type { MemoryFact } from "../../shared/library";
+import { defined } from "../../shared/testing";
 
 const fact = (text: string, site: string | null, savedAt = 1): MemoryFact => ({ id: text, mascotId: "m", text, site, savedAt });
 
@@ -208,7 +209,7 @@ describe("relevantFacts", () => {
     const chosen = relevantFacts([...many, here], { sites: ["webhallen.com"], text: "", allowed: [] });
     expect(chosen).toHaveLength(8);
     expect(chosen[0]).toBe(here);
-    expect(chosen[1].text).toBe("You like 11.");
+    expect(defined(chosen[1]).text).toBe("You like 11.");
   });
 });
 
