@@ -1,5 +1,4 @@
 import { screen, type Display } from "electron";
-import type { OwnMenuItem } from "../menus/ownMenu";
 import type { Rect } from "../window/Layout";
 import {
   DESKTOP_DEFAULT_SPOT,
@@ -254,7 +253,7 @@ export class DropWindow {
     if (!this.d.window || !this.d.menus) return;
     const { keepBerryStill, showBerry } = this.d.host.settings();
     const result = this.d.news.announcing ?? this.d.news.results.at(-1)?.chatId ?? null;
-    const items: OwnMenuItem[] = [
+    const items: Parameters<NonNullable<DesktopParts["menus"]>["open"]>[0] = [
       ...(result
         ? [
             {

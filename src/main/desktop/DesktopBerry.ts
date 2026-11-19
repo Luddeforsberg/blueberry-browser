@@ -1,4 +1,3 @@
-import type { MenuView } from "../menus/MenuView";
 import type { ChromeView } from "../window/chromeView";
 import type { Rect } from "../window/Layout";
 import type { DesktopTarget } from "./desktopBerryState";
@@ -59,7 +58,7 @@ export class DesktopBerry {
   get composerView(): ChromeView | null {
     return this.parts.panel;
   }
-  get menuView(): MenuView | null {
+  get menuView(): DesktopParts["menus"] {
     return this.parts.menus;
   }
   get shortcutTaken(): boolean {
