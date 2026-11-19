@@ -17,6 +17,8 @@ const config: KnipConfig = {
     // Loaded by path into the test app's main process: tests/app.ts and tests/features/driver.ts.
     "tests/*.cjs",
     "tests/features/*.cjs",
+    // Each export is bundled by itself into src/main/pageCode.ts by scripts/buildPage.mjs, which reads this file as text.
+    "src/page/index.ts",
     // The public site and the phone page, static pages with no build.
     "site/**/*.html",
     // Registered by site/app/push.js with `serviceWorker.register("./sw.js")`, a string, not an import.

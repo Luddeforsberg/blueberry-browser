@@ -82,7 +82,7 @@ This is the `foundations` audit of the preview branch at `581637f`. The full rep
     - Later, the user's call: write the new palette ids to mascots.json once going back to an older version no longer matters. Server writes switch in step 10 itself, after its migration is applied.
 11. `src/main` into folders (medium).
 12. Boundary rules (low).
-13. Page code out of template strings (high).
+13. Page code out of template strings (high). Done.
 14. Split `browserTools.ts` (high, Codex).
 15. Split `Chats.ts` (high, Codex).
 16. Split `Window.ts` (medium).

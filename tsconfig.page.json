@@ -1,0 +1,16 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.json",
+  // The code main runs in web pages, bundled by scripts/buildPage.mjs. It gets the DOM and nothing from Node.
+  "include": ["src/page/**/*"],
+  "compilerOptions": {
+    "composite": true,
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": [],
+    // Off or unset in @electron-toolkit/tsconfig. Each one costs nothing to keep on.
+    "noImplicitAny": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false
+  }
+}
