@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync } from "fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { describe, expect, it, vi } from "vitest";
@@ -24,8 +24,7 @@ const CARD = JSON.stringify({
   ],
 });
 
-const setup = () => {
-  const file = join(mkdtempSync(join(tmpdir(), "blueberry-suggestions-")), "suggestions.json");
+const setup = (file = join(mkdtempSync(join(tmpdir(), "blueberry-suggestions-")), "suggestions.json")) => {
   let now = NOW;
   let visits = VISITS;
   let hasModel = true;
@@ -149,6 +148,32 @@ describe("what the user did with a card", () => {
     const [card] = await newTabAt(1);
     suggestions.used(card.id);
     expect(JSON.parse(readFileSync(file, "utf8")).feedback).toEqual([expect.objectContaining({ verdict: "used", line: card.title })]);
+  });
+
+  it("draws a mascot card saved under a palette's old id as its berry", async () => {
+    const { file, write, newTabAt } = setup();
+    write.mockResolvedValueOnce(CARD);
+    await newTabAt(0);
+    const saved = JSON.parse(readFileSync(file, "utf8")) as { proposals: Array<{ card: unknown }> };
+    const draft = { name: "Scout", instructions: "Watch it.", sites: ["news.ycombinator.com"], tools: ["visit"] };
+    const card = (palette: string) => ({
+      id: "ai-1",
+      kind: "mascot",
+      title: "I'm Scout.",
+      draft: { ...draft, look: { palette, accessory: "cap" } },
+    });
+    saved.proposals = [
+      { ...saved.proposals[0], card: card("robin") },
+      { ...saved.proposals[0], card: { ...card("currant"), id: "ai-2" } },
+      { ...saved.proposals[0], card: { ...card("red"), id: "ai-3" } },
+    ];
+    writeFileSync(file, JSON.stringify(saved));
+
+    const cards = await setup(file).newTabAt(1);
+    expect(cards.map((shown) => shown.kind === "mascot" && [shown.id, shown.draft.look.palette])).toEqual([
+      ["ai-1", "lingon"],
+      ["ai-2", "currant"],
+    ]);
   });
 
   it("drops a card once its history is gone", async () => {

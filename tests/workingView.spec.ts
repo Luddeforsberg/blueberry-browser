@@ -212,7 +212,7 @@ test.describe("the working view", () => {
     const saved = await chrome.evaluate(() =>
       window.chromeAPI.mascots.save(null, {
         name: "Scout",
-        look: { palette: "robin", accessory: "cap" },
+        look: { palette: "lingon", accessory: "cap" },
         instructions: "Stay here.",
         sites: ["127.0.0.1"],
         tools: ["visit"],

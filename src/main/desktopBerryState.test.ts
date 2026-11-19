@@ -16,7 +16,7 @@ import {
 import type { MascotProfile, NeedsYouItem } from "../shared/library";
 import { BERRY } from "../shared/mascots";
 
-const SCOUT: MascotProfile = { ...BERRY, id: "scout", name: "Scout", look: { palette: "robin", accessory: "none" } };
+const SCOUT: MascotProfile = { ...BERRY, id: "scout", name: "Scout", look: { palette: "lingon", accessory: "none" } };
 
 const facts = (over: Partial<DesktopFacts> = {}): DesktopFacts => ({
   needsYou: [],

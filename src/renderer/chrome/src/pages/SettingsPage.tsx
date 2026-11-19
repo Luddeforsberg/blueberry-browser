@@ -221,8 +221,8 @@ const Mascots: React.FC = () => {
         >
           <Switch
             labelledBy="setting-mascot-on-pages"
-            checked={settings.birdOnPages}
-            onChange={(birdOnPages) => updateSettings({ birdOnPages })}
+            checked={settings.mascotOnPages}
+            onChange={(mascotOnPages) => updateSettings({ mascotOnPages })}
           />
         </SettingsRow>
         <SettingsRow

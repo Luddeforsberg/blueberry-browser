@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -8,7 +8,7 @@ import { BERRY, BERRY_ID } from "../shared/mascots";
 const file = () => join(mkdtempSync(join(tmpdir(), "blueberry-mascots-")), "mascots.json");
 const draft = {
   name: "Scout",
-  look: { palette: "robin", accessory: "cap" },
+  look: { palette: "lingon", accessory: "cap" },
   instructions: "Read things.",
   sites: ["https://www.GitHub.com/x"],
   tools: ["visit"],
@@ -50,6 +50,22 @@ describe("MascotStore", () => {
       ]),
     );
     expect(new MascotStore(path).all()).toEqual([BERRY]);
+  });
+
+  it("reads a look saved under an old palette id as its berry, and saves only the new id", () => {
+    const path = file();
+    const old = { ...draft, look: { palette: "robin", accessory: "cap" }, sites: ["github.com"], id: "scout", deletedAt: null };
+    writeFileSync(path, JSON.stringify([old, { ...old, id: "pip", look: { palette: "currant", accessory: "none" } }]));
+    const store = new MascotStore(path);
+    expect(store.find("scout")?.look).toEqual({ palette: "lingon", accessory: "cap" });
+    expect(store.find("pip")?.look).toEqual({ palette: "currant", accessory: "none" });
+
+    store.save("pip", { ...draft, name: "Pip" });
+    const saved = JSON.parse(readFileSync(path, "utf8")) as Array<{ id: string; look: unknown }>;
+    expect(saved.map(({ id, look }) => [id, look])).toEqual([
+      ["scout", { palette: "lingon", accessory: "cap" }],
+      ["pip", { palette: "lingon", accessory: "cap" }],
+    ]);
   });
 
   it("keeps Works in the cloud through a restart, only when it's exactly true, and never from the Gallery", () => {

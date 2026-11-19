@@ -46,11 +46,10 @@ await build({
       import { createElement } from "react";
       import { renderToStaticMarkup } from "react-dom/server";
       import { Mascot } from "./src/renderer/common/components/Mascot";
-      import { BERRY_KIND } from "./src/renderer/common/components/berryKinds";
-      import { ACCESSORIES } from "./src/shared/mascots";
-      export { BERRY_KIND };
+      import { ACCESSORIES, PALETTES } from "./src/shared/mascots";
+      export { PALETTES };
       export { PIP_MARKS, PIP_PATTERNS, pipOpacities, STEP_PIPS } from "./src/renderer/common/components/pipPatterns";
-      const pose = (mood, accessory, size = 120) => renderToStaticMarkup(createElement(Mascot, { mood, size, still: true, anyLook: true, look: { palette: "jackdaw", accessory } }));
+      const pose = (mood, accessory, size = 120) => renderToStaticMarkup(createElement(Mascot, { mood, size, still: true, anyLook: true, look: { palette: "currant", accessory } }));
       // What the mascot on a web page is drawn from, by \`src/main/pageActorScript.ts\`.
       export const actorArt = Object.fromEntries(ACCESSORIES.map(({ id }) => [id, {
         flying: pose("fetching", id),
@@ -83,9 +82,7 @@ await build({
   },
   outfile: script,
 });
-const { drawings, actorArt, poses, BERRY_KIND, PIP_MARKS, PIP_PATTERNS, pipOpacities, STEP_PIPS } = await import(
-  pathToFileURL(script).href
-);
+const { drawings, actorArt, poses, PALETTES, PIP_MARKS, PIP_PATTERNS, pipOpacities, STEP_PIPS } = await import(pathToFileURL(script).href);
 rmSync(temp, { recursive: true, force: true });
 
 // The pips (DESIGN.md section 6) for the phone page, as CSS from the app's own frames: a grid of nine dots, each
@@ -131,7 +128,7 @@ for (const [family, file] of [
 // Of the bodies every drawing carries, only its own mascot's shows.
 const rules = [
   "[data-berry] { display: none; }",
-  ...Object.entries(BERRY_KIND).map(([palette, kind]) => `[data-mascot="${palette}"] [data-berry="${kind}"] { display: inline; }`),
+  ...PALETTES.map(({ id }) => `[data-mascot="${id}"] [data-berry="${id}"] { display: inline; }`),
 ];
 writeFileSync(join(site, "mascots.js"), `${NOTE}export const DRAWINGS = ${JSON.stringify(drawings, null, 2)};\n`);
 writeFileSync(join(site, "app", "poses.js"), `${NOTE}export const POSES = ${JSON.stringify(poses)};\n`);
@@ -189,18 +186,18 @@ const eyes = tokens.match(/(?:\[data-mascot="[a-z]+"\],?\s*)+\{[^}]*\}/g).map((r
 const sheet = [`.sky { ${block(":root")} }`, `.sky.dark { ${block(".dark")} }`, ...eyes, ...rules].join("\n");
 writeFileSync(
   join(root, "src/main/pageActorArt.ts"),
-  `${NOTE}export type ArtNode = [tag: string, attributes: Record<string, string>, ...children: ArtNode[]];\n\nexport const ACTOR_ART = ${JSON.stringify(tree)} as unknown as Record<string, Record<string, ArtNode>>;\n\nexport const ACTOR_ART_SHEET = ${JSON.stringify(sheet)};\n\n// Which berry each saved palette draws as, so a page gets only that one's parts.\nexport const ACTOR_BERRY: Record<string, string> = ${JSON.stringify(BERRY_KIND)};\n`,
+  `${NOTE}export type ArtNode = [tag: string, attributes: Record<string, string>, ...children: ArtNode[]];\n\nexport const ACTOR_ART = ${JSON.stringify(tree)} as unknown as Record<string, Record<string, ArtNode>>;\n\nexport const ACTOR_ART_SHEET = ${JSON.stringify(sheet)};\n\n// Every berry, by the palette id a look draws it with, so a page gets only its own one's parts.\nexport const ACTOR_BERRIES: string[] = ${JSON.stringify(PALETTES.map(({ id }) => id))};\n`,
 );
 
 // The picture a shared link shows, since a link preview can't run the page: the mascots in a row, on `ground` in light mode. It's
 // drawn by the Chrome on this computer, so without one it says so and leaves the old picture.
 const SHARE_MASCOTS = [
-  ["none", "kingfisher"],
-  ["cap", "robin"],
-  ["glasses", "canary"],
-  ["headphones", "flamingo"],
-  ["bow", "parakeet"],
-  ["crown", "jackdaw"],
+  ["none", "blueberry"],
+  ["cap", "lingon"],
+  ["glasses", "cloudberry"],
+  ["headphones", "raspberry"],
+  ["bow", "gooseberry"],
+  ["crown", "currant"],
 ];
 const shareCard = `<!doctype html><html><head><meta charset="utf-8"><style>${readFileSync(join(site, "tokens.css"), "utf8")}
 ${readFileSync(join(site, "mascots.css"), "utf8")}
@@ -211,7 +208,7 @@ h1 { font-size: 72px; font-weight: 500; letter-spacing: -0.025em; color: rgb(var
 p { margin-top: 12px; font-size: 30px; color: rgb(var(--ink-2)); }
 .wire { margin-top: auto; display: flex; justify-content: space-between; margin-bottom: 72px; }
 .wire svg { width: 150px; height: 150px; overflow: visible; }
-</style></head><body><div class="card"><h1>Blueberry</h1><p>An AI browser that works on your behalf.</p><div class="wire">${SHARE_MASCOTS.map(([accessory, palette]) => `<div>${drawings[accessory].replace('data-mascot="jackdaw"', `data-mascot="${palette}"`)}</div>`).join("")}</div></div></body></html>`;
+</style></head><body><div class="card"><h1>Blueberry</h1><p>An AI browser that works on your behalf.</p><div class="wire">${SHARE_MASCOTS.map(([accessory, palette]) => `<div>${drawings[accessory].replace('data-mascot="currant"', `data-mascot="${palette}"`)}</div>`).join("")}</div></div></body></html>`;
 try {
   const { chromium } = await import("playwright-core");
   const browser = await chromium.launch({ channel: "chrome" });

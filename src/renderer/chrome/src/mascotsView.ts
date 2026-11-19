@@ -137,7 +137,7 @@ export const dockFaces = <T>(mascots: T[], room: number, busy: (mascot: T) => bo
 
 // The mascots' page at a place. It moves around itself this way too, so where it is lives in its tab's param, which is
 // how Back and a restored session find it.
-export const openMascots = (place: MascotsPlace) => void window.chromeAPI.browser.openPage("flock", { param: mascotsParam(place) });
+export const openMascots = (place: MascotsPlace) => void window.chromeAPI.browser.openPage("mascots", { param: mascotsParam(place) });
 
 // What's being typed on the mascots' page, by tab, for the one place it was typed in. It lasts while the tab is away, so
 // going to another tab and back loses nothing, and goes once the page has moved anywhere else, so leaving keeps nothing.

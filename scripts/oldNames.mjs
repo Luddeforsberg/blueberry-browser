@@ -2,9 +2,10 @@
 // part of a word. Run by `pnpm run lint`. It reads every file git tracks or would track, so a new file counts before
 // it's added. Code says "mascot" or "mascots", or "Berry" where it means Berry.
 //
-// What's left is saved on disk, sent to a server, read by a model or an app, or public, so it can't change without a
-// migration. Each is listed below with the step of docs/quality-plan.md that renames it: 9 for saved formats, 10 for
-// server- and model-facing names. An entry whose text is no longer in its file fails too, so this list only shrinks.
+// What's left is sent to a server, read by a model or an app, or public, so it can't change without a migration, and is
+// listed below with step 10 of docs/quality-plan.md, which renames it. Names saved on disk were renamed in step 9, and
+// only the migrations that read old saved data still name them. An entry whose text is no longer in its file fails too,
+// so this list only shrinks.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 
@@ -22,10 +23,11 @@ const UNCHECKED = [
 ];
 
 const entries = (until, text, why, files) => files.map((file) => ({ file, text, until, why }));
-const saved = (text, why, ...files) => entries(9, text, why, files);
 const external = (text, why, ...files) => entries(10, text, why, files);
+// An old name in data an older version saved, read by the migration that moves it to the new name, in that file and its
+// test only. Kept for good, since old data can turn up at any time.
+const migrated = (text, why, ...files) => entries(null, text, why, files);
 
-const PAGE_ID = "The internal page's id, saved with each tab in session.json.";
 const SERVER = "A Supabase name, in the migrations and on the server.";
 const MODEL = "Read by the model, or by ChatGPT, Claude or another app over MCP.";
 const ROW = "An error written to a job's row on the server, which ChatGPT and Claude read through get_job.";
@@ -34,43 +36,26 @@ const COPY = "The public site's own words, deployed with its address.";
 
 // The exact text that may stay in each file, case and all.
 const ALLOWED = [
-  ...saved(
+  ...migrated(
     "birdOnPages",
-    "A key in settings.json.",
+    "The old key in settings.json.",
     "src/main/SettingsStore.ts",
     "src/main/SettingsStore.test.ts",
-    "src/main/Window.ts",
-    "src/renderer/chrome/src/pages/SettingsPage.tsx",
-    "src/shared/ipc.ts",
-    "tests/browser.spec.ts",
-    "tests/mascotOnPage.spec.ts",
+    "tests/session.spec.ts",
   ),
-  ...saved(
+  ...migrated(
     '"flock"',
-    PAGE_ID,
-    "src/main/InternalTab.ts",
-    "src/main/Menu.ts",
+    "The mascots' page's old id, saved with its tab in session.json.",
     "src/main/Session.ts",
-    "src/main/Window.ts",
-    "src/renderer/chrome/src/components/TabIcon.tsx",
-    "src/renderer/chrome/src/mascotsView.ts",
-    "src/renderer/chrome/src/pages/InternalPageView.tsx",
-    "src/shared/ipc.ts",
-    "tests/features/map.ts",
-    "tests/mascotGallery.spec.ts",
-    "tests/mascotLimits.spec.ts",
-    "tests/mascotsPage.spec.ts",
-    "tests/memory.spec.ts",
-    "tests/publishing.spec.ts",
+    "src/main/Session.test.ts",
+    "tests/session.spec.ts",
   ),
-  ...saved(
-    'flock: "Your mascots"',
-    PAGE_ID,
-    "src/main/InternalTab.ts",
-    "src/renderer/chrome/src/addressSuggestions.ts",
-    "src/renderer/chrome/src/components/AddressBar.tsx",
+  ...migrated(
+    '"blueberry.bird"',
+    "The phone page's old key in the browser's sessionStorage.",
+    "site/app/state.js",
+    "src/shared/phoneState.test.ts",
   ),
-  ...saved('"blueberry.bird"', "The phone page's key in the browser's localStorage.", "site/app/state.js"),
 
   ...external(
     "sync_cloud_flock",
@@ -89,6 +74,7 @@ const ALLOWED = [
     "AGENTS.md",
     "site/app/api.js",
     "src/shared/phoneApi.test.ts",
+    "supabase/berryPalettes.test.ts",
     "supabase/phone.test.ts",
     "supabase/relay.test.ts",
     "tests/fakeSupabase.ts",

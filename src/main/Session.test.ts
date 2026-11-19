@@ -96,6 +96,19 @@ describe("sanitizeSession", () => {
       chatOpen: true,
     });
   });
+
+  it("opens the mascots' page from a session saved under its old id, and the new id as it is", () => {
+    const tabs = [
+      { page: "flock", param: "scout/limits", title: "" },
+      { page: "mascots", param: null, title: "" },
+    ];
+    const restored = sanitizeSession({ ...session(), tabs, active: 1 });
+    expect(restored?.tabs).toEqual([
+      { page: "mascots", param: "scout/limits", title: "" },
+      { page: "mascots", param: null, title: "" },
+    ]);
+    expect(restored?.active).toBe(1);
+  });
 });
 
 describe("SessionStore", () => {

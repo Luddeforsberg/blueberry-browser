@@ -43,11 +43,18 @@ export const senderOf = (job) => {
   return id === BERRY_ID ? state.mascots[0] : (state.mascots.find((mascot) => mascot.id === id) ?? null);
 };
 
-// Who the box talks to, kept for this visit.
-const CHOSEN = "blueberry.bird";
+// Who the box talks to, kept for this visit. A page from before the mascots were called mascots kept it under the old
+// key, which moves to the new one the first time it's read.
+const CHOSEN = "blueberry.mascot";
+const OLD_CHOSEN = "blueberry.bird";
 export const chosen = () => {
   let id = null;
   try {
+    const old = sessionStorage.getItem(OLD_CHOSEN);
+    if (old !== null) {
+      if (sessionStorage.getItem(CHOSEN) === null) sessionStorage.setItem(CHOSEN, old);
+      sessionStorage.removeItem(OLD_CHOSEN);
+    }
     id = sessionStorage.getItem(CHOSEN);
   } catch {
     // Private windows can refuse it.

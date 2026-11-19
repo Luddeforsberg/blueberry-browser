@@ -633,7 +633,7 @@ test("settings reach the page: a marker when still, a pointer with Hide Berry, n
     await expect.poll(async () => (await stateIn(app, "/plain"))?.pose).toBe("pointer");
     await current.finished();
 
-    await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ showBerry: true, birdOnPages: false }));
+    await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ showBerry: true, mascotOnPages: false }));
     await expect.poll(() => hostInPage(page)).toBe(false);
     model.reset();
     current = await job([{ name: "click", args: { ref: "e1" } }]);
@@ -643,7 +643,7 @@ test("settings reach the page: a marker when still, a pointer with Hide Berry, n
     await current.finished();
 
     // The system's Reduce Motion, as a page's media query reports it, does what Keep Berry still does.
-    await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ birdOnPages: true }));
+    await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ mascotOnPages: true }));
     await page.emulateMedia({ reducedMotion: "reduce" });
     current = await job([{ name: "hover", args: { ref: "e1" } }]);
     await current.allAsked();

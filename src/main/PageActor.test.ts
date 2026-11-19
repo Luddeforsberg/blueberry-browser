@@ -97,7 +97,7 @@ describe("when the tab is taken away mid-draw", () => {
       on: true,
       plain: false,
       still: false,
-      look: { palette: "jackdaw", accessory: "none" },
+      look: { palette: "currant", accessory: "none" },
       dark: false,
       windowShowing: true,
     };
@@ -131,7 +131,7 @@ describe("when the tab is taken away mid-draw", () => {
       on: true,
       plain: false,
       still: false,
-      look: { palette: "jackdaw", accessory: "none" },
+      look: { palette: "currant", accessory: "none" },
       dark: false,
       windowShowing: true,
     };
@@ -169,7 +169,7 @@ describe("when the tab is taken away mid-draw", () => {
       on: true,
       plain: false,
       still: false,
-      look: { palette: "jackdaw", accessory: "none" },
+      look: { palette: "currant", accessory: "none" },
       dark: false,
       windowShowing: true,
     };

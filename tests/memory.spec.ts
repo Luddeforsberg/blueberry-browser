@@ -90,18 +90,18 @@ test("a mascot offers to remember after a job, keeps it only on Remember, uses i
   await chrome.evaluate(() =>
     window.chromeAPI.mascots.save(null, {
       name: "Scout",
-      look: { palette: "robin", accessory: "cap" },
+      look: { palette: "lingon", accessory: "cap" },
       instructions: "Find things.",
       sites: [],
       tools: [],
     }),
   );
   const scout = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).mascots.find((mascot) => mascot.name === "Scout")!;
-  await chrome.evaluate((id) => window.chromeAPI.browser.openPage("flock", { param: id }), scout.id);
+  await chrome.evaluate((id) => window.chromeAPI.browser.openPage("mascots", { param: id }), scout.id);
   await expect(chrome.getByRole("button", { name: /^What it remembers/ })).toContainText("Nothing yet");
 
   // What it remembers can be read, edited under the same rules, and forgotten.
-  await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock", { param: "berry" }));
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("mascots", { param: "berry" }));
   await chrome.getByRole("button", { name: /^What it remembers/ }).click();
   await expect(chrome.getByRole("heading", { name: "What Berry remembers" })).toBeVisible();
   const site = chrome.getByRole("region", { name: "on 127.0.0.1" });

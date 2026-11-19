@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { buildDigest } from "./suggestionDigest";
 import { fallbackWords, scheduleFits, verifyProposals, type Existing } from "./suggestionProposals";
 import { findPatterns } from "./suggestionPatterns";
-import { BERRY } from "../shared/mascots";
 
 const NOW = new Date(2026, 10, 2, 18, 0).getTime();
 const at = (daysAgo: number, hour: number, minute = 0) => {
@@ -169,7 +168,8 @@ describe("verifying a proposal", () => {
       sites: ["kayak.com", "skyscanner.se", "momondo.se"],
       tools: ["visit"],
     });
-    expect(kept.card.kind === "mascot" && kept.card.draft.look.palette).not.toBe(BERRY.look.palette);
+    // A palette's old id is the berry it was drawn as.
+    expect(kept.card.kind === "mascot" && kept.card.draft.look.palette).toBe("currant");
     expect(
       verify({
         kind: "mascot",

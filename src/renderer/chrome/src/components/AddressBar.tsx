@@ -41,7 +41,7 @@ const PAGE_LABELS: Record<InternalPage, string | null> = {
   downloads: "Downloads",
   gallery: "Component gallery",
   history: "History",
-  flock: "Your mascots",
+  mascots: "Your mascots",
   "mascot-gallery": "Gallery",
   "needs-you": "Needs you",
   recording: "What I watched",

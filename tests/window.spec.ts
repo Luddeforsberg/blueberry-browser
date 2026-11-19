@@ -84,7 +84,7 @@ test("choosing a mascot on the new tab changes the pill, the greeting and the li
     await chrome.evaluate(() =>
       window.chromeAPI.mascots.save(null, {
         name: "Scout",
-        look: { palette: "robin", accessory: "cap" },
+        look: { palette: "lingon", accessory: "cap" },
         instructions: "News.",
         sites: ["svt.se"],
         tools: ["visit"],
@@ -181,7 +181,7 @@ test("in the horizontal layout, Chats and a mascot's card open over a web page, 
     await chrome.evaluate(() =>
       window.chromeAPI.mascots.save(null, {
         name: "Scout",
-        look: { palette: "robin", accessory: "cap" },
+        look: { palette: "lingon", accessory: "cap" },
         instructions: "News.",
         sites: ["svt.se"],
         tools: ["visit"],

@@ -88,7 +88,7 @@ const SINGLE_INSTANCE_PAGES: InternalPage[] = [
   "settings",
   "downloads",
   "history",
-  "flock",
+  "mascots",
   "mascot-gallery",
   "needs-you",
   "recording",
@@ -1086,7 +1086,7 @@ export class Window {
           this.workViews.sync();
         },
         actorOptions: () => ({
-          on: this.settings.birdOnPages,
+          on: this.settings.mascotOnPages,
           plain: !this.settings.showBerry,
           still: this.settings.keepBerryStill || systemPreferences.getAnimationSettings().prefersReducedMotion,
           look: this.mascotStore.resolve(tab?.workingMascotId ?? null).look,

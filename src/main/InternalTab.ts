@@ -12,7 +12,7 @@ const TITLES: Record<InternalPage, string> = {
   downloads: "Downloads",
   gallery: "Component gallery",
   history: "History",
-  flock: "Your mascots",
+  mascots: "Your mascots",
   "mascot-gallery": "Gallery",
   "needs-you": "Needs you",
   recording: "What I watched",
@@ -44,7 +44,7 @@ export class InternalTab {
 
   private get back(): string | null {
     if (this.page === "settings") return settingsBack(this.param);
-    if (this.page === "flock") return mascotsBack(this.param);
+    if (this.page === "mascots") return mascotsBack(this.param);
     if (this.page === "routines") return routinesBack(this.param);
     if (this.page === "mascot-gallery") return galleryBack(this.param);
     return null;

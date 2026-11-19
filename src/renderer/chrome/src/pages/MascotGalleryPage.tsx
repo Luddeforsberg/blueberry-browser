@@ -6,7 +6,6 @@ import { MAX_MASCOT_NAME } from "@shared/mascots";
 import { galleryParam, galleryPlace } from "@shared/galleryPlaces";
 import { Button } from "@common/components/Button";
 import { Choice } from "@common/components/Controls";
-import { BERRY_KIND } from "@common/components/berryKinds";
 import type { Mood } from "@common/components/moods";
 import { Pips } from "@common/components/Pips";
 import { useStill } from "@common/components/motion";
@@ -54,7 +53,7 @@ const startChat = (id: string, choose: (id: string) => void) => {
   void window.chromeAPI.browser.createTab();
 };
 
-const tint = (entry: GalleryMascot) => BERRY_KIND[entry.draft.look.palette];
+const tint = (entry: GalleryMascot) => entry.draft.look.palette;
 
 // The four moods the stage can show, so you can see it working before it's yours.
 type StageMood = Extract<Mood, "rest" | "thinking" | "asking" | "delivered">;

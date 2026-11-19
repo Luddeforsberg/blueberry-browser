@@ -30,7 +30,7 @@ describe("addStarters", () => {
     expect(names(mascots)).toEqual(["Berry", "Plain Words", "Competitor Watch", "Meeting Prep", "Newsletter Builder"]);
     const starters = mascots.all().slice(1);
     expect(starters.map(({ galleryId }) => galleryId)).toEqual([...STARTER_IDS]);
-    expect(new Set(starters.map(({ look }) => look.palette))).toEqual(new Set(["canary", "jackdaw", "robin", "flamingo"]));
+    expect(new Set(starters.map(({ look }) => look.palette))).toEqual(new Set(["cloudberry", "currant", "lingon", "raspberry"]));
     expect(settings.get().startersAdded).toBe(true);
   });
 
@@ -56,7 +56,7 @@ describe("addStarters", () => {
     const mascots = store();
     mascots.save(null, {
       name: "Scout",
-      look: { palette: "robin", accessory: "cap" },
+      look: { palette: "lingon", accessory: "cap" },
       instructions: "News.",
       sites: ["svt.se"],
       tools: ["visit"],
@@ -77,7 +77,7 @@ describe("addStarters", () => {
     const mascots = store();
     const saved = mascots.save(null, {
       name: "Plain Words",
-      look: { palette: "canary", accessory: "bow" },
+      look: { palette: "cloudberry", accessory: "bow" },
       instructions: "Mine.",
       sites: [],
       tools: [],

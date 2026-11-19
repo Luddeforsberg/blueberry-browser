@@ -17,7 +17,7 @@ describe("Gallery.unpublish", () => {
     const mascots = new MascotStore(join(dir, "mascots.json"));
     const saved = mascots.save(null, {
       name: "Scout",
-      look: { palette: "robin", accessory: "cap" },
+      look: { palette: "lingon", accessory: "cap" },
       instructions: "Read.",
       sites: [],
       tools: [],

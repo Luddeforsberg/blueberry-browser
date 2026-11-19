@@ -23,7 +23,7 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     await chrome.evaluate(() =>
       window.chromeAPI.mascots.save(null, {
         name: "Scout",
-        look: { palette: "robin", accessory: "cap" },
+        look: { palette: "lingon", accessory: "cap" },
         instructions: "Read svt.se and mail ana.private@example.com.",
         sites: ["svt.se"],
         tools: ["visit"],
@@ -31,7 +31,7 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     );
 
     // A chat, which is where the example comes from. The chat's other words must not go anywhere.
-    await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock"));
+    await chrome.evaluate(() => window.chromeAPI.browser.openPage("mascots"));
     model.replyWith("Private first reply.");
     await chrome.getByRole("button", { name: "Chat with Scout" }).click();
     const composer = chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Scout" });
@@ -48,7 +48,7 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     const scoutId = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).mascots.find(
       (mascot) => mascot.name === "Scout",
     )!.id;
-    await chrome.evaluate((id) => window.chromeAPI.browser.openPage("flock", { param: id }), scoutId);
+    await chrome.evaluate((id) => window.chromeAPI.browser.openPage("mascots", { param: id }), scoutId);
     await expect(chrome.getByRole("button", { name: /^In the Gallery/ })).toContainText("Not published");
     await chrome.getByRole("button", { name: /^In the Gallery/ }).click();
     const form = chrome.getByRole("form", { name: "Sign in" });
@@ -266,7 +266,7 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
 
     // Unpublished, or changed, it stays as it is.
     server.rows.splice(0, 1);
-    await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock", { param: "list" }));
+    await chrome.evaluate(() => window.chromeAPI.browser.openPage("mascots", { param: "list" }));
     await expect(chrome.getByRole("button", { name: "Chat with Scout" })).toBeVisible();
     expect(onFile()[0].instructions).toBe(original);
 
@@ -275,7 +275,7 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     const popular = entries.find((entry) => entry.draft.name === "Popular");
     expect(popular?.draft).toEqual({
       name: "Popular",
-      look: { palette: "canary", accessory: "bow" },
+      look: { palette: "cloudberry", accessory: "bow" },
       instructions: "Read.",
       sites: [],
       tools: ["visit"],
@@ -398,7 +398,7 @@ test("with no server set up there's no sign-in or publish control, and the Galle
     await chrome.evaluate(() =>
       window.chromeAPI.mascots.save(null, {
         name: "Scout",
-        look: { palette: "robin", accessory: "cap" },
+        look: { palette: "lingon", accessory: "cap" },
         instructions: "Read.",
         sites: [],
         tools: [],
@@ -407,7 +407,7 @@ test("with no server set up there's no sign-in or publish control, and the Galle
     const scoutId = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).mascots.find(
       (mascot) => mascot.name === "Scout",
     )!.id;
-    await chrome.evaluate((id) => window.chromeAPI.browser.openPage("flock", { param: id }), scoutId);
+    await chrome.evaluate((id) => window.chromeAPI.browser.openPage("mascots", { param: id }), scoutId);
     await expect(chrome.getByRole("button", { name: /^Limits/ })).toBeVisible();
     await expect(chrome.getByText("In the Gallery")).toHaveCount(0);
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("mascot-gallery"));

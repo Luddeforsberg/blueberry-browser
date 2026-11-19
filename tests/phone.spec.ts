@@ -34,7 +34,7 @@ const ASKED = "Click the button “Place order” on https://shop.example/cart";
 const SCOUT: MascotProfile = {
   id: "m-scout",
   name: "Scout",
-  look: { palette: "robin", accessory: "cap" },
+  look: { palette: "lingon", accessory: "cap" },
   instructions: "Find the cheapest one that fits.",
   sites: ["shop.example", "prices.example"],
   tools: ["visit", "click", "type"],
@@ -44,7 +44,7 @@ const PENNY: MascotProfile = {
   ...SCOUT,
   id: "m-penny",
   name: "Penny",
-  look: { palette: "canary", accessory: "glasses" },
+  look: { palette: "cloudberry", accessory: "glasses" },
   sites: ["news.example"],
   tools: ["visit"],
 };

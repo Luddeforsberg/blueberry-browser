@@ -17,7 +17,7 @@ test("a mascot that works in the cloud starts the box on Cloud, and it can still
     await chrome.evaluate(() =>
       window.chromeAPI.mascots.save(null, {
         name: "Scout",
-        look: { palette: "robin", accessory: "cap" },
+        look: { palette: "lingon", accessory: "cap" },
         instructions: "Find things.",
         sites: [],
         tools: ["visit"],

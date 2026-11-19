@@ -1,5 +1,5 @@
 import type { MascotProfile } from "./library";
-import { BERRY, BERRY_ID, parseMascotDraft } from "./mascots";
+import { BERRY, BERRY_ID, parseMascotDraft, serverPalette } from "./mascots";
 
 // The mascots on their way to the phone and back. The app shares each mascot's name, look and limits, never what it remembers,
 // and the phone sends a job as one of them with the same snapshot the app would. Plain data, used by the app and, bundled
@@ -26,7 +26,7 @@ export const sharedMascotRows = (mascots: readonly MascotProfile[]): SharedMasco
     .map(({ id, name, look, instructions, sites, tools, galleryId }) => ({
       id,
       name,
-      palette: look.palette,
+      palette: serverPalette(look.palette),
       accessory: look.accessory,
       instructions,
       sites: [...sites],

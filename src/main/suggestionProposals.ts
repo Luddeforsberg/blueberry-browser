@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
 import type { MascotDraft, RoutineSchedule, SuggestionWords } from "../shared/library";
-import { ACCESSORIES, BERRY, PALETTES, normaliseSite, parseMascotDraft, siteAllowed } from "../shared/mascots";
+import { ACCESSORIES, BERRY, PALETTES, normaliseSite, paletteOf, parseMascotDraft, siteAllowed } from "../shared/mascots";
 import type { Digest, Evidence, Feedback } from "./suggestionDigest";
 import { parseDraft } from "./routineSchedule";
 import { areSimilar, nameOfSite, plainText, wordsOf, type Pattern } from "./suggestionPatterns";
@@ -71,7 +71,7 @@ Reply with JSON only, in this shape, with every field its kind needs:
 {"cards":[
 {"kind":"prompt","line":"...","why":"...","evidence":["s1"],"sites":["example.com"],"prompt":"..."},
 {"kind":"routine","line":"...","why":"...","evidence":["s2","s5"],"sites":["example.com"],"name":"...","instructions":"...","schedule":{"kind":"weekly","days":[1],"time":"07:30"}},
-{"kind":"mascot","line":"...","why":"...","evidence":["s3","s4"],"sites":["example.com"],"name":"...","instructions":"...","palette":"robin","accessory":"glasses"}
+{"kind":"mascot","line":"...","why":"...","evidence":["s3","s4"],"sites":["example.com"],"name":"...","instructions":"...","palette":"lingon","accessory":"glasses"}
 ]}
 If nothing is worth offering, reply {"cards":[]}.`;
 
@@ -201,7 +201,7 @@ const mascotDraft = (raw: Record<string, unknown>, name: string, instructions: s
     name,
     instructions,
     look: {
-      palette: palettes.includes(raw.palette as (typeof palettes)[number]) ? raw.palette : palettes[0],
+      palette: palettes.find((id) => id === paletteOf(raw.palette)) ?? palettes[0],
       accessory: accessories.includes(raw.accessory as (typeof accessories)[number]) ? raw.accessory : accessories[0],
     },
     // It can look and go to pages, only on its evidence's sites, and the rest is the user's to switch on.

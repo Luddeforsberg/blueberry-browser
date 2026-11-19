@@ -97,7 +97,7 @@ const SAMPLE_FACTS: MemoryFact[] = [
 const SAMPLE_MASCOT: MascotProfile = {
   id: "gallery-mascot",
   name: "Scout",
-  look: { palette: "kingfisher", accessory: "cap" },
+  look: { palette: "blueberry", accessory: "cap" },
   instructions: "Reads pull requests and tells me what needs me.",
   sites: ["github.com"],
   tools: ["visit"],
@@ -231,7 +231,7 @@ const SAMPLE_SUGGESTIONS: Suggestion[] = [
     why: "You’ve gone back and forth between GitHub and Linear on 4 of the last 5 days",
     draft: {
       name: "Pip",
-      look: { palette: "kingfisher", accessory: "glasses" },
+      look: { palette: "blueberry", accessory: "glasses" },
       instructions: "Keep an eye on my pull requests.",
       sites: ["github.com", "linear.app"],
       tools: ["visit"],
@@ -260,7 +260,7 @@ const SAMPLE_ROWS: SuggestionRow[] = [
     mascot: {
       id: "sample-prep",
       name: "Meeting Prep",
-      look: { palette: "robin", accessory: "glasses" },
+      look: { palette: "lingon", accessory: "glasses" },
       instructions: "",
       sites: [],
       tools: ["visit"],
@@ -417,7 +417,7 @@ const ASK_SAMPLES: AskCard[] = [
     question: "Delete “Scout”?",
     detail: "It leaves your mascots, and what it remembers is forgotten.",
     action: "Delete",
-    mascot: { name: "Scout", look: { palette: "robin", accessory: "glasses" }, hidden: false },
+    mascot: { name: "Scout", look: { palette: "lingon", accessory: "glasses" }, hidden: false },
   },
   {
     id: "notice",
@@ -477,7 +477,7 @@ export const GalleryPage: React.FC = () => {
                     />
                   ))}
                   {[14, 18, 20, 22, 26, 40].map((size) => (
-                    <Mascot key={size} look={{ palette: "flamingo", accessory: "none" }} size={size} still={still} />
+                    <Mascot key={size} look={{ palette: "raspberry", accessory: "none" }} size={size} still={still} />
                   ))}
                 </div>
                 <div className="mt-4 flex items-center gap-2 h-8 w-fit pl-2 pr-3 rounded-row bg-ink text-ground">
@@ -542,12 +542,12 @@ export const GalleryPage: React.FC = () => {
                 author: "Ana",
                 addCount: 12,
                 publishedAt: 1,
-                draft: { ...SAMPLE_MASCOT, look: { palette: "parakeet", accessory: "cap" } },
+                draft: { ...SAMPLE_MASCOT, look: { palette: "gooseberry", accessory: "cap" } },
               }}
               onPick={() => undefined}
             />
             <GalleryTile
-              entry={{ ...SAMPLE_GALLERY_ENTRY, draft: { ...SAMPLE_MASCOT, look: { palette: "jackdaw", accessory: "glasses" } } }}
+              entry={{ ...SAMPLE_GALLERY_ENTRY, draft: { ...SAMPLE_MASCOT, look: { palette: "currant", accessory: "glasses" } } }}
               onPick={() => undefined}
             />
           </div>
