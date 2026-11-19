@@ -57,7 +57,7 @@ export const useChatThread = (chatId: string | null): ChatThread | null => {
     const unsubscribeChunks = chat.onChatChunk(({ chatId: id, content }) => {
       if (id === chatId) setThread((current) => current && { ...current, partial: (current.partial ?? "") + content });
     });
-    library.getChat(chatId).then(setThread);
+    void library.getChat(chatId).then(setThread);
     return () => {
       unsubscribeThread();
       unsubscribeChunks();

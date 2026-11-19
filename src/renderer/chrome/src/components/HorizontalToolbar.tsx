@@ -173,7 +173,7 @@ const BookmarksBar: React.FC = () => {
                     onClick={() => {
                       const open = tabs.find((tab) => !tab.page && sameSite(tab.url, site.url));
                       if (open) void switchTab(open.id);
-                      else createTab(site.url);
+                      else void createTab(site.url);
                     }}
                     onContextMenu={(event) => savedSiteMenu(event, site)}
                     className={cn(SAVED_SITE, selected ? "text-ink" : "text-ink-2", drag?.site.id === site.id && "opacity-40", FOCUS)}

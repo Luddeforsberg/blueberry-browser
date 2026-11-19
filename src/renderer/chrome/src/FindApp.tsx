@@ -13,7 +13,7 @@ export const FindApp: React.FC = () => {
 
   useEffect(() => {
     const api = window.chromeAPI;
-    api.theme.getTheme().then(setTheme);
+    void api.theme.getTheme().then(setTheme);
     const unsubscribe = [
       api.theme.onThemeUpdated(setTheme),
       api.find.onResult(setResult),

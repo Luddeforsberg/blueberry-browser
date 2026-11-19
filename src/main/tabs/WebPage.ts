@@ -97,7 +97,7 @@ export class WebPage {
       this.unloaded = restored;
     } else {
       // Load the initial URL
-      this.loadURL(url);
+      void this.loadURL(url);
     }
   }
 

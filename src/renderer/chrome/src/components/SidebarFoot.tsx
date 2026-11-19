@@ -96,7 +96,7 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; onClose: () => void; 
         type="button"
         onClick={() => {
           choose(mascot.id);
-          createTab();
+          void createTab();
           onClose();
         }}
         className={cn(buttonVariants({ variant: "raised" }), "mt-1.5 w-full min-w-0")}

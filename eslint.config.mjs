@@ -38,6 +38,7 @@ export default tseslint.config(
       "@typescript-eslint/no-base-to-string": "error",
       // A switch with a default has said what happens to the rest, so only one with neither fails.
       "@typescript-eslint/switch-exhaustiveness-check": ["error", { considerDefaultExhaustiveForUnions: true }],
+      "@typescript-eslint/no-floating-promises": "error",
     },
   },
   {

@@ -53,7 +53,7 @@ const Favourites: React.FC<{ dragging: SiteDragging }> = ({ dragging: { drag, st
                 onClick={() => {
                   const open = tabs.find((tab) => !tab.page && sameSite(tab.url, site.url));
                   if (open) void switchTab(open.id);
-                  else createTab(site.url);
+                  else void createTab(site.url);
                 }}
                 onContextMenu={(event) => savedSiteMenu(event, site)}
                 className={cn(

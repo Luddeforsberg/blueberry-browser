@@ -11,9 +11,9 @@ export const ShellProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     const api = window.chromeAPI;
-    api.layout.getLayout().then(setLayout);
-    api.theme.getTheme().then(setTheme);
-    api.settings.getSettings().then(setSettings);
+    void api.layout.getLayout().then(setLayout);
+    void api.theme.getTheme().then(setTheme);
+    void api.settings.getSettings().then(setSettings);
     const unsubscribe = [
       api.layout.onLayoutUpdated(setLayout),
       api.theme.onThemeUpdated(setTheme),

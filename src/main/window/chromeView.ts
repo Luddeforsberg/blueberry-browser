@@ -35,7 +35,7 @@ export const createChromeView = (region: ChromeRegion): ChromeView => {
 
   // The chrome keeps its preload for its whole life, so it must never show anything but our own page.
   view.webContents.on("will-navigate", (event) => event.preventDefault());
-  view.webContents.loadURL(url);
+  void view.webContents.loadURL(url);
 
   return { view, url };
 };

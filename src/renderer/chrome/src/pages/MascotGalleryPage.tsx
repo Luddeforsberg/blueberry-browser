@@ -186,7 +186,7 @@ export const MascotGalleryPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
   const asked = useRef(0);
   const load = useCallback(() => {
     const ask = ++asked.current;
-    window.chromeAPI.mascots
+    void window.chromeAPI.mascots
       .gallery()
       .catch((): GalleryListing => ({ entries: [], status: "unreachable" }))
       .then((answer) => ask === asked.current && setListing(answer));
@@ -197,7 +197,7 @@ export const MascotGalleryPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
   useEffect(() => {
     if (linkedId === null || linkKey === null) return undefined;
     let left = false;
-    window.chromeAPI.mascots
+    void window.chromeAPI.mascots
       .galleryLinked(linkedId)
       .catch((): GalleryLinked => ({ entry: null, status: "unreachable" }))
       .then((answer) => {
