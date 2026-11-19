@@ -5,6 +5,7 @@ import { createPageTools, type PageTool } from "./browserTools";
 import type { CdpTab } from "./CdpTab";
 import { CloudSessions } from "./cloudBrowser";
 import { findChrome, isLocalEndpoint, localChrome } from "./localChrome";
+import { scrollPage } from "./pageScripts";
 
 // Berry's own tools, unchanged, on a page in a real headless Chrome reached over CDP. Skipped where there's no Chrome.
 
@@ -47,6 +48,10 @@ describe.skipIf(!findChrome())("a page in a browser over CDP", () => {
         response.end(
           `<title>Links</title><a href="${away}/popup-link" target="_blank">Link away</a> <button onclick="window.open('${away}/popup-script')">Open away</button> <a href="${origin}/next" target="_blank">Next</a>`,
         );
+        return;
+      }
+      if (request.url === "/long") {
+        response.end(`<!doctype html><title>Long</title>${"<p>line</p>".repeat(400)}`);
         return;
       }
       response.end(request.url === "/" ? PAGE : `<title>${request.url}</title><p>${request.url}</p>`);
@@ -191,6 +196,34 @@ describe.skipIf(!findChrome())("a page in a browser over CDP", () => {
     expect(await tab.page.evaluate(() => [innerWidth, innerHeight])).toEqual([900, 500]);
     await tab.fitTo(1280, 720);
     expect(await tab.page.evaluate(() => [innerWidth, innerHeight])).toEqual([1280, 720]);
+  });
+
+  it("answers a smooth scroll where it ends, even one that starts late, and at once where the page can't go", async () => {
+    const long = await cloud.open("job", "cloud-8", `${origin}/long`, { onChange: () => {} });
+    await long.settled();
+    // Where it answered, where it came to rest, and whether it answered at once, timed in the page.
+    const scroll = async (direction: "up" | "down", page = long, first = "") => {
+      const { top, ms } = await page.runInPage<{ top: number; ms: number }>(
+        `${first}(async (started) => ({ ...(await ${scrollPage(direction, true)}), ms: performance.now() - started }))(performance.now())`,
+      );
+      return { top, settled: await page.runInPage<number>("Math.round(scrollY)"), quick: ms < 100 };
+    };
+    // Busy for 200ms just after the call, as a page still loading can be, so the scroll hasn't started 120ms in.
+    const late = await scroll("down", long, "setTimeout(() => { const end = performance.now() + 200; while (performance.now() < end); });");
+    expect(late.top).toBeGreaterThan(0);
+    expect(late).toEqual({ top: late.settled, settled: late.settled, quick: false });
+    const normal = await scroll("down");
+    expect(normal.top).toBeGreaterThan(late.top);
+    expect(normal).toEqual({ top: normal.settled, settled: normal.settled, quick: false });
+    // Already at the bottom, already at the top, and a page too short to scroll.
+    await long.runInPage("scrollTo(0, document.documentElement.scrollHeight)");
+    const bottom = await scroll("down");
+    expect(bottom.top).toBeGreaterThan(normal.top);
+    expect(bottom).toEqual({ top: bottom.settled, settled: bottom.settled, quick: true });
+    await long.runInPage("scrollTo(0, 0)");
+    expect(await scroll("up")).toEqual({ top: 0, settled: 0, quick: true });
+    expect(await scroll("down", tab)).toEqual({ top: 0, settled: 0, quick: true });
+    await cloud.close("cloud-8");
   });
 
   it("lets one job at a time use the session", () => {
