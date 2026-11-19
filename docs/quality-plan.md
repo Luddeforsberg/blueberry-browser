@@ -101,6 +101,7 @@ This is the `foundations` audit of the preview branch at `581637f`. The full rep
 17. Split `ipc.ts` (low). Done: `src/shared/ipc.ts` re-exports ten files in `src/shared/ipc/`, held to types only by a lint rule. The built app is byte-identical.
 18. The other files over 400 lines. Done: every file is within 400 lines, and `linesOver` in `eslint.limits.mjs` is empty.
 19. `exactOptionalPropertyTypes`, then `noUncheckedIndexedAccess` (medium). The first is on for page code, and everything it finds in main and the renderers is fixed. It stays off there for now, because LangChain's own types fail under it at `humanInTheLoopMiddleware` in `agent.ts`, in the latest LangChain too.
+    - The user's call: a `pnpm patch` of `@langchain/core` that adds `| undefined` to `description` in `ZodV3TypeDef` and `ZodV3Like` (`dist/utils/types/zod.d.ts`) clears it, types only. It also needs `runner/Dockerfile` to copy `patches/` before `pnpm install`, so build the runner's image once to check. Otherwise, turn the flag on when LangChain fixes it.
 20. Type-aware lint, one rule at a time (medium).
 21. Fences: SQL, `fetch`, effects and timers, the UI kit (medium).
 22. End-to-end tests in CI, and protect `main` (medium).
