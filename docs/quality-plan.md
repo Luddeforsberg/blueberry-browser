@@ -97,7 +97,7 @@ This is the `foundations` audit of the preview branch at `581637f`. The full rep
 13. Page code out of template strings (high). Done.
 14. Split `browserTools.ts` (high, Codex). Done: 13 files in `tools/`, with the ask-first rules alone in `askFirst.ts`. The tool list the model sees is identical before and after.
 15. Split `Chats.ts` (high, Codex). Done: `Chats` keeps every public method and hands each to one of 10 parts in `chats/`, which nothing outside `chats/` may import.
-16. Split `Window.ts` (medium).
+16. Split `Window.ts` (medium). Done: `Window` is the face callers see, `WindowParts` builds the window and holds 20 parts, one job each.
 17. Split `ipc.ts` (low).
 18. The other files over 400 lines.
 19. `exactOptionalPropertyTypes`, then `noUncheckedIndexedAccess` (medium).
