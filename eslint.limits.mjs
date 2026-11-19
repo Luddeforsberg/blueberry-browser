@@ -20,7 +20,7 @@ export const linesOver = {
   "src/main/RunnerJobs.ts": 720,
   "src/main/Tab.ts": 756,
   "src/main/TelegramChannel.ts": 409,
-  "src/main/Window.ts": 1899,
+  "src/main/Window.ts": 1898,
   "src/main/agent.test.ts": 689,
   "src/main/agent.ts": 466,
   "src/main/browserTools.test.ts": 874,

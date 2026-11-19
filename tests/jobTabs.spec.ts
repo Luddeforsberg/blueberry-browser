@@ -103,4 +103,23 @@ test.describe("a job's tabs", () => {
       .toEqual([`${site.origin}/a`]);
     await chrome.screenshot({ path: join(SHOTS, "3-taken-over.png") });
   });
+
+  test("go under their chat even when one opens before the chat's own tab", async () => {
+    model.callTools({ name: "open_tab", args: { url: `${site.origin}/a` } });
+    model.replyWith("It's on 127.0.0.1.");
+    const finish = model.holdBeforeFirstToken();
+    const sent = await chrome.evaluate(
+      (origin) => window.chromeAPI.chat.send(null, `Find it on ${origin}`, { seePage: false }),
+      site.origin,
+    );
+    await expect.poll(async () => (await tabs()).some(({ jobChatId }) => jobChatId === sent!.id)).toBe(true);
+    await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), sent!.id);
+
+    finish();
+    // The reply points to its page, so that stays, as the user's, under the chat.
+    const order = async () => (await tabs()).filter(({ page, url }) => page === "chat" || url.startsWith(site.origin));
+    await expect
+      .poll(async () => (await order()).map(({ page, url, jobChatId }) => page ?? `${url} ${jobChatId ?? "theirs"}`))
+      .toEqual(["chat", `${site.origin}/a theirs`]);
+  });
 });
