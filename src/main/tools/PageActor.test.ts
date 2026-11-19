@@ -85,7 +85,7 @@ describe("when the tab is taken away mid-draw", () => {
         webContents: {
           isDestroyed: () => false,
           // The page has no mascot yet, and the tab is handed over while that answer is on its way.
-          executeJavaScriptInIsolatedWorld: async (_world: number, [{ code }]: Array<{ code: string }>) => {
+          executeJavaScriptInIsolatedWorld: async (_world: number, [{ code }]: [{ code: string }]) => {
             sent.push(code);
             tab.heldForUser = true;
             return "absent";
@@ -120,7 +120,7 @@ describe("when the tab is taken away mid-draw", () => {
       existingView: {
         webContents: {
           isDestroyed: () => false,
-          executeJavaScriptInIsolatedWorld: async (_world: number, [{ code }]: Array<{ code: string }>) => {
+          executeJavaScriptInIsolatedWorld: async (_world: number, [{ code }]: [{ code: string }]) => {
             sent.push(code);
             return true;
           },
@@ -158,7 +158,7 @@ describe("when the tab is taken away mid-draw", () => {
       existingView: {
         webContents: {
           isDestroyed: () => false,
-          executeJavaScriptInIsolatedWorld: async (_world: number, [{ code }]: Array<{ code: string }>) => {
+          executeJavaScriptInIsolatedWorld: async (_world: number, [{ code }]: [{ code: string }]) => {
             sent.push(code);
             return true;
           },

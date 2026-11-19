@@ -278,9 +278,10 @@ export const toolContext = <T extends PageTarget>({
     const { result, refused } = await tab.withNavigationLimit(allowed, act);
     if (!allowed(tab.url)) return `${offLimits(tab.url).message} The tab went there by itself. Don't use it again.`;
     // A picture can't carry words, and it shows where the tab stayed anyway.
-    return refused.length === 0 || result.startsWith("data:image/")
+    const [firstRefused] = refused;
+    return firstRefused === undefined || result.startsWith("data:image/")
       ? result
-      : `${result} The page tried to go to ${siteOf(refused[0])}, which ${limits?.name} isn't allowed on, so it stayed here.`;
+      : `${result} The page tried to go to ${siteOf(firstRefused)}, which ${limits?.name} isn't allowed on, so it stayed here.`;
   };
 
   // The name each element had when it was last described, which for an allowed call is the check just before it runs,

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createPageTools } from "./browserTools";
+import { defined } from "../../shared/testing";
 
 describe("the ask_user tool", () => {
   const askTool = (ask: (question: string, answers: string[]) => Promise<string | null>) =>
@@ -76,9 +77,9 @@ describe("the ask_user tool", () => {
     });
     const both = Promise.all([tool.run({ question: "First?" }), tool.run({ question: "Second?" })]);
     await vi.waitFor(() => expect(asked).toEqual(["First?"]));
-    answers[0]();
+    defined(answers[0])();
     await vi.waitFor(() => expect(asked).toEqual(["First?", "Second?"]));
-    answers[1]();
+    defined(answers[1])();
     await both;
   });
 });

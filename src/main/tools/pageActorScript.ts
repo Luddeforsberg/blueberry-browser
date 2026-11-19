@@ -1,5 +1,6 @@
 import type { ActorCommand } from "../../page/actor/command";
 import type { ActorLook } from "../../page/actor/stage";
+import { missing } from "../../shared/missing";
 import { ACTOR_ART, ACTOR_ART_SHEET, ACTOR_BERRIES, type ArtNode } from "./pageActorArt";
 import * as page from "./pageCode";
 import { inPage } from "./pageScripts";
@@ -21,8 +22,10 @@ export const artFor = (node: ArtNode, palette: string): ArtNode => {
   return prune(node);
 };
 
-const posesFor = (accessory: string, palette: string): Record<string, ArtNode> =>
-  Object.fromEntries(Object.entries(ACTOR_ART[accessory] ?? ACTOR_ART.none).map(([pose, node]) => [pose, artFor(node, palette)]));
+const posesFor = (accessory: string, palette: string): Record<string, ArtNode> => {
+  const art = ACTOR_ART[accessory] ?? ACTOR_ART.none ?? missing("the art with no accessory");
+  return Object.fromEntries(Object.entries(art).map(([pose, node]) => [pose, artFor(node, palette)]));
+};
 
 // Where the feet were on the last page, so the mascot carries on from there after a navigation.
 export const installActor = (key: string, look: ActorLook, start: { x: number; y: number } | null): string =>

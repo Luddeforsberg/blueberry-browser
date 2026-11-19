@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createPageTools } from "./browserTools";
 import type { Tab } from "../tabs/Tab";
 import type { MascotTool } from "../../shared/library";
+import { defined } from "../../shared/testing";
 
 const IMAGE = Buffer.from("picture");
 
@@ -20,9 +21,9 @@ describe("a mascot's limits", () => {
       runInPage: vi.fn(async () => ({ total: 0, elements: [] })),
       ...extra,
     }) as unknown as Tab;
-  const setUp = (tabs: Tab[], tools: MascotTool[] = ["visit", "click", "type"], openTab = vi.fn(() => tabs[0])) => {
+  const setUp = (tabs: Tab[], tools: MascotTool[] = ["visit", "click", "type"], openTab = vi.fn(() => defined(tabs[0]))) => {
     const list = createPageTools({
-      activeTab: () => tabs[0],
+      activeTab: () => defined(tabs[0]),
       allTabs: () => tabs,
       openTab,
       closeTab: () => true,

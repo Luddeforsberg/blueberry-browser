@@ -313,9 +313,9 @@ export class CdpTab implements PageTarget {
       await this.page.goto(url, { waitUntil: "commit", timeout: LOAD_END_MS });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const failed = /net::(ERR_[A-Z_]+)/.exec(message);
-      if (failed && failed[1] !== "ERR_ABORTED") {
-        this._loadError = { url, description: failed[1] };
+      const failed = /net::(ERR_[A-Z_]+)/.exec(message)?.[1];
+      if (failed && failed !== "ERR_ABORTED") {
+        this._loadError = { url, description: failed };
         this.events.onChange();
       }
       throw error;
