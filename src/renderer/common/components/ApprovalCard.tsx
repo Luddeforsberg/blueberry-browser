@@ -8,7 +8,11 @@ import { useCardKeys, type CardRegion } from "./cardKeys";
 // Exactly what will happen, set apart from the sentence above it in an inset well, because this is what's being
 // allowed. 12px mono, and never cut. `mark` is the piece the card's reason is about, on `ask-bg`, and only ever a piece
 // that's in the words as they are.
-export const ExactWords: React.FC<{ children: string; mark?: string; className?: string }> = ({ children, mark, className }) => {
+export const ExactWords: React.FC<{ children: string; mark?: string | undefined; className?: string }> = ({
+  children,
+  mark,
+  className,
+}) => {
   const at = mark ? children.indexOf(mark) : -1;
   return (
     <p
@@ -82,8 +86,8 @@ export const WhyLine: React.FC<{ children: React.ReactNode }> = ({ children }) =
 // `head` goes over the words, as on Needs you, and `note` under the card, such as why it asks.
 export const ApprovalCard: React.FC<{
   question: React.ReactNode;
-  exactly?: string;
-  mark?: string;
+  exactly?: string | undefined;
+  mark?: string | undefined;
   head?: React.ReactNode;
   note?: React.ReactNode;
   onConfirm: () => void;

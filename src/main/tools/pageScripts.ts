@@ -12,10 +12,10 @@ export const inPage = <Args>(script: PageScript<Args>, args: NoInfer<Args>): str
   `(${script.code})(${args === undefined ? "" : JSON.stringify(args)})`;
 
 export interface ListOptions {
-  query?: string;
+  query?: string | undefined;
   limit: number;
   // Also pictures and text, which are left out otherwise unless the query names them.
-  everything?: boolean;
+  everything?: boolean | undefined;
   // False in a frame `browserTools` runs this in by itself, which gets the frames inside it the same way.
   descend: boolean;
 }

@@ -323,7 +323,7 @@ export const startWatching = (): Watching => {
       wake = null;
       finishAll();
       stopping.abort();
-      delete globalThis.__watching;
+      Reflect.deleteProperty(globalThis, "__watching");
       waiting?.(null);
       return queue.splice(0);
     },

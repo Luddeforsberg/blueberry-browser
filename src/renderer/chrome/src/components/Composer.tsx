@@ -20,34 +20,34 @@ export const Composer: React.FC<{
   onChange: (value: string) => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   rows?: number;
-  autoFocus?: boolean;
+  autoFocus?: boolean | undefined;
   // Moves the keyboard here each time this changes.
-  focusKey?: number;
+  focusKey?: number | undefined;
   spellCheck?: boolean;
   // The new tab's box is larger, with room for a longer ask. Everywhere else it's the chat's.
   size?: "hero" | "chat";
   // Shown above the text: the chips for what it's been given to read.
   attachment?: React.ReactNode;
   // What the + menu offers. Without it, there's no +.
-  add?: AddMenuOptions;
+  add?: AddMenuOptions | undefined;
   // Files dropped or pasted onto the box, which go where A file's do.
-  onFiles?: (files: File[]) => void;
+  onFiles?: ((files: File[]) => void) | undefined;
   // With no box of its own, because the window it's in is the box.
   bare?: boolean;
   canSend: boolean;
   onSend: () => void;
   // While a reply is running, Send stops it.
-  onStop?: () => void;
+  onStop?: (() => void) | undefined;
   // Who this goes to. With `onChooseMascot`, pressing it opens the menu. Without, it just says who.
-  mascot?: MascotProfile;
-  onChooseMascot?: (id: string) => void;
+  mascot?: MascotProfile | undefined;
+  onChooseMascot?: ((id: string) => void) | undefined;
   // Who's ticked in the menu, when the pill is still showing the one before (the new tab's switch).
   chosenId?: string;
   face?: PillFace;
   // The placeholder fades while one mascot gives way to another.
   quietPlaceholder?: boolean;
   // Whether this job is done in the cloud, where that's set up.
-  cloud?: { on: boolean; onToggle: () => void };
+  cloud?: { on: boolean; onToggle: () => void } | undefined;
   // The chosen mascot's limits, in words, in the shell under the card. Null or empty slides it away.
   limits?: string | null;
 }> = ({

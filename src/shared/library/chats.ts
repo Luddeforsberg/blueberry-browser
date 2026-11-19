@@ -80,7 +80,7 @@ export interface ChatThreadMessage {
   attached?: SentAttachment[];
   // A reply's words between its steps, when it began and how long it took, in milliseconds. None from before these.
   said?: SaidOnTheWay[];
-  startedAt?: number;
+  startedAt?: number | undefined;
   took?: number;
 }
 

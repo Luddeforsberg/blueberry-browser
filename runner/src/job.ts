@@ -108,7 +108,7 @@ export interface RunJobOptions {
   answerTimeoutMs?: number;
   log?: (line: string) => void;
   // Tells the owner's phone, with no content: when the job asks them, and when it ends other than by their own Stop.
-  notify?: (kind: PushKind) => Promise<void>;
+  notify?: ((kind: PushKind) => Promise<void>) | undefined;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

@@ -28,7 +28,7 @@ export const StepCard: React.FC<{
   label: string;
   action?: React.ReactNode;
   question: string;
-  hint?: string;
+  hint?: string | undefined;
   motionKey?: string;
   from?: "next" | "back";
   nav: React.ReactNode;
@@ -71,7 +71,7 @@ export const StepCard: React.FC<{
 };
 
 // Under the card, in the shell: a round Back on the left, where the steps are in the middle, and the button on the right.
-export const StepNav: React.FC<{ step: number; steps: number; onBack?: () => void; children: React.ReactNode }> = ({
+export const StepNav: React.FC<{ step: number; steps: number; onBack?: (() => void) | undefined; children: React.ReactNode }> = ({
   step,
   steps,
   onBack,

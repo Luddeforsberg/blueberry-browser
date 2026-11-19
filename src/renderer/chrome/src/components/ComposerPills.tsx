@@ -76,11 +76,11 @@ const MenuRow: React.FC<{ mascot: MascotProfile; checked: boolean; onChoose: () 
 // Says who this goes to. Where the choice is still open it opens the menu, and anywhere else it only says who.
 export const MascotPill: React.FC<{
   mascot: MascotProfile;
-  face?: PillFace;
+  face?: PillFace | undefined;
   small: boolean;
   // On the chat's card, where a quiet fill is `card-2`.
   onCard: boolean;
-  chooser?: { open: boolean; onToggle: () => void; onOpen: () => void; button: React.Ref<HTMLButtonElement> };
+  chooser?: { open: boolean; onToggle: () => void; onOpen: () => void; button: React.Ref<HTMLButtonElement> } | undefined;
 }> = ({ mascot, face, small, onCard, chooser }) => {
   const name = useAssistantName(mascot);
   const { keepBerryStill } = useShell().settings;

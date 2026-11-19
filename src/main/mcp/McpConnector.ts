@@ -289,7 +289,7 @@ export class McpConnector {
         },
       );
     });
-    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+    const transport = new StreamableHTTPServerTransport({ enableJsonResponse: true });
     response.on("close", () => {
       void transport.close();
       void server.close();

@@ -12,7 +12,7 @@ export interface PageSnapshot {
   text: string | null;
   screenshot: string | null;
   // Said after the page, as ours rather than the page's.
-  note?: string;
+  note?: string | undefined;
 }
 
 const ATTRIBUTE: Record<string, string> = { "&": "&amp;", '"': "&quot;", "<": "&lt;", ">": "&gt;" };

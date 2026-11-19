@@ -71,11 +71,11 @@ export interface PageToolAccess<T extends PageTarget = PageTarget> {
   // Told about each tab a tool is about to use, so the user can see where Berry is working.
   onUse: (tab: T) => void;
   // A mascot other than Berry. It only ever takes tools and sites away. Approvals work the same either way.
-  limits?: Pick<MascotProfile, "name" | "sites" | "tools">;
+  limits?: Pick<MascotProfile, "name" | "sites" | "tools"> | undefined;
   // What the user asked, in their own words, and the sites earlier replies in this chat were on. With the sites this job
   // goes to, they're where it may go without asking. Anywhere else asks in the default mode.
-  asked?: string;
-  beenTo?: Iterable<string>;
+  asked?: string | undefined;
+  beenTo?: Iterable<string> | undefined;
   // Tabs the user attached to this chat. They're the user's, so they're reached and never closed.
   attached?: (id: string) => boolean;
   // Whether this job has been stopped. A tool already running only hears of it here, and the mascot gives it time to.
@@ -222,7 +222,7 @@ export const toolContext = <T extends PageTarget>({
   };
   // While the card waits, it stands on what the card is about, then and whenever the user comes to look. Nothing waits
   // for this, so the card goes out as it always did.
-  const standOnRef = ({ tabId: id, ref }: { tabId?: string; ref: string }) => {
+  const standOnRef = ({ tabId: id, ref }: { tabId?: string | undefined; ref: string }) => {
     const tab = canSee() ? find(id) : null;
     const actor = tab?.actor;
     if (tab && actor) actor.askAbout(() => (canSee() && find(tab.id) === tab ? spotOfRef(tab, actor, ref) : Promise.resolve(null)));

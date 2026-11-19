@@ -49,9 +49,9 @@ export interface Run {
   // The cloud pages it has used in this reply, latest last, like `used`.
   usedInCloud?: Set<CdpTab>;
   // Asks at least this much before acting, whatever the setting, as for a job from the relay.
-  askAtLeast?: ActionApproval;
+  askAtLeast?: ActionApproval | undefined;
   // Told once, when this reply ends, how it went. Not for a later reply in the same chat.
-  onEnd?: (ended: EndedReply) => void;
+  onEnd?: ((ended: EndedReply) => void) | undefined;
   // The user typed this here and is there to answer, so it may ask or plan before starting.
   userPresent: boolean;
 }

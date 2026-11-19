@@ -60,7 +60,7 @@ export const RoutineRunRow: React.FC<{
   run: RoutineRun;
   open?: boolean;
   onStop: () => void;
-  onRunAgain?: () => void;
+  onRunAgain?: (() => void) | undefined;
 }> = ({ run, open: openAtFirst = false, onStop, onRunAgain }) => {
   const { routines } = useLibrary();
   const { find } = useMascots();

@@ -161,8 +161,8 @@ export const WorkingLine: React.FC<{
   steps: ChatStep[];
   said: SaidOnTheWay[];
   status: React.ReactNode;
-  startedAt?: number;
-  onShowWork?: () => void;
+  startedAt?: number | undefined;
+  onShowWork?: (() => void) | undefined;
 }> = ({ steps, said, status, startedAt, onShowWork }) => {
   const [open, setOpen] = useState(false);
   const entries = workEntries(steps, said);
@@ -225,7 +225,7 @@ export const WorkingLine: React.FC<{
 
 // When it ends, the line folds where it is: "Worked 0:48", then "7 steps on klm.com" and a faint arrow, in `ink-3`.
 // Pressing it opens the steps in place, above the answer. Folded, the steps worth seeing on any trail still show.
-export const FoldedLine: React.FC<{ steps: ChatStep[]; said: SaidOnTheWay[]; took?: number }> = ({ steps, said, took }) => {
+export const FoldedLine: React.FC<{ steps: ChatStep[]; said: SaidOnTheWay[]; took?: number | undefined }> = ({ steps, said, took }) => {
   const [open, setOpen] = useState(false);
   const words = foldedWords(steps, took);
   const kept = keptWhenFolded(steps);

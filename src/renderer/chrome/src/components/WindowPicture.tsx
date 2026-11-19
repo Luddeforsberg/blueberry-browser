@@ -5,7 +5,7 @@ import { cn } from "@common/lib/utils";
 // window is, and System is half of each. Without one, it's in the window's own colours. A hairline goes round it, as a
 // light window is nearly the colour of the sheet it's drawn on.
 
-const Window: React.FC<{ tabs: "side" | "top"; className?: string }> = ({ tabs, className }) =>
+const Window: React.FC<{ tabs: "side" | "top"; className?: string | undefined }> = ({ tabs, className }) =>
   tabs === "side" ? (
     <span
       className={cn("absolute inset-0 flex py-[5px] pr-[5px] bg-ground rounded-[inherit] shadow-[inset_0_0_0_1px_var(--line)]", className)}

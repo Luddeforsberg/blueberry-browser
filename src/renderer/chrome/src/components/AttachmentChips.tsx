@@ -17,14 +17,14 @@ const Chip: React.FC<{
   name: string;
   fact?: string | null;
   // Said in full where `fact` is a shortening.
-  factInFull?: string | null;
-  problem?: string | null;
+  factInFull?: string | null | undefined;
+  problem?: string | null | undefined;
   label: string;
   // Shown on hover when there's nothing more to say, such as a page's title.
   hint?: string;
-  onRemove?: () => void;
+  onRemove?: (() => void) | undefined;
   removeLabel?: string;
-  sheet?: boolean;
+  sheet?: boolean | undefined;
 }> = ({ icon, name, fact, factInFull, problem, label, hint, onRemove, removeLabel, sheet }) => {
   const said = problem ?? fact;
   return (
@@ -64,7 +64,7 @@ const Chip: React.FC<{
 const iconClass = (problem: string | null | undefined) => cn("size-[13px] shrink-0", problem ? "text-ask" : "text-ink-3");
 
 // The page in front, marked as that.
-export const PageChip: React.FC<{ title: string; host: string; favicon?: string | null; onRemove: () => void }> = ({
+export const PageChip: React.FC<{ title: string; host: string; favicon?: string | null | undefined; onRemove: () => void }> = ({
   title,
   host,
   favicon,
@@ -98,7 +98,7 @@ export const TabChip: React.FC<{
   />
 );
 
-const FileIcon: React.FC<{ kind: FileChipInfo["kind"]; thumbnail: string | null; problem?: string | null }> = ({
+const FileIcon: React.FC<{ kind: FileChipInfo["kind"]; thumbnail: string | null; problem?: string | null | undefined }> = ({
   kind,
   thumbnail,
   problem,

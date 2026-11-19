@@ -131,7 +131,7 @@ const TRAIL_MARKS: Record<Exclude<TrailKind, "secret">, PipMark> = {
 
 // The steps under the site they were on: its icon and name as a label, then the steps on a thread, a hairline down the
 // left from each step's mark to the next. Everything's plain text, so a label from a page is only ever words.
-export const TrailNotes: React.FC<{ steps: TrailStep[]; onRemove?: (id: string) => void }> = ({ steps, onRemove }) => {
+export const TrailNotes: React.FC<{ steps: TrailStep[]; onRemove?: ((id: string) => void) | undefined }> = ({ steps, onRemove }) => {
   const isBerry = useAssistantName() !== "Assistant";
   const groups: Array<{ site: string; steps: TrailStep[] }> = [];
   steps.forEach((step) => {

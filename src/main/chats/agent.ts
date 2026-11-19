@@ -1,5 +1,5 @@
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import type { AIMessageChunk, BaseMessage } from "@langchain/core/messages";
+import type { AIMessageChunk, BaseMessage, StandardMessageStructure } from "@langchain/core/messages";
 import type { Interrupt } from "langchain";
 import * as dotenv from "dotenv";
 import { join } from "path";
@@ -40,12 +40,12 @@ export interface ReplyOptions {
   // call the user allowed, naming what they allowed, and is only for the screen, as `kind` is.
   onStep: (text: string, shown?: string, kind?: StepKind) => () => void;
   // Told the tokens each model call used, as they're reported.
-  onUsage?: (tokens: number) => void;
+  onUsage?: ((tokens: number) => void) | undefined;
   // Added after the system prompt: who this chat runs as, in the user's own words. Set for a mascot other than Berry.
-  mascotNote?: string;
+  mascotNote?: string | undefined;
   // The user typed this in Blueberry's own composer and is there to answer, so a reply may ask or plan first. Never for a
   // routine, the cloud, another app or the desktop mascot, where nobody may be looking.
-  userPresent?: boolean;
+  userPresent?: boolean | undefined;
 }
 
 // What a reply streams. Words are more of the answer. A status line is what the model wrote in a message that went on to
@@ -127,7 +127,11 @@ const shortened = (message: BaseMessage, ToolMessage: typeof import("@langchain/
   const text = typeof content === "string" ? content : message.text;
   if (typeof content === "string" && text.length <= SHORTENED_LENGTH) return message;
   const { tool_call_id, name } = message as InstanceType<typeof ToolMessage>;
-  return new ToolMessage({ tool_call_id, name, content: `${text.slice(0, SHORTENED_LENGTH)}${SHORTENED_NOTE}` });
+  return new ToolMessage({
+    tool_call_id,
+    ...(name === undefined ? {} : { name }),
+    content: `${text.slice(0, SHORTENED_LENGTH)}${SHORTENED_NOTE}`,
+  });
 };
 
 export const shortenOldResults = async (messages: BaseMessage[]): Promise<BaseMessage[]> => {
@@ -280,7 +284,7 @@ export async function* streamReply(
         const [chunk] = part[1];
         // Tool results come through this stream too, and they're for the model.
         if (chunk.type === "ai") yield* sorter.chunk(chunk.text, callsTools(chunk as AIMessageChunk));
-        const usage = chunk.type === "ai" ? (chunk as AIMessageChunk).usage_metadata : undefined;
+        const usage = chunk.type === "ai" ? (chunk as AIMessageChunk<StandardMessageStructure>).usage_metadata : undefined;
         if (usage) onUsage?.(usage.total_tokens);
       } else {
         // LangGraph adds this key to its updates, which the agent's types don't show.

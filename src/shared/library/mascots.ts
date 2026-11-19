@@ -32,7 +32,7 @@ export interface MascotProfile extends MascotDraft {
   // The Gallery entry this is a copy of, only so the Gallery can say it's added. The copy never reads from the entry.
   galleryId?: string;
   // Its row on the Gallery's server, if the user published it. Saving here doesn't change that row.
-  publishedId?: string;
+  publishedId?: string | undefined;
   // Choosing it turns on Do this in the cloud. Only the user's own choice here, so it's never published or shared.
   worksInCloud?: boolean;
 }
@@ -81,7 +81,7 @@ export interface GalleryMascot {
   description: string;
   draft: MascotDraft;
   // Starters only have one from a real run. Left out, there's none to show.
-  example?: MascotExample | null;
+  example?: MascotExample | null | undefined;
   // These are for what people published. A starter has no server row, so it has no count to show.
   addCount?: number;
   publishedAt?: number;

@@ -241,7 +241,7 @@ export const TooltipProvider: React.FC<{ mac: boolean; elsewhere?: TipElsewhere;
 // only when they really are cut. The control keeps its own accessible name: the pill is hidden from screen readers.
 export const Tooltip: React.FC<{
   words: string | null | undefined;
-  shortcut?: string;
+  shortcut?: string | undefined;
   whenCut?: boolean;
   children: React.ReactElement;
 }> = ({ words, shortcut, whenCut = false, children }) => {

@@ -8,12 +8,12 @@ import { atPointer } from "./menuAnchors";
 // Berry, or one of the mascots, as the settings say: hidden, still, or itself. Right-clicking it offers both switches.
 // `still` holds it still whatever the settings say, where something else in its area already moves.
 export const Berry: React.FC<{
-  mood?: Mood;
+  mood?: Mood | undefined;
   size: number;
-  className?: string;
-  mascot?: MascotProfile;
-  still?: boolean;
-  shut?: boolean;
+  className?: string | undefined;
+  mascot?: MascotProfile | undefined;
+  still?: boolean | undefined;
+  shut?: boolean | undefined;
 }> = ({ mascot, ...props }) => {
   const { settings } = useShell();
 

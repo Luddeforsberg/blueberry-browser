@@ -66,7 +66,10 @@ const launch = (executable: string): Promise<{ endpoint: string; process: ChildP
 };
 
 // `endpoint` connects to a browser already running here. Otherwise one is launched from `executable` or the usual place.
-export const localChrome = ({ endpoint, executable }: { endpoint?: string; executable?: string } = {}): CloudBrowser => ({
+export const localChrome = ({
+  endpoint,
+  executable,
+}: { endpoint?: string | undefined; executable?: string | undefined } = {}): CloudBrowser => ({
   name: "local",
   // Closing the session ends this browser, so there's nothing left at a provider to release.
   hasSession: false,

@@ -1,5 +1,6 @@
 import { FakeListChatModel } from "@langchain/core/utils/testing";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
+import type { StandardMessageStructure } from "@langchain/core/messages";
 import { AIMessage, fakeModel } from "langchain";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -67,7 +68,10 @@ describe("streamReply", () => {
 
   it("reports the tokens each model call used", async () => {
     const model = fakeModel().respond(
-      new AIMessage({ content: "hello", usage_metadata: { input_tokens: 10, output_tokens: 5, total_tokens: 15 } }),
+      new AIMessage<StandardMessageStructure>({
+        content: "hello",
+        usage_metadata: { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
+      }),
     );
     const used: number[] = [];
 

@@ -6,12 +6,12 @@ import { cn } from "../lib/utils";
 // is really happening. Its next step, if any, is a raised button beside it.
 export type PillTone = "off" | "on" | "ask";
 
-export const StatusPill: React.FC<{ tone?: PillTone; lead?: React.ReactNode; className?: string; children: React.ReactNode }> = ({
-  tone = "off",
-  lead,
-  className,
-  children,
-}) => (
+export const StatusPill: React.FC<{
+  tone?: PillTone | undefined;
+  lead?: React.ReactNode;
+  className?: string;
+  children: React.ReactNode;
+}> = ({ tone = "off", lead, className, children }) => (
   <span
     className={cn(
       "h-6 px-[9px] shrink-0 inline-flex items-center gap-1.5 rounded-full text-12 font-medium whitespace-nowrap",

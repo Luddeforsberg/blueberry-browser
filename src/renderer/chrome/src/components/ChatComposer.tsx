@@ -12,7 +12,7 @@ import { Composer } from "./Composer";
 export const ChatComposer: React.FC<{
   // Whether main took the message. It may refuse one, as when an attached tab has been handed to the user since.
   onSend: (message: string, attached: Attached) => Promise<boolean>;
-  onStop?: () => void;
+  onStop?: (() => void) | undefined;
   disabled?: boolean;
   placeholder: string;
   // Shown first among the chips, such as the page in front.
@@ -24,7 +24,7 @@ export const ChatComposer: React.FC<{
   draft?: string | null;
   onDraftTaken?: () => void;
   mascot?: MascotProfile;
-  onChooseMascot?: (id: string) => void;
+  onChooseMascot?: ((id: string) => void) | undefined;
   // A question waits, so sending answers it, and Send shows over Stop once there's an answer to send.
   answering?: boolean;
 }> = ({

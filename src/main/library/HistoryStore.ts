@@ -90,7 +90,11 @@ export class HistoryStore {
   }
 
   // Newest first. Pass the last page's `next` as `before` to go on from it.
-  search({ query = "", before, limit = DEFAULT_PAGE_SIZE }: { query?: string; before?: HistoryCursor; limit?: number } = {}): HistoryPage {
+  search({
+    query = "",
+    before,
+    limit = DEFAULT_PAGE_SIZE,
+  }: { query?: string; before?: HistoryCursor | undefined; limit?: number } = {}): HistoryPage {
     const size = Math.max(1, Math.min(limit, MAX_PAGE_SIZE));
     const pattern = `%${query.trim().replace(/[\\%_]/g, "\\$&")}%`;
     const rows = this.db

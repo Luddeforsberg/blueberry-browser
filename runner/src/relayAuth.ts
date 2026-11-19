@@ -72,7 +72,7 @@ export interface RelayAuthOptions {
   server: Pick<GalleryServer, "signIn" | "signOut">;
   grants: RelayGrants;
   // Where connections are kept across a restart, sealed. Without one, a redeploy means connecting again.
-  stateFile?: string;
+  stateFile?: string | undefined;
   now?: () => number;
 }
 

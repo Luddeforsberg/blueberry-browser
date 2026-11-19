@@ -21,7 +21,7 @@ export interface MenuOptions {
   // A page the menu is about. It closes when that page goes somewhere else or goes.
   page?: WebContents;
   // After the menu closes, chosen or not, once what was chosen has run.
-  onClosed?: () => void;
+  onClosed?: (() => void) | undefined;
 }
 
 const MAX_SHEETS = 32;

@@ -66,7 +66,7 @@ export interface InvokeChannels {
   "history:recent": { region: "chrome"; args: []; result: Visit[] };
   "history:search": {
     region: "chrome";
-    args: [options: { query?: string; before?: HistoryCursor }];
+    args: [options: { query?: string; before?: HistoryCursor | undefined }];
     result: HistoryPage;
   };
   "history:delete": { region: "chrome"; args: [id: number]; result: boolean };

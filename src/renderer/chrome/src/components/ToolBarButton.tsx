@@ -12,7 +12,7 @@ interface ToolBarButtonProps {
   shortcut?: string;
   active?: boolean;
   toggled?: boolean;
-  onClick?: () => void;
+  onClick?: (() => void) | undefined;
   children?: React.ReactNode;
   className?: string;
 }

@@ -152,7 +152,7 @@ export const relayApp = (config: RelayConfig, supabase: { url: string; key: stri
         },
       );
     }
-    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+    const transport = new StreamableHTTPServerTransport({ enableJsonResponse: true });
     res.on("close", () => {
       void transport.close();
       void server.close();
