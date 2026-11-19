@@ -1,4 +1,4 @@
-import { HANDOFF_WORDS } from "../tools/browserTools";
+import { HANDOFF_WORDS } from "../tools/handoffWords";
 import { plausibleCode } from "../phone/phoneReplies";
 import type { DesktopAsk, DesktopDropSays, DesktopFace, DesktopTray } from "../../shared/ipc";
 import type { ChatApproval, MascotProfile, NeedsYouItem } from "../../shared/library";
