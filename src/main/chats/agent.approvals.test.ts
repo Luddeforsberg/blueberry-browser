@@ -272,8 +272,7 @@ describe("streamReply with an action that needs approval", () => {
   describe("shortenOldResults", () => {
     const results = (count: number) =>
       Array.from({ length: count }, (_, at) => new ToolMessage({ tool_call_id: `${at}`, content: "x".repeat(1000) }));
-    const cut = async (count: number) =>
-      (await shortenOldResults(results(count))).filter((message) => String(message.content).length < 1000).length;
+    const cut = async (count: number) => (await shortenOldResults(results(count))).filter((message) => message.text.length < 1000).length;
 
     it("keeps the newest whole and cuts the rest in batches", async () => {
       expect(await cut(0)).toBe(0);

@@ -14,11 +14,11 @@ describe("fetching a page through Firecrawl", () => {
     vi.stubGlobal("fetch", fetch);
     const read = firecrawlFetch({ FIRECRAWL_API_KEY: "fc-secret" })!;
     const error = await read("https://acme.example/team").catch((caught: Error) => caught);
-    expect(String(error)).toBe("Error: The page service answered 402.");
+    expect(error).toEqual(new Error("The page service answered 402."));
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("https://api.firecrawl.dev/v2/scrape");
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer fc-secret");
-    expect(JSON.parse(String(init.body))).toMatchObject({
+    expect(JSON.parse(await new Response(init.body).text())).toMatchObject({
       url: "https://acme.example/team",
       formats: ["markdown"],
       onlyMainContent: true,
@@ -57,7 +57,7 @@ describe("fetching a page through Firecrawl", () => {
       const read = firecrawlFetch({ FIRECRAWL_API_KEY: "fc-secret" })!;
       const gaveUp = read("https://acme.example/").catch((caught: Error) => caught);
       await vi.runAllTimersAsync();
-      expect(String(await gaveUp)).toBe("Error: The page service answered 429.");
+      expect(await gaveUp).toEqual(new Error("The page service answered 429."));
       expect(fetch).toHaveBeenCalledTimes(3);
 
       fetch.mockReset();
@@ -74,7 +74,7 @@ describe("fetching a page through Firecrawl", () => {
       const ended = read("https://acme.example/", () => stopped).catch((caught: Error) => caught);
       stopped = true;
       await vi.runAllTimersAsync();
-      expect(String(await ended)).toBe("Error: The page service answered 429.");
+      expect(await ended).toEqual(new Error("The page service answered 429."));
       expect(fetch).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();

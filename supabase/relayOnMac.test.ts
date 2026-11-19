@@ -52,7 +52,7 @@ describe("relay jobs on the Mac", () => {
   };
   const start = async (secret: string, where: string) => {
     const id = await one(RUNNER, `select public.relay_start_job('${secret}', 'Find tea', ${MASCOT}, '${where}')`);
-    return id === null ? null : String(id);
+    return typeof id === "string" ? id : null;
   };
   const targetOf = async (job: string) =>
     (await db.query<{ target: string }>("select target from public.cloud_jobs where id = $1", [job])).rows[0]?.target;

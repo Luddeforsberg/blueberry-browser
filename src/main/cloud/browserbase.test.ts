@@ -18,7 +18,12 @@ const stub = (answers: Record<string, { status?: number; body: unknown }>) => {
   const calls: Call[] = [];
   const send = (async (url: string, init: RequestInit) => {
     const method = init.method ?? "GET";
-    calls.push({ method, url, key: new Headers(init.headers).get("X-BB-API-Key"), body: init.body ? JSON.parse(String(init.body)) : null });
+    calls.push({
+      method,
+      url,
+      key: new Headers(init.headers).get("X-BB-API-Key"),
+      body: typeof init.body === "string" ? JSON.parse(init.body) : null,
+    });
     const answer = answers[`${method} ${url.replace("https://api.browserbase.com/v1", "")}`];
     if (!answer) return new Response("{}", { status: 404 });
     return new Response(JSON.stringify(answer.body), { status: answer.status ?? 200 });

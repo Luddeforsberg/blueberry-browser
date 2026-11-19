@@ -126,7 +126,9 @@ export const relayApp = (config: RelayConfig, supabase: { url: string; key: stri
       res.status(405).json({ jsonrpc: "2.0", id: null, error: { code: -32000, message: "Only POST is supported." } });
       return;
     }
-    const grantId = String(req.auth?.extra?.grantId ?? "");
+    // relayAuth.ts's verifier sets it, always to the grant's id.
+    const granted = req.auth?.extra?.grantId;
+    const grantId = typeof granted === "string" ? granted : "";
     const tools = createRelayTools(grantHost(auth, grantId, db));
     const server = new McpServer({ name: NAME, version: "1.0.0" }, { instructions: INSTRUCTIONS });
     for (const tool of tools) {

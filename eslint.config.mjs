@@ -35,7 +35,14 @@ export default tseslint.config(
       "@typescript-eslint/no-redundant-type-constituents": "error",
       "@typescript-eslint/no-unnecessary-type-assertion": "error",
       "@typescript-eslint/restrict-template-expressions": "error",
+      "@typescript-eslint/no-base-to-string": "error",
     },
+  },
+  {
+    // Held back: each turns a value of any type into text with String, and a typed fix would change the text for some
+    // value. A link's words that aren't one string, and a model's prompt that isn't text (docs/quality-plan.md, step 20).
+    files: ["src/renderer/chrome/src/components/Markdown.tsx", "src/main/suggestions/suggestionProposals.ts"],
+    rules: { "@typescript-eslint/no-base-to-string": "off" },
   },
   {
     files: ["**/*.{ts,tsx}"],
