@@ -88,13 +88,28 @@ export default tseslint.config(
     },
   })),
   {
+    // An import at run time would load code the bundle never checked, and a strict page refuses it anyway.
+    files: ["src/page/**/*.ts"],
+    rules: {
+      "no-restricted-syntax": ["error", { selector: "ImportExpression", message: "Code that runs in a page imports nothing at run time." }],
+    },
+  },
+  {
     // Everything else reaches page code through src/main/pageCode.ts, as the strings scripts/buildPage.mjs bundles, and
     // only borrows its types.
-    files: ["src/main/**/*.ts", "src/shared/**/*.ts", "src/renderer/**/*.{ts,tsx}", "runner/**/*.ts", "tests/**/*.ts", "evals/**/*.ts"],
+    files: [
+      "src/main/**/*.ts",
+      "src/shared/**/*.ts",
+      "src/preload/**/*.ts",
+      "src/renderer/**/*.{ts,tsx}",
+      "runner/**/*.ts",
+      "tests/**/*.ts",
+      "evals/**/*.ts",
+    ],
     rules: {
       "@typescript-eslint/no-restricted-imports": [
         "error",
-        { patterns: [{ regex: "(^|/)page/", allowTypeImports: true, message: "Run page code through src/main/pageCode.ts." }] },
+        { patterns: [{ regex: "(^|/)page(/|$)", allowTypeImports: true, message: "Run page code through src/main/pageCode.ts." }] },
       ],
     },
   },
