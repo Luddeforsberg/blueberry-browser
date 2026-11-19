@@ -22,9 +22,9 @@ export class WindowSession {
     this.w.panels.sidebarOpen = sidebarOpen;
     this.w.panels.chatOpen = chatOpen;
     const ids = tabs.map((saved) => this.w.tabs.restoreTab(saved));
-    const open = ids.filter((id) => id !== null);
-    if (open.length === 0) this.w.tabs.createTab();
-    else this.w.tabs.switchActiveTab(ids[active] ?? open[0]);
+    const [firstOpen] = ids.filter((id) => id !== null);
+    if (firstOpen === undefined) this.w.tabs.createTab();
+    else this.w.tabs.switchActiveTab(ids[active] ?? firstOpen);
   }
 
   get currentSession(): Session | null {
