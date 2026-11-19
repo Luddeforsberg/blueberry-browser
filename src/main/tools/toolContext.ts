@@ -104,6 +104,8 @@ export const toolContext = <T extends PageTarget>({
   beenTo = [],
   attached = () => false,
   stopped = () => false,
+  search = null,
+  fetchPage = null,
 }: PageToolAccess<T>) => {
   const allowed = (url: string) => !limits || siteAllowed(url, limits.sites);
   const offLimits = (url: string) => {
@@ -312,6 +314,8 @@ export const toolContext = <T extends PageTarget>({
     limits,
     attached,
     stopped,
+    search,
+    fetchPage,
     allowed,
     offLimits,
     frameName,

@@ -17,8 +17,9 @@ export { HANDOFF_WORDS } from "./handoffWords";
 
 // What Berry can do in the browser, put together from each kind of tool. The order is the one the model sees.
 export const createPageTools = <T extends PageTarget>(access: PageToolAccess<T>): PageTool[] => {
-  const { search = null, fetchPage = null } = access;
+  // Every part of `access` is read once, here, in the order it always was, since a caller can hand over getters.
   const context = toolContext(access);
+  const { search, fetchPage } = context;
   const reading = readingTools(context);
   const pointer = pointerTools(context);
   const typing = typingTools(context);
