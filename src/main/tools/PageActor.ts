@@ -4,8 +4,8 @@ import type { MascotLook } from "../../shared/library";
 
 // The mascot on the page. It only shows what a job is doing and when: it never decides where input goes or whether it
 // happens. Every call here is a no-op unless the user can see this tab, in front of them or as the picture of it in the
-// chat, so a job nobody's watching pays nothing, not even the waiting. `browserTools.ts` asks `showing` first, and takes
-// the path it always took if the answer is no.
+// chat, so a job nobody's watching pays nothing, not even the waiting. `actorOn` in `toolContext.ts` asks `showing`
+// first, and the tools take the path they always took if the answer is no.
 
 // Drawing size on screen. `.pose` is positioned from where the feet are, which is what everything here measures.
 const MASCOT_SIZE = 56;

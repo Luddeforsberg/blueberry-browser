@@ -50,7 +50,7 @@ const PAGE_TITLES: Record<StepInPage, string> = {
   cloud: "Cloud",
 };
 
-// The default follows `needsCard` and `isRisky` in browserTools.ts.
+// The default follows each tool's `whyRisky` in src/main/tools, and `whyCardFor` in askFirst.ts.
 const APPROVAL_DESCRIPTIONS: Record<ActionApproval, { description: string; more?: string }> = {
   risky: {
     description: "Berry asks before anything that could delete, send, buy or change text, and before going to a site you didn’t name.",

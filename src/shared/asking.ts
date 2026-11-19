@@ -1,5 +1,6 @@
-// Why an action needed the user's leave, as a code. Each is one rule in `browserTools.ts`, `pageScripts.ts` or `agent.ts`,
-// and the words a person reads are chosen from it on screen, so nothing the model or a page wrote is ever one.
+// Why an action needed the user's leave, as a code. Each is one rule in `askFirst.ts`, a tool's own `whyRisky`,
+// `pageScripts.ts` or `agent.ts`, and the words a person reads are chosen from it on screen, so nothing the model or a
+// page wrote is ever one.
 export const ASK_REASONS = [
   // Ask before acting is set to always.
   "always-ask",
