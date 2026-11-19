@@ -70,11 +70,11 @@ describe("what strangers publish", () => {
     });
   });
 
-  it("reads a row under a palette's old id, from any version of the app, as its berry, and publishes under the old id", () => {
+  it("reads a row under a palette's old id, from any version of the app, as its berry, and publishes under the new id", () => {
     expect(parsePublishedRow(row)?.draft.look).toEqual({ palette: "lingon", accessory: "cap" });
     expect(parsePublishedRow({ ...row, palette: "lingon" })?.draft.look).toEqual({ palette: "lingon", accessory: "cap" });
-    // The server only takes the old ids until its migration is applied, and today's phone page and older apps only read them.
-    expect(publicRow(draft as never, choices).palette).toBe("robin");
+    // The server takes both since 20261119000000_berry_palettes.sql.
+    expect(publicRow(draft as never, choices).palette).toBe("lingon");
   });
 
   it.each([

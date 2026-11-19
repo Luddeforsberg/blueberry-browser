@@ -189,6 +189,14 @@ writeFileSync(
   `${NOTE}export type ArtNode = [tag: string, attributes: Record<string, string>, ...children: ArtNode[]];\n\nexport const ACTOR_ART = ${JSON.stringify(tree)} as unknown as Record<string, Record<string, ArtNode>>;\n\nexport const ACTOR_ART_SHEET = ${JSON.stringify(sheet)};\n\n// Every berry, by the palette id a look draws it with, so a page gets only its own one's parts.\nexport const ACTOR_BERRIES: string[] = ${JSON.stringify(PALETTES.map(({ id }) => id))};\n`,
 );
 
+// Where the site is. A link preview only reads the share picture from a whole address, so the pages' tags are written from
+// this. Change it here and run this to move the site.
+const SITE_ORIGIN = "https://blueberry-flock.netlify.app";
+for (const page of ["index.html", "m/index.html"]) {
+  const file = join(site, page);
+  writeFileSync(file, readFileSync(file, "utf8").replace(/content="https:\/\/[^"]+\/share\.png"/g, `content="${SITE_ORIGIN}/share.png"`));
+}
+
 // The picture a shared link shows, since a link preview can't run the page: the mascots in a row, on `ground` in light mode. It's
 // drawn by the Chrome on this computer, so without one it says so and leaves the old picture.
 const SHARE_MASCOTS = [
@@ -214,8 +222,8 @@ try {
   const browser = await chromium.launch({ channel: "chrome" });
   const page = await browser.newPage({ viewport: { width: 1200, height: 630 }, colorScheme: "light" });
   await page.setContent(shareCard);
-  await page.screenshot({ path: join(site, "flock.png") });
+  await page.screenshot({ path: join(site, "share.png") });
   await browser.close();
 } catch (error) {
-  console.warn(`Couldn't draw site/flock.png, so it wasn't changed: ${error.message.split("\n")[0]}`);
+  console.warn(`Couldn't draw site/share.png, so it wasn't changed: ${error.message.split("\n")[0]}`);
 }

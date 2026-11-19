@@ -2,6 +2,12 @@
 [build]
   publish = "site"
 
+# The share picture's old name, which link previews made before it was renamed may still ask for.
+[[redirects]]
+  from = "/flock.png"
+  to = "/share.png"
+  status = 301
+
 # Nobody may frame any of it, and nothing is guessed as another type.
 [[headers]]
   for = "/*"

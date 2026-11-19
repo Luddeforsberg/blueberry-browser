@@ -31,7 +31,7 @@ describe("the mascots on the phone", () => {
       {
         id: "m-1",
         name: "Scout",
-        palette: "robin",
+        palette: "lingon",
         accessory: "cap",
         instructions: "Find cables.",
         sites: ["webhallen.com"],

@@ -2,10 +2,10 @@
 // part of a word. Run by `pnpm run lint`. It reads every file git tracks or would track, so a new file counts before
 // it's added. Code says "mascot" or "mascots", or "Berry" where it means Berry.
 //
-// What's left is sent to a server, read by a model or an app, or public, so it can't change without a migration, and is
-// listed below with step 10 of docs/quality-plan.md, which renames it. Names saved on disk were renamed in step 9, and
-// only the migrations that read old saved data still name them. An entry whose text is no longer in its file fails too,
-// so this list only shrinks.
+// What's left is listed below with why. Names saved on disk were renamed in step 9, and server and model-facing names in
+// step 10, so only the code that reads old saved data, the old server names that still answer clients from before, and
+// the public site's address still say them. An entry whose text is no longer in its file fails too, so this list only
+// shrinks.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 
@@ -19,20 +19,20 @@ const UNCHECKED = [
   { path: /^docs\/design\//, why: "Design history: the old document and the mocks, kept as they were made." },
   { path: /^evals\/results\//, why: "Records of past eval runs, in the words of the time." },
   { path: "evals/fixtures/article.html", why: "A news article about real jackdaws, which evals load as it is." },
-  { path: /^supabase\/migrations\//, why: "Applied migrations are never edited. Step 10 renames in a new migration." },
+  { path: /^supabase\/migrations\//, why: "Applied migrations are never edited, so each keeps the names of its time." },
 ];
 
 const entries = (until, text, why, files) => files.map((file) => ({ file, text, until, why }));
-const external = (text, why, ...files) => entries(10, text, why, files);
 // An old name in data an older version saved, read by the migration that moves it to the new name, in that file and its
 // test only. Kept for good, since old data can turn up at any time.
 const migrated = (text, why, ...files) => entries(null, text, why, files);
+// An old Supabase name that supabase/migrations/20261120000000_mascot_names.sql keeps answering for clients from before,
+// named only in tests. They go when the wrappers do, as step 10 of docs/quality-plan.md says.
+const wrapped = (text, ...files) => entries("wrappers", text, WRAPPED, files);
+// The public site's address, which the user picks a new one for. docs/quality-plan.md has the switch.
+const address = (text, why, ...files) => entries("address", text, why, files);
 
-const SERVER = "A Supabase name, in the migrations and on the server.";
-const MODEL = "Read by the model, or by ChatGPT, Claude or another app over MCP.";
-const ROW = "An error written to a job's row on the server, which ChatGPT and Claude read through get_job.";
-const SITE = "The public site's address and share picture, which links and link previews have saved.";
-const COPY = "The public site's own words, deployed with its address.";
+const WRAPPED = "An old Supabase name, kept working for clients from before until the wrappers go.";
 
 // The exact text that may stay in each file, case and all.
 const ALLOWED = [
@@ -57,70 +57,24 @@ const ALLOWED = [
     "src/shared/phoneState.test.ts",
   ),
 
-  ...external(
-    "sync_cloud_flock",
-    SERVER,
-    "AGENTS.md",
-    "runner/src/relay.test.ts",
-    "src/main/galleryServer.ts",
-    "supabase/phone.test.ts",
-    "tests/fakeSupabase.ts",
-    "tests/features/map.ts",
-    "tests/phone.spec.ts",
-  ),
-  ...external(
-    "cloud_flock",
-    SERVER,
-    "AGENTS.md",
-    "site/app/api.js",
-    "src/shared/phoneApi.test.ts",
+  ...wrapped("sync_cloud_flock", "supabase/mascotNames.test.ts"),
+  ...wrapped("cloud_flock", "supabase/mascotNames.test.ts"),
+  ...wrapped("relay_flock", "supabase/mascotNames.test.ts", "supabase/relay.test.ts"),
+  ...wrapped("p_birds", "supabase/mascotNames.test.ts"),
+  ...entries(null, "cloud_flock", "The table's name before the rename, in the test of the migration before it.", [
     "supabase/berryPalettes.test.ts",
-    "supabase/phone.test.ts",
-    "supabase/relay.test.ts",
-    "tests/fakeSupabase.ts",
+  ]),
+
+  ...address(
+    "blueberry-flock.netlify.app",
+    "The public site's address, which shared links and link previews have saved. `SITE_ORIGIN` in scripts/buildSite.mjs holds it, and `pnpm run site:build` writes it into the pages.",
+    "scripts/buildSite.mjs",
+    "site/index.html",
+    "site/m/index.html",
   ),
-  ...external("relay_flock", SERVER, "runner/src/db.ts", "supabase/relay.test.ts", "tests/fakeSupabase.ts"),
-  ...external("p_birds", SERVER, "runner/src/relay.test.ts", "src/main/galleryServer.ts", "tests/features/map.ts", "tests/phone.spec.ts"),
-  ...external("runner has no flock", "An error the server raises.", "supabase/phone.test.ts"),
-
-  ...external("Its birds (the flock)", MODEL, "runner/src/relay.ts"),
-  ...external("List the flock", MODEL, "runner/src/relayTools.ts", "src/main/mcpTools.ts"),
-  ...external("The user's birds (agents)", MODEL, "runner/src/relayTools.ts"),
-  ...external("Give a bird a job", MODEL, "runner/src/relayTools.ts"),
-  ...external("one of the user\\'s birds", MODEL, "runner/src/relayTools.ts"),
-  ...external("what the bird may do", MODEL, "runner/src/relayTools.ts"),
-  ...external("The bird's name or id", MODEL, "runner/src/relayTools.ts"),
-  ...external("the bird's own", MODEL, "runner/src/relayTools.ts"),
-  ...external("There's no bird called", MODEL, "runner/src/relayTools.ts"),
-  ...external("(the flock)", MODEL, "src/main/McpConnector.ts"),
-  ...external('name: "The flock"', MODEL, "src/main/mcpTools.ts"),
-  ...external("let their birds remember", MODEL, "src/main/mcpTools.ts"),
-  ...external("What the birds remember", MODEL, "src/main/mcpTools.ts"),
-  ...external("the small birds", MODEL, "src/main/suggestionProposals.ts"),
-  ...external('"flock": the helper birds', MODEL, "src/main/suggestionProposals.ts"),
-  ...external("a bird of its own", MODEL, "src/main/suggestionProposals.ts"),
-  ...external("a helper bird", MODEL, "src/main/suggestionProposals.ts"),
-  ...external("not one in the flock", MODEL, "src/main/suggestionProposals.ts"),
-  ...external("what the bird says", MODEL, "src/main/suggestionProposals.ts"),
-  ...external("flock: mascotData", `${MODEL} The digest's key for the mascots.`, "src/main/suggestionDigest.ts"),
-  ...external("routines, flock, feedback", "The digest's key, as above.", "src/main/suggestionDigest.test.ts"),
-  ...external("expect(flock)", "The digest's key, as above.", "src/main/suggestionDigest.test.ts"),
-
-  ...external("The bird this job was sent as", ROW, "runner/src/job.ts"),
-  ...external("That bird isn't", ROW, "src/main/MacJobs.ts"),
-  ...external("This job's bird", ROW, "src/main/MacJobs.ts"),
-
-  ...external("blueberry-flock.netlify.app", SITE, "site/index.html", "site/m/index.html", "src/main/mascotLink.test.ts"),
-  ...external("flock.png", SITE, "site/flock.png", "site/index.html", "site/m/index.html", "scripts/buildSite.mjs"),
-  ...external("a flock of birds", COPY, "site/index.html"),
-  ...external("Six birds from Blueberry", COPY, "site/index.html", "site/m/index.html"),
-  ...external("Some of the flock", COPY, "site/index.html"),
-  ...external("Grow a flock.", COPY, "site/index.html"),
-  ...external("Make a bird for", COPY, "site/index.html"),
-  ...external("The tabs a bird opens", COPY, "site/index.html"),
-  ...external("Share a bird.", COPY, "site/index.html"),
-  ...external("this bird for Blueberry", COPY, "site/m/index.html"),
-  ...external("A bird called", COPY, "site/m/mascot.js"),
+  ...entries(null, "/flock.png", "The share picture's old address, redirected to its new one for link previews made before.", [
+    "netlify.toml",
+  ]),
 
   // Real birds, not mascots. The feature map pictures this page, so renaming it would change a baseline picture.
   ...entries(null, '"birds.example", "/birds"', "A page about jackdaws.", ["tests/features/map.ts"]),

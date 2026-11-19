@@ -20,7 +20,7 @@ const FINAL_TRIES = 3;
 
 export const NO_ANSWER = "Nobody answered in time, so the job stopped there. Nothing waiting was done.";
 export const SHUT_DOWN = "The runner was restarting, so the job stopped there.";
-const BAD_MASCOT = "The bird this job was sent as couldn't be read, so it didn't run.";
+const BAD_MASCOT = "The mascot this job was sent as couldn't be read, so it didn't run.";
 
 // The cloud browser for one job, which ends with it, so nothing is left running or costing.
 export interface JobBrowser {

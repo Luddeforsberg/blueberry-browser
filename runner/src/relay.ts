@@ -21,8 +21,8 @@ const MAX_BODY = "1mb";
 const NAME = "blueberry";
 
 const INSTRUCTIONS =
-  "Blueberry is the user's AI browser. Its birds (the flock) do jobs in a browser in the cloud, signed in to the sites " +
-  "the user brought there, and keep going with the user's computer off: list_agents names them. With the user's " +
+  "Blueberry is the user's AI browser. Its mascots do jobs in a browser in the cloud, signed in to the sites the " +
+  "user brought there, and keep going with the user's computer off: list_agents names them. With the user's " +
   "Blueberry open on their Mac and allowed, a job can run there instead, with their real tabs: start_job's `where` " +
   "chooses, and by default it's the Mac when it's there. start_job returns a " +
   "job id at once, because a job can take minutes: check on it with get_job. A job asks the user before anything risky, " +

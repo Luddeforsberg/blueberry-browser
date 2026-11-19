@@ -300,7 +300,7 @@ export const buildDigest = ({ visits, chats, routines, mascots, feedback, now }:
       searches: searchData,
       chats: chatData,
       routines: routineData,
-      flock: mascotData,
+      mascots: mascotData,
       feedback: feedbackData,
     },
     evidence,

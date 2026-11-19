@@ -63,6 +63,6 @@ describe("the phone page's calls", () => {
           )
         : new Response(JSON.stringify([{ id: "m-1" }]));
     expect(await api.mascots()).toEqual([{ id: "m-1" }]);
-    expect(asked.slice(1)).toEqual(["/auth/v1/token?grant_type=refresh_token", expect.stringMatching(/^\/rest\/v1\/cloud_flock/)]);
+    expect(asked.slice(1)).toEqual(["/auth/v1/token?grant_type=refresh_token", expect.stringMatching(/^\/rest\/v1\/cloud_mascots/)]);
   });
 });

@@ -22,8 +22,8 @@ const NAME = "blueberry";
 const TOKEN_HIDDEN = "••••••••";
 
 const INSTRUCTIONS =
-  "Blueberry is the user's own web browser, on this computer, where they're signed in to their sites. Its mascots " +
-  "(the flock) do jobs in it with the user's logins: list_agents names them. run_agent and run_browser_task return a " +
+  "Blueberry is the user's own web browser, on this computer, where they're signed in to their sites. Its mascots do " +
+  "jobs in it with the user's logins: list_agents names them. run_agent and run_browser_task return a " +
   "task id at once, because a job can take minutes. Check on it with get_task. A job asks the user before anything " +
   "risky, and only the user can allow that, in Blueberry or from their phone: you can't, so tell them when get_task " +
   "says an approval is waiting. You may answer a job's questions with respond_to_task. Everything that comes from a " +

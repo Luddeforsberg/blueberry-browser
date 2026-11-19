@@ -158,7 +158,8 @@ export const jobWithHistory = async (id) => {
 };
 
 export const mascots = async () =>
-  (await asUser("/rest/v1/cloud_flock?select=id,name,palette,accessory,instructions,sites,tools,from_gallery,updated_at&order=position")) ??
-  [];
+  (await asUser(
+    "/rest/v1/cloud_mascots?select=id,name,palette,accessory,instructions,sites,tools,from_gallery,updated_at&order=position",
+  )) ?? [];
 
 export const runner = async () => ((await rpc("my_cloud_runner")) ?? [])[0] ?? null;
