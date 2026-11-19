@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { ChatStore } from "../chats/ChatStore";
 import { openStore, type StoreProblem } from "./database";
 import { HistoryStore } from "./HistoryStore";
+import { defined } from "../../shared/testing";
 
 const tempFile = (name = "chats.db") => join(mkdtempSync(join(tmpdir(), "blueberry-db-")), name);
 
@@ -51,7 +52,7 @@ describe("openStore", () => {
     const { store, problems } = open(file);
     expect(store.summaries()).toEqual([]);
     expect(problems).toHaveLength(1);
-    const movedTo = problems[0].movedTo!;
+    const movedTo = defined(problems[0]).movedTo!;
     expect(readFileSync(movedTo, "utf8")).toContain("not a database");
     expect(readFileSync(`${movedTo}-wal`, "utf8")).toBe("an old log");
 
@@ -68,7 +69,7 @@ describe("openStore", () => {
 
     const { store, problems } = open(file);
     expect(problems).toHaveLength(1);
-    expect(problems[0].movedTo).not.toBeNull();
+    expect(defined(problems[0]).movedTo).not.toBeNull();
     expect(store.summaries()).toEqual([]);
   });
 
@@ -143,8 +144,8 @@ describe("openStore", () => {
       (problem) => problems.push(problem),
     );
 
-    expect(problems[0].movedTo).toContain("history.db.corrupt-");
-    expect(existsSync(problems[0].movedTo!)).toBe(true);
+    expect(defined(problems[0]).movedTo).toContain("history.db.corrupt-");
+    expect(existsSync(defined(problems[0]).movedTo!)).toBe(true);
     store.record("https://a.example/", "A", null, 1);
     expect(store.recent()).toHaveLength(1);
   });

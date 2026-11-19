@@ -3,6 +3,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { describe, expect, it } from "vitest";
 import { BookmarkStore, MAX_ICON_LENGTH } from "./BookmarkStore";
+import { defined } from "../../shared/testing";
 
 const tempFile = () => join(mkdtempSync(join(tmpdir(), "blueberry-bookmarks-")), "pinned.json");
 const site = { id: "a", title: "Example", url: "https://example.com/" };
@@ -79,7 +80,7 @@ describe("BookmarkStore", () => {
   it("uses the address when a page has no title", () => {
     const store = new BookmarkStore(tempFile());
     store.add(site.url, "");
-    expect(store.get()[0].title).toBe(site.url);
+    expect(defined(store.get()[0]).title).toBe(site.url);
   });
 
   it("won't save anything but a web page", () => {
@@ -98,7 +99,7 @@ describe("BookmarkStore", () => {
 
     store.place(moved, 1);
     expect(titles()).toEqual(["A", "D", "B", "C"]);
-    expect(new BookmarkStore(file).get()[1].id).toBe("kept");
+    expect(defined(new BookmarkStore(file).get()[1]).id).toBe("kept");
     // Later, to the end, and earlier, counting the others.
     store.place(moved, 3);
     expect(titles()).toEqual(["A", "B", "C", "D"]);

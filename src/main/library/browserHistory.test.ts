@@ -5,6 +5,7 @@ import { join } from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { chromeHistoryFile, chromiumTime, writeChromiumHistory } from "../../../tests/chromiumHistory";
 import { browserDataFor, findBrowsers, readBrowserHistory, type BrowserData } from "./browserHistory";
+import { defined } from "../../shared/testing";
 
 // Records every file the reader copies, and still copies it.
 vi.mock("fs/promises", async (original) => {
@@ -102,7 +103,7 @@ describe("reading another browser's history", () => {
     fixture([page("other", NOW - 500)], "Profile 1");
     const visits = await read();
     expect(visits).toHaveLength(50_000);
-    expect(visits?.[0].visitedAt).toBe(NOW);
+    expect(defined(visits?.[0]).visitedAt).toBe(NOW);
     expect(visits?.some(({ title }) => title === "other")).toBe(true);
   });
 

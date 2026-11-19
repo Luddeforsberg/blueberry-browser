@@ -3,6 +3,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { describe, expect, it } from "vitest";
 import { HistoryStore } from "./HistoryStore";
+import { defined } from "../../shared/testing";
 
 const tempFile = () => join(mkdtempSync(join(tmpdir(), "blueberry-history-")), "history.db");
 
@@ -63,7 +64,7 @@ describe("HistoryStore", () => {
   it("fills in the title and favicon of the newest visit once the page reports them", () => {
     const history = new HistoryStore(":memory:");
     history.record("https://a.example/", "", null, 1);
-    expect(history.recent()[0].title).toBe("https://a.example/");
+    expect(defined(history.recent()[0]).title).toBe("https://a.example/");
 
     history.update("https://a.example/", { title: "A page", favicon: "https://a.example/icon.png" });
     expect(history.recent()[0]).toMatchObject({ title: "A page", favicon: "https://a.example/icon.png" });
@@ -106,7 +107,7 @@ describe("HistoryStore", () => {
     const history = new HistoryStore(":memory:");
     history.record("https://a.example/", "A", null, 1);
     history.record("https://b.example/", "B", null, 2);
-    const { id } = history.search({ query: "a.example" }).entries[0];
+    const { id } = defined(history.search({ query: "a.example" }).entries[0]);
 
     expect(history.delete(id)).toBe("https://a.example/");
     expect(history.delete(id)).toBeNull();
