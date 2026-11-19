@@ -1,6 +1,6 @@
 import { PGlite } from "@electric-sql/pglite";
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
@@ -26,7 +26,7 @@ const CLOUD_FUNCTIONS = new Set([
   "runner_update_job",
   "runner_ask",
   "runner_decision",
-  "sync_cloud_flock",
+  "sync_cloud_mascots",
   "save_push_subscription",
   "forget_push_subscription",
   "runner_push_subscriptions",
@@ -34,7 +34,7 @@ const CLOUD_FUNCTIONS = new Set([
   "runner_set_relay_url",
   "create_relay_grant",
   "revoke_relay_grants",
-  "relay_flock",
+  "relay_mascots",
   "relay_start_job",
   "relay_jobs",
   "relay_stop_job",
@@ -44,7 +44,7 @@ const CLOUD_FUNCTIONS = new Set([
   "mac_update_job",
 ]);
 // Tables the phone page reads with a plain select, as the user each token stands for, so row-level security decides.
-const CLOUD_TABLES = new Set(["cloud_jobs", "cloud_flock"]);
+const CLOUD_TABLES = new Set(["cloud_jobs", "cloud_mascots"]);
 const CLOUD_STANDINS = `
   create role anon nologin;
   create role authenticated nologin;
@@ -58,12 +58,13 @@ const CLOUD_STANDINS = `
 const cloudDatabase = async () => {
   const db = new PGlite();
   await db.exec(CLOUD_STANDINS);
-  await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261102000000_cloud_jobs.sql"), "utf8"));
-  await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261103000000_phone.sql"), "utf8"));
-  await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261104000000_cloud_conversations.sql"), "utf8"));
-  await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261105000000_cloud_routines.sql"), "utf8"));
-  await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261106000000_cloud_relay.sql"), "utf8"));
-  await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261107000000_relay_on_mac.sql"), "utf8"));
+  // Every migration, in order, as the server has them.
+  const migrations = join(__dirname, "../supabase/migrations");
+  for (const file of readdirSync(migrations)
+    .filter((name) => name.endsWith(".sql"))
+    .sort()) {
+    await db.exec(readFileSync(join(migrations, file), "utf8"));
+  }
   // One connection, so one call at a time, each with its own role.
   let queue: Promise<unknown> = Promise.resolve();
   const call = (role: string, uid: string | null, name: string, args: Record<string, unknown>) => {

@@ -153,7 +153,7 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     const runner = await signIn(RUNNER, RUNNER_PASSWORD);
     expect(await rpc(owner, "link_cloud_runner", { p_email: RUNNER })).toBe(true);
     expect(await rpc(runner, "accept_cloud_runner_link", { p_owner_email: OWNER })).toBe(true);
-    await rpc(owner, "sync_cloud_flock", { p_birds: sharedMascotRows([SCOUT, PENNY]) });
+    await rpc(owner, "sync_cloud_mascots", { p_mascots: sharedMascotRows([SCOUT, PENNY]) });
 
     // A job sent from the Mac, which the runner has started and is now asking about.
     const first = await rpc(owner, "start_cloud_job", {

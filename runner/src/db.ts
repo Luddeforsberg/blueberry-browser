@@ -162,7 +162,7 @@ export const supabaseDb = (
       await rpc("runner_set_relay_url", { p_url: relayUrl });
     },
     // The relay's calls, as this runner, each with a grant's secret. None of them can decide anything.
-    relayMascots: async (secret) => (await rpc<Record<string, unknown>[]>("relay_flock", { p_secret: secret })) ?? [],
+    relayMascots: async (secret) => (await rpc<Record<string, unknown>[]>("relay_mascots", { p_secret: secret })) ?? [],
     relayStartJob: async (secret, prompt, mascot, where) => {
       const id = await rpc<unknown>("relay_start_job", { p_secret: secret, p_prompt: prompt, p_mascot: mascot, p_where: where });
       if (id === null && where === "mac") return null;

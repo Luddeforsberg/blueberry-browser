@@ -1,9 +1,9 @@
 import { PGlite } from "@electric-sql/pglite";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-// The phone page's tables, in real Postgres as Supabase's roles, on top of the cloud jobs' migration.
+// The phone page's tables, in real Postgres as Supabase's roles, on top of every migration.
 const SUPABASE_STANDINS = `
   create role anon nologin;
   create role authenticated nologin;
@@ -16,10 +16,15 @@ const SUPABASE_STANDINS = `
   alter default privileges in schema public grant all on functions to anon, authenticated;
 `;
 
+// Every migration, so the tables are tested as they are now, with the mascots' new names.
+const MIGRATIONS = readdirSync(join(__dirname, "migrations"))
+  .filter((file) => file.endsWith(".sql"))
+  .sort();
+
 const SCOUT = {
   id: "m-1",
   name: "Scout",
-  palette: "robin",
+  palette: "lingon",
   accessory: "cap",
   instructions: "Find cables.",
   sites: ["webhallen.com"],
@@ -50,7 +55,7 @@ describe("the phone page's database rules", () => {
     await as(runner, `select public.accept_cloud_runner_link('${`user${Number(owner.slice(-12))}@example.com`}')`);
   };
   const sync = (uid: string | null, mascots: unknown) =>
-    as(uid, `select public.sync_cloud_flock('${JSON.stringify(mascots)}'::jsonb) as kept`);
+    as(uid, `select public.sync_cloud_mascots('${JSON.stringify(mascots)}'::jsonb) as kept`);
   const subscribe = (uid: string | null, endpoint = ENDPOINT) =>
     as(uid, `select public.save_push_subscription('${endpoint}', ${KEYS}) as ok`);
 
@@ -60,8 +65,7 @@ describe("the phone page's database rules", () => {
   beforeAll(async () => {
     db = new PGlite();
     await db.exec(SUPABASE_STANDINS);
-    await db.exec(readFileSync(join(__dirname, "migrations/20261102000000_cloud_jobs.sql"), "utf8"));
-    await db.exec(readFileSync(join(__dirname, "migrations/20261103000000_phone.sql"), "utf8"));
+    for (const file of MIGRATIONS) await db.exec(readFileSync(join(__dirname, "migrations", file), "utf8"));
     ALICE = await newUser();
     RUNNER = await newUser();
     BOB = await newUser();
@@ -72,25 +76,25 @@ describe("the phone page's database rules", () => {
   it("keeps each owner's mascots to that owner, replaced whole on every sync", async () => {
     expect(await sync(ALICE, [SCOUT, { ...SCOUT, id: "m-2", name: "Penny" }])).toEqual([{ kept: 2 }]);
     expect(await sync(ALICE, [SCOUT])).toEqual([{ kept: 1 }]);
-    expect(await as(ALICE, "select id, name, position, sites, tools from public.cloud_flock")).toEqual([
+    expect(await as(ALICE, "select id, name, position, sites, tools from public.cloud_mascots")).toEqual([
       { id: "m-1", name: "Scout", position: 0, sites: ["webhallen.com"], tools: ["visit", "click"] },
     ]);
     // Nobody else reads it: not another user, not her runner, not anyone signed out.
-    expect(await as(BOB, "select id from public.cloud_flock")).toEqual([]);
-    expect(await as(RUNNER, "select id from public.cloud_flock")).toEqual([]);
-    await expect(as(null, "select id from public.cloud_flock")).rejects.toThrow(/permission denied/);
+    expect(await as(BOB, "select id from public.cloud_mascots")).toEqual([]);
+    expect(await as(RUNNER, "select id from public.cloud_mascots")).toEqual([]);
+    await expect(as(null, "select id from public.cloud_mascots")).rejects.toThrow(/permission denied/);
     // Only through the function, which a runner can't use.
     await expect(
       as(
         ALICE,
-        `insert into public.cloud_flock (id, position, name, palette, accessory, instructions) values ('x', 0, 'X', 'robin', 'cap', 'Y')`,
+        `insert into public.cloud_mascots (id, position, name, palette, accessory, instructions) values ('x', 0, 'X', 'robin', 'cap', 'Y')`,
       ),
     ).rejects.toThrow(/permission denied/);
-    await expect(sync(RUNNER, [SCOUT])).rejects.toThrow(/runner has no flock/);
+    await expect(sync(RUNNER, [SCOUT])).rejects.toThrow(/runner has no mascots/);
     await expect(sync(null, [SCOUT])).rejects.toThrow(/permission denied/);
     // Bob's sync never touches hers.
     await sync(BOB, []);
-    expect(await as(ALICE, "select id from public.cloud_flock")).toEqual([{ id: "m-1" }]);
+    expect(await as(ALICE, "select id from public.cloud_mascots")).toEqual([{ id: "m-1" }]);
   });
 
   it("refuses a mascot that couldn't have come from the app", async () => {
@@ -99,7 +103,7 @@ describe("the phone page's database rules", () => {
     await expect(sync(ALICE, [{ ...SCOUT, palette: "red" }])).rejects.toThrow(/look_shape/);
     await expect(sync(ALICE, [{ ...SCOUT, name: "" }])).rejects.toThrow(/name_shape/);
     // A refused sync leaves the last one.
-    expect(await as(ALICE, "select id from public.cloud_flock")).toEqual([{ id: "m-1" }]);
+    expect(await as(ALICE, "select id from public.cloud_mascots")).toEqual([{ id: "m-1" }]);
   });
 
   it("gives the runner its own owner's push addresses only, and nothing else of them", async () => {

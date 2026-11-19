@@ -288,7 +288,7 @@ const SCOUT: MascotProfile = {
 const PROMPT = "Find the cheapest USB-C cable on shop.example and put it in my cart";
 
 const jobOnRunner = async (phone: PhoneDrive, end: "asks" | "done") => {
-  await phone.owner("sync_cloud_flock", { p_birds: sharedMascotRows([SCOUT]) });
+  await phone.owner("sync_cloud_mascots", { p_mascots: sharedMascotRows([SCOUT]) });
   const job = await phone.owner("start_cloud_job", {
     p_prompt: PROMPT,
     p_history: [],

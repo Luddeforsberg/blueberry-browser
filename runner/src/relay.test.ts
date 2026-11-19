@@ -89,8 +89,8 @@ beforeAll(async () => {
   expect(await asOwner("link_cloud_runner", { p_email: RUNNER })).toBe(true);
   runnerDb = supabaseDb(config, runnerSession(config));
   expect(await runnerDb.accept()).toBe(true);
-  await asOwner("sync_cloud_flock", {
-    p_birds: [
+  await asOwner("sync_cloud_mascots", {
+    p_mascots: [
       {
         id: "scout",
         name: "Scout",

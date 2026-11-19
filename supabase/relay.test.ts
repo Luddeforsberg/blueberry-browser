@@ -1,5 +1,5 @@
 import { PGlite } from "@electric-sql/pglite";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -13,6 +13,11 @@ const SUPABASE_STANDINS = `
   grant usage on schema public, auth to anon, authenticated;
   grant execute on function auth.uid() to anon, authenticated;
 `;
+
+// Every migration, so the relay is tested as it is now, with the mascots' new names.
+const MIGRATIONS = readdirSync(join(__dirname, "migrations"))
+  .filter((file) => file.endsWith(".sql"))
+  .sort();
 
 const MASCOT = `'{"id":"berry","name":"Berry","sites":[],"tools":["visit","click","type"]}'::jsonb`;
 
@@ -41,7 +46,7 @@ describe("the relay's grants", () => {
   const grant = async (owner: string) => String(await one(owner, "select public.create_relay_grant()"));
   // Every relay function, as `uid` with `secret`, each either answering or refused.
   const everyCall = (secret: string, job = "00000000-0000-4000-8000-000000000000") => [
-    `select * from public.relay_flock('${secret}')`,
+    `select * from public.relay_mascots('${secret}')`,
     `select public.relay_start_job('${secret}', 'Go', ${MASCOT})`,
     `select * from public.relay_jobs('${secret}', null)`,
     `select public.relay_stop_job('${secret}', '${job}')`,
@@ -58,15 +63,7 @@ describe("the relay's grants", () => {
   beforeAll(async () => {
     db = new PGlite();
     await db.exec(SUPABASE_STANDINS);
-    for (const file of [
-      "20261102000000_cloud_jobs.sql",
-      "20261103000000_phone.sql",
-      "20261104000000_cloud_conversations.sql",
-      "20261105000000_cloud_routines.sql",
-      "20261106000000_cloud_relay.sql",
-    ]) {
-      await db.exec(readFileSync(join(__dirname, "migrations", file), "utf8"));
-    }
+    for (const file of MIGRATIONS) await db.exec(readFileSync(join(__dirname, "migrations", file), "utf8"));
   });
   beforeEach(async () => {
     [ALICE, RUNNER, BOB, BOBS_RUNNER] = [await newUser(), await newUser(), await newUser(), await newUser()];
@@ -91,12 +88,12 @@ describe("the relay's grants", () => {
 
   it("lets the runner act as the owner, only on the grant's own jobs", async () => {
     await db.query(
-      "insert into public.cloud_flock (owner, id, position, name, palette, accessory, instructions) values ($1, 'scout', 0, 'Scout', 'robin', 'none', 'Finds')",
+      "insert into public.cloud_mascots (owner, id, position, name, palette, accessory, instructions) values ($1, 'scout', 0, 'Scout', 'robin', 'none', 'Finds')",
       [ALICE],
     );
     const own = String(await one(ALICE, `select public.start_cloud_job('Mine', '[]', ${MASCOT}, 'risky', 'ctx-1')`));
     const secret = await grant(ALICE);
-    expect(await as(RUNNER, `select id, name from public.relay_flock('${secret}')`)).toEqual([{ id: "scout", name: "Scout" }]);
+    expect(await as(RUNNER, `select id, name from public.relay_mascots('${secret}')`)).toEqual([{ id: "scout", name: "Scout" }]);
     const job = String(await one(RUNNER, `select public.relay_start_job('${secret}', 'Find tea', ${MASCOT})`));
     const [row] = (
       await db.query<Record<string, unknown>>(
@@ -163,6 +160,7 @@ describe("the relay's grants", () => {
       "relay_flock",
       "relay_grant",
       "relay_jobs",
+      "relay_mascots",
       "relay_revoke_grant",
       "relay_start_job",
       "relay_stop_job",

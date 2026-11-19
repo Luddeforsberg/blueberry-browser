@@ -334,7 +334,7 @@ export class GalleryServer {
 
   // The mascots as the phone page sees them, replaced whole. Mascot fields only, never memory.
   async syncCloudMascots(token: string, mascots: object[]): Promise<void> {
-    await this.request("/rest/v1/rpc/sync_cloud_flock", { method: "POST", token, body: { p_birds: mascots } });
+    await this.request("/rest/v1/rpc/sync_cloud_mascots", { method: "POST", token, body: { p_mascots: mascots } });
   }
 
   async syncCloudRoutine(token: string, row: CloudRoutineRow): Promise<void> {
