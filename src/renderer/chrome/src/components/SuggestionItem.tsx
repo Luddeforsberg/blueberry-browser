@@ -54,12 +54,12 @@ const looksOf = (
 // DESIGN.md section 10, New tab: one two-line row under the box. The whole row is the button, so what it does shows as a
 // raised button on the row you're on, with a faint arrow at rest. A suggestion has a × beside it, a button of its own,
 // which shows on hover and while the row has the keyboard.
-export const SuggestionItem: React.FC<{ row: SuggestionRow; used?: boolean; onPress: () => void; onDismiss?: () => void }> = ({
-  row,
-  used = false,
-  onPress,
-  onDismiss,
-}) => {
+export const SuggestionItem: React.FC<{
+  row: SuggestionRow;
+  used?: boolean;
+  onPress: () => void;
+  onDismiss?: (() => void) | undefined;
+}> = ({ row, used = false, onPress, onDismiss }) => {
   const { find } = useMascots();
   const { mascot, mood, title, reason, action } = looksOf(row, find);
   return (

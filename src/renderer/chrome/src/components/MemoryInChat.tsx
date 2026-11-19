@@ -77,7 +77,7 @@ export const RememberedFacts: React.FC<{ used: MemoryFact[] }> = ({ used }) => {
   );
 };
 
-export const RememberedLine: React.FC<{ ids?: string[] }> = ({ ids = [] }) => {
+export const RememberedLine: React.FC<{ ids?: string[] | undefined }> = ({ ids = [] }) => {
   const { facts } = useLibrary().memory;
   const used = ids.flatMap((id) => facts.filter((fact) => fact.id === id));
   return used.length > 0 ? <RememberedFacts used={used} /> : null;
@@ -123,7 +123,7 @@ export const MemoryOffersLine: React.FC<{
   offers: Pick<MemoryOffer, "id" | "text" | "site">[];
   mascot: MascotProfile;
   kept: boolean;
-  keptBy?: string;
+  keptBy?: string | undefined;
   errors?: Record<string, string>;
   onAnswer: (id: string, keep: boolean) => void;
 }> = ({ offers, mascot, kept, keptBy, errors = {}, onAnswer }) => {

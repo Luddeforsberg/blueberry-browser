@@ -98,7 +98,7 @@ export const installActor = ({ key, look, start, art, artSheet }: InstallArgs): 
     removeEventListener("focusout", checkFocus, true);
     if (a.leaving !== null) clearTimeout(a.leaving);
     host.remove();
-    if (globalThis.__berryActor === api) delete globalThis.__berryActor;
+    if (globalThis.__berryActor === api) Reflect.deleteProperty(globalThis, "__berryActor");
   };
 
   const api: ActorApi = {

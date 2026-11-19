@@ -15,7 +15,7 @@ import { approvalWords, HANDOFF_TITLE } from "./approvalWords";
 
 // Part of the message layout (ChatMessage.tsx): the cards a job asks with, a question or a handoff.
 
-type SpokenProps = { chatId: string; approval: ChatApproval; mascot?: MascotProfile };
+type SpokenProps = { chatId: string; approval: ChatApproval; mascot?: MascotProfile | undefined };
 
 const LETTERS = ["A", "B", "C"];
 
@@ -111,7 +111,7 @@ const ChatQuestionCard: React.FC<SpokenProps> = ({ chatId, approval, mascot }) =
 
 // What the user can do about a tab they've been handed. Words are never typed here, so there's nowhere for a secret to go.
 const HandoffActions: React.FC<{
-  tabId?: string;
+  tabId?: string | undefined;
   onDone: () => void;
   onNotNow: () => void;
 }> = ({ tabId, onDone, onNotNow }) => {

@@ -14,7 +14,11 @@ import { Mascot } from "@common/components/Mascot";
 const BERRY_LOOK: MascotLook = { palette: "blueberry", accessory: "none" };
 const FACE = 66.7;
 
-export const AppIcon: React.FC<{ look?: MascotLook; ground: AppIconGround; size: number }> = ({ look = BERRY_LOOK, ground, size }) => {
+export const AppIcon: React.FC<{ look?: MascotLook | undefined; ground: AppIconGround; size: number }> = ({
+  look = BERRY_LOOK,
+  ground,
+  size,
+}) => {
   const id = useId().replace(/[^\w-]/g, "");
   const body = `var(--berry-${look.palette})`;
   const dots = ground === "paper" || ground === "night";

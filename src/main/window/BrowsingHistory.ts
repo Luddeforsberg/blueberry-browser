@@ -14,7 +14,7 @@ export class BrowsingHistory {
     private readonly stores: WindowStores,
   ) {}
 
-  searchHistory(options: { query?: string; before?: HistoryCursor }): HistoryPage {
+  searchHistory(options: { query?: string; before?: HistoryCursor | undefined }): HistoryPage {
     return this.stores.history.search(options);
   }
 

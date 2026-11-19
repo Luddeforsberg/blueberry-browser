@@ -93,27 +93,27 @@ const POSE_FOR: Partial<Record<Reaction, Mood>> = {
 };
 
 interface MascotProps {
-  mood?: Mood;
+  mood?: Mood | undefined;
   size: number;
   // Which berry and what it wears. Left out, this is Berry.
-  look?: MascotLook;
+  look?: MascotLook | undefined;
   // What it's called to assistive technology.
-  name?: string;
+  name?: string | undefined;
   // Hide Berry: a plain icon stands in, and every feature keeps working.
   hidden?: boolean;
   // Keep Berry still: the face stays, the motion stops. Left out, the setting and reduced motion decide.
-  still?: boolean;
+  still?: boolean | undefined;
   // Reacts when clicked. Decoration only: any control it's inside still takes the click as well.
   lively?: boolean;
   // On the address field while a mascot works, which is `ink`: the body takes the ground's colour, so it shows there,
   // and goes plain, as it does while it works.
   inverted?: boolean;
   // Eyes shut, as the old one does when another takes its place.
-  shut?: boolean;
+  shut?: boolean | undefined;
   // Every berry's body, for a drawing made once and shown as any mascot by the `data-mascot` it's given where it's
   // shown (scripts/buildSite.mjs). The app never needs this.
   anyLook?: boolean;
-  className?: string;
+  className?: string | undefined;
   onContextMenu?: (event: React.MouseEvent) => void;
 }
 

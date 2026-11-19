@@ -14,7 +14,7 @@ const percent = (download: DownloadInfo): string => {
 
 // The ring is all active downloads together. With no sizes known it stays full, because it can't say how far. `small` is
 // the horizontal toolbar's 28px button.
-export const DownloadsProgress: React.FC<{ downloads: DownloadInfo[]; onClick?: () => void; small?: boolean }> = ({
+export const DownloadsProgress: React.FC<{ downloads: DownloadInfo[]; onClick?: () => void; small?: boolean | undefined }> = ({
   downloads,
   onClick,
   small = false,

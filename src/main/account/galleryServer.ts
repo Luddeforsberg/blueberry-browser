@@ -118,7 +118,7 @@ export class GalleryServer {
           ...(options.body === undefined ? {} : { "content-type": "application/json" }),
           ...(options.prefer ? { prefer: options.prefer } : {}),
         },
-        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
         signal: AbortSignal.timeout(CALL_ABORT_MS),
       });
       text = await response.text();

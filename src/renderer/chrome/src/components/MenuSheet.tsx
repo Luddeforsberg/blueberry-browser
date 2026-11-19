@@ -22,10 +22,10 @@ export const MenuSheet: React.FC<
     onKey?: (event: React.KeyboardEvent<HTMLDivElement>) => boolean;
     // Changes when the rows are replaced, so the keyboard goes to the first of the new ones, or `focusFirst`'s.
     view?: string;
-    focusFirst?: string;
+    focusFirst?: string | undefined;
     // False for a submenu, which takes the keyboard only when the keyboard opens it.
     autoFocus?: boolean;
-    leaving?: boolean;
+    leaving?: boolean | undefined;
     hidden?: boolean;
     // For the menu view, which measures each sheet it drew.
     sheetRef?: (element: HTMLDivElement | null) => void;

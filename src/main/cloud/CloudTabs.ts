@@ -54,7 +54,7 @@ export class CloudTabs implements ChatCloud {
     private readonly file: string,
     private readonly hooks: CloudTabsHooks,
     // Only an unpackaged app gets these, like the other test hooks: a Chrome on this computer instead of Browserbase.
-    private readonly local: { endpoint?: string; executable?: string } | null,
+    private readonly local: { endpoint?: string | undefined; executable?: string | undefined } | null,
   ) {
     this.logins = new CloudLogins(join(dirname(file), "cloud-logins.json"), {
       jar: () => this.sessions,

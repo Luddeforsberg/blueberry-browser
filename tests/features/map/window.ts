@@ -13,7 +13,11 @@ const showChatMenu = (drive: Drive) =>
 // A menu is drawn in the page first and placed by main after, so it's open once main shows its view.
 const menuShows = async (drive: Drive, timeout?: number) => {
   const menu = await findView(drive.app, "view=menu");
-  await menu.locator('[role=menu]:not([aria-hidden="true"]), [role=alertdialog]').filter({ visible: true }).first().waitFor({ timeout });
+  await menu
+    .locator('[role=menu]:not([aria-hidden="true"]), [role=alertdialog]')
+    .filter({ visible: true })
+    .first()
+    .waitFor(timeout === undefined ? {} : { timeout });
   await viewShows(drive, "view=menu", timeout);
 };
 

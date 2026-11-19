@@ -199,7 +199,7 @@ export class Chats {
       tabs: tabIds = [],
     }: {
       seePage: boolean;
-      mascotId?: string | null;
+      mascotId?: string | null | undefined;
       from?: string | null;
       sites?: string[];
       tools?: string[];

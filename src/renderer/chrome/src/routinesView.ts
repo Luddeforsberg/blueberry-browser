@@ -27,7 +27,7 @@ export interface RoutineFormValues {
   // The suggestion that filled this in, which goes away once it's saved.
   suggestionId?: string;
   // Filled in from what the user showed Berry: what looks like it changes, and whether to ask for it on each run.
-  recorded?: RecordedChangeValue[];
+  recorded?: RecordedChangeValue[] | undefined;
 }
 
 export interface RecordedChangeValue extends RecordedChange {
@@ -149,7 +149,7 @@ const askedFor = (instructions: string): RecordedChangeValue[] | undefined => {
 };
 
 // The steps as they're shown: plain text, and each value, with its row, where it stands.
-export type StepsPiece = { text: string; row?: number };
+export type StepsPiece = { text: string; row?: number | undefined };
 
 export const stepsPieces = (values: Pick<RoutineFormValues, "instructions" | "recorded">): StepsPiece[] => {
   const steps = stepsText(values);

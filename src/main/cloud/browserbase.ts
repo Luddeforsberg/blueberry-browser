@@ -62,7 +62,7 @@ export const browserbase = ({
     const response = await send(`${API}${path}`, {
       method,
       headers: { "X-BB-API-Key": apiKey, ...(body ? { "Content-Type": "application/json" } : {}) },
-      body: body ? JSON.stringify(body) : undefined,
+      ...(body ? { body: JSON.stringify(body) } : {}),
     });
     if (response.status === 401 || response.status === 403)
       throw new Error("Browserbase refused the API key. Check it in Settings > Cloud.");

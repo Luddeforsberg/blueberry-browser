@@ -164,7 +164,7 @@ export class TabStrip {
     return id;
   }
 
-  openPage(page: InternalPage, options: { param?: string; title?: string } = {}): BrowserTab {
+  openPage(page: InternalPage, options: { param?: string | undefined; title?: string } = {}): BrowserTab {
     // Only a job opens one, with a page behind it.
     if (page === "cloud") return this.openPage("new-tab");
     const param = options.param ?? null;

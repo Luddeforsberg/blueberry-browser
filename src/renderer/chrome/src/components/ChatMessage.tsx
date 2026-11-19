@@ -29,7 +29,7 @@ export { Markdown } from "./Markdown";
 
 // Your own words, on `sheet-2` at the right, with a small corner where a tail would be (DESIGN.md section 10, Main chat).
 // Yours, at the right, with what went with it over it.
-export const UserMessage: React.FC<{ content: string; attached?: readonly SentAttachment[] }> = ({ content, attached }) => (
+export const UserMessage: React.FC<{ content: string; attached?: readonly SentAttachment[] | undefined }> = ({ content, attached }) => (
   <div className="flex flex-col items-end gap-1.5 animate-fade-in">
     {attached && attached.length > 0 && (
       <div className="max-w-[80%]">
@@ -137,7 +137,7 @@ export interface ReplyActions {
   onSay: (words: string) => void;
   // Only after a job that did some work: a reply that's just an answer has nothing to repeat. What to do and who does
   // it, from the chat, for the card under the reply that asks only when.
-  routineFromChat?: () => RoutineFormValues;
+  routineFromChat?: (() => RoutineFormValues) | undefined;
 }
 
 // Where a chat runs, said only when it isn't here, or who started it when it wasn't the user. Quiet, over its first reply.
@@ -157,7 +157,7 @@ const OriginLine: React.FC<{ origin: ReplyOrigin }> = ({ origin }) => (
 // their column, and in the panel it's smaller and in line. Beside a Working block it lines up with the heading. With
 // Berry hidden there's no face, and the words take its place.
 const WithFace: React.FC<{
-  mascot?: MascotProfile;
+  mascot?: MascotProfile | undefined;
   mood: Mood;
   still?: boolean;
   gutter: boolean;
@@ -187,7 +187,7 @@ const TroubleLine: React.FC<{ words: string; alert?: boolean; children?: React.R
 
 // What went wrong, in plain words, with Try again. The folded line above it opens the steps it got through. With no
 // key, trying again can't work, so it's Add a key, which opens Settings where the key is kept.
-const WhatWentWrong: React.FC<{ message: string; actions?: ReplyActions }> = ({ message, actions }) => (
+const WhatWentWrong: React.FC<{ message: string; actions?: ReplyActions | undefined }> = ({ message, actions }) => (
   <TroubleLine words={message} alert>
     {message === NO_KEY ? (
       <Button onClick={() => openSettings("ai-service")}>Add a key</Button>
@@ -202,28 +202,28 @@ const WhatWentWrong: React.FC<{ message: string; actions?: ReplyActions }> = ({ 
 // Copy and Save as routine on the last reply.
 export const AssistantMessage: React.FC<{
   content: string;
-  steps?: ChatStep[];
+  steps?: ChatStep[] | undefined;
   // What it wrote between its steps, where it wrote it.
-  said?: SaidOnTheWay[];
-  isStreaming?: boolean;
+  said?: SaidOnTheWay[] | undefined;
+  isStreaming?: boolean | undefined;
   // A card is waiting for the user's answer.
   waiting?: boolean;
   mascot?: MascotProfile;
   // This reply went wrong on the way, and this is what happened.
-  error?: string;
+  error?: string | undefined;
   // What its mascot went into this reply remembering.
-  memoryIds?: string[];
+  memoryIds?: string[] | undefined;
   // The pages its job opened, which closed when it ended.
-  pages?: UsedPage[];
+  pages?: UsedPage[] | undefined;
   // When the running reply started, and how long a finished one took, where that's known.
-  startedAt?: number;
-  took?: number;
+  startedAt?: number | undefined;
+  took?: number | undefined;
   // Set on the last reply only.
-  actions?: ReplyActions;
+  actions?: ReplyActions | undefined;
   // Set on the first reply only, where there's something to say.
-  origin?: ReplyOrigin;
+  origin?: ReplyOrigin | undefined;
   // While the working view is hidden.
-  onShowWork?: () => void;
+  onShowWork?: (() => void) | undefined;
   // In the main chat, where the face hangs in the gutter.
   gutter?: boolean;
 }> = ({

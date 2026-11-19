@@ -13,7 +13,7 @@ import { menuRowClass } from "./menuRows";
 
 export interface AddMenuOptions {
   // The page in front, in the chat panel, while it isn't on the card already.
-  thisPage?: { site: string; favicon: string | null; problem: string | null; onAdd: () => void };
+  thisPage?: { site: string; favicon: string | null; problem: string | null; onAdd: () => void } | undefined;
   tabs: {
     // Why no tab can go, such as the job going to the cloud.
     problem: string | null;
@@ -26,7 +26,7 @@ export interface AddMenuOptions {
   };
   files: { problem: string | null; onChoose: () => void };
   // `note` is what it leads to, where the label doesn't say.
-  showHow?: { label: string; note: string | null; problem: string | null; onStart: () => void };
+  showHow?: { label: string; note: string | null; problem: string | null; onStart: () => void } | undefined;
 }
 
 // The menu lists this many tabs itself. With more, it lists one fewer and a row that opens them all.

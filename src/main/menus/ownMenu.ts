@@ -76,20 +76,22 @@ export const buildMenu = (items: OwnMenuItem[], options: { mac: boolean; role?: 
 export const toElectronMenu = (items: OwnMenuItem[]): MenuItemConstructorOptions[] =>
   items.map((item) => {
     if (!isRow(item)) return { type: "separator" };
-    const { click } = item;
-    return {
-      id: item.id,
+    const { click, submenu } = item;
+    const options: MenuItemConstructorOptions = {
       label: item.label,
       // Electron reads a submenu only from an item whose type is "submenu" or left out, never "normal".
-      type: item.type ?? (item.submenu ? "submenu" : "normal"),
-      checked: item.checked,
-      enabled: item.enabled,
-      visible: item.visible,
-      accelerator: item.accelerator,
-      role: item.role,
-      click: click && (() => click()),
-      submenu: item.submenu && toElectronMenu(item.submenu),
+      type: item.type ?? (submenu ? "submenu" : "normal"),
     };
+    // Electron's options take no unset values, so only what the item sets goes in.
+    if (item.id !== undefined) options.id = item.id;
+    if (item.checked !== undefined) options.checked = item.checked;
+    if (item.enabled !== undefined) options.enabled = item.enabled;
+    if (item.visible !== undefined) options.visible = item.visible;
+    if (item.accelerator !== undefined) options.accelerator = item.accelerator;
+    if (item.role !== undefined) options.role = item.role;
+    if (click) options.click = () => click();
+    if (submenu) options.submenu = toElectronMenu(submenu);
+    return options;
   });
 
 // The one menu that's open, and what its rows do. A row acts once, only for the menu it was sent in: a new menu, a

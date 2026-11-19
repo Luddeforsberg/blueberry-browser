@@ -17,9 +17,9 @@ const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-focus";
 // that adds a row.
 export const SettingsLabel: React.FC<{
   id?: string;
-  list?: boolean;
-  count?: number;
-  tone?: "ask";
+  list?: boolean | undefined;
+  count?: number | undefined;
+  tone?: "ask" | undefined;
   trailing?: React.ReactNode;
   children: React.ReactNode;
 }> = ({ id, list = false, count, tone, trailing, children }) => (
@@ -40,8 +40,8 @@ export const SettingsLabel: React.FC<{
 export const SettingsGroup: React.FC<{
   label?: React.ReactNode;
   list?: boolean;
-  count?: number;
-  tone?: "ask";
+  count?: number | undefined;
+  tone?: "ask" | undefined;
   trailing?: React.ReactNode;
   children: React.ReactNode;
 }> = ({ label, list, count, tone, trailing, children }) => {
@@ -59,7 +59,7 @@ export const SettingsGroup: React.FC<{
 };
 
 // A row's name is a heading under its group's label, so a screen reader can move from row to row.
-const Words: React.FC<{ id: string; title: React.ReactNode; description?: React.ReactNode; more?: string }> = ({
+const Words: React.FC<{ id: string; title: React.ReactNode; description?: React.ReactNode; more?: string | undefined }> = ({
   id,
   title,
   description,
@@ -92,7 +92,7 @@ export const SettingsRow: React.FC<{
   id: string;
   title: React.ReactNode;
   description?: React.ReactNode;
-  more?: string;
+  more?: string | undefined;
   lead?: React.ReactNode;
   below?: React.ReactNode;
   // For a control taller than a line, such as pictures: the name sits at the top beside it.
@@ -119,8 +119,8 @@ export const SettingsLink: React.FC<{
   lead?: React.ReactNode;
   // A quiet value, which may lead with a small face. It's cut short rather than pushing the name aside.
   value?: React.ReactNode;
-  state?: { words: string; tone?: PillTone };
-  action?: { label: string; onAct: () => void };
+  state?: { words: string; tone?: PillTone } | undefined;
+  action?: { label: string; onAct: () => void } | undefined;
   onOpen: () => void;
 }> = ({ title, description, lead, value, state, action, onOpen }) => {
   const descriptionId = useId();

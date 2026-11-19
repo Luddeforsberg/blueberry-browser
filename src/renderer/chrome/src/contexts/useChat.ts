@@ -9,7 +9,7 @@ export interface Message {
   content: string;
   steps?: ChatStep[];
   said?: SaidOnTheWay[];
-  startedAt?: number;
+  startedAt?: number | undefined;
   took?: number;
   memoryIds?: string[];
   pages?: UsedPage[];

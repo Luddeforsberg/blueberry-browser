@@ -13,7 +13,7 @@ export type MascotSaveResult = { ok: true; id: string } | { ok: false; error: st
 // `mascotId` picks who a new chat runs as. An existing chat keeps the one it started with.
 export interface ChatSendOptions {
   seePage: boolean;
-  mascotId?: string | null;
+  mascotId?: string | null | undefined;
   // Work in a browser in the cloud rather than in this window's tabs. Ignored while the cloud is off.
   cloud?: boolean;
   // Send it to the cloud runner, which keeps going with this computer off. Needs the user signed in.

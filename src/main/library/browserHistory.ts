@@ -72,7 +72,14 @@ export const browserDataFor = (
     programFiles = [],
     override,
     packaged,
-  }: { appData: string; localAppData?: string; home: string; programFiles?: (string | undefined)[]; override?: string; packaged: boolean },
+  }: {
+    appData: string;
+    localAppData?: string | undefined;
+    home: string;
+    programFiles?: (string | undefined)[];
+    override?: string | undefined;
+    packaged: boolean;
+  },
 ): BrowserData | null => {
   if (override && !packaged) return { base: override, layout: "mac" };
   if (platform === "darwin") return { base: appData, layout: "mac", apps: ["/Applications", join(home, "Applications")] };

@@ -81,7 +81,7 @@ const Unreachable: React.FC<{ onRetry: () => void; className?: string }> = ({ on
 );
 
 // The crumb on top of a mascot's page: back to the tiles, and where you are.
-const Crumb: React.FC<{ name?: string; onClose: () => void }> = ({ name, onClose }) => (
+const Crumb: React.FC<{ name?: string | undefined; onClose: () => void }> = ({ name, onClose }) => (
   <nav aria-label="Where you are" className="flex items-center gap-1.5 text-13 text-ink-2 min-w-0">
     <button
       type="button"

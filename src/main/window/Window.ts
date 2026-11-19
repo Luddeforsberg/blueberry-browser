@@ -213,7 +213,7 @@ export class Window {
   createTab(url?: string, popup?: Popup): BrowserTab {
     return this.parts.tabs.createTab(url, popup);
   }
-  openPage(page: InternalPage, options: { param?: string; title?: string } = {}): BrowserTab {
+  openPage(page: InternalPage, options: { param?: string | undefined; title?: string } = {}): BrowserTab {
     return this.parts.tabs.openPage(page, options);
   }
   navigateTab(tabId: string, url: string): Promise<boolean> {
@@ -323,7 +323,7 @@ export class Window {
   get recentVisits(): Visit[] {
     return this.parts.stores.history.recent();
   }
-  searchHistory(options: { query?: string; before?: HistoryCursor }): HistoryPage {
+  searchHistory(options: { query?: string; before?: HistoryCursor | undefined }): HistoryPage {
     return this.parts.browsing.searchHistory(options);
   }
   deleteHistoryEntry(id: number): boolean {

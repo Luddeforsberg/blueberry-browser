@@ -45,7 +45,7 @@ const TabItem: React.FC<{
   onNudge: (delta: number, button: HTMLElement) => void;
   dragged: boolean;
   shifting: boolean;
-  style?: React.CSSProperties;
+  style?: React.CSSProperties | undefined;
   // Opening from nothing as it arrives, and folding to nothing once it's closed: its height in the sidebar and its
   // width in the row. A folding one is only a picture of the tab that was.
   phase: DrawnRow<TabInfo>["phase"];

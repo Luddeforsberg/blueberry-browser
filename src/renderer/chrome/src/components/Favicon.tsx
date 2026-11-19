@@ -3,12 +3,12 @@ import { Globe } from "lucide-react";
 import { cn } from "@common/lib/utils";
 
 interface FaviconProps {
-  src?: string | null;
-  className?: string;
+  src?: string | null | undefined;
+  className?: string | undefined;
   // Shown instead of the site's letter when the site has no icon.
   fallback?: React.ReactNode;
   // The page's address or host, for its letter when it has no icon.
-  site?: string;
+  site?: string | undefined;
 }
 
 // The first letter of the site's name, so sites with no icon still look different from each other, on a tile in a colour

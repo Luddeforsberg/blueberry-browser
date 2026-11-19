@@ -76,7 +76,7 @@ interface BrowserAPI {
   resetZoom: (tabId: string) => Promise<boolean>;
   openPage: (page: InternalPage, options?: { param?: string; title?: string }) => Promise<TabInfo>;
   getRecent: () => Promise<Visit[]>;
-  searchHistory: (options: { query?: string; before?: HistoryCursor }) => Promise<HistoryPage>;
+  searchHistory: (options: { query?: string; before?: HistoryCursor | undefined }) => Promise<HistoryPage>;
   deleteHistoryEntry: (id: number) => Promise<boolean>;
   clearHistory: () => Promise<boolean>;
   importSources: () => Promise<ImportSource[]>;

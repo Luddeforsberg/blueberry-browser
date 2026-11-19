@@ -45,7 +45,7 @@ const Yours: React.FC<{ className?: string }> = ({ className }) => (
   </span>
 );
 
-export const GroupLabel: React.FC<{ label: string; count?: number; note?: string; className?: string }> = ({
+export const GroupLabel: React.FC<{ label: string; count?: number | undefined; note?: string | undefined; className?: string }> = ({
   label,
   count,
   note,

@@ -100,7 +100,7 @@ This is the `foundations` audit of the preview branch at `581637f`. The full rep
 16. Split `Window.ts` (medium). Done: `Window` is the face callers see, `WindowParts` builds the window and holds 20 parts, one job each.
 17. Split `ipc.ts` (low). Done: `src/shared/ipc.ts` re-exports ten files in `src/shared/ipc/`, held to types only by a lint rule. The built app is byte-identical.
 18. The other files over 400 lines. Done: every file is within 400 lines, and `linesOver` in `eslint.limits.mjs` is empty.
-19. `exactOptionalPropertyTypes`, then `noUncheckedIndexedAccess` (medium).
+19. `exactOptionalPropertyTypes`, then `noUncheckedIndexedAccess` (medium). The first is on for page code, and everything it finds in main and the renderers is fixed. It stays off there for now, because LangChain's own types fail under it at `humanInTheLoopMiddleware` in `agent.ts`, in the latest LangChain too.
 20. Type-aware lint, one rule at a time (medium).
 21. Fences: SQL, `fetch`, effects and timers, the UI kit (medium).
 22. End-to-end tests in CI, and protect `main` (medium).

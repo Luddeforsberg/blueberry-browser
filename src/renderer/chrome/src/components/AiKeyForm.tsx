@@ -82,7 +82,7 @@ const ServiceTiles: React.FC<{ keyTry: KeyTry }> = ({ keyTry }) => {
 };
 
 // One 46px field, whatever it holds. In the first run's card, as in the cards that make a mascot, the caret marks focus.
-const Field: React.FC<{ inCard?: boolean; atFault?: boolean; focusRing?: boolean; children: React.ReactNode }> = ({
+const Field: React.FC<{ inCard?: boolean | undefined; atFault?: boolean; focusRing?: boolean; children: React.ReactNode }> = ({
   inCard,
   atFault,
   focusRing,
