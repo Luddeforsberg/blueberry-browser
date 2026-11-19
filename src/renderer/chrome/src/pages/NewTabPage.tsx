@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import type { TabInfo, Visit } from "@shared/ipc";
 import type { MascotProfile, NeedsYouItem, Suggestion } from "@shared/library";
@@ -13,7 +13,7 @@ import { useMascots, useLibrary } from "../contexts/useLibrary";
 import { useShell } from "../contexts/useShell";
 import { Berry } from "../components/Berry";
 import { useAssistantName } from "../components/useAssistantName";
-import { Composer, type PillFace } from "../components/Composer";
+import { Composer } from "../components/Composer";
 import { useCloud } from "../useCloud";
 import { useRunner } from "../useRunner";
 import { startMascot, suggestedMascot } from "../mascotsView";
@@ -31,6 +31,7 @@ import { FIRST_JOB_PROMPT, FirstJobs } from "../components/FirstJobs";
 import { setGalleryView } from "../galleryView";
 import { galleryParam } from "@shared/galleryPlaces";
 import { openSettings } from "../openSettings";
+import { useMascotSwitch } from "./useMascotSwitch";
 
 // DESIGN.md section 10, New tab: no page yet, so no sheet. The well, the greeting, the prompt box, and what's real under it.
 
@@ -104,52 +105,6 @@ const ShowMeHow: React.FC<{ tab: TabInfo }> = ({ tab }) => {
       </div>
     </div>
   );
-};
-
-// DESIGN.md section 10, Choosing a mascot: the old one's eyes shut, the new one pops in at 120ms with the pips for a
-// face, and its eyes open at 420ms. Held still, it's a short fade. Choosing again partway starts over from there.
-const ARRIVES_MS = 120;
-const SETTLED_MS = 420;
-const useMascotSwitch = (chosen: MascotProfile) => {
-  const { keepBerryStill } = useShell().settings;
-  const [shown, setShown] = useState(chosen);
-  const [phase, setPhase] = useState<"rest" | "shut" | "arriving">("rest");
-  const [arrival, setArrival] = useState(0);
-  // Who's showing, and the latest of who's chosen, so a library update partway doesn't start the switch again.
-  const showing = useRef(chosen.id);
-  const latest = useRef(chosen);
-  latest.current = chosen;
-
-  // The same mascot, saved again: show what it is now.
-  useEffect(() => {
-    if (chosen.id === showing.current) setShown(chosen);
-  }, [chosen]);
-
-  useEffect(() => {
-    if (chosen.id === showing.current) return;
-    const arrive = () => {
-      showing.current = latest.current.id;
-      setShown(latest.current);
-      setArrival((count) => count + 1);
-    };
-    if (keepBerryStill) {
-      arrive();
-      return;
-    }
-    setPhase("shut");
-    const arriving = window.setTimeout(() => {
-      arrive();
-      setPhase("arriving");
-    }, ARRIVES_MS);
-    const settle = window.setTimeout(() => setPhase("rest"), SETTLED_MS);
-    return () => {
-      window.clearTimeout(arriving);
-      window.clearTimeout(settle);
-    };
-  }, [chosen.id, keepBerryStill]);
-
-  const face: PillFace = { mood: phase === "arriving" ? "fetching" : "rest", shut: phase === "shut", arrival };
-  return { shown, face, switching: phase !== "rest", still: keepBerryStill };
 };
 
 // What a mascot may not do, in words, or nothing for one with no limits, as Berry has none.

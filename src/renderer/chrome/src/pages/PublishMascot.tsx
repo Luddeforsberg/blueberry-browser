@@ -1,115 +1,33 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowLeft, Check, ExternalLink, Lock, LockOpen } from "lucide-react";
-import type { MascotDraft, MascotExample, PublishChoices } from "@shared/library";
+import { AlertTriangle, ArrowLeft, ExternalLink } from "lucide-react";
+import type { PublishChoices } from "@shared/library";
 import {
   GALLERY_CATEGORIES,
   MAX_AUTHOR,
   MAX_DESCRIPTION,
-  MAX_EXAMPLE_ANSWER,
-  MAX_EXAMPLE_PROMPT,
   parsePublicDraft,
   parsePublishChoices,
   publishWarnings,
 } from "@shared/publishing";
-import { ACCESSORIES, PALETTES, permissionsInWords } from "@shared/mascots";
 import { Button } from "@common/components/Button";
 import { QuietChoice } from "@common/components/Controls";
 import { cn } from "@common/lib/utils";
 import { AccountForm } from "../components/AccountForm";
 import { Berry } from "../components/Berry";
 import { CopyLink } from "../components/CopyLink";
-import { ChatError, Markdown } from "../components/ChatMessage";
+import { ChatError } from "../components/ChatMessage";
 import { useMascots, useLibrary } from "../contexts/useLibrary";
 import { useShell } from "../contexts/useShell";
 import { lastExchange, type PublishValues } from "../mascotsView";
 import { useAccount } from "../useAccount";
 import { GalleryTile } from "./MascotGalleryPage";
+import { INPUT, Field } from "./PublishField";
+import { ExampleField } from "./PublishExample";
+import { WhatGoesPublic } from "./WhatGoesPublic";
 
-const INPUT = "w-full px-3 rounded-tile border bg-sheet text-14 outline-none focus-visible:ring-2 focus-visible:ring-focus";
-const ROW = "py-5 border-b";
 const MASCOT_SIZE = 148;
 // How far down the standing drawing its feet reach, so its toes grip the line under it.
 const FEET_Y = 113 / 120;
-
-const Field: React.FC<{ title: string; hint?: string; htmlFor?: string; children: React.ReactNode }> = ({
-  title,
-  hint,
-  htmlFor,
-  children,
-}) => (
-  <div className={ROW}>
-    {htmlFor ? (
-      <label htmlFor={htmlFor} className="block text-14 font-medium">
-        {title}
-      </label>
-    ) : (
-      <p className="text-14 font-medium">{title}</p>
-    )}
-    {hint && <p className="mt-0.5 text-14 text-ink-2">{hint}</p>}
-    <div className="mt-2">{children}</div>
-  </div>
-);
-
-const Line: React.FC<{ term: string; children: React.ReactNode }> = ({ term, children }) => (
-  <div className="grid grid-cols-[120px_1fr] gap-3 py-3 border-b last:border-b-0">
-    <dt className="text-14 text-ink-2">{term}</dt>
-    <dd className="min-w-0 text-14 [overflow-wrap:anywhere]">{children}</dd>
-  </div>
-);
-
-// A radio or a checkbox in our own colours. The real one lies over its whole line, unseen, so the pointer, the keyboard
-// and labels work as ever.
-// What it may do, in words, read from its real limits. Open means it isn't limited.
-const Permissions: React.FC<{ draft: Pick<MascotDraft, "sites" | "tools"> }> = ({ draft }) => (
-  <ul aria-label="What it’s allowed to do" className="flex flex-wrap gap-x-4 gap-y-0.5 text-13 text-ink-2">
-    {permissionsInWords(draft).map(({ text, open }) => {
-      const Icon = open ? LockOpen : Lock;
-      return (
-        <li key={text} className="flex items-start gap-1.5 [overflow-wrap:anywhere]">
-          <Icon aria-hidden className="shrink-0 mt-[2px] size-3" />
-          {text}
-        </li>
-      );
-    })}
-  </ul>
-);
-
-// The example as it will go: the question as typed, and the answer as it reads in the Gallery, which can't fetch an
-// image or dress up a link.
-const ExampleText: React.FC<{ example: MascotExample }> = ({ example }) => (
-  <>
-    <h3 className="text-13 text-ink-2">I asked this</h3>
-    <p className="mt-1 text-14 whitespace-pre-wrap [overflow-wrap:anywhere]">{example.prompt}</p>
-    <h3 className="mt-4 text-13 text-ink-2">And here’s what it gave me</h3>
-    <Markdown content={example.answer} fromStranger className="mt-1 text-14 [overflow-wrap:anywhere]" />
-  </>
-);
-
-const REAL_INPUT = "peer absolute inset-0 m-0 size-full opacity-0";
-const Mark: React.FC<{ round?: boolean }> = ({ round = false }) => (
-  <span
-    aria-hidden
-    className={cn(
-      "size-4 shrink-0 flex items-center justify-center border bg-sheet transition-colors text-ground",
-      round ? "rounded-full" : "rounded-[4px]",
-      "peer-checked:bg-ink peer-checked:border-ink peer-focus-visible:ring-2 peer-focus-visible:ring-focus peer-focus-visible:ring-offset-1 peer-focus-visible:ring-offset-sheet [&>*]:opacity-0 peer-checked:[&>*]:opacity-100",
-    )}
-  >
-    {round ? <span className="size-1.5 rounded-full bg-ground" /> : <Check className="size-3" strokeWidth={3} />}
-  </span>
-);
-
-const ExampleChoice: React.FC<{ checked: boolean; onPick?: () => void; children: React.ReactNode }> = ({ checked, onPick, children }) => (
-  <li>
-    <label className="relative flex items-center gap-2 py-2 text-14">
-      <input type="radio" name="publish-example" className={REAL_INPUT} checked={checked} readOnly={!onPick} onChange={onPick} />
-      <Mark round />
-      {children}
-    </label>
-  </li>
-);
-
-const labelOf = (list: { id: string; label: string }[], id: string) => list.find((item) => item.id === id)?.label ?? id;
 
 export const PublishMascot: React.FC<{
   mascotId: string;
@@ -401,92 +319,9 @@ export const PublishMascot: React.FC<{
             />
           </Field>
 
-          <div className={ROW}>
-            <h2 className="text-14 font-medium">An example</h2>
-            <p className="mt-0.5 text-14 text-ink-2">
-              Optional, and it shows people what it really does. Only these two pieces of text go, as you leave them. The rest of the chat,
-              its pages, screenshots and steps stay here.
-            </p>
-            <ul aria-label="Choose an example" className="mt-2 divide-y">
-              <ExampleChoice checked={!hasExample} onPick={() => void pickChat(null)}>
-                No example
-              </ExampleChoice>
-              {values.exampleChatId === "published" && <ExampleChoice checked>The one already published</ExampleChoice>}
-              {own.map((chat) => (
-                <ExampleChoice key={chat.id} checked={values.exampleChatId === chat.id} onPick={() => void pickChat(chat.id)}>
-                  <span className="truncate">{chat.title}</span>
-                </ExampleChoice>
-              ))}
-            </ul>
-            {own.length === 0 && (
-              <p className="text-14 text-ink-2">
-                {mascot.name} has no chats yet, so there’s nothing to pick. Chat with it first if you’d like an example.
-              </p>
-            )}
-            {hasExample && (
-              <div className="mt-3 flex flex-col gap-3">
-                <label className="text-14">
-                  What you asked
-                  <textarea
-                    rows={3}
-                    maxLength={MAX_EXAMPLE_PROMPT}
-                    value={values.prompt}
-                    onChange={(event) => set({ prompt: event.target.value, checked: false })}
-                    className={cn(INPUT, "mt-1 py-2 resize-y")}
-                  />
-                </label>
-                <label className="text-14">
-                  What it gave you
-                  <textarea
-                    rows={8}
-                    value={values.answer}
-                    onChange={(event) => set({ answer: event.target.value, checked: false })}
-                    className={cn(INPUT, "mt-1 py-2 resize-y")}
-                  />
-                  <span
-                    className={cn("block mt-1 text-13 tabular-nums", values.answer.length > MAX_EXAMPLE_ANSWER ? "text-ask" : "text-ink-2")}
-                  >
-                    {values.answer.length} of {MAX_EXAMPLE_ANSWER} characters
-                  </span>
-                </label>
-                <label className="relative flex items-start gap-2 text-14">
-                  <input
-                    type="checkbox"
-                    className={REAL_INPUT}
-                    checked={values.checked}
-                    onChange={(event) => set({ checked: event.target.checked })}
-                  />
-                  <Mark />
-                  I’ve read both, and there’s nothing in them I wouldn’t show a stranger.
-                </label>
-              </div>
-            )}
-          </div>
+          <ExampleField values={values} set={set} own={own} mascot={mascot} hasExample={hasExample} pickChat={pickChat} />
 
-          <section aria-label="What goes public" className="mt-6">
-            <h2 className="text-14 font-medium">Exactly what goes public</h2>
-            <p className="mt-0.5 text-14 text-ink-2">This and nothing else: never your chats, your history or your account’s email.</p>
-            <dl className="mt-2">
-              <Line term="Name and look">
-                <span className="flex items-center gap-2">
-                  <Berry size={32} mascot={mascot} />
-                  {mascot.name}, {labelOf(PALETTES, mascot.look.palette)}, {labelOf(ACCESSORIES, mascot.look.accessory).toLowerCase()}
-                </span>
-              </Line>
-              <Line term="Author">{choices.author.trim() || <span className="text-ink-2">Not chosen yet</span>}</Line>
-              <Line term="What it does">{choices.description.trim() || <span className="text-ink-2">Not written yet</span>}</Line>
-              <Line term="Category">{choices.category}</Line>
-              <Line term="Sites and tools">
-                <Permissions draft={mascot} />
-              </Line>
-              <Line term="Its instructions">
-                <span className="whitespace-pre-wrap">{mascot.instructions}</span>
-              </Line>
-              <Line term="Example">
-                {choices.example ? <ExampleText example={choices.example} /> : <span className="text-ink-2">None</span>}
-              </Line>
-            </dl>
-          </section>
+          <WhatGoesPublic mascot={mascot} choices={choices} />
 
           {warnings.length > 0 && (
             <ul aria-label="Before you publish" className="mt-4 flex flex-col gap-1 text-14 text-ask">
