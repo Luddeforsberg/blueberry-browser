@@ -66,7 +66,7 @@ With `RELAY_PUBLIC_URL` and `RELAY_SECRET` set, the runner also serves a remote 
 
 1. **A public domain.** In Railway, the service's Settings > Networking > Generate Domain. Railway gives it HTTPS and sets `PORT`, which the relay listens on.
 2. **Set `RELAY_PUBLIC_URL`** to that address and **`RELAY_SECRET`** to a long random string, and redeploy. The log says `Relay listening on port …`, and Settings > Cloud > With your Mac off shows the address to paste, `https://<domain>/mcp`, once the runner has linked.
-3. **Keep connections across redeploys (optional).** Add a volume to the service, mounted at `/data`, and set `RELAY_STATE_FILE=/data/relay.json`. Without it, connections live in memory and ChatGPT or Claude ask you to sign in again after each deploy. The file is sealed with `RELAY_SECRET`, so changing the secret also means signing in again.
+3. **Keep connections across redeploys (optional).** `.railway/railway.ts` mounts a volume called `runner-volume` at `/data`, so set `RELAY_STATE_FILE=/data/relay.json`. Without it, connections live in memory and ChatGPT or Claude ask you to sign in again after each deploy. The file is sealed with `RELAY_SECRET`, so changing the secret also means signing in again.
 4. **ChatGPT:** Settings > Apps & Connectors > Advanced settings, turn on Developer mode, then create a connector with the address and OAuth as the authentication. **Claude:** Settings > Connectors > Add custom connector, with the address.
 5. **Sign in** on the page that opens with your own Blueberry account, the one in `BLUEBERRY_RUNNER_OWNER`. No other account can connect, and nobody else's password is sent anywhere.
 
