@@ -14,6 +14,32 @@ describe("runner jobs in the app", () => {
     expect(runner.progress("chat-1")).toBeNull();
   });
 
+  it("sends a start whose answer was lost again under the same id, so it makes one job", async () => {
+    const { runner, send, server, jobs, lost } = setUp();
+    lost.answers = 2;
+    expect(await send()).toBeNull();
+    expect(jobs.size).toBe(1);
+    const ids = vi.mocked(server.startCloudJob).mock.calls.map(([, job]) => job.id);
+    expect(ids).toHaveLength(3);
+    expect(new Set(ids).size).toBe(1);
+    expect(runner.progress("chat-1")).not.toBeNull();
+    // The next message is a job of its own.
+    jobs.get("job-1")!.row.status = "done";
+    expect(await send()).toBeNull();
+    expect(jobs.size).toBe(2);
+    runner.destroy();
+  });
+
+  it("stops sending a start nobody has answered once someone else signs in, and says it may have gone", async () => {
+    const { runner, send, signIn, server, lost } = setUp();
+    lost.answers = 99;
+    const sending = send();
+    await expect.poll(() => vi.mocked(server.startCloudJob).mock.calls.length).toBeGreaterThan(1);
+    signIn(BO);
+    expect(await sending).toMatch(/If it did, it shows here/);
+    runner.destroy();
+  });
+
   it.each([
     ["Stop", "stopCloudJob" as const],
     ["deleting the chat", "forgetCloudConversation" as const],

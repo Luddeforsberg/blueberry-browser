@@ -62,6 +62,8 @@ export interface RelayDb {
   // The grant's own jobs by id, or its newest with none.
   relayJobs(secret: string, ids: string[] | null): Promise<Record<string, unknown>[]>;
   relayStopJob(secret: string, jobId: string): Promise<void>;
+  // Takes up a grant made at sign-in, once its code is exchanged.
+  relayActivate(secret: string): Promise<void>;
   relayRevoke(secret: string): Promise<void>;
 }
 
@@ -178,6 +180,9 @@ export const supabaseDb = (
     relayJobs: async (secret, ids) => (await rpc<Record<string, unknown>[]>("relay_jobs", { p_secret: secret, p_ids: ids })) ?? [],
     relayStopJob: async (secret, jobId) => {
       await rpc("relay_stop_job", { p_secret: secret, p_job: jobId });
+    },
+    relayActivate: async (secret) => {
+      if ((await rpc<unknown>("relay_activate_grant", { p_secret: secret })) !== true) throw new DbError(500);
     },
     relayRevoke: async (secret) => {
       await rpc("relay_revoke_grant", { p_secret: secret });

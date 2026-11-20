@@ -21,7 +21,13 @@ afterEach(() => {
 
 // Supabase and the database's grants, faked: what was signed in, signed out, made and revoked.
 const setUp = (extra: Partial<RelayAuthOptions> = {}) => {
-  const seen = { signIns: [] as string[], signOuts: [] as string[], created: [] as string[], revoked: [] as string[] };
+  const seen = {
+    signIns: [] as string[],
+    signOuts: [] as string[],
+    created: [] as string[],
+    activated: [] as string[],
+    revoked: [] as string[],
+  };
   let made = 0;
   let clock = Date.now();
   const options: RelayAuthOptions = {
@@ -38,6 +44,7 @@ const setUp = (extra: Partial<RelayAuthOptions> = {}) => {
     },
     grants: {
       create: async (token) => (seen.created.push(token), `grant-secret-${++made}`),
+      activate: async (secret) => void seen.activated.push(secret),
       revoke: async (secret) => void seen.revoked.push(secret),
     },
     now: () => clock,
@@ -84,6 +91,27 @@ describe("RelayAuth", () => {
     const info = await restarted.verifyAccessToken(tokens.access_token);
     expect(restarted.secretOf(String(info.extra!.grantId))).toBe("grant-secret-1");
     await expect(new RelayAuth({ ...options, secret: "t".repeat(40) }).verifyAccessToken(tokens.access_token)).rejects.toThrow();
+  });
+
+  it("takes up the grant only when the code is exchanged, and gives no tokens when it can't be", async () => {
+    const { auth, seen, options } = setUp();
+    const signedIn = async () => {
+      const { client, request } = await formFor(auth);
+      const answer = await auth.signIn({ request, email: OWNER, password: "pw" }, "1.2.3.4");
+      if (!("redirect" in answer)) throw new Error(answer.page);
+      return { client, code: new URL(answer.redirect).searchParams.get("code")! };
+    };
+    const first = await signedIn();
+    expect(seen.created).toHaveLength(1);
+    expect(seen.activated).toEqual([]);
+    const tokens = await auth.exchangeAuthorizationCode(first.client, first.code, undefined, REDIRECT);
+    expect(seen.activated).toEqual(["grant-secret-1"]);
+    expect(await auth.verifyAccessToken(tokens.access_token)).toBeTruthy();
+
+    // The database won't take it up, as for one left waiting too long: no connection is made.
+    options.grants.activate = async () => Promise.reject(new Error("Not a grant waiting for this runner"));
+    const late = await signedIn();
+    await expect(auth.exchangeAuthorizationCode(late.client, late.code, undefined, REDIRECT)).rejects.toThrow(/Connect again/);
   });
 
   it("ends the whole connection when a used refresh token comes back", async () => {
@@ -164,7 +192,9 @@ describe("RelayAuth", () => {
   });
 
   it("says to set up the cloud first when the database won't make a grant", async () => {
-    const { auth, seen } = setUp({ grants: { create: async () => Promise.reject(new ServerError(400, "")), revoke: async () => {} } });
+    const { auth, seen } = setUp({
+      grants: { create: async () => Promise.reject(new ServerError(400, "")), activate: async () => {}, revoke: async () => {} },
+    });
     const { request } = await formFor(auth);
     const answer = await auth.signIn({ request, email: OWNER, password: "pw" }, "1.2.3.4");
     expect("page" in answer && answer.page).toContain("Settings &#62; Cloud");

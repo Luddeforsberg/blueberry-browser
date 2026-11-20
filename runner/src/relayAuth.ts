@@ -57,9 +57,11 @@ interface Code {
   expiresAt: number;
 }
 
-// The two calls the grants need: one as the owner, once, and one as the runner.
+// The calls the grants need: one as the owner, once, and the rest as the runner. A grant made at sign-in works for
+// nothing until it's taken up, when the app that signed in exchanges its code, so codes left unused leave no grant.
 interface RelayGrants {
   create(ownerAccessToken: string): Promise<string>;
+  activate(secret: string): Promise<void>;
   revoke(secret: string): Promise<void>;
 }
 
@@ -206,6 +208,11 @@ export class RelayAuth implements OAuthServerProvider {
     if (redirectUri !== undefined && redirectUri !== code.redirectUri) throw new InvalidGrantError("The redirect_uri doesn't match.");
     if (resource && resource.href !== this.options.resource.href)
       throw new InvalidTargetError("This server is only for its own MCP address.");
+    try {
+      await this.options.grants.activate(code.secret);
+    } catch {
+      throw new InvalidGrantError("That code can't be used any more. Connect again.");
+    }
     const now = this.now();
     const grant: Grant = {
       id: randomUUID(),

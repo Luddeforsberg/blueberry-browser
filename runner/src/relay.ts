@@ -86,7 +86,11 @@ export const relayApp = (config: RelayConfig, supabase: { url: string; key: stri
     resource,
     owner: supabase.owner,
     server,
-    grants: { create: (token) => server.createRelayGrant(token), revoke: (secret) => db.relayRevoke(secret) },
+    grants: {
+      create: (token) => server.createRelayGrant(token),
+      activate: (secret) => db.relayActivate(secret),
+      revoke: (secret) => db.relayRevoke(secret),
+    },
     stateFile: config.stateFile,
   });
   const app = express();

@@ -209,11 +209,13 @@ export class GalleryServer {
 
   // The cloud runner's jobs, always as the signed-in user, so row-level security keeps each to their own.
 
+  // `id` is made here, once for each message, so a start sent again gives back the job it made rather than make another.
   // `afterJobId` is the conversation's newest job, the one the history was built on. Answers 409 while another job of it
   // is going, or if it has gone on since that one.
   async startCloudJob(
     token: string,
     job: {
+      id: string;
       prompt: string;
       history: unknown[];
       mascot: object;
@@ -227,6 +229,7 @@ export class GalleryServer {
       method: "POST",
       token,
       body: {
+        p_id: job.id,
         p_prompt: job.prompt,
         p_history: job.history,
         p_mascot: job.mascot,
