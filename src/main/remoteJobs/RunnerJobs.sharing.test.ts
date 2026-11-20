@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -105,7 +105,13 @@ describe("routines kept in the cloud", () => {
   });
 
   // A server holding the routines' keys, as `my_cloud_routine_keys` gives them. `failForgets` makes that many forgets fail.
-  const make = (onServer: string[], rows: () => CloudRoutineRow[] | null, failForgets = 0) => {
+  // `here` is every routine on this computer, in the cloud or not, `sentBefore` what an earlier launch saved as sent, and
+  // `oldList` what an earlier version saved.
+  const make = (
+    onServer: string[],
+    rows: () => CloudRoutineRow[] | null,
+    { failForgets = 0, here = () => (rows() ?? []).map(({ key }) => key), sentBefore = [] as string[], oldList = [] as string[] } = {},
+  ) => {
     const keys = new Set(onServer);
     let failing = failForgets;
     const syncCloudRoutine = vi.fn(async (_token: string, sent: CloudRoutineRow) => void keys.add(sent.key));
@@ -121,11 +127,13 @@ describe("routines kept in the cloud", () => {
       myCloudRoutineKeys: async () => [...keys],
       cloudConversationJobs: async () => [],
     } as unknown as GalleryServer;
+    const file = join(mkdtempSync(join(tmpdir(), "runner-jobs-")), "runner-jobs.json");
+    writeFileSync(file, JSON.stringify({ chats: {}, forgotten: [], routinesSentFromHere: sentBefore, routinesInCloud: oldList }));
     const runner = new RunnerJobs(
       server,
       { state: { status: "signed-in", email: ANA, problem: null } as AccountState, accessToken: async () => "token" },
-      join(mkdtempSync(join(tmpdir(), "runner-jobs-")), "runner-jobs.json"),
-      { changed: vi.fn(), finished: vi.fn(), contextId: () => null, routines: rows },
+      file,
+      { changed: vi.fn(), finished: vi.fn(), contextId: () => null, routines: rows, routineIds: here },
       5,
     );
     return { runner, keys, syncCloudRoutine, forgetCloudRoutine };
@@ -154,7 +162,8 @@ describe("routines kept in the cloud", () => {
 
   it("leaves the cloud's routines alone while the ones here couldn't be read", async () => {
     let rows: CloudRoutineRow[] | null = null;
-    const { runner, keys, syncCloudRoutine, forgetCloudRoutine } = make(["r1", "r2"], () => rows);
+    // r2 was moved back to this computer.
+    const { runner, keys, syncCloudRoutine, forgetCloudRoutine } = make(["r1", "r2"], () => rows, { here: () => ["r1", "r2"] });
     await settle();
     await runner.routinesChanged();
     expect(syncCloudRoutine).not.toHaveBeenCalled();
@@ -168,8 +177,11 @@ describe("routines kept in the cloud", () => {
   });
 
   it("takes away what the server still has after a restart, tries a failed forget again, and holds it back here till then", async () => {
-    // Deleted or moved back on the Mac before it quit, while the forget couldn't get through.
-    const { runner, keys, forgetCloudRoutine } = make(["kept", "deleted-before-restart"], () => [row("kept")], 1);
+    // Deleted on the Mac before it quit, while the forget couldn't get through.
+    const { runner, keys, forgetCloudRoutine } = make(["kept", "deleted-before-restart"], () => [row("kept")], {
+      failForgets: 1,
+      sentBefore: ["kept", "deleted-before-restart"],
+    });
     await settle();
     expect(forgetCloudRoutine).toHaveBeenCalledTimes(1);
     expect([...keys].sort()).toEqual(["deleted-before-restart", "kept"]);
@@ -180,6 +192,23 @@ describe("routines kept in the cloud", () => {
     expect(runner.stillInCloud("deleted-before-restart")).toBe(false);
     expect(runner.stillInCloud("kept")).toBe(true);
     runner.destroy();
+  });
+
+  it("leaves another computer's routines on the account alone, even with none here, and an old list of them unread", async () => {
+    // An earlier version saved every key on the server as this computer's.
+    const { runner, keys, forgetCloudRoutine } = make(["other-mac", "mine"], () => [row("mine")], { oldList: ["other-mac", "mine"] });
+    await settle();
+    await runner.routinesChanged();
+    expect(forgetCloudRoutine).not.toHaveBeenCalled();
+    expect(runner.stillInCloud("other-mac")).toBe(false);
+    runner.destroy();
+
+    const fresh = make(["other-mac"], () => [], { here: () => [] });
+    await settle();
+    expect(fresh.forgetCloudRoutine).not.toHaveBeenCalled();
+    expect([...fresh.keys]).toEqual(["other-mac"]);
+    expect([...keys].sort()).toEqual(["mine", "other-mac"]);
+    fresh.runner.destroy();
   });
 
   it("says a routine couldn't be sent, and stops saying so once it is", async () => {

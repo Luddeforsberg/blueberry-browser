@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { defined } from "../src/shared/testing";
+import { JOB_LEASE_MS, SERVER_SILENCE_MS } from "../src/main/remoteJobs/cloudJobs";
 
 // The real migration in real Postgres (compiled to WebAssembly), as the roles Supabase uses. The runner is a user like
 // any other here, signed in as itself. Only `auth` is a stand-in.
@@ -103,7 +104,14 @@ describe("the cloud jobs' database rules", () => {
   it("ends a job whose runner went quiet as failed, rather than running it again", async () => {
     const id = await start(ALICE);
     await claim(RUNNER);
-    await db.query("update public.cloud_jobs set heartbeat_at = now() - interval '3 minutes' where id = $1", [id]);
+    // A runner stops once its lease runs out, which is always before the server would end the job.
+    await db.query("update public.cloud_jobs set heartbeat_at = now() - $2 * interval '1 millisecond' where id = $1", [id, JOB_LEASE_MS]);
+    expect(await claim(RUNNER)).toEqual([]);
+    expect(defined(await job(id)).status).toBe("running");
+    await db.query("update public.cloud_jobs set heartbeat_at = now() - $2 * interval '1 millisecond' where id = $1", [
+      id,
+      SERVER_SILENCE_MS + 1_000,
+    ]);
     expect(await claim(RUNNER)).toEqual([]);
     expect(defined(await job(id)).status).toBe("failed");
     // Once it's over, the runner can't see it any more.

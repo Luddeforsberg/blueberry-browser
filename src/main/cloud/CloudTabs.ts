@@ -18,6 +18,8 @@ import { Latest } from "../../shared/lateWork";
 
 const NOT_SAFE = "This computer can't keep the key encrypted, so it wasn't saved.";
 const NOT_SAVED = "The key couldn't be saved.";
+// The session's id is the only way to end it, and it goes with the key.
+const STILL_RUNNING = "The cloud session didn't confirm it ended, so the key was kept to end it with. Press End again first.";
 // What a cloud tab may ask its page's viewport to be, in pixels.
 const FIT = { min: { width: 320, height: 200 }, max: { width: 3840, height: 2160 } };
 
@@ -121,8 +123,9 @@ export class CloudTabs implements ChatCloud {
       this.problem = "Both the API key and the project id are needed.";
     } else if (!safeStorage.isEncryptionAvailable()) {
       this.problem = NOT_SAFE;
+    } else if (await this.stillRunning()) {
+      this.problem = STILL_RUNNING;
     } else {
-      await this.end();
       // A new key may be a new account, where the old context and session don't exist.
       this.saved = { apiKey: key, projectId: project, contextId: null, sessionId: null };
       this.save();
@@ -133,13 +136,23 @@ export class CloudTabs implements ChatCloud {
   }
 
   async forget(): Promise<CloudState> {
-    await this.end();
+    if (await this.stillRunning()) {
+      this.problem = STILL_RUNNING;
+      this.changed();
+      return this.state;
+    }
     this.saved = EMPTY;
     this.problem = null;
     this.save();
     if (!this.local) this.sessions = null;
     this.changed();
     return this.state;
+  }
+
+  // Ends the session first. True if Browserbase didn't confirm it, so it may still be running on the key saved now.
+  private async stillRunning(): Promise<boolean> {
+    await this.end();
+    return !!this.sessions?.unreleased;
   }
 
   // Ends the session at the provider and closes every cloud tab, whatever was working there.
@@ -248,10 +261,15 @@ export class CloudTabs implements ChatCloud {
     const turn = this.watches.next();
     await was?.watch(null);
     if (!turn.current) return;
-    await page?.watch((data) => {
-      const chrome = this.hooks.chrome();
-      if (this.watching === page && !chrome.isDestroyed()) sendToRenderer(chrome, "cloud:frame", { tabId: page.id, data });
-    });
+    try {
+      await page?.watch((data) => {
+        const chrome = this.hooks.chrome();
+        if (this.watching === page && !chrome.isDestroyed()) sendToRenderer(chrome, "cloud:frame", { tabId: page.id, data });
+      });
+    } catch {
+      // The browser wouldn't start the pictures, so it isn't watching, and the next ask for this tab tries again.
+      if (turn.current && this.watching === page) this.watching = null;
+    }
   }
 
   // The chrome says how big the tab shows the page, and the page's viewport follows, as a window's own tab does on a resize.

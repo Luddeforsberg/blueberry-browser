@@ -10,6 +10,9 @@ const API = "https://api.browserbase.com/v1";
 export const BROWSERBASE_REGION = "eu-central-1";
 // Seconds. A kept-alive session runs, and costs, until this or until it's released.
 const SESSION_TIMEOUT_S = 3600;
+// What Browserbase says of a session that has stopped, and costs nothing more.
+const ENDED = ["COMPLETED", "ERROR", "TIMED_OUT"];
+const NOT_YET = "The last cloud session hasn't said whether it's still running, so no new one was started. Try again in a moment.";
 
 export interface BrowserbaseSaved {
   contextId: string | null;
@@ -47,6 +50,12 @@ export const isLiveView = (url: string): boolean => {
   }
 };
 
+class BrowserbaseError extends Error {
+  constructor(readonly status: number) {
+    super(`Browserbase answered ${status}.`);
+  }
+}
+
 // The navbar is Browserbase's, and the tab in Blueberry already says where it is.
 const withoutNavbar = (url: string) => `${url}${url.includes("?") ? "&" : "?"}navbar=false`;
 
@@ -66,9 +75,16 @@ export const browserbase = ({
     });
     if (response.status === 401 || response.status === 403)
       throw new Error("Browserbase refused the API key. Check it in Settings > Cloud.");
-    if (!response.ok) throw new Error(`Browserbase answered ${response.status}.`);
+    if (!response.ok) throw new BrowserbaseError(response.status);
     return (await response.json()) as T;
   };
+
+  // Null only when Browserbase says there's no such session. A lookup that fails says nothing about it, so it throws.
+  const lookUp = (id: string): Promise<Session | null> =>
+    call<Session>("GET", `/sessions/${encodeURIComponent(id)}`).catch((error: unknown) => {
+      if (error instanceof BrowserbaseError && error.status === 404) return null;
+      throw error;
+    });
 
   const context = async (): Promise<string> => {
     if (saved.contextId) return saved.contextId;
@@ -78,11 +94,13 @@ export const browserbase = ({
     return id;
   };
 
-  // The kept-alive session from last time if it's still running, or a new one.
+  // The kept-alive session from last time if it's still running, or a new one. Its id is the only way to release it, so
+  // it's replaced only once Browserbase says it has ended, never on a lookup that failed.
   const session = async (): Promise<Session & { connectUrl: string }> => {
     if (saved.sessionId) {
-      const known = await call<Session>("GET", `/sessions/${encodeURIComponent(saved.sessionId)}`).catch(() => null);
+      const known = await lookUp(saved.sessionId);
       if (known?.status === "RUNNING" && known.connectUrl) return { ...known, connectUrl: known.connectUrl };
+      if (known && !ENDED.includes(known.status)) throw new Error(NOT_YET);
     }
     const contextId = await context();
     const made = await call<Session>("POST", "/sessions", {
@@ -92,9 +110,11 @@ export const browserbase = ({
       timeout: SESSION_TIMEOUT_S,
       browserSettings: { context: { id: contextId, persist: true } },
     });
-    if (!made.connectUrl) throw new Error("Browserbase didn't say how to connect to the session.");
+    if (typeof made.id !== "string" || !made.id) throw new Error("Browserbase didn't say which session it made.");
+    // Kept before anything else about it is checked, so it can be released whatever comes next.
     saved = { ...saved, sessionId: made.id };
     onSaved(saved);
+    if (!made.connectUrl) throw new Error("Browserbase didn't say how to connect to the session.");
     return { ...made, connectUrl: made.connectUrl };
   };
 
@@ -110,9 +130,9 @@ export const browserbase = ({
       try {
         await call("POST", `/sessions/${encodeURIComponent(id)}`, { status: "REQUEST_RELEASE" });
       } catch (error) {
-        // One that has already ended can't be released, and doesn't need to be.
-        const known = await call<Session>("GET", `/sessions/${encodeURIComponent(id)}`).catch(() => null);
-        if (!known || known.status === "RUNNING" || known.status === "PENDING") throw error;
+        // One that has already ended, or isn't there at all, can't be released, and doesn't need to be.
+        const known = await lookUp(id).catch(() => undefined);
+        if (known === undefined || (known && !ENDED.includes(known.status))) throw error;
       }
       saved = { ...saved, sessionId: null };
       onSaved(saved);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Latest, OneAtATime } from "./lateWork";
+import { Latest, Lease, OneAtATime } from "./lateWork";
 
 const later = <T = void>() => {
   let resolve: (value: T) => void = () => {};
@@ -118,5 +118,20 @@ describe("OneAtATime", () => {
     void queue.run(async () => void (ran = true), "b");
     expect(ran).toBe(true);
     held.resolve();
+  });
+});
+
+describe("Lease", () => {
+  it("lapses once the time has passed since the last answer, and an answer renews it", () => {
+    let time = 1_000;
+    const lease = new Lease(100, () => time);
+    time += 99;
+    expect(lease.live).toBe(true);
+    time += 1;
+    expect(lease.live).toBe(false);
+    lease.renew();
+    expect(lease.live).toBe(true);
+    time += 100;
+    expect(lease.live).toBe(false);
   });
 });

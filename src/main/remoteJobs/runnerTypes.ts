@@ -44,6 +44,8 @@ export interface RunnerJobsHooks {
   // The routines that run in the cloud, as rows for it, kept there while a linked runner has accepted. Null leaves the
   // cloud's alone, neither sent nor forgotten.
   routines?: () => CloudRoutineRow[] | null;
+  // The id of every routine here, in the cloud or not. Only those, and ones sent from here, are ever taken away there.
+  routineIds?: () => string[];
   // What `stillInCloud` or `cloudFailed` says about a routine changed.
   routinesSettled?: () => void;
 }

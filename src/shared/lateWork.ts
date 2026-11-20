@@ -57,3 +57,25 @@ export class OneAtATime<K = void> {
     return result;
   }
 }
+
+// A claim on work held somewhere else, which lasts only while that place keeps answering. `renew` is for an answer, never
+// for a send, so a worker that can't be heard stops counting as the owner once `ms` has passed since the last one, and
+// stops acting before the other side gives the work to someone else.
+export class Lease {
+  private heardAt: number;
+
+  constructor(
+    private readonly ms: number,
+    private readonly now: () => number = Date.now,
+  ) {
+    this.heardAt = now();
+  }
+
+  renew(): void {
+    this.heardAt = this.now();
+  }
+
+  get live(): boolean {
+    return this.now() - this.heardAt < this.ms;
+  }
+}

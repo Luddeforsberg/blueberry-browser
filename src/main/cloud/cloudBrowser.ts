@@ -203,8 +203,14 @@ export class CloudSessions {
         () => tab.settled(),
         () => {},
       );
-    if (allows) await tab.withNavigationLimit(allows, load);
-    else await load();
+    try {
+      if (allows) await tab.withNavigationLimit(allows, load);
+      else await load();
+    } catch (error) {
+      // A limit that couldn't be put on leaves no blank page behind it.
+      await this.close(id);
+      throw error;
+    }
     this.onChange();
     return tab;
   }

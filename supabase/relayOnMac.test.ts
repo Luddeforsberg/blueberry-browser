@@ -2,7 +2,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { fitJobUpdate } from "../src/main/remoteJobs/cloudJobs";
+import { fitJobUpdate, JOB_LEASE_MS, SERVER_SILENCE_MS } from "../src/main/remoteJobs/cloudJobs";
 import type { ChatStep } from "../src/shared/library";
 import { defined } from "../src/shared/testing";
 
@@ -150,7 +150,18 @@ describe("relay jobs on the Mac", () => {
     const quiet = (await start(SECRET, "mac"))!;
     await as(ALICE, "select id from public.mac_claim_job()");
     const late = (await start(SECRET, "mac"))!;
-    await db.query("update public.cloud_jobs set heartbeat_at = now() - interval '3 minutes' where id = $1", [quiet]);
+    // The Mac stops once its lease runs out, which is always before the server would end the job.
+    await db.query("update public.cloud_jobs set heartbeat_at = now() - $2 * interval '1 millisecond' where id = $1", [
+      quiet,
+      JOB_LEASE_MS,
+    ]);
+    expect(await as(RUNNER, `select status from public.relay_jobs('${SECRET}', array['${quiet}']::uuid[])`)).toEqual([
+      { status: "running" },
+    ]);
+    await db.query("update public.cloud_jobs set heartbeat_at = now() - $2 * interval '1 millisecond' where id = $1", [
+      quiet,
+      SERVER_SILENCE_MS + 1_000,
+    ]);
     await db.query("update public.cloud_jobs set created_at = now() - interval '6 minutes' where id = $1", [late]);
     expect(await as(ALICE, "select id from public.mac_claim_job()")).toEqual([]);
     expect((await db.query("select status from public.cloud_jobs where id = any($1) order by created_at", [[quiet, late]])).rows).toEqual([

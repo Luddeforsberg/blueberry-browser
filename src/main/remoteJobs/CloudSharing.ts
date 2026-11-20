@@ -11,8 +11,9 @@ export class CloudSharing {
   // owns when it's due. `reconciled` is the set of keys last checked against the server's, null until that's worked.
   private sharedRoutines: { account: string; rows: Map<string, string>; reconciled: string | null } | null = null;
   private routinesSending: Promise<void> | null = null;
-  // Routines that may be in the cloud, by key: sent there, and not yet known to be gone. Saved, so one turned off before
-  // a restart stays held back here until the server confirms it's gone.
+  // This computer's routines that may be in the cloud, by key: sent from here, or found there under the id of one here,
+  // and not yet known to be gone. Saved, so one deleted or turned off before a restart is still taken away there, and
+  // held back here until the server confirms it's gone. Nothing another computer on the account sent is ever in it.
   readonly routinesThere = new Set<string>();
   // Routines whose last send failed.
   private readonly routinesFailed = new Set<string>();
@@ -104,18 +105,20 @@ export class CloudSharing {
     shared: NonNullable<CloudSharing["sharedRoutines"]>,
     rows: CloudRoutineRow[],
   ): Promise<void> {
-    // Anything there that this no longer has goes, checked against the server's own keys, so one deleted or turned off
-    // while it couldn't be reached, or before a restart, still goes. Only when the keys here change, or until it's worked.
+    // What this computer has there and no longer sends goes, checked against the server's own keys, so one deleted or
+    // turned off while it couldn't be reached, or before a restart, still goes. Another computer on the account keeps
+    // its own. Only when the keys here change, or until it's worked.
     const keys = rows.map(({ key }) => key);
     const local = JSON.stringify([...keys].sort());
     if (shared.reconciled === local) return;
     const there = await this.withToken(account, (token) => this.server!.myCloudRoutineKeys(token));
     if (!there) return;
-    // Whatever the server doesn't have is known to be gone.
+    const here = new Set(this.hooks.routineIds?.() ?? []);
+    // Whatever the server doesn't have is known to be gone, and one of this computer's that it has may still run there.
     [...this.routinesThere].filter((key) => !there.includes(key)).forEach((key) => this.routinesThere.delete(key));
-    there.forEach((key) => this.routinesThere.add(key));
+    there.filter((key) => here.has(key)).forEach((key) => this.routinesThere.add(key));
     let gone = true;
-    for (const key of there.filter((key) => !keys.includes(key))) {
+    for (const key of there.filter((key) => this.routinesThere.has(key) && !keys.includes(key))) {
       const forgotten = await this.withToken(account, (token) => this.server!.forgetCloudRoutine(token, key).then(() => true));
       if (forgotten) {
         shared.rows.delete(key);

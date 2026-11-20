@@ -2,25 +2,26 @@ import { randomUUID } from "node:crypto";
 import { streamReply as agentReply, type StreamReply } from "../../src/main/chats/agent";
 import { isLiveView } from "../../src/main/cloud/browserbase";
 import { Chats, type ChatCloud, type ChatStoreLike, type TaskProgress } from "../../src/main/chats/Chats";
-import { approvalToAsk, mascotFromSnapshot } from "../../src/main/remoteJobs/cloudJobs";
+import { approvalToAsk, JOB_LEASE_MS, mascotFromSnapshot } from "../../src/main/remoteJobs/cloudJobs";
 import type { CloudSessions } from "../../src/main/cloud/cloudBrowser";
 import type { ChatApproval } from "../../src/shared/library";
 import type { ClaimedJob, JobUpdate, RunnerDb } from "./db";
 import type { PushKind } from "./push";
-import { Latest } from "../../src/shared/lateWork";
+import { Latest, Lease } from "../../src/shared/lateWork";
 
 // One job, run the way a chat with no page runs in the app: the same `Chats.runTask`, agent, tools, mascot limits,
 // approvals and step limit, in the cloud browser's pages. What it does is written to the job's row as it happens. An
 // approval is written as a row and the job waits for the user's answer, which only they can write. The runner never
-// answers, and with no answer in time the job stops.
+// answers, and with no answer in time the job stops. It goes on only while the server keeps answering its writes, within
+// the job's lease, and it has ended only once the server has answered the write that ends it.
 
 const POLL_MS = 2_000;
 const HEARTBEAT_MS = 15_000;
 const ANSWER_TIMEOUT_MS = 30 * 60_000;
-const FINAL_TRIES = 3;
 
 export const NO_ANSWER = "Nobody answered in time, so the job stopped there. Nothing waiting was done.";
 export const SHUT_DOWN = "The runner was restarting, so the job stopped there.";
+export const LOST_TOUCH = "The runner lost touch with Blueberry's server, so the job stopped there.";
 const BAD_MASCOT = "The mascot this job was sent as couldn't be read, so it didn't run.";
 
 // The cloud browser for one job, which ends with it, so nothing is left running or costing.
@@ -107,12 +108,28 @@ export interface RunJobOptions {
   pollMs?: number;
   heartbeatMs?: number;
   answerTimeoutMs?: number;
+  leaseMs?: number;
+  now?: () => number;
   log?: (line: string) => void;
   // Tells the owner's phone, with no content: when the job asks them, and when it ends other than by their own Stop.
   notify?: ((kind: PushKind) => Promise<void>) | undefined;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// How the job ended, tried at least once and again while the lease holds. After that the server ends it as failed on
+// its own. True once the server has it.
+const writeEnd = async (write: () => Promise<unknown>, lease: Lease, pollMs: number): Promise<boolean> => {
+  do {
+    try {
+      await write();
+      return true;
+    } catch {
+      if (lease.live) await sleep(pollMs);
+    }
+  } while (lease.live);
+  return false;
+};
 
 // The live view the job's row shows, for the page asked for last. Every step asks again, and a lookup can take a while,
 // so one for an earlier page that answers late never replaces the page the user is being asked to type into.
@@ -140,6 +157,8 @@ export const runJob = async (job: ClaimedJob, options: RunJobOptions): Promise<"
     pollMs = POLL_MS,
     heartbeatMs = HEARTBEAT_MS,
     answerTimeoutMs = ANSWER_TIMEOUT_MS,
+    leaseMs = JOB_LEASE_MS,
+    now = Date.now,
     log = console.log,
   } = options;
   const notify = (kind: PushKind) => void options.notify?.(kind).catch(() => {});
@@ -177,6 +196,8 @@ export const runJob = async (job: ClaimedJob, options: RunJobOptions): Promise<"
   const onShutDown = () => stop(SHUT_DOWN);
   signal?.addEventListener("abort", onShutDown, { once: true });
 
+  // Claimed just now, which was the server's answer.
+  const lease = new Lease(leaseMs, now);
   // One write at a time, in order, with whatever came in meanwhile folded into the next. Every write is a heartbeat too.
   let pending: JobUpdate | null = null;
   let writing: Promise<void> = Promise.resolve();
@@ -187,9 +208,12 @@ export const runJob = async (job: ClaimedJob, options: RunJobOptions): Promise<"
       pending = null;
       if (!next) return;
       try {
-        if (await db.update(job.id, next)) stop(null);
+        const stopping = await db.update(job.id, next);
+        lease.renew();
+        if (stopping) stop(null);
       } catch {
         log(`Job ${job.id}: couldn't write its progress.`);
+        if (!lease.live) stop(LOST_TOUCH);
       }
     });
     return writing;
@@ -252,14 +276,9 @@ export const runJob = async (job: ClaimedJob, options: RunJobOptions): Promise<"
     const status = result.stopped ? "stopped" : result.error ? "failed" : "done";
     const error = result.stopped ? stopWords : result.error;
     const final: JobUpdate = { status, steps: result.steps, reply: result.text, ...(error ? { error } : {}) };
-    for (let attempt = 1; attempt <= FINAL_TRIES; attempt++) {
-      try {
-        await db.update(job.id, final);
-        break;
-      } catch {
-        if (attempt === FINAL_TRIES) log(`Job ${job.id}: couldn't write how it ended.`);
-        else await sleep(pollMs);
-      }
+    if (!(await writeEnd(() => db.update(job.id, final), lease, pollMs))) {
+      log(`Job ${job.id}: couldn't write how it ended, so it's left to time out there.`);
+      return status;
     }
     log(`Job ${job.id}: ${status}.`);
     if (status !== "stopped" || stopWords) notify("finished");

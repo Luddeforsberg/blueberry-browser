@@ -16,6 +16,13 @@ const MAX_STEP_TEXT = 300;
 export type CloudJobStatus = "queued" | "running" | "waiting" | "done" | "failed" | "stopped";
 export const FINISHED: readonly CloudJobStatus[] = ["done", "failed", "stopped"];
 
+// The server ends a running job it hasn't heard from in two minutes, in `runner_claim_job` and `expire_mac_jobs`, and a
+// new job may then start in its place. Whoever runs one counts it as theirs only while a write was answered within the
+// lease, which runs out well before that: with no answer for that long it stops, rather than act on a job that may
+// already be over there. A job ends only when the server has answered the write that ends it.
+export const SERVER_SILENCE_MS = 2 * 60_000;
+export const JOB_LEASE_MS = SERVER_SILENCE_MS - 30_000;
+
 // A row is written with the user's session, so it can only say what the user could have sent: a stolen session could
 // already make any mascot and answer its approvals. What this stops is a row that's odd or edited. Berry's id is the only
 // one with no limits, and only with none in the row, which is how the app always sends Berry. A routine of Berry's

@@ -22,7 +22,7 @@ You link it to your account in Blueberry, and it accepts the link when it starts
    railway up
    ```
 
-   `railway.json` builds `runner/Dockerfile` with one replica.
+   `.railway/railway.ts` builds `runner/Dockerfile` with one replica. Apply it to the service with `railway config plan`, and then `railway config apply` once the plan changes nothing but the build and deploy settings: never accept one that deletes a variable.
 5. **Set its variables** in the Railway dashboard, or with `railway variables --set NAME=value`:
 
    | Variable | What |

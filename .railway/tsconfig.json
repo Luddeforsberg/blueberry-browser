@@ -1,0 +1,11 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
+  // The Railway CLI runs railway.ts itself. Its package only resolves with the newer module rules.
+  "include": ["railway.ts"],
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "noImplicitAny": true,
+    "noUncheckedIndexedAccess": true
+  }
+}

@@ -4,7 +4,7 @@ import type { ChatCloud } from "../../src/main/chats/Chats";
 import { mascotSnapshot } from "../../src/main/remoteJobs/cloudJobs";
 import { BERRY } from "../../src/shared/mascots";
 import { dbConfig, type ClaimedJob, type Decision, type JobUpdate, type RunnerDb } from "./db";
-import { followLiveView, NO_ANSWER, runJob, SHUT_DOWN, UnreleasedBrowsers, type JobBrowser } from "./job";
+import { followLiveView, LOST_TOUCH, NO_ANSWER, runJob, SHUT_DOWN, UnreleasedBrowsers, type JobBrowser } from "./job";
 
 const ASKED = "Click the button “Place order” on shop.example";
 
@@ -178,6 +178,78 @@ describe("a job on the runner", () => {
       notify: async (kind) => void sent.push(kind),
     });
     expect(sent).toEqual(["needs-you"]);
+  });
+
+  // The database stops answering writes for a while, each try taking ten seconds of the clock, while the site stays up.
+  const outage = (failing: (update: JobUpdate) => boolean) => {
+    const { db, updates } = fakeDb();
+    const clock = { time: 0 };
+    const update = db.update;
+    db.update = async (jobId, change) => {
+      if (failing(change)) {
+        clock.time += 10_000;
+        throw new Error("Couldn't reach Supabase.");
+      }
+      return update(jobId, change);
+    };
+    const lines: string[] = [];
+    const sent: string[] = [];
+    return {
+      updates,
+      lines,
+      sent,
+      run: (streamReply: StreamReply) =>
+        runJob(JOB, {
+          ...options,
+          heartbeatMs: 5,
+          now: () => clock.time,
+          db,
+          browser: fakeBrowser().browser,
+          streamReply,
+          log: (line) => lines.push(line),
+          notify: async (kind) => void sent.push(kind),
+        }),
+    };
+  };
+  // Works for as long as it's let, as a job on a site that's still up would.
+  const working: StreamReply = async function* (_messages, signal) {
+    yield "Working on it. ";
+    await new Promise((resolve) => signal.addEventListener("abort", resolve));
+  };
+  const quick: StreamReply = async function* () {
+    yield "Done it";
+  };
+
+  it("stops once the server hasn't answered for as long as its lease, though the site is still there", async () => {
+    const { run, updates, lines, sent } = outage(() => true);
+    expect(await run(working)).toBe("stopped");
+    expect(updates).toEqual([]);
+    expect(lines).toContain(`Job ${JOB.id}: couldn't write how it ended, so it's left to time out there.`);
+    expect(sent).toEqual([]);
+  });
+
+  it("says it stopped for lost touch when the server is back in time to hear how it ended", async () => {
+    const { run, updates, sent } = outage((update) => update.status === undefined);
+    expect(await run(working)).toBe("stopped");
+    expect(updates).toEqual([expect.objectContaining({ status: "stopped", error: LOST_TOUCH })]);
+    expect(sent).toEqual(["finished"]);
+  });
+
+  it("doesn't say it finished when how it ended was never written", async () => {
+    const { run, updates, lines, sent } = outage((update) => update.status !== undefined);
+    expect(await run(quick)).toBe("done");
+    expect(updates.some(({ status }) => status)).toBe(false);
+    expect(lines).toContain(`Job ${JOB.id}: couldn't write how it ended, so it's left to time out there.`);
+    expect(sent).toEqual([]);
+  });
+
+  it("writes how it ended once the server answers again, while the lease holds, and only then says it finished", async () => {
+    // Four tries fail, forty seconds of the clock, well within the lease.
+    let finals = 0;
+    const { run, updates, sent } = outage((update) => update.status !== undefined && ++finals <= 4);
+    expect(await run(quick)).toBe("done");
+    expect(updates.at(-1)).toMatchObject({ status: "done", reply: "Done it" });
+    expect(sent).toEqual(["finished"]);
   });
 
   it("doesn't run as a mascot it can't read", async () => {
