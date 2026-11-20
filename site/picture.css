@@ -1,0 +1,320 @@
+/* The type, and the app's parts as the front page draws them, from tokens.css only (DESIGN.md sections 3 to 9). Each
+   direction's own stylesheet places them. */
+
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("./fonts/geist-latin-wght-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Geist Mono";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("./fonts/geist-mono-latin-wght-normal.woff2") format("woff2");
+}
+
+* {
+  box-sizing: border-box;
+}
+html {
+  background: rgb(var(--ground));
+}
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: rgb(var(--ground));
+  color: rgb(var(--ink));
+  font-family: "Geist", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  letter-spacing: -0.006em;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+}
+h1,
+h2,
+h3,
+p,
+ol,
+ul,
+figure {
+  margin: 0;
+}
+ol,
+ul {
+  padding: 0;
+  list-style: none;
+}
+a {
+  color: inherit;
+}
+:focus-visible {
+  outline: 2px solid rgb(var(--focus));
+  outline-offset: 2px;
+}
+.mono {
+  font-family: "Geist Mono", ui-monospace, monospace;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+.icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* --- The wordmark: Berry and the name. --- */
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  border-radius: 8px;
+}
+
+/* --- State is a pill (DESIGN.md section 8), on tray, since sheet-2 vanishes on the ground (section 4). --- */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgb(var(--tray));
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  color: rgb(var(--ink-2));
+}
+
+/* --- Mascots, drawn from the phone page's poses. Under 48px their texture goes (DESIGN.md section 9). --- */
+.mascot {
+  display: block;
+  flex: none;
+}
+.mascot svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.s16 {
+  width: 16px;
+  height: 16px;
+}
+.s18 {
+  width: 18px;
+  height: 18px;
+}
+.s20 {
+  width: 20px;
+  height: 20px;
+}
+.s24 {
+  width: 24px;
+  height: 24px;
+}
+.s26 {
+  width: 26px;
+  height: 26px;
+}
+.s40 {
+  width: 40px;
+  height: 40px;
+}
+:is(.s16, .s18, .s20, .s24, .s26, .s40) [data-texture] {
+  display: none;
+}
+
+/* --- A picture of the app. Nothing in it moves, since no work is happening, and nothing takes the pointer. --- */
+.pic {
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+/* So the pips hold one frame a third of the way in, where every pattern shows something. */
+.pic .pips i {
+  animation-delay: -400ms;
+  animation-play-state: paused;
+}
+.pips.ask {
+  color: rgb(var(--ask));
+}
+figcaption {
+  font-size: 13px;
+  line-height: 18px;
+  color: rgb(var(--ink-3));
+}
+
+.tile {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  color: #fff;
+}
+.site-4 {
+  background: var(--site-4);
+}
+.site-5 {
+  background: var(--site-5);
+}
+.site-6 {
+  background: var(--site-6);
+}
+.site-7 {
+  background: var(--site-7);
+}
+
+/* --- A conversation (Main chat in DESIGN.md). --- */
+.bubble {
+  align-self: flex-end;
+  max-width: 85%;
+  padding: 9px 14px;
+  border-radius: 18px 18px 6px 18px;
+  background: rgb(var(--sheet-2));
+  font-size: 15px;
+  line-height: 1.55;
+}
+.reply {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.reply > .mascot {
+  margin-top: 1px;
+}
+.reply-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.workline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 24px;
+  font-size: 11.5px;
+  color: rgb(var(--ink));
+}
+.dim {
+  color: rgb(var(--ink-3));
+}
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+  font-size: 11.5px;
+  line-height: 20px;
+  color: rgb(var(--ink-3));
+}
+.steps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.steps li span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.steps .said {
+  display: block;
+  margin: 6px 0;
+  font-family: "Geist", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  letter-spacing: -0.006em;
+  color: rgb(var(--ink-2));
+}
+.steps .live {
+  color: rgb(var(--ink));
+}
+
+/* A card set into a shell: 4px larger all round, its radius 4px more (DESIGN.md section 3). */
+.shell {
+  padding: 4px;
+  border-radius: 20px;
+  background: rgb(var(--tray));
+}
+.card {
+  padding: 14px 16px 16px;
+  border-radius: 16px;
+  background: rgb(var(--card));
+  box-shadow: var(--shadow-card-lift);
+}
+.shell-note {
+  padding: 7px 12px 5px;
+  font-size: 13px;
+  line-height: 18px;
+  color: rgb(var(--ink-2));
+}
+.ask-title {
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 21px;
+}
+.exact {
+  margin-top: 10px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: rgb(var(--card-2));
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: 12px;
+  line-height: 18px;
+  color: rgb(var(--ink-2));
+  overflow-wrap: anywhere;
+}
+.exact mark {
+  padding: 1px 2px;
+  border-radius: 3px;
+  background: rgb(var(--ask-bg));
+  color: rgb(var(--ask));
+}
+.buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: rgb(var(--ink));
+}
+.btn.fill {
+  background: rgb(var(--ink));
+  color: rgb(var(--ground));
+  box-shadow: var(--shadow-filled);
+}
+.btn.raised {
+  background: rgb(var(--card));
+  box-shadow: var(--shadow-chip);
+}
