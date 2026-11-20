@@ -25,15 +25,15 @@ An AI browser built with Electron, React and TypeScript. [DESIGN.md](./DESIGN.md
 | `pnpm run site:deploy` | Deploy `site/` to Netlify, as it is, with `netlify.toml`. Needs `npx netlify login` and a linked site first |
 | `pnpm run push:keys` | Print a new VAPID key pair for notifications on the phone page. See `runner/README.md` |
 | `pnpm run runner:build` | Bundle the cloud runner into `runner/dist/`. `pnpm run runner:start` runs it. See `runner/README.md` |
-| `pnpm run verify` | Typecheck, format check, lint, knip, unit tests, build and end-to-end tests: CI's checks plus the end-to-end tests |
+| `pnpm run verify` | Typecheck, format check, lint, knip, unit tests, build and end-to-end tests: what CI runs, on this computer |
 
-CI runs typecheck, the format check, lint, knip, unit tests and build on macOS and Windows. It doesn't run the end-to-end tests, because 15 of them need a real screen and GitHub's runners have none, and it doesn't package the app. The end-to-end tests run on a Mac with `pnpm run verify`, and nothing checks them on Windows yet.
+CI runs typecheck, the format check, lint, knip, unit tests and build on macOS and Windows, and the end-to-end tests on both, in three shards each. Its `ci` job passes only when all of them do, and it's the check to require. It doesn't package the app. The runners have a real screen, a small one with motion turned down, so every test app loads `tests/background.cjs` and `tests/motion.cjs`, and Windows gets a larger screen first. Every end-to-end test runs on macOS. On Windows six skip, each saying why: five look for Google Chrome only where a Mac keeps it, and one is about how only macOS keeps running with no windows.
 
 ## How we build
 
 - **One branch and one PR per working feature, from the latest `main`.** Don't stack PRs. Each runs in its own worktree.
 - **Every PR goes through `self-check`, proof and `file-pr`.** `review-loop` only for changes that touch what Berry may do, permissions or secrets, for as many rounds as the size of the change calls for.
-- **Run `pnpm run verify` before filing.** It runs CI's checks plus the end-to-end tests. Put the result in the PR.
+- **Run `pnpm run verify` before filing.** It runs what CI runs. Put the result in the PR.
 - **The project manager agent merges.** It merges PRs one at a time and reruns `verify` on anything `main` has moved under.
 - **The user merges anything that lets Berry do more without asking.** Say so at the top of the PR.
 - **Tests stay small:** one end-to-end test of the main flow, plus unit tests only for real logic. If a test fails with no link to the change, rerun it once and move on. Look into it only if the same test keeps failing. Don't write tests for test helpers.
@@ -91,7 +91,7 @@ Most rules are checks, and each says why when it fails: `eslint.boundaries.mjs` 
 - **`executeJavaScript`:** the code is a script, not a function body, so a top-level `return` is a syntax error.
 - **Views stack by order:** a tab view covers the chrome beneath it, so CSS in the chrome can't draw over a page.
 - **Parked tabs:** a view wholly outside the window gets no size and draws nothing on Windows, so a tab Berry works in behind the user's keeps one corner pixel in the window, under the chrome, which takes any click there. `parkedPage` in `Layout.ts` and `Panels.placeTab` do this.
-- **Tests run off-screen:** outside CI, `tests/background.cjs` keeps the test app off-screen and out of the foreground, so they don't disturb the Mac. Take screenshots with Playwright, not `screencapture`.
+- **Tests run off-screen:** `tests/background.cjs` keeps the test app off-screen and out of the foreground, so they don't disturb the Mac, on every computer, CI included. Take screenshots with Playwright, not `screencapture`.
 - **Asking about site permissions:** Electron has no "not asked yet" answer, so `Notification.permission` and `navigator.permissions.query` say `denied` until the user allows. The request itself still reaches the prompt.
 - **`getUserMedia` in tests:** allowing it can raise the Mac's own permission dialog. Tests only ever block it.
 - **Real input isn't checked by Electron:** `sendInputEvent` goes wherever the coordinates are, or nowhere. It doesn't reach a frame from another origin, and pages move after a scroll, so aim after they settle. Just before each press, a click's or a drag's, `watchPress` checks the point still lands on the named element and only then watches, stopping a press on anything else, until the tool has read what happened and ends that watch by its id. Once a real press has gone, a click that may not have arrived is said in words, never sent again as a scripted one.

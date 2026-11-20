@@ -204,38 +204,31 @@ describe.skipIf(!findChrome())("a page in a browser over CDP", () => {
     expect(await tab.page.evaluate(() => [innerWidth, innerHeight])).toEqual([1280, 720]);
   });
 
-  it("answers a smooth scroll where it ends, even one that starts late, and at once where the page can't go", async () => {
+  it("answers a smooth scroll where Chrome's own slide comes to rest, and where the page is when it can't go", async () => {
     const long = await cloud.open("job", "cloud-8", `${origin}/long`, { onChange: () => {} });
     try {
       await long.settled();
-      // Where it answered, where it came to rest, and whether it answered at once, timed in the page. Where the system
-      // turns smooth scrolling off, as on some CI runners, a scroll that moves is instant too, so only one that can't go is
-      // held to answering at once.
-      const scroll = async (direction: "up" | "down", page = long, first = "") => {
-        const { top, ms } = await page.runInPage<{ top: number; ms: number }>(
-          `${first}(async (started) => ({ ...(await ${scrollPage(direction, true)}), ms: performance.now() - started }))(performance.now())`,
-        );
-        return { top, settled: await page.runInPage<number>("Math.round(scrollY)"), quick: ms < 100 };
+      // Where it answered, and where the page was a moment later. When it answers, late starts included, is held in
+      // scrollPage.test.ts, since a real browser's frames on a busy runner aren't this test's to time.
+      const scroll = async (direction: "up" | "down", page = long) => {
+        const { top } = await page.runInPage<{ top: number }>(scrollPage(direction, true));
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        return { top, settled: await page.runInPage<number>("Math.round(scrollY)") };
       };
-      // Busy for 200ms just after the call, as a page still loading can be, so the scroll hasn't started 120ms in.
-      const late = await scroll(
-        "down",
-        long,
-        "setTimeout(() => { const end = performance.now() + 200; while (performance.now() < end); });",
-      );
-      expect(late.top).toBeGreaterThan(0);
-      expect(late.top).toBe(late.settled);
-      const normal = await scroll("down");
-      expect(normal.top).toBeGreaterThan(late.top);
-      expect(normal.top).toBe(normal.settled);
+      const first = await scroll("down");
+      expect(first.top).toBeGreaterThan(0);
+      expect(first.top).toBe(first.settled);
+      const second = await scroll("down");
+      expect(second.top).toBeGreaterThan(first.top);
+      expect(second.top).toBe(second.settled);
       // Already at the bottom, already at the top, and a page too short to scroll.
       await long.runInPage("scrollTo(0, document.documentElement.scrollHeight)");
       const bottom = await scroll("down");
-      expect(bottom.top).toBeGreaterThan(normal.top);
-      expect(bottom).toEqual({ top: bottom.settled, settled: bottom.settled, quick: true });
+      expect(bottom.top).toBeGreaterThan(second.top);
+      expect(bottom.top).toBe(bottom.settled);
       await long.runInPage("scrollTo(0, 0)");
-      expect(await scroll("up")).toEqual({ top: 0, settled: 0, quick: true });
-      expect(await scroll("down", tab)).toEqual({ top: 0, settled: 0, quick: true });
+      expect(await scroll("up")).toEqual({ top: 0, settled: 0 });
+      expect(await scroll("down", tab)).toEqual({ top: 0, settled: 0 });
     } finally {
       await cloud.close("cloud-8");
     }

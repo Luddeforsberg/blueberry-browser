@@ -1,0 +1,24 @@
+name: Set up
+description: Node, pnpm and the project's packages, with Chrome read from disk once
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v6
+    - uses: actions/setup-node@v7
+      with:
+        node-version: 24
+        cache: pnpm
+    - run: pnpm install --frozen-lockfile
+      shell: bash
+    # A fresh runner reads Chrome's files from a disk that's still coming down from the image, and on Windows that held
+    # the first start for over a minute, with Chrome idle before its first line of code. Read once here, so the tests that
+    # start Chrome get the start they get anywhere else (issue #145).
+    - name: Start Chrome once
+      shell: bash
+      run: |
+        case "$RUNNER_OS" in
+          Windows) chrome="C:/Program Files/Google/Chrome/Application/chrome.exe" ;;
+          macOS) chrome="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" ;;
+          *) chrome=/usr/bin/google-chrome ;;
+        esac
+        time "$chrome" --headless=new --no-first-run --user-data-dir="$RUNNER_TEMP/warm-chrome" --dump-dom about:blank >/dev/null

@@ -21,12 +21,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup
       - run: pnpm run typecheck
       - run: pnpm run format:check
       - run: pnpm run lint
@@ -34,5 +29,40 @@ jobs:
       - run: pnpm run site:check
       - run: pnpm run test
       - run: pnpm exec electron-vite build
-      # No end-to-end tests here: 15 of them need a real screen, where the mascot on the page has its poses, and
-      # GitHub's runners have none. They run on a Mac with `pnpm run verify` before every PR.
+
+  e2e:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+        shard: [1, 2, 3]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      # Windows keeps a window within the screen, and the runner's is 1024x768, so the app's window came out narrower than
+      # the tests make it and the sidebar folded away. A Mac allows larger, which tests/background.cjs asks for.
+      - name: A screen as large as a desktop's
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Set-DisplayResolution -Width 1920 -Height 1080 -Force
+      - run: pnpm exec electron-vite build
+      - run: pnpm exec playwright test --shard=${{ matrix.shard }}/3
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-results-${{ matrix.os }}-${{ matrix.shard }}
+          path: test-results
+          if-no-files-found: ignore
+
+  # The one check to require. It passes only when every job above did, so the jobs can change without touching branch
+  # protection.
+  ci:
+    if: always()
+    needs: [check, e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every job passed
+        run: |
+          echo "check: ${{ needs.check.result }}, e2e: ${{ needs.e2e.result }}"
+          [ "${{ needs.check.result }}" = success ] && [ "${{ needs.e2e.result }}" = success ]

@@ -101,17 +101,18 @@ export async function launchApp(
   } as Record<string, string>;
   delete env.ELECTRON_RUN_AS_NODE;
 
-  // CI has nobody to disturb, so it runs the app exactly as users get it.
-  const background = process.env.CI ? [] : ["-r", join(__dirname, "background.cjs")];
-
   const started = Date.now();
   const app = await retryStuckLaunch(() =>
     electron.launch({
       executablePath: electronPath as unknown as string,
       // A fresh profile keeps tests apart and away from the developer's real browsing data.
       args: [
-        ...background,
+        // The same on every computer, CI included: a window off-screen, which may be larger than a runner's small screen.
+        "-r",
+        join(__dirname, "background.cjs"),
         ...preload.flatMap((file) => ["-r", file]),
+        "-r",
+        join(__dirname, "motion.cjs"),
         "-r",
         join(__dirname, "fakeKeychain.cjs"),
         "-r",
