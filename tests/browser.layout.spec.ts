@@ -133,6 +133,7 @@ test("in the tab row at the smallest window, the active tab has as much room for
   await expect.poll(async () => (await titles()).length).toBe(6);
   // New tabs open from nothing, the row slides to its new width, and each tab hears its own width a frame later, so this
   // holds once the row has come to rest, which a slow runner can take a while to reach.
+  await expect(row.locator("li[style*='max-width']")).toHaveCount(0);
   await expect(async () => {
     const six = await titles();
     const others = six.filter((tab) => !tab.active).map((tab) => tab.title);

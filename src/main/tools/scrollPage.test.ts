@@ -9,17 +9,21 @@ import { scrollPage } from "./pageScripts";
 const VIEW = 700;
 
 // `staleEnd` is the end of a slide before this one, which the browser tells only after that one answered at its limit.
+// `shrinksTo` is a page that gets shorter while it slides, so the slide stops at the new bottom.
 const pageWith = ({
   height,
   top = 0,
   slideMs = null,
   staleEnd = false,
+  shrinksTo,
 }: {
   height: number;
   top?: number;
   slideMs?: number | null;
   staleEnd?: boolean;
+  shrinksTo?: number;
 }) => {
+  const root = { scrollHeight: height };
   const scrollEnd = new Set<() => void>();
   const ended = () => {
     for (const listener of [...scrollEnd]) listener();
@@ -37,7 +41,8 @@ const pageWith = ({
       // A slide that never ends stands for a browser that doesn't say so.
       if (slideMs === null) return;
       setTimeout(() => {
-        window.scrollY = to;
+        if (shrinksTo !== undefined) root.scrollHeight = shrinksTo;
+        window.scrollY = Math.min(to, root.scrollHeight - VIEW);
         ended();
       }, slideMs);
     },
@@ -46,7 +51,7 @@ const pageWith = ({
     window,
     innerHeight: VIEW,
     visualViewport: { height: VIEW },
-    document: { documentElement: { scrollHeight: height } },
+    document: { documentElement: root },
     addEventListener: (type: string, listener: () => void) => type === "scrollend" && scrollEnd.add(listener),
     removeEventListener: (type: string, listener: () => void) => type === "scrollend" && scrollEnd.delete(listener),
     // The test's own clock, which it moves by hand.
@@ -87,6 +92,11 @@ describe("a smooth scroll", () => {
   it("doesn't take the end of the slide before it for its own", async () => {
     const page = pageWith({ height: 5_000, top: 630, slideMs: 450, staleEnd: true });
     expect(await answerOf(page, "down", true)).toEqual({ top: 1_260, ms: 450 });
+  });
+
+  it("answers where a page that got shorter on the way stopped it", async () => {
+    const page = pageWith({ height: 5_000, top: 4_000, slideMs: 300, shrinksTo: 4_500 });
+    expect(await answerOf(page, "down", true)).toEqual({ top: 3_800, ms: 300 });
   });
 
   it("stops waiting for a slide that never says it ended, and answers where the page is", async () => {
