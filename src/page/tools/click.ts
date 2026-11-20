@@ -15,8 +15,7 @@ export interface Aim {
 // Scrolled to it and ready for a real click. A dropdown opens a native menu and a file field the Mac's file
 // picker, which nobody here can answer, so those are never really clicked.
 // Pages often move when they're scrolled, so it only scrolls if it has to, and never in the same step as aiming.
-// `arm: false` is only for finding out where it is, with no watch set on the page.
-export const aimClick = ({ ref, mayScroll, arm }: { ref: string; mayScroll: boolean; arm: boolean }): Aim | null =>
+export const aimClick = ({ ref, mayScroll }: { ref: string; mayScroll: boolean }): Aim | null =>
   withElement(ref, (el): Aim => {
     if (el.matches(":disabled")) return { status: "disabled" };
     if (el.tagName === "SELECT" || el.type === "file") return { status: "scripted" };
@@ -30,8 +29,14 @@ export const aimClick = ({ ref, mayScroll, arm }: { ref: string; mayScroll: bool
       if (!point) return { status: "scripted" };
       return { status: "covered", by: (hit && nameOf(hit)) || hit?.tagName.toLowerCase() || "nothing" };
     }
-    if (arm) expectPressOn(el);
     return { status: "aimed", ...point };
+  });
+
+// Watches for the press just before it goes, not when aiming, because the watch runs out and real input can be slow.
+export const watchPress = ({ ref }: { ref: string }): true | null =>
+  withElement(ref, (el) => {
+    expectPressOn(el);
+    return true;
   });
 
 // False until the input arrives, then true, or "missed" for a press that was stopped. A new page has no record, so

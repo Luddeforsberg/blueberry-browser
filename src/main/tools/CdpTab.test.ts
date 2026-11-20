@@ -93,6 +93,29 @@ describe.skipIf(!findChrome())("a page in a browser over CDP", () => {
     expect(await tab.runInPage("document.getElementById('count').textContent")).toBe("Cart: 1");
   });
 
+  // The watch on the press runs out 1.5s after it's set, and on a slow machine or over the network the input can
+  // take longer than that to arrive.
+  it("clicks once when real input is slow to arrive after the aim", async () => {
+    const ref = await refOf("Add to cart");
+    // Every click, real or scripted, counted in the tools' own world.
+    await tab.runInPage("globalThis.clicks = 0; document.getElementById('add').addEventListener('click', () => globalThis.clicks++)");
+    const send = tab.sendAgentInput.bind(tab);
+    let first = true;
+    const slow = vi.spyOn(tab, "sendAgentInput").mockImplementation(async (event) => {
+      if (first) await new Promise((resolve) => setTimeout(resolve, 2000));
+      first = false;
+      return send(event);
+    });
+    try {
+      const result = await tool("click").run({ ref });
+      expect(await tab.runInPage("globalThis.clicks")).toBe(1);
+      expect(result).toMatch(/^Done\./);
+      expect(result).not.toMatch(/scripted/);
+    } finally {
+      slow.mockRestore();
+    }
+  }, 10_000);
+
   it("types into a field", async () => {
     const ref = await refOf("Name");
     expect(await tool("type_text").run({ ref, text: "Ada" })).toMatch(/^Done\./);

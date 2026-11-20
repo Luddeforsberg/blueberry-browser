@@ -25,8 +25,11 @@ export const listElements = ({ query, limit, everything = false, descend }: List
 
 export const describeElement = (ref: string): string => inPage(page.describeElement, { ref });
 
-// Scrolled to it and ready for a real click. `arm: false` is only for finding out where it is, with no watch set on the page.
-export const aimClick = (ref: string, mayScroll: boolean, arm = true): string => inPage(page.aimClick, { ref, mayScroll, arm });
+// Scrolled to it and ready for a real click. It sets no watch on the page: `watchPress` does, just before the press.
+export const aimClick = (ref: string, mayScroll: boolean): string => inPage(page.aimClick, { ref, mayScroll });
+
+// The watch on the press, set just before it goes. Null if the element has gone.
+export const watchPress = (ref: string): string => inPage(page.watchPress, { ref });
 
 // False until the input arrives, then true, or "missed" for a press that was stopped. A new page has no record, so
 // null means the input took the page somewhere.

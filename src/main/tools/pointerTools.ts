@@ -11,6 +11,7 @@ import {
   scriptedHover,
   selectedOptions,
   spotOf,
+  watchPress,
   type Aim,
   type DragPlan,
 } from "./pageScripts";
@@ -68,26 +69,30 @@ export const pointerTools = <T extends PageTarget>(context: ToolContext<T>) => {
       if (!(await flyToRef(tab, ref, (name) => `${doing} in ${name}`, "look"))) return leftOff(tab);
       return finish(await scripted(), SCRIPTED);
     }
-    // With a mascot on the way nothing watches for the press until it lands, because the user may press somewhere meanwhile.
-    const arm = !actorOn(tab);
     const aimAgain = async () => {
       await pause(SCROLL_SETTLE_MS);
-      return tab.runInPage<Aim | null>(aimClick(ref, false, arm));
+      return tab.runInPage<Aim | null>(aimClick(ref, false));
     };
-    let aim = await tab.runInPage<Aim | null>(aimClick(ref, true, arm));
+    let aim = await tab.runInPage<Aim | null>(aimClick(ref, true));
     if (aim?.status === "scrolled") aim = await aimAgain();
     if (aim === null) return STALE_ELEMENT;
     if (aim.status === "disabled") return finish("disabled");
-    if (!arm) {
+    if (actorOn(tab)) {
       if (!(await flyToRef(tab, ref, (name) => `${doing} ${unnamed(name, "something")}`, "land"))) return leftOff(tab);
-      // Where it is now, as the page may have moved while the mascot flew, and now the watch goes on.
+      // Where it is now, as the page may have moved while the mascot flew.
       if (aim.status === "aimed") aim = await tab.runInPage<Aim | null>(aimClick(ref, false));
       if (aim === null) return STALE_ELEMENT;
     }
+    // Nothing watches for the press until just before it goes: the user may press somewhere while a mascot flies, and
+    // real input can be slow enough to arrive that a watch set at the aim would have run out, letting the press land
+    // unseen and a scripted click follow it.
+    const beforePress = async () => carryOn(tab) && (await tab.runInPage<true | null>(watchPress(ref)).catch(() => null)) === true;
+    // A press it didn't send, because the job stopped or the element went.
+    const notSent = () => (carryOn(tab) ? STALE_ELEMENT : leftOff(tab));
     for (let tries = 0; aim?.status === "aimed" && tries <= RETRIES_AFTER_MISS; tries++) {
       await actorOn(tab)?.peck(aim.x!, aim.y!, clicks);
       if (!carryOn(tab)) return leftOff(tab);
-      if (!(await clickAt(tab, { x: aim.x!, y: aim.y! }, clicks, () => carryOn(tab)))) return leftOff(tab);
+      if (!(await clickAt(tab, { x: aim.x!, y: aim.y! }, clicks, beforePress))) return notSent();
       const arrived = await landed(() => tab.runInPage<boolean | "missed" | null>(inputLanded));
       if (arrived === "landed") return finish("done");
       if (arrived === "lost") return carryOn(tab) ? finish(await scripted(), SCRIPTED) : leftOff(tab);
