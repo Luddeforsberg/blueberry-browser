@@ -6,8 +6,9 @@ export interface ToolState {
   next: number;
   byRef: Map<string, PageElement>;
   refs: WeakMap<Element, string>;
-  // False until the input arrives, then true, or "missed" for a press that was stopped.
-  landed?: boolean | "missed";
+  // False until the input arrives, then true, "missed" for a press that was stopped, or "cut" for one that reached
+  // the element before the rest of the click was stopped.
+  landed?: boolean | "missed" | "cut";
   stopWatching?: (() => void) | null;
 }
 

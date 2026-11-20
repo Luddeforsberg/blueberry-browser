@@ -6,6 +6,7 @@ import type { CdpTab } from "./CdpTab";
 import { CloudSessions } from "../cloud/cloudBrowser";
 import { findChrome, isLocalEndpoint, localChrome } from "../cloud/localChrome";
 import { scrollPage } from "./pageScripts";
+import { STOPPED } from "./toolMessages";
 
 // Berry's own tools, unchanged, on a page in a real headless Chrome reached over CDP. Skipped where there's no Chrome.
 
@@ -28,6 +29,8 @@ describe.skipIf(!findChrome())("a page in a browser over CDP", () => {
   let tools: PageTool[];
   // Requests that reached the site a mascot isn't allowed on.
   const forbidden: string[] = [];
+  // Whether the job has been stopped.
+  let stopped = false;
   const tool = (name: string) => tools.find((one) => one.name === name)!;
   const refOf = async (name: string) => {
     const listed = JSON.parse(await tool("list_elements").run({})) as { elements: { ref: string; name: string }[] };
@@ -70,6 +73,7 @@ describe.skipIf(!findChrome())("a page in a browser over CDP", () => {
       ask: async () => null,
       canSee: () => true,
       onUse: () => {},
+      stopped: () => stopped,
       limits: { name: "Scout", sites: ["127.0.0.1"], tools: ["click", "type", "visit"] },
     });
   }, 30_000);
@@ -93,28 +97,129 @@ describe.skipIf(!findChrome())("a page in a browser over CDP", () => {
     expect(await tab.runInPage("document.getElementById('count').textContent")).toBe("Cart: 1");
   });
 
-  // The watch on the press runs out 1.5s after it's set, and on a slow machine or over the network the input can
-  // take longer than that to arrive.
-  it("clicks once when real input is slow to arrive after the aim", async () => {
-    const ref = await refOf("Add to cart");
-    // Every click, real or scripted, counted in the tools' own world.
-    await tab.runInPage("globalThis.clicks = 0; document.getElementById('add').addEventListener('click', () => globalThis.clicks++)");
-    const send = tab.sendAgentInput.bind(tab);
-    let first = true;
-    const slow = vi.spyOn(tab, "sendAgentInput").mockImplementation(async (event) => {
-      if (first) await new Promise((resolve) => setTimeout(resolve, 2000));
-      first = false;
-      return send(event);
-    });
-    try {
-      const result = await tool("click").run({ ref });
-      expect(await tab.runInPage("globalThis.clicks")).toBe(1);
+  describe("when real input is slow, as on a slow machine or over the network", () => {
+    // Each test clicks a button of its own, with every click on it counted in the tools' own world, real or scripted.
+    const addButton = async (name: string, onClick = "") => {
+      await tab.runInPage(`(() => {
+        const button = document.createElement("button");
+        button.id = ${JSON.stringify(name)};
+        button.textContent = ${JSON.stringify(name)};
+        document.body.prepend(button);
+        globalThis.clicks = { ...globalThis.clicks, [button.id]: 0 };
+        button.addEventListener("click", () => { globalThis.clicks[button.id]++; ${onClick} });
+      })()`);
+      return refOf(name);
+    };
+    const clicksOn = (name: string) => tab.runInPage<number>(`globalThis.clicks[${JSON.stringify(name)}] ?? 0`);
+    // Something the page puts exactly over the button, which counts what reaches it too.
+    const cover = (name: string, tag = "button") => `(() => {
+      const box = document.getElementById(${JSON.stringify(name)}).getBoundingClientRect();
+      const cover = document.createElement("${tag}");
+      cover.className = "cover";
+      cover.style.cssText = "position: fixed; z-index: 10; margin: 0; padding: 0; border: 0; left: " + box.left + "px; top: " + box.top + "px; width: " + box.width + "px; height: " + box.height + "px";
+      document.body.append(cover);
+      const counted = cover.contentDocument ?? cover;
+      globalThis.clicks = { ...globalThis.clicks, cover: 0 };
+      counted.addEventListener("mousedown", () => globalThis.clicks.cover++, true);
+    })()`;
+    // Holds back the input of one type by `ms`, first running `meanwhile` in the page.
+    const holdBack = (type: string, ms: number, meanwhile = "") => {
+      const send = tab.sendAgentInput.bind(tab);
+      let held = false;
+      return vi.spyOn(tab, "sendAgentInput").mockImplementation(async (event) => {
+        if (event.type === type && !held) {
+          held = true;
+          if (meanwhile) await tab.runInPage(meanwhile);
+          await new Promise((resolve) => setTimeout(resolve, ms));
+        }
+        return send(event);
+      });
+    };
+    const clickWhileHeld = async (hold: ReturnType<typeof holdBack>, ref: string, toolName = "click") => {
+      try {
+        return await tool(toolName).run({ ref });
+      } finally {
+        hold.mockRestore();
+        await tab.runInPage("document.querySelectorAll('.cover').forEach((cover) => cover.remove())");
+      }
+    };
+
+    it("clicks once when the pointer is slow to get there", async () => {
+      const ref = await addButton("Slow move");
+      const result = await clickWhileHeld(holdBack("mouseMove", 2000), ref);
+      expect(await clicksOn("Slow move")).toBe(1);
       expect(result).toMatch(/^Done\./);
       expect(result).not.toMatch(/scripted/);
-    } finally {
-      slow.mockRestore();
-    }
-  }, 10_000);
+    }, 10_000);
+
+    it("clicks once when the press is slow to arrive after the watch is set", async () => {
+      const ref = await addButton("Slow press");
+      const result = await clickWhileHeld(holdBack("mouseDown", 2000), ref);
+      expect(await clicksOn("Slow press")).toBe(1);
+      expect(result).toMatch(/^Done\./);
+      expect(result).not.toMatch(/scripted/);
+    }, 10_000);
+
+    it("stops a slow press from reaching what the page put under the pointer meanwhile", async () => {
+      const ref = await addButton("Covered later");
+      const result = await clickWhileHeld(holdBack("mouseDown", 2000, cover("Covered later")), ref);
+      expect(await clicksOn("cover")).toBe(0);
+      // Nothing real reached the page, so the click it was asked for goes to the element as a scripted one.
+      expect(await clicksOn("Covered later")).toBe(1);
+      expect(result).toMatch(/scripted/);
+    }, 10_000);
+
+    // A frame put over it just as the press goes takes the press where the page can't see, which is the gap left: the
+    // check just before the press only sees what's there then.
+    it("never clicks again after a press it couldn't see arrive", async () => {
+      const ref = await addButton("Framed");
+      const result = await clickWhileHeld(holdBack("mouseDown", 0, cover("Framed", "iframe")), ref);
+      expect(await clicksOn("cover")).toBe(1);
+      expect(await clicksOn("Framed")).toBe(0);
+      expect(result).toMatch(/may not have/);
+      expect(result).not.toMatch(/scripted/);
+    }, 10_000);
+
+    it("sends no press when the job is stopped while the watch is being set", async () => {
+      const ref = await addButton("Stopped");
+      const run = tab.runInPage.bind(tab);
+      const stopping = vi.spyOn(tab, "runInPage").mockImplementation(async <R>(code: string): Promise<R> => {
+        const result = await run<R>(code);
+        // Only the watch is given a point to check.
+        if (code.includes('"x":')) stopped = true;
+        return result;
+      });
+      try {
+        expect(await tool("click").run({ ref })).toBe(STOPPED);
+      } finally {
+        stopping.mockRestore();
+        stopped = false;
+      }
+      expect(await clicksOn("Stopped")).toBe(0);
+    }, 10_000);
+
+    it("double-clicks with real input, reading each press before the next", async () => {
+      const ref = await addButton("Twice");
+      await tab.runInPage(
+        "globalThis.doubles = 0; document.getElementById('Twice').addEventListener('dblclick', (event) => { if (event.isTrusted) globalThis.doubles++; })",
+      );
+      const result = await tool("double_click").run({ ref });
+      expect(result).toMatch(/^Done\./);
+      expect(result).not.toMatch(/scripted/);
+      expect(await clicksOn("Twice")).toBe(2);
+      expect(await tab.runInPage("globalThis.doubles")).toBe(1);
+    });
+
+    it("stops a double-click after a first click that covered the element, and says so", async () => {
+      const ref = await addButton("Covers itself", cover("Covers itself"));
+      const result = await tool("double_click").run({ ref });
+      await tab.runInPage("document.querySelectorAll('.cover').forEach((cover) => cover.remove())");
+      expect(await clicksOn("Covers itself")).toBe(1);
+      expect(await clicksOn("cover")).toBe(0);
+      expect(result).toMatch(/first/);
+      expect(result).not.toMatch(/scripted/);
+    }, 10_000);
+  });
 
   it("types into a field", async () => {
     const ref = await refOf("Name");

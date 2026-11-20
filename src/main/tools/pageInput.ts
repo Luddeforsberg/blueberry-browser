@@ -42,18 +42,13 @@ const release = async (tab: PageTarget, at: Point, clickCount: number) => {
   await tab.sendAgentInput({ type: "mouseUp", button: "left", clickCount, ...at });
 };
 
-// False if `beforePress` said no just before a press, so that press wasn't sent.
-export const clickAt = async (tab: PageTarget, point: Point, clicks: 1 | 2, beforePress: () => Promise<boolean>): Promise<boolean> => {
-  await moveTo(tab, point);
+// One press and release, the `count`th of a click, with the pointer already there.
+export const pressAt = async (tab: PageTarget, point: Point, count: number): Promise<void> => {
   const at = inView(tab, point);
-  for (let count = 1; count <= clicks; count++) {
-    if (!(await beforePress())) return false;
-    await press(tab, at, count);
-    await pause(STEP_MS);
-    await release(tab, at, count);
-    await pause(STEP_MS);
-  }
-  return true;
+  await press(tab, at, count);
+  await pause(STEP_MS);
+  await release(tab, at, count);
+  await pause(STEP_MS);
 };
 
 export const dragBetween = async (tab: PageTarget, from: Point, to: Point): Promise<void> => {
@@ -114,11 +109,13 @@ export const pressKey = async (tab: Pick<PageTarget, "sendAgentInput">, key: str
   await pause(STEP_MS);
 };
 
+export type Arrival = "landed" | "missed" | "cut" | "lost";
+
 // "landed" once the page has reported it, or if `ask` can't answer, which means the input took it to a new page.
-export const landed = async (ask: () => Promise<boolean | "missed" | null>): Promise<"landed" | "missed" | "lost"> => {
+export const landed = async (ask: () => Promise<boolean | "missed" | "cut" | null>): Promise<Arrival> => {
   for (let waited = 0; waited < LANDED_MS; waited += LANDED_POLL_MS) {
     const answer = await ask().catch(() => null);
-    if (answer === "missed") return "missed";
+    if (answer === "missed" || answer === "cut") return answer;
     if (answer !== false) return "landed";
     await pause(LANDED_POLL_MS);
   }

@@ -32,18 +32,28 @@ export const aimClick = ({ ref, mayScroll }: { ref: string; mayScroll: boolean }
     return { status: "aimed", ...point };
   });
 
-// Watches for the press just before it goes, not when aiming, because the watch runs out and real input can be slow.
-export const watchPress = ({ ref }: { ref: string }): true | null =>
-  withElement(ref, (el) => {
+// Just before each press: whether a press at the point would still land on the element, and only then a watch for
+// it, which lasts until main ends it. Anything else is reported and nothing should be pressed.
+export const watchPress = ({ ref, x, y }: { ref: string } & Point): Aim | null =>
+  withElement(ref, (el): Aim => {
+    if (el.matches(":disabled")) return { status: "disabled" };
+    const hit = hitAt({ x, y });
+    if (!reaches(hit, el)) return { status: "covered", by: (hit && nameOf(hit)) || hit?.tagName.toLowerCase() || "nothing" };
     expectPressOn(el);
-    return true;
+    return { status: "aimed", x, y };
   });
 
-// False until the input arrives, then true, or "missed" for a press that was stopped. A new page has no record, so
-// null means the input took the page somewhere.
-export const inputLanded = (): boolean | "missed" | null => {
-  if (state.landed === true || state.landed === "missed") state.stopWatching?.();
+// False until the input arrives, then true, "missed" for a press that was stopped, or "cut" for one that reached the
+// element before the rest of the click was stopped. A new page has no record, so null means the input took the page
+// somewhere.
+export const inputLanded = (): boolean | "missed" | "cut" | null => {
+  if (state.landed !== false) state.stopWatching?.();
   return state.landed ?? null;
+};
+
+// Main is done with the press, however it went.
+export const endWatch = (): void => {
+  state.stopWatching?.();
 };
 
 // For a frame from another origin, and when real input can't get there. Pages can tell this from a person.

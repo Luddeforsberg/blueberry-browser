@@ -2,8 +2,9 @@ import { isElement, isFrame, type AnyElement, type Point } from "./dom";
 import { parentOf } from "./names";
 import { state } from "./state";
 
-// Long enough for a click to arrive, and short enough not to catch one of the user's own.
-const WATCH_PRESS_MS = 1500;
+// Main ends the watch once it knows what happened, however slowly the input arrives. This only ends one a job left behind,
+// so it can't keep stopping the user's own clicks.
+const WATCH_BACKSTOP_MS = 15_000;
 
 // Where real input should go for this element, in the top page's pixels, or null if it can't go there: it's off
 // screen, or inside a frame from another origin, where the top page can't measure it and real input doesn't reach.
@@ -79,13 +80,13 @@ export const expectPressOn = (el: AnyElement, { pressOnly = false } = {}): void 
     const first = event.composedPath()[0];
     const onIt = reaches(isElement(first) ? first : null, el);
     if (state.landed === false) state.landed = onIt ? true : "missed";
-    // The press arrived but the rest of the click is about to be stopped, so it didn't happen.
-    else if (state.landed === true && !onIt && !pressOnly) state.landed = "missed";
+    // The press reached it but the rest of the click is about to be stopped, so it may or may not have counted.
+    else if (state.landed === true && !onIt && !pressOnly) state.landed = "cut";
     if (onIt || (pressOnly && state.landed === true)) return;
     event.preventDefault();
     event.stopImmediatePropagation();
   };
-  const timer = setTimeout(() => state.stopWatching?.(), WATCH_PRESS_MS);
+  const timer = setTimeout(() => state.stopWatching?.(), WATCH_BACKSTOP_MS);
   state.stopWatching = () => {
     clearTimeout(timer);
     targets.forEach((win) => types.forEach((type) => win.removeEventListener(type, watch, true)));
