@@ -36,7 +36,7 @@ const fences = [
     },
     rules: {
       "no-restricted-globals": ["fetch"],
-      "no-restricted-properties": ["globalThis", "window", "self"].map((object) => ({ object, property: "fetch" })),
+      "no-restricted-properties": ["globalThis", "global", "window", "self"].map((object) => ({ object, property: "fetch" })),
     },
     message:
       "Each service is called from one file: Supabase from account/galleryServer.ts (runner/src/db.ts on the runner, shared/phoneCalls.ts on the phone page), Browserbase from cloud/browserbase.ts, Telegram from phone/TelegramChannel.ts, Firecrawl from tools/webFetch.ts and tools/webSearch.ts, and a model provider's key from settings/aiKeyTry.ts. Call that file, or give a new service a file of its own, allowed in eslint.fences.mjs.",
