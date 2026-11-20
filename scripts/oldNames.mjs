@@ -3,8 +3,8 @@
 // it's added. Code says "mascot" or "mascots", or "Berry" where it means Berry.
 //
 // What's left is listed below with why. Names saved on disk were renamed in step 9, and server and model-facing names in
-// step 10, so only the code that reads old saved data, the old server names that still answer clients from before, and
-// the public site's address still say them. An entry whose text is no longer in its file fails too, so this list only
+// step 10, so only the code that reads old saved data and the old server names that still answer clients from before
+// still say them. An entry whose text is no longer in its file fails too, so this list only
 // shrinks.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
@@ -29,8 +29,6 @@ const migrated = (text, why, ...files) => entries(null, text, why, files);
 // An old Supabase name that supabase/migrations/20261120000000_mascot_names.sql keeps answering for clients from before,
 // named only in tests. They go when the wrappers do, as step 10 of docs/quality-plan.md says.
 const wrapped = (text, ...files) => entries("wrappers", text, WRAPPED, files);
-// The public site's address, which the user picks a new one for. docs/quality-plan.md has the switch.
-const address = (text, why, ...files) => entries("address", text, why, files);
 
 const WRAPPED = "An old Supabase name, kept working for clients from before until the wrappers go.";
 
@@ -65,13 +63,6 @@ const ALLOWED = [
     "supabase/berryPalettes.test.ts",
   ]),
 
-  ...address(
-    "blueberry-flock.netlify.app",
-    "The public site's address, which shared links and link previews have saved. `SITE_ORIGIN` in scripts/buildSite.mjs holds it, and `pnpm run site:build` writes it into the pages.",
-    "scripts/buildSite.mjs",
-    "site/index.html",
-    "site/m/index.html",
-  ),
   ...entries(null, "/flock.png", "The share picture's old address, redirected to its new one for link previews made before.", [
     "netlify.toml",
   ]),
