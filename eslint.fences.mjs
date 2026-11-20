@@ -10,8 +10,15 @@
 
 import { existsSync, statSync } from "node:fs";
 import { builtinRules } from "eslint/use-at-your-own-risk";
+import eslintPluginReact from "eslint-plugin-react";
 
 const FREE = ["**/*.test.ts", "**/*.test.tsx", "**/*Testing.ts", "tests/**", "evals/**", "supabase/**"];
+
+// Why a screen still draws its own controls. Moving one onto the kit would change how it looks, so each moves in a
+// change of its own.
+const BUTTONS = "Its own buttons, from before the kit.";
+const FIELDS = "A field, which the kit has none of yet.";
+const BOTH = "Its own buttons, from before the kit, and a field, which the kit has none of yet.";
 
 const fences = [
   {
@@ -75,9 +82,81 @@ const fences = [
     message:
       "In a renderer, wait and repeat with useNow or useForAMoment from @common/lib/timers, which clear their timer when the component goes. If neither fits, add a hook there rather than a timer here (eslint.fences.mjs).",
   },
+  {
+    name: "kit",
+    in: ["src/renderer/**/*.tsx"],
+    allowed: { "src/renderer/common/components": "The kit itself." },
+    heldBack: {
+      "src/renderer/chrome/src/DesktopApp.tsx": BUTTONS,
+      "src/renderer/chrome/src/DesktopBox.tsx": BOTH,
+      "src/renderer/chrome/src/DesktopSheets.tsx": BOTH,
+      "src/renderer/chrome/src/MenuApp.tsx": BUTTONS,
+      "src/renderer/chrome/src/SuggestionsApp.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/AccountForm.tsx": FIELDS,
+      "src/renderer/chrome/src/components/AccountMenu.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/AddMenu.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/AddressBar.tsx": BOTH,
+      "src/renderer/chrome/src/components/AiKeyForm.tsx": BOTH,
+      "src/renderer/chrome/src/components/AttachmentChips.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/ChatMessage.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/ChatPanel.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/Composer.tsx": BOTH,
+      "src/renderer/chrome/src/components/ComposerPills.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/DownloadRow.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/FindBarCard.tsx": FIELDS,
+      "src/renderer/chrome/src/components/FirstJobs.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/FirstRun.tsx": BOTH,
+      "src/renderer/chrome/src/components/FirstRunParts.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/HistoryImport.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/HorizontalToolbar.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/JobGroups.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/MascotPerch.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/MemoryInChat.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/NeedsYouNotice.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/PageFrame.tsx": FIELDS,
+      "src/renderer/chrome/src/components/PasswordInput.tsx": BOTH,
+      "src/renderer/chrome/src/components/QuestionCards.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/ReplySteps.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/RoutineNotice.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/RoutineRunRow.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/SegmentSwitch.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/SettingsRow.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/SidebarChats.tsx": BOTH,
+      "src/renderer/chrome/src/components/SidebarFoot.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/SidebarLabels.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/SidebarTabs.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/StepCard.tsx": BOTH,
+      "src/renderer/chrome/src/components/SuggestionItem.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/Tabs.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/ToolBarButton.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/WorkingNotice.tsx": BUTTONS,
+      "src/renderer/chrome/src/components/WorkingView.tsx": BUTTONS,
+      "src/renderer/chrome/src/pages/AccountSettings.tsx": FIELDS,
+      "src/renderer/chrome/src/pages/CloudSettings.tsx": BOTH,
+      "src/renderer/chrome/src/pages/GalleryTile.tsx": BUTTONS,
+      "src/renderer/chrome/src/pages/HistoryPage.tsx": BUTTONS,
+      "src/renderer/chrome/src/pages/MascotAnswers.tsx": BOTH,
+      "src/renderer/chrome/src/pages/MascotGalleryPage.tsx": BUTTONS,
+      "src/renderer/chrome/src/pages/MascotMemory.tsx": FIELDS,
+      "src/renderer/chrome/src/pages/MascotPage.tsx": FIELDS,
+      "src/renderer/chrome/src/pages/MascotsPage.tsx": BUTTONS,
+      "src/renderer/chrome/src/pages/NeedsYouPage.tsx": BOTH,
+      "src/renderer/chrome/src/pages/NewTabPage.tsx": FIELDS,
+      "src/renderer/chrome/src/pages/PhoneSettings.tsx": FIELDS,
+      "src/renderer/chrome/src/pages/PublishExample.tsx": FIELDS,
+      "src/renderer/chrome/src/pages/PublishMascot.tsx": FIELDS,
+      "src/renderer/chrome/src/pages/RoutineAnswers.tsx": BOTH,
+      "src/renderer/chrome/src/pages/RoutinesPage.tsx": BOTH,
+      "src/renderer/chrome/src/pages/SignedInTo.tsx": BOTH,
+    },
+    rules: { "forbid-elements": ["button", "input", "textarea"] },
+    message:
+      "Draw controls from the UI kit in src/renderer/common/components (DESIGN.md section 8): Button from Button.tsx, and Switch, SwitchSheet, Choice or QuietChoice from Controls.tsx. The kit has no field yet, so a new <input> or <textarea> starts one there. Screens from before the kit are held back in eslint.fences.mjs.",
+  },
 ];
 
 const RULES = {
+  "forbid-elements": eslintPluginReact.rules["forbid-elements"],
   "no-restricted-globals": builtinRules.get("no-restricted-globals"),
   "no-restricted-properties": builtinRules.get("no-restricted-properties"),
   "no-restricted-syntax": builtinRules.get("no-restricted-syntax"),
@@ -87,6 +166,7 @@ const RULES = {
 const options = (rule, entries, message) => {
   if (rule === "no-restricted-globals") return entries.map((name) => ({ name, message }));
   if (rule === "no-restricted-syntax") return entries.map((selector) => ({ selector, message }));
+  if (rule === "forbid-elements") return [{ forbid: entries.map((element) => ({ element, message })) }];
   return entries.map((entry) => ({ ...entry, message }));
 };
 
