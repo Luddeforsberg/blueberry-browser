@@ -11,5 +11,6 @@ export default defineConfig({
   workers: Number(process.env.BLUEBERRY_DRIVE_WORKERS) || 1,
   timeout: 90_000,
   reporter: [["line"]],
+  globalSetup: "../tempRun.ts",
   globalTeardown: "./manifest.ts",
 });

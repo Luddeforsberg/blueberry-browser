@@ -1,7 +1,7 @@
 import { SECRET_SHAPES } from "./publishing";
 import { siteAllowed } from "./mascots";
 
-// What a bird may remember, checked in plain code wherever a fact comes from: the model, the user's own edit or the file.
+// What a mascot may remember, checked in plain code wherever a fact comes from: the model, the user's own edit or the file.
 // Runtime code shared by main and the chrome renderer, so preloads may only `import type` from here.
 
 export const MAX_FACT_LENGTH = 140;
@@ -13,16 +13,19 @@ const SECRET_WORDS = word(
   "codes?|kod|koden|koder|pass ?words?|passwd|pwd|pass ?phrases?|pass ?codes?|lösenord|lösen|pin|pin ?(?:code|kod)|one[- ]time|otp|2fa|two[- ]factor|mfa|" +
     "(?:verification|security|login|sign[- ]in|access|auth) ?codes?|verifieringskod|engångskod|säkerhetskod|bank ?id|" +
     "cvv|cvc|(?:credit|debit|bank) ?cards?|card ?(?:number|details)|kortnummer|kortuppgifter|personnummer|social security|ssn|iban|" +
-    "log[- ]?ins?|sign[- ]?ins?|logga in|api ?keys?|access tokens?|tokens?|secrets?|username|användarnamn"
+    "log[- ]?ins?|sign[- ]?ins?|logga in|api ?keys?|access tokens?|tokens?|secrets?|username|användarnamn",
 );
-const ADDRESS_WORDS = word("addresse?s?|adress|adressen|hemadress|leveransadress|faktureringsadress|post ?codes?|postal codes?|zip ?codes?|postnummer|phone number|telefonnummer|mobilnummer");
-const STREET = /[\p{L}-]+(?:gatan|vägen|gränd|gränden|torget|stigen|allén|backen)\s+\d|\b[\p{L}-]+\s+(?:street|avenue|road|boulevard|lane|drive)\s+\d|\b\d+\p{L}?\s+[\p{L}-]+(?:\s[\p{L}-]+)?\s+(?:street|st|avenue|ave|road|rd|boulevard|blvd|lane|ln|drive|dr)\b/iu;
+const ADDRESS_WORDS = word(
+  "addresse?s?|adress|adressen|hemadress|leveransadress|faktureringsadress|post ?codes?|postal codes?|zip ?codes?|postnummer|phone number|telefonnummer|mobilnummer",
+);
+const STREET =
+  /[\p{L}-]+(?:gatan|vägen|gränd|gränden|torget|stigen|allén|backen)\s+\d|\b[\p{L}-]+\s+(?:street|avenue|road|boulevard|lane|drive)\s+\d|\b\d+\p{L}?\s+[\p{L}-]+(?:\s[\p{L}-]+)?\s+(?:street|st|avenue|ave|road|rd|boulevard|blvd|lane|ln|drive|dr)\b/iu;
 // A price or a share is a fair thing to prefer. Any other run of four digits may be a code, a PIN or part of a phone number.
 const AMOUNT = /\d[\d\s.,]*\s*(?:kr|kronor|sek|eur|euros?|usd|dollars?|gbp|pounds?|:-|%)(?![\p{L}])|[$€£]\s*\d[\d\s.,]*/giu;
 const LONG_NUMBER = /\d(?:[\s-]?\d){3,}/;
 const CODE_SHAPED = /(?<![\p{L}\p{N}])(?=(?:[^\d\s]*\d){2})(?=[^\s]*\p{L})[\p{L}\p{N}-]{5,}(?![\p{L}\p{N}])/u;
 
-// A preference is how someone likes things. Nothing here may be about what a bird is allowed to do, because that's
+// A preference is how someone likes things. Nothing here may be about what a mascot is allowed to do, because that's
 // decided by limits and approvals, which don't read this, and a sentence like these is what a fooled model would write.
 const NOT_A_PREFERENCE = [
   /<|>/,

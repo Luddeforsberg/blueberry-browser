@@ -2,8 +2,9 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { fitJobUpdate } from "../src/main/cloudJobs";
+import { fitJobUpdate } from "../src/main/remoteJobs/cloudJobs";
 import type { ChatStep } from "../src/shared/library";
+import { defined } from "../src/shared/testing";
 
 // Relay jobs on the owner's Mac, in real Postgres as Supabase's roles, on top of every migration before it.
 const SUPABASE_STANDINS = `
@@ -37,7 +38,7 @@ describe("relay jobs on the Mac", () => {
       await db.exec("reset role");
     }
   };
-  const one = async (uid: string | null, sql: string) => Object.values((await as(uid, sql))[0])[0];
+  const one = async (uid: string | null, sql: string) => Object.values(defined((await as(uid, sql))[0]))[0];
   let users = 0;
   const newUser = async () => {
     const id = `00000000-0000-4000-8000-${String(++users).padStart(12, "0")}`;
@@ -51,9 +52,11 @@ describe("relay jobs on the Mac", () => {
   };
   const start = async (secret: string, where: string) => {
     const id = await one(RUNNER, `select public.relay_start_job('${secret}', 'Find tea', ${MASCOT}, '${where}')`);
-    return id === null ? null : String(id);
+    if (id !== null && typeof id !== "string") throw new Error(`Expected a job id or null, got ${JSON.stringify(id)}`);
+    return id;
   };
-  const targetOf = async (job: string) => (await db.query<{ target: string }>("select target from public.cloud_jobs where id = $1", [job])).rows[0]?.target;
+  const targetOf = async (job: string) =>
+    (await db.query<{ target: string }>("select target from public.cloud_jobs where id = $1", [job])).rows[0]?.target;
 
   let ALICE = "";
   let RUNNER = "";
@@ -88,7 +91,9 @@ describe("relay jobs on the Mac", () => {
     expect(await one(ALICE, "select public.mac_presence(false)")).toBe(false);
     expect((await db.query("select status from public.cloud_jobs where id = $1", [waiting])).rows).toEqual([{ status: "failed" }]);
     expect(await start(SECRET, "mac")).toBeNull();
-    expect((await as(RUNNER, `select target from public.relay_jobs('${SECRET}', array['${waiting}']::uuid[])`))[0]).toEqual({ target: "mac" });
+    expect((await as(RUNNER, `select target from public.relay_jobs('${SECRET}', array['${waiting}']::uuid[])`))[0]).toEqual({
+      target: "mac",
+    });
   });
 
   it("is never claimed, read or written by the runner", async () => {
@@ -103,7 +108,9 @@ describe("relay jobs on the Mac", () => {
     expect((await as<{ id: string }>(ALICE, "select id from public.mac_claim_job()")).map(({ id }) => id)).toEqual([job]);
     expect(await one(RUNNER, `select public.runner_update_job('${job}', 'done', null, 'Hijacked')`)).toBe(true);
     await expect(as(RUNNER, `select public.runner_ask('${job}', 'approval', 'Buy it')`)).rejects.toThrow(/Not a job it's running/);
-    expect((await db.query("select status, reply from public.cloud_jobs where id = $1", [job])).rows).toEqual([{ status: "running", reply: "" }]);
+    expect((await db.query("select status, reply from public.cloud_jobs where id = $1", [job])).rows).toEqual([
+      { status: "running", reply: "" },
+    ]);
   });
 
   it("is claimed only by its owner, with the switch on, once", async () => {
@@ -122,11 +129,17 @@ describe("relay jobs on the Mac", () => {
     expect((await as<{ id: string }>(ALICE, "select id from public.mac_claim_job()")).map(({ id }) => id)).toEqual([job]);
     expect(await as(ALICE, "select id from public.mac_claim_job()")).toEqual([]);
     // It writes back, and a Stop from the relay reaches it.
-    expect(await one(ALICE, `select public.mac_update_job('${job}', null, '[{"text":"Looking","done":false}]'::jsonb, 'Half')`)).toBe(false);
+    expect(await one(ALICE, `select public.mac_update_job('${job}', null, '[{"text":"Looking","done":false}]'::jsonb, 'Half')`)).toBe(
+      false,
+    );
     expect(await one(RUNNER, `select public.relay_stop_job('${SECRET}', '${job}')`)).toBe(true);
     expect(await one(ALICE, `select public.mac_update_job('${job}')`)).toBe(true);
     await one(ALICE, `select public.mac_update_job('${job}', 'stopped', null, 'Found tea')`);
-    expect((await as(RUNNER, `select status, reply, steps from public.relay_jobs('${SECRET}', array['${job}']::uuid[])`))[0]).toEqual({ status: "stopped", reply: "Found tea", steps: [{ text: "Looking", done: false }] });
+    expect((await as(RUNNER, `select status, reply, steps from public.relay_jobs('${SECRET}', array['${job}']::uuid[])`))[0]).toEqual({
+      status: "stopped",
+      reply: "Found tea",
+      steps: [{ text: "Looking", done: false }],
+    });
     // Over, nothing more is written.
     expect(await one(ALICE, `select public.mac_update_job('${job}', 'done', null, 'Again')`)).toBe(true);
     expect((await db.query("select status from public.cloud_jobs where id = $1", [job])).rows).toEqual([{ status: "stopped" }]);
@@ -140,7 +153,10 @@ describe("relay jobs on the Mac", () => {
     await db.query("update public.cloud_jobs set heartbeat_at = now() - interval '3 minutes' where id = $1", [quiet]);
     await db.query("update public.cloud_jobs set created_at = now() - interval '6 minutes' where id = $1", [late]);
     expect(await as(ALICE, "select id from public.mac_claim_job()")).toEqual([]);
-    expect((await db.query("select status from public.cloud_jobs where id = any($1) order by created_at", [[quiet, late]])).rows).toEqual([{ status: "failed" }, { status: "failed" }]);
+    expect((await db.query("select status from public.cloud_jobs where id = any($1) order by created_at", [[quiet, late]])).rows).toEqual([
+      { status: "failed" },
+      { status: "failed" },
+    ]);
   });
 
   it("ends Mac jobs that can't go on while the Mac is off, so they never hold up the cloud", async () => {
@@ -150,10 +166,17 @@ describe("relay jobs on the Mac", () => {
     await as(ALICE, "select id from public.mac_claim_job()");
     // The Mac goes away without saying so, as when it sleeps, and nothing of it calls again.
     await db.query("update public.cloud_mac_presence set last_seen = now() - interval '1 hour' where owner = $1", [ALICE]);
-    await db.query("update public.cloud_jobs set created_at = now() - interval '6 minutes', heartbeat_at = now() - interval '3 minutes' where id = any($1)", [stale]);
+    await db.query(
+      "update public.cloud_jobs set created_at = now() - interval '6 minutes', heartbeat_at = now() - interval '3 minutes' where id = any($1)",
+      [stale],
+    );
     // The relay's next job goes to the cloud rather than being refused as one too many.
     expect(await targetOf((await start(SECRET, "auto"))!)).toBe("cloud");
-    expect((await as<{ status: string }>(RUNNER, `select status from public.relay_jobs('${SECRET}', array['${stale.join("','")}']::uuid[])`)).map(({ status }) => status)).toEqual(Array(5).fill("failed"));
+    expect(
+      (
+        await as<{ status: string }>(RUNNER, `select status from public.relay_jobs('${SECRET}', array['${stale.join("','")}']::uuid[])`)
+      ).map(({ status }) => status),
+    ).toEqual(Array(5).fill("failed"));
 
     // The runner's claim ends them too, with nothing from the relay.
     const more: string[] = [];
@@ -161,7 +184,11 @@ describe("relay jobs on the Mac", () => {
     for (let n = 0; n < 4; n++) more.push((await start(SECRET, "mac"))!);
     await db.query("update public.cloud_jobs set created_at = now() - interval '6 minutes' where id = any($1)", [more]);
     expect((await as<{ id: string }>(RUNNER, "select id from public.runner_claim_job()")).length).toBe(1);
-    expect((await db.query<{ status: string }>("select status from public.cloud_jobs where id = any($1)", [more])).rows.map(({ status }) => status)).toEqual(Array(4).fill("failed"));
+    expect(
+      (await db.query<{ status: string }>("select status from public.cloud_jobs where id = any($1)", [more])).rows.map(
+        ({ status }) => status,
+      ),
+    ).toEqual(Array(4).fill("failed"));
     // Nor did the runner get to read them.
     expect(await as(RUNNER, "select id from public.cloud_jobs where target = 'mac'")).toEqual([]);
   });
@@ -174,25 +201,38 @@ describe("relay jobs on the Mac", () => {
     expect((await as<{ id: string }>(ALICE, "select id from public.mac_claim_job()")).map(({ id }) => id)).toEqual([mac]);
     // As `supabaseDb` and `GalleryServer.macUpdateJob` send it.
     const write = (job: string, { steps, reply, error }: { steps?: ChatStep[]; reply?: string; error?: string }) =>
-      as(job === cloud ? RUNNER : ALICE, `select public.${job === cloud ? "runner" : "mac"}_update_job($1, null, $2::jsonb, $3, $4)`, [job, steps ? JSON.stringify(steps) : null, reply ?? null, error ?? null]);
+      as(job === cloud ? RUNNER : ALICE, `select public.${job === cloud ? "runner" : "mac"}_update_job($1, null, $2::jsonb, $3, $4)`, [
+        job,
+        steps ? JSON.stringify(steps) : null,
+        reply ?? null,
+        error ?? null,
+      ]);
     const saved = async (job: string) =>
-      (await db.query<{ reply: number; error: number; steps: number }>("select char_length(reply) as reply, char_length(error) as error, jsonb_array_length(steps) as steps from public.cloud_jobs where id = $1", [job])).rows[0];
+      (
+        await db.query<{ reply: number; error: number; steps: number }>(
+          "select char_length(reply) as reply, char_length(error) as error, jsonb_array_length(steps) as steps from public.cloud_jobs where id = $1",
+          [job],
+        )
+      ).rows[0];
     const longSteps = Array.from({ length: 500 }, (_, index) => ({ text: `${index} ${"🫐".repeat(400)}`, done: true }));
 
     for (const job of [cloud, mac]) {
       for (const character of ["a", "🫐"]) {
         await write(job, { reply: character.repeat(40_000) });
-        expect((await saved(job)).reply).toBe(40_000);
+        expect(defined(await saved(job)).reply).toBe(40_000);
         await expect(write(job, { reply: character.repeat(40_001) })).rejects.toThrow(/reply_shape/);
         await write(job, fitJobUpdate({ reply: character.repeat(40_001) }));
-        expect((await saved(job)).reply).toBe(40_000);
+        expect(defined(await saved(job)).reply).toBe(40_000);
       }
       await expect(write(job, { error: "x".repeat(501) })).rejects.toThrow(/error_shape/);
       await expect(write(job, { steps: longSteps })).rejects.toThrow(/steps_shape/);
       await write(job, fitJobUpdate({ steps: longSteps, error: "x".repeat(501) }));
       expect(await saved(job)).toMatchObject({ error: 500, steps: expect.any(Number) });
       // The last write that fits is just under the limit, so the estimate isn't far off it.
-      const bytes = (await db.query<{ bytes: number }>("select octet_length(steps::text) as bytes from public.cloud_jobs where id = $1", [job])).rows[0].bytes;
+      const bytes = defined(
+        (await db.query<{ bytes: number }>("select octet_length(steps::text) as bytes from public.cloud_jobs where id = $1", [job]))
+          .rows[0],
+      ).bytes;
       expect(bytes).toBeGreaterThan(98_000);
     }
   });

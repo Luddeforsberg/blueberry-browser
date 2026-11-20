@@ -1,4 +1,3 @@
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const motion = require("./src/renderer/common/motion.json");
 const ms = (name) => `${motion.ms[name]}ms`;
 
@@ -123,12 +122,11 @@ module.exports = {
       },
       // The live line's words: `ink-3` with a band of `ink` passing through (DESIGN.md section 7).
       backgroundImage: {
-        shimmer:
-          "linear-gradient(90deg, rgb(var(--ink-3)) 38%, rgb(var(--ink)) 50%, rgb(var(--ink-3)) 62%)",
+        shimmer: "linear-gradient(90deg, rgb(var(--ink-3)) 38%, rgb(var(--ink)) 50%, rgb(var(--ink-3)) 62%)",
       },
       animation: {
         "fade-in": "fade-in 280ms cubic-bezier(.2, .8, .2, 1) forwards",
-        "answered": "answered 1600ms cubic-bezier(.2, .8, .2, 1) forwards",
+        answered: "answered 1600ms cubic-bezier(.2, .8, .2, 1) forwards",
         shimmer: "shimmer 2400ms linear infinite",
         // Overshoot is the mascots' alone: one pops when it arrives (DESIGN.md section 7).
         "mascot-pop": "mascot-pop 340ms cubic-bezier(.3, 1.5, .5, 1)",
@@ -229,9 +227,7 @@ module.exports = {
           },
         },
       },
-
     },
   },
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   plugins: [require("@tailwindcss/typography")],
 };

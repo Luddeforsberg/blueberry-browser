@@ -4,17 +4,29 @@ import { join } from "node:path";
 import { DEFAULT_LOOK, driveFeature } from "./driver";
 import { FEATURES, featureNamed, layoutsOf, type Feature, type Look } from "./map";
 import { ENTRIES, readRequest, shotFile, type Entry } from "./shots";
+import { defined } from "../../src/shared/testing";
 
 // What scripts/drive.mjs asked for: one feature in one state and look, or every one of them for a baseline.
 const request = readRequest();
 
 const shotsFor = (feature: Feature): Array<{ state: string; look: Look }> => {
   if (request.feature) {
-    const state = request.state ?? Object.keys(feature.states)[0];
-    return [{ state, look: { theme: request.theme ?? DEFAULT_LOOK.theme, layout: request.layout ?? layoutsOf(feature)[0], width: request.width ?? DEFAULT_LOOK.width } }];
+    const state = request.state ?? defined(Object.keys(feature.states)[0]);
+    return [
+      {
+        state,
+        look: {
+          theme: request.theme ?? DEFAULT_LOOK.theme,
+          layout: request.layout ?? layoutsOf(feature)[0],
+          width: request.width ?? DEFAULT_LOOK.width,
+        },
+      },
+    ];
   }
   return Object.keys(feature.states).flatMap((state) =>
-    (["light", "dark"] as const).flatMap((theme) => layoutsOf(feature).map((layout) => ({ state, look: { theme, layout, width: DEFAULT_LOOK.width } })))
+    (["light", "dark"] as const).flatMap((theme) =>
+      layoutsOf(feature).map((layout) => ({ state, look: { theme, layout, width: DEFAULT_LOOK.width } })),
+    ),
   );
 };
 
@@ -28,7 +40,16 @@ for (const feature of features as Feature[]) {
       const { png, restless } = await driveFeature(feature, state, look);
       mkdirSync(join(request.out, ENTRIES), { recursive: true });
       writeFileSync(join(request.out, file), png);
-      const entry: Entry = { feature: feature.name, state, theme: look.theme, layout: feature.layouts === "none" ? null : look.layout, width: look.width, file, restless, design: feature.design };
+      const entry: Entry = {
+        feature: feature.name,
+        state,
+        theme: look.theme,
+        layout: feature.layouts === "none" ? null : look.layout,
+        width: look.width,
+        file,
+        restless,
+        design: feature.design,
+      };
       writeFileSync(join(request.out, ENTRIES, `${file}.json`), JSON.stringify(entry));
       console.log(`Saved ${join(request.out, file)}${restless ? `, but it kept changing at ${restless}` : ""}`);
     });

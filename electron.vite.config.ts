@@ -1,10 +1,22 @@
+import { execFileSync } from "node:child_process";
 import { resolve } from "path";
 import { defineConfig, externalizeDepsPlugin } from "electron-vite";
 import react from "@vitejs/plugin-react";
+import type { Plugin } from "vite";
+
+// The page code main injects is bundled from src/page into src/main/tools/pageCode.ts by `pnpm run page:build`. A build stops if
+// that file isn't what src/page builds to, so an app never runs page code nobody reviewed.
+const pageCodeCurrent: Plugin = {
+  name: "page-code-current",
+  apply: "build",
+  buildStart() {
+    execFileSync(process.execPath, [resolve(__dirname, "scripts/buildPage.mjs"), "--check"], { stdio: "inherit" });
+  },
+};
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin(), pageCodeCurrent],
   },
   preload: {
     plugins: [externalizeDepsPlugin()],

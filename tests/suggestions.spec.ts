@@ -1,15 +1,13 @@
-// Preload types live beside a .ts file of the same name, so TypeScript skips them unless asked.
-/* eslint-disable @typescript-eslint/triple-slash-reference */
-/// <reference path="../src/preload/chrome.d.ts" />
 import { expect, test } from "@playwright/test";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { demoVisits, seedChats } from "../evals/seedHistory";
-import { HistoryStore } from "../src/main/HistoryStore";
+import { HistoryStore } from "../src/main/library/HistoryStore";
 import { findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
 import { DEMO_LINES, REFUSED_LINES, demoProposals } from "./suggestionReplies";
+import { defined } from "../src/shared/testing";
 
 test("only suggestions whose evidence checks out show, a row fills things in, and one dismissed stays gone", async () => {
   test.setTimeout(60_000);
@@ -37,7 +35,7 @@ test("only suggestions whose evidence checks out show, a row fills things in, an
     const saved = JSON.parse(readFileSync(join(profile, "suggestions.json"), "utf8")) as { proposals: Array<{ card: { title: string } }> };
     expect(saved.proposals.map(({ card }) => card.title).sort()).toEqual(Object.values(DEMO_LINES).sort());
 
-    const sent = JSON.stringify(model.suggestionRequests[0].messages);
+    const sent = JSON.stringify(defined(model.suggestionRequests[0]).messages);
     expect(sent).toContain("news.ycombinator.com");
     expect(sent).toContain("Cheap flights to Lisbon");
     expect(sent).not.toContain("sore throat");
@@ -50,7 +48,10 @@ test("only suggestions whose evidence checks out show, a row fills things in, an
     await row(words).click();
     await expect(composer).not.toHaveValue("");
     await expect(composer).toBeFocused();
-    const { caret, length } = await composer.evaluate((box: HTMLTextAreaElement) => ({ caret: box.selectionStart, length: box.value.length }));
+    const { caret, length } = await composer.evaluate((box: HTMLTextAreaElement) => ({
+      caret: box.selectionStart,
+      length: box.value.length,
+    }));
     expect(caret).toBe(length);
     expect(model.requests).toHaveLength(0);
 

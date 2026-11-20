@@ -4,8 +4,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { mcpAuthRouter, getOAuthProtectedResourceMetadataUrl } from "@modelcontextprotocol/sdk/server/auth/router.js";
 import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js";
-import { GalleryServer } from "../../src/main/galleryServer";
-import { flockFromRows } from "../../src/shared/phone";
+import { GalleryServer } from "../../src/main/account/galleryServer";
+import { mascotsFromSharedRows } from "../../src/shared/phone";
 import { DbError, type RelayDb } from "./db";
 import { RelayAuth } from "./relayAuth";
 import { createRelayTools, type RelayHost } from "./relayTools";
@@ -21,8 +21,8 @@ const MAX_BODY = "1mb";
 const NAME = "blueberry";
 
 const INSTRUCTIONS =
-  "Blueberry is the user's AI browser. Its birds (the flock) do jobs in a browser in the cloud, signed in to the sites " +
-  "the user brought there, and keep going with the user's computer off: list_agents names them. With the user's " +
+  "Blueberry is the user's AI browser. Its mascots do jobs in a browser in the cloud, signed in to the sites the " +
+  "user brought there, and keep going with the user's computer off: list_agents names them. With the user's " +
   "Blueberry open on their Mac and allowed, a job can run there instead, with their real tabs: start_job's `where` " +
   "chooses, and by default it's the Mac when it's there. start_job returns a " +
   "job id at once, because a job can take minutes: check on it with get_job. A job asks the user before anything risky, " +
@@ -61,7 +61,7 @@ export const relayConfig = (env: Record<string, string | undefined>): RelayConfi
 const grantHost = (auth: RelayAuth, grantId: string, db: RelayDb): RelayHost => {
   const secret = () => auth.secretOf(grantId);
   return {
-    flock: async () => flockFromRows(await db.relayFlock(secret())),
+    mascots: async () => mascotsFromSharedRows(await db.relayMascots(secret())),
     startJob: (prompt, mascot, where) => db.relayStartJob(secret(), prompt, mascot, where),
     jobs: (ids) => db.relayJobs(secret(), ids),
     stop: (id) => db.relayStopJob(secret(), id),
@@ -70,8 +70,10 @@ const grantHost = (auth: RelayAuth, grantId: string, db: RelayDb): RelayHost => 
 
 // Words for a failed call that say what to do, never what came back.
 const problemWords = (error: unknown): string => {
-  if (error instanceof DbError && error.status === 403) return "This connection to Blueberry has ended, as when the cloud is unlinked in Blueberry. Connect again.";
-  if (error instanceof DbError && error.status === 400) return "Blueberry refused that. There may be too many jobs going at once, or the cloud isn't set up in Blueberry on the Mac.";
+  if (error instanceof DbError && error.status === 403)
+    return "This connection to Blueberry has ended, as when the cloud is unlinked in Blueberry. Connect again.";
+  if (error instanceof DbError && error.status === 400)
+    return "Blueberry refused that. There may be too many jobs going at once, or the cloud isn't set up in Blueberry on the Mac.";
   if (error instanceof DbError && error.status === 0) return "Couldn't reach Blueberry's server. Try again.";
   return "That didn't work in Blueberry. Try again, or connect again if it keeps failing.";
 };
@@ -103,7 +105,7 @@ export const relayApp = (config: RelayConfig, supabase: { url: string; key: stri
       issuerUrl: new URL(config.origin),
       resourceServerUrl: resource,
       resourceName: "Blueberry",
-    })
+    }),
   );
   // Some clients look for the resource's metadata at the root.
   app.get("/.well-known/oauth-protected-resource", (_req, res) => {
@@ -112,7 +114,7 @@ export const relayApp = (config: RelayConfig, supabase: { url: string; key: stri
 
   app.post("/sign-in", express.urlencoded({ extended: false, limit: "10kb" }), async (req, res) => {
     res.setHeader("cache-control", "no-store");
-    const result = await auth.signIn(req.body ?? {}, req.ip ?? "unknown");
+    const result = await auth.signIn((req.body ?? {}) as Record<string, unknown>, req.ip ?? "unknown");
     if ("redirect" in result) return res.redirect(302, result.redirect);
     return res.status(200).type("html").send(result.page);
   });
@@ -124,13 +126,20 @@ export const relayApp = (config: RelayConfig, supabase: { url: string; key: stri
       res.status(405).json({ jsonrpc: "2.0", id: null, error: { code: -32000, message: "Only POST is supported." } });
       return;
     }
-    const grantId = String(req.auth?.extra?.grantId ?? "");
+    // relayAuth.ts's verifier sets it, always to the grant's id.
+    const granted = req.auth?.extra?.grantId;
+    const grantId = typeof granted === "string" ? granted : "";
     const tools = createRelayTools(grantHost(auth, grantId, db));
     const server = new McpServer({ name: NAME, version: "1.0.0" }, { instructions: INSTRUCTIONS });
     for (const tool of tools) {
       server.registerTool(
         tool.name,
-        { title: tool.title, description: tool.description, inputSchema: tool.shape, annotations: { readOnlyHint: tool.readOnly, openWorldHint: true } },
+        {
+          title: tool.title,
+          description: tool.description,
+          inputSchema: tool.shape,
+          annotations: { readOnlyHint: tool.readOnly, openWorldHint: true },
+        },
         async (args: Record<string, unknown>) => {
           let result;
           try {
@@ -142,10 +151,10 @@ export const relayApp = (config: RelayConfig, supabase: { url: string; key: stri
             result = { text: problemWords(error), isError: true, summary: "Failed" };
           }
           return { content: [{ type: "text" as const, text: result.text }], ...(result.isError ? { isError: true } : {}) };
-        }
+        },
       );
     }
-    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+    const transport = new StreamableHTTPServerTransport({ enableJsonResponse: true });
     res.on("close", () => {
       void transport.close();
       void server.close();
@@ -155,7 +164,8 @@ export const relayApp = (config: RelayConfig, supabase: { url: string; key: stri
       await transport.handleRequest(req, res, req.body);
     } catch {
       console.error("Relay: a request failed.");
-      if (!res.headersSent) res.status(500).json({ jsonrpc: "2.0", id: null, error: { code: -32000, message: "Something went wrong in Blueberry." } });
+      if (!res.headersSent)
+        res.status(500).json({ jsonrpc: "2.0", id: null, error: { code: -32000, message: "Something went wrong in Blueberry." } });
     }
   });
 

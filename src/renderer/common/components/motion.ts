@@ -4,7 +4,7 @@ import { forgetGone, goneSince, rowsToDraw, type DrawnRow, type GoneRow, type Ro
 
 // DESIGN.md section 7's durations, in ms, for timers that wait for something to finish moving. Tailwind's `duration-*`
 // classes come from the same file.
-export const MOTION = motion.ms;
+const MOTION = motion.ms;
 
 // Keep Berry still, from the settings. The chrome provides it, so anything that moves can ask without being told.
 export const StillContext = createContext(false);
@@ -19,7 +19,7 @@ const subscribe = (changed: () => void) => {
 
 // Whether the system asks for less motion. The chrome's own motion follows this alone, and Keep Berry still only
 // holds the mascots and the pips. Drawn outside a browser, as the site's pictures are, it's still.
-export const useReducedMotion = (): boolean =>
+const useReducedMotion = (): boolean =>
   useSyncExternalStore(
     subscribe,
     () => window.matchMedia(REDUCED).matches,
@@ -53,7 +53,12 @@ export const useComings = <T>(items: T[], keyOf: (item: T) => string): DrawnRow<
   const reduced = useReducedMotion();
   const here: Row<T>[] = items.map((item) => ({ key: keyOf(item), item }));
   const signature = here.map(({ key }) => key).join("\n");
-  const [state, setState] = useState(() => ({ signature, keys: new Set(here.map(({ key }) => key)), gone: [] as GoneRow<T>[], opening: new Set<string>() }));
+  const [state, setState] = useState(() => ({
+    signature,
+    keys: new Set(here.map(({ key }) => key)),
+    gone: [] as GoneRow<T>[],
+    opening: new Set<string>(),
+  }));
   // What was on screen after the last change, folding rows included, for where the next one to go was.
   const drawnBefore = useRef<Row<T>[]>(here);
   if (state.signature !== signature) {
@@ -96,29 +101,36 @@ export const useRowMotion = (row: RefObject<HTMLElement | null>, phase: DrawnRow
     const { style } = element;
     const size = axis === "height" ? element.offsetHeight : element.offsetWidth;
     const sizeName = axis === "height" ? "height" : "max-width";
-    const gap = element.parentElement ? parseFloat(getComputedStyle(element.parentElement)[axis === "height" ? "rowGap" : "columnGap"]) || 0 : 0;
+    const gap = element.parentElement
+      ? parseFloat(getComputedStyle(element.parentElement)[axis === "height" ? "rowGap" : "columnGap"]) || 0
+      : 0;
     const before = element.previousElementSibling !== null;
     const marginName = axis === "height" ? (before ? "margin-top" : "margin-bottom") : before ? "margin-left" : "margin-right";
     const opening = phase === "opening";
     const padNames = axis === "height" ? ["padding-top", "padding-bottom"] : ["padding-left", "padding-right"];
     const computed = getComputedStyle(element);
-    const pads = padNames.map((name) => parseFloat(computed.getPropertyValue(name)) || 0);
+    const pads = padNames.map((name) => ({ name, size: parseFloat(computed.getPropertyValue(name)) || 0 }));
     const set = (at: { size: number; margin: number; opacity: number; padded: number }) => {
       style.setProperty(sizeName, `${at.size}px`);
       style.setProperty(marginName, `${at.margin}px`);
-      padNames.forEach((name, index) => style.setProperty(name, `${pads[index] * at.padded}px`));
+      pads.forEach(({ name, size }) => style.setProperty(name, `${size * at.padded}px`));
       style.opacity = `${at.opacity}`;
     };
     style.transition = "none";
     style.overflow = "hidden";
     if (axis === "width") style.minWidth = "0px";
-    set(opening ? { size: 0, margin: -gap, opacity: 0, padded: 0 } : { size, margin: parseFloat(style.getPropertyValue(marginName)) || 0, opacity: parseFloat(computed.opacity), padded: 1 });
+    set(
+      opening
+        ? { size: 0, margin: -gap, opacity: 0, padded: 0 }
+        : { size, margin: parseFloat(style.getPropertyValue(marginName)) || 0, opacity: parseFloat(computed.opacity), padded: 1 },
+    );
     void element.offsetWidth;
     style.transition = [sizeName, marginName, ...padNames, "opacity"].map((name) => `${name} ${MOTION.slide}ms ${motion.ease}`).join(", ");
     set(opening ? { size, margin: 0, opacity: 1, padded: 1 } : { size: 0, margin: -gap, opacity: 0, padded: 0 });
     if (opening) {
       settle.current = window.setTimeout(() => {
-        for (const name of ["transition", "overflow", "min-width", sizeName, marginName, ...padNames, "opacity"]) style.removeProperty(name);
+        for (const name of ["transition", "overflow", "min-width", sizeName, marginName, ...padNames, "opacity"])
+          style.removeProperty(name);
       }, MOTION.slide);
     }
   }, [row, phase, axis]);

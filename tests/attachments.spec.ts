@@ -1,6 +1,3 @@
-// Preload types live beside a .ts file of the same name, so TypeScript skips them unless asked.
-/* eslint-disable @typescript-eslint/triple-slash-reference */
-/// <reference path="../src/preload/chrome.d.ts" />
 import { expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
@@ -36,7 +33,11 @@ test.describe("attaching to a message", () => {
     model = await startFakeModel();
     site = await startSite();
     app = await launchApp(undefined, { modelEnv: model.env });
-    await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].setSize(1400, 860));
+    await app.evaluate(({ BaseWindow }) => {
+      const [main] = BaseWindow.getAllWindows();
+      if (!main) throw new Error("No window");
+      return main.setSize(1400, 860);
+    });
     chrome = await findView(app, "view=chrome");
   });
 
@@ -54,7 +55,11 @@ test.describe("attaching to a message", () => {
 
   const openSite = async () => {
     await chrome.evaluate((url) => window.chromeAPI.browser.createTab(url), `${site.origin}/flights`);
-    await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).some(({ title }) => title === "Flights to Lisbon")).toBe(true);
+    await expect
+      .poll(async () =>
+        (await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).some(({ title }) => title === "Flights to Lisbon"),
+      )
+      .toBe(true);
   };
   const newTab = async () => {
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("new-tab"));
@@ -76,7 +81,9 @@ test.describe("attaching to a message", () => {
     await chrome.keyboard.press("Enter");
     await expect(plus()).toBeFocused();
     await plus().click();
-    await menu().getByRole("menuitem", { name: /A file/ }).click();
+    await menu()
+      .getByRole("menuitem", { name: /A file/ })
+      .click();
     await expect(chips().getByRole("group")).toHaveCount(2);
     await expect(chips().getByRole("group", { name: /The tab Flights to Lisbon/ })).toBeVisible();
     await expect(chips().getByRole("group", { name: "The file notes.txt" })).toBeVisible();
@@ -103,7 +110,9 @@ test.describe("attaching to a message", () => {
     const box = await newTab();
     await dialogChooses([1, 2, 3, 4, 5, 6].map((n) => file(`${n}.txt`, `File ${n}`)));
     await plus().click();
-    await menu().getByRole("menuitem", { name: /A file/ }).click();
+    await menu()
+      .getByRole("menuitem", { name: /A file/ })
+      .click();
     await expect(chips().getByRole("group")).toHaveCount(6);
     await expect(chips().getByRole("group", { name: "The file 6.txt, not added: 5 files at most" })).toBeVisible();
 
@@ -120,7 +129,9 @@ test.describe("attaching to a message", () => {
     // A job hands the user the tab to sign in, and waits.
     let box = await newTab();
     await plus().click();
-    await menu().getByRole("menuitem", { name: /Flights to Lisbon/ }).click();
+    await menu()
+      .getByRole("menuitem", { name: /Flights to Lisbon/ })
+      .click();
     model.callTools({ name: "hand_to_user", args: { need: "sign-in" } });
     await box.fill("Sign me in there");
     await box.press("Enter");
@@ -136,7 +147,13 @@ test.describe("attaching to a message", () => {
 
     // A mascot kept to one site is offered only tabs on it.
     const saved = await chrome.evaluate(() =>
-      window.chromeAPI.mascots.save(null, { name: "Deal Watcher", look: { palette: "robin", accessory: "none" }, instructions: "Watch prices.", sites: ["prisjakt.nu"], tools: ["visit"] })
+      window.chromeAPI.mascots.save(null, {
+        name: "Deal Watcher",
+        look: { palette: "lingon", accessory: "none" },
+        instructions: "Watch prices.",
+        sites: ["prisjakt.nu"],
+        tools: ["visit"],
+      }),
     );
     await chrome.evaluate((id) => window.chromeAPI.mascots.choose(id), saved.ok ? saved.id : null);
     await expect(chrome.getByRole("button", { name: /Asking Deal Watcher/ })).toBeVisible();

@@ -1,7 +1,7 @@
 import { PGlite } from "@electric-sql/pglite";
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { createServer } from "node:http";
+import { readdirSync, readFileSync } from "node:fs";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 
@@ -12,15 +12,39 @@ type Row = Record<string, unknown> & { id: string; owner: string; hidden: boolea
 // The cloud runner's functions, which run in real Postgres here with the real migration, as the user each token stands
 // for, so the app and the runner, which signs in as a user of its own, meet the real rules.
 const CLOUD_FUNCTIONS = new Set([
-  "start_cloud_job", "my_cloud_jobs", "stop_cloud_job", "decide_cloud_approval", "forget_cloud_job", "forget_cloud_conversation",
-  "link_cloud_runner", "unlink_cloud_runner", "my_cloud_runner", "accept_cloud_runner_link",
-  "runner_claim_job", "runner_update_job", "runner_ask", "runner_decision",
-  "sync_cloud_flock", "save_push_subscription", "forget_push_subscription", "runner_push_subscriptions", "runner_forget_push_subscription", "runner_set_relay_url",
-  "create_relay_grant", "revoke_relay_grants", "relay_flock", "relay_start_job", "relay_jobs", "relay_stop_job", "relay_revoke_grant",
-  "mac_presence", "mac_claim_job", "mac_update_job",
+  "start_cloud_job",
+  "my_cloud_jobs",
+  "stop_cloud_job",
+  "decide_cloud_approval",
+  "forget_cloud_job",
+  "forget_cloud_conversation",
+  "link_cloud_runner",
+  "unlink_cloud_runner",
+  "my_cloud_runner",
+  "accept_cloud_runner_link",
+  "runner_claim_job",
+  "runner_update_job",
+  "runner_ask",
+  "runner_decision",
+  "sync_cloud_mascots",
+  "save_push_subscription",
+  "forget_push_subscription",
+  "runner_push_subscriptions",
+  "runner_forget_push_subscription",
+  "runner_set_relay_url",
+  "create_relay_grant",
+  "revoke_relay_grants",
+  "relay_mascots",
+  "relay_start_job",
+  "relay_jobs",
+  "relay_stop_job",
+  "relay_revoke_grant",
+  "mac_presence",
+  "mac_claim_job",
+  "mac_update_job",
 ]);
 // Tables the phone page reads with a plain select, as the user each token stands for, so row-level security decides.
-const CLOUD_TABLES = new Set(["cloud_jobs", "cloud_flock"]);
+const CLOUD_TABLES = new Set(["cloud_jobs", "cloud_mascots"]);
 const CLOUD_STANDINS = `
   create role anon nologin;
   create role authenticated nologin;
@@ -34,12 +58,13 @@ const CLOUD_STANDINS = `
 const cloudDatabase = async () => {
   const db = new PGlite();
   await db.exec(CLOUD_STANDINS);
-  await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261102000000_cloud_jobs.sql"), "utf8"));
-  await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261103000000_phone.sql"), "utf8"));
-  await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261104000000_cloud_conversations.sql"), "utf8"));
-  await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261105000000_cloud_routines.sql"), "utf8"));
-  await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261106000000_cloud_relay.sql"), "utf8"));
-  await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261107000000_relay_on_mac.sql"), "utf8"));
+  // Every migration, in order, as the server has them.
+  const migrations = join(__dirname, "../supabase/migrations");
+  for (const file of readdirSync(migrations)
+    .filter((name) => name.endsWith(".sql"))
+    .sort()) {
+    await db.exec(readFileSync(join(migrations, file), "utf8"));
+  }
   // One connection, so one call at a time, each with its own role.
   let queue: Promise<unknown> = Promise.resolve();
   const call = (role: string, uid: string | null, name: string, args: Record<string, unknown>) => {
@@ -48,9 +73,13 @@ const cloudDatabase = async () => {
       await db.query("select set_config('test.uid', $1, false)", [uid ?? ""]);
       await db.exec(`set role ${role}`);
       try {
-        const { rows } = await db.query<Record<string, unknown>>(`select * from public.${name}(${names.map((key, at) => `${key} => $${at + 1}`).join(", ")})`, names.map((key) => args[key]));
+        const { rows } = await db.query<Record<string, unknown>>(
+          `select * from public.${name}(${names.map((key, at) => `${key} => $${at + 1}`).join(", ")})`,
+          names.map((key) => args[key]),
+        );
         // A function returning one value answers with it, as the REST API does. One returning rows answers with them.
-        return rows.length === 1 && Object.keys(rows[0]).length === 1 && name in rows[0] ? rows[0][name] : rows;
+        const [only] = rows;
+        return rows.length === 1 && only && Object.keys(only).length === 1 && name in only ? only[name] : rows;
       } finally {
         await db.exec("reset role");
       }
@@ -116,7 +145,7 @@ export const startFakeSupabase = async ({ cloudJobs = false }: { cloudJobs?: boo
     return { access_token: token, refresh_token: refresh, expires_in: 3600, user: { id, email } };
   };
 
-  const server = createServer(async (request, response) => {
+  const respond = async (request: IncomingMessage, response: ServerResponse) => {
     let text = "";
     for await (const part of request) text += part;
     const url = new URL(request.url ?? "/", "http://fake");
@@ -150,7 +179,8 @@ export const startFakeSupabase = async ({ cloudJobs = false }: { cloudJobs?: boo
     }
     if (route === "POST /auth/v1/token" && url.searchParams.get("grant_type") === "password") {
       const account = accounts.get(body.email);
-      if (!account || account.password !== body.password) return answer(400, { error_code: "invalid_credentials", msg: "Invalid login credentials" });
+      if (!account || account.password !== body.password)
+        return answer(400, { error_code: "invalid_credentials", msg: "Invalid login credentials" });
       return answer(200, sessionFor(body.email, account.id));
     }
     if (route === "POST /auth/v1/token" && url.searchParams.get("grant_type") === "refresh_token") {
@@ -181,8 +211,16 @@ export const startFakeSupabase = async ({ cloudJobs = false }: { cloudJobs?: boo
       }
     }
 
-    if (route === "GET /rest/v1/mascots") return answer(200, rows.filter((row) => !row.hidden && (!id || row.id === id)).map(({ owner: _owner, hidden: _hidden, ...row }) => row));
-    if (route === "POST /rest/v1/rpc/my_mascots") return answer(200, rows.filter((row) => row.owner === uid).map(({ owner: _owner, ...row }) => row));
+    if (route === "GET /rest/v1/mascots")
+      return answer(
+        200,
+        rows.filter((row) => !row.hidden && (!id || row.id === id)).map(({ owner: _owner, hidden: _hidden, ...row }) => row),
+      );
+    if (route === "POST /rest/v1/rpc/my_mascots")
+      return answer(
+        200,
+        rows.filter((row) => row.owner === uid).map(({ owner: _owner, ...row }) => row),
+      );
     if (route === "POST /rest/v1/rpc/record_add") {
       const row = rows.find((candidate) => candidate.id === body.p_mascot);
       const adder = `${body.p_mascot} ${uid ?? body.p_install}`;
@@ -206,10 +244,14 @@ export const startFakeSupabase = async ({ cloudJobs = false }: { cloudJobs?: boo
     if (route === "DELETE /rest/v1/mascots") {
       const at = rows.findIndex((candidate) => candidate.id === id && candidate.owner === uid);
       const removed = at >= 0 ? rows.splice(at, 1) : [];
-      return answer(200, removed.map((row) => ({ id: row.id })));
+      return answer(
+        200,
+        removed.map((row) => ({ id: row.id })),
+      );
     }
     return answer(404, { message: "Not here" });
-  });
+  };
+  const server = createServer((request, response) => void respond(request, response));
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
@@ -220,7 +262,14 @@ export const startFakeSupabase = async ({ cloudJobs = false }: { cloudJobs?: boo
     state,
     // A row as someone else, or something else, might have stored it.
     seed: (row: Record<string, unknown>) => {
-      const seeded: Row = { id: randomUUID(), owner: randomUUID(), hidden: false, add_count: 0, created_at: new Date().toISOString(), ...row };
+      const seeded: Row = {
+        id: randomUUID(),
+        owner: randomUUID(),
+        hidden: false,
+        add_count: 0,
+        created_at: new Date().toISOString(),
+        ...row,
+      };
       rows.push(seeded);
       return seeded;
     },
@@ -231,7 +280,7 @@ export const startFakeSupabase = async ({ cloudJobs = false }: { cloudJobs?: boo
       await cloud?.db.query("insert into auth.users values ($1, $2)", [id, email]);
     },
     // What's in the cloud jobs' tables, as the database sees it.
-    cloudRows: async (sql: string) => (await cloud!.db.query<Record<string, unknown>>(sql)).rows,
+    cloudRows: async <T = Record<string, unknown>>(sql: string) => (await cloud!.db.query<T>(sql)).rows,
     close: () => {
       server.close();
       void cloud?.db.close();

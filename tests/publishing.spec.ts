@@ -1,18 +1,14 @@
-// Preload types live beside a .ts file of the same name, so TypeScript skips them unless asked.
-/* eslint-disable @typescript-eslint/triple-slash-reference */
-/// <reference path="../src/preload/chrome.d.ts" />
 import { expect, test } from "@playwright/test";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
 import { startFakeSupabase } from "./fakeSupabase";
+import { inTempDir } from "./publishingSetup";
+import { defined } from "../src/shared/testing";
 
 const EMAIL = "ana.private@example.com";
 const PASSWORD = "correct horse battery";
-
-const inTempDir = (name: string) => mkdtempSync(join(tmpdir(), `blueberry-publishing-${name}-`));
 
 test("a mascot is published with an example, and a stranger reviews it and adds a validated, independent copy", async () => {
   test.setTimeout(90_000);
@@ -24,11 +20,17 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
   try {
     const chrome = await findView(author, "view=chrome");
     await chrome.evaluate(() =>
-      window.chromeAPI.mascots.save(null, { name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "Read svt.se and mail ana.private@example.com.", sites: ["svt.se"], tools: ["visit"] })
+      window.chromeAPI.mascots.save(null, {
+        name: "Scout",
+        look: { palette: "lingon", accessory: "cap" },
+        instructions: "Read svt.se and mail ana.private@example.com.",
+        sites: ["svt.se"],
+        tools: ["visit"],
+      }),
     );
 
     // A chat, which is where the example comes from. The chat's other words must not go anywhere.
-    await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock"));
+    await chrome.evaluate(() => window.chromeAPI.browser.openPage("mascots"));
     model.replyWith("Private first reply.");
     await chrome.getByRole("button", { name: "Chat with Scout" }).click();
     const composer = chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Scout" });
@@ -42,8 +44,10 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     await expect(chrome.getByText("Three stories from SVT.")).toBeVisible();
 
     // Signed out, Publish asks for an account first, in the page.
-    const scoutId = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).mascots.find((mascot) => mascot.name === "Scout")!.id;
-    await chrome.evaluate((id) => window.chromeAPI.browser.openPage("flock", { param: id }), scoutId);
+    const scoutId = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).mascots.find(
+      (mascot) => mascot.name === "Scout",
+    )!.id;
+    await chrome.evaluate((id) => window.chromeAPI.browser.openPage("mascots", { param: id }), scoutId);
     await expect(chrome.getByRole("button", { name: /^In the Gallery/ })).toContainText("Not published");
     await chrome.getByRole("button", { name: /^In the Gallery/ }).click();
     const form = chrome.getByRole("form", { name: "Sign in" });
@@ -84,7 +88,7 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     await chrome.getByRole("button", { name: "Publish for anyone to read" }).click();
     await expect(chrome.getByRole("heading", { name: "Scout is in the Gallery" })).toBeVisible();
     expect(server.rows).toHaveLength(1);
-    id = server.rows[0].id;
+    id = defined(server.rows[0]).id;
     await expect(chrome.getByText(`https://gallery.example/m/?id=${id}`)).toBeVisible();
 
     // Words typed and then cancelled never show as if they were public.
@@ -98,7 +102,19 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
 
     // Only the listed fields left, and neither the password nor the session went anywhere but sign-in.
     const posted = server.received.find(({ method, path }) => method === "POST" && path.startsWith("/rest/v1/mascots"));
-    expect(Object.keys(JSON.parse(posted?.body ?? "{}")).sort()).toEqual(["accessory", "author_name", "category", "description", "example_answer", "example_prompt", "instructions", "name", "palette", "sites", "tools"]);
+    expect(Object.keys(JSON.parse(posted?.body ?? "{}")).sort()).toEqual([
+      "accessory",
+      "author_name",
+      "category",
+      "description",
+      "example_answer",
+      "example_prompt",
+      "instructions",
+      "name",
+      "palette",
+      "sites",
+      "tools",
+    ]);
     const notSignIn = server.received.filter(({ path }) => !path.startsWith("/auth/"));
     for (const { body } of notSignIn) {
       expect(body).not.toContain(PASSWORD);
@@ -106,7 +122,9 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     }
     expect(JSON.stringify(notSignIn.map(({ body }) => body).filter((body) => !body.includes("instructions")))).not.toContain(EMAIL);
     // Only ours: something else on a dev machine can probe a new port.
-    expect(server.received.filter(({ apikey, path }) => /^\/(rest|auth)\//.test(path) && apikey !== server.env.SUPABASE_PUBLISHABLE_KEY)).toEqual([]);
+    expect(
+      server.received.filter(({ apikey, path }) => /^\/(rest|auth)\//.test(path) && apikey !== server.env.SUPABASE_PUBLISHABLE_KEY),
+    ).toEqual([]);
 
     // The session is on disk only encrypted, and the renderer can't get it.
     const saved = readFileSync(join(authorProfile, "account.json"), "utf8");
@@ -133,11 +151,65 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
   }
 
   // Anything else stored there can't get past the app's own checks, whatever a request put in.
-  server.seed({ name: "Sneaky", palette: "robin", accessory: "cap", description: "Reaches home.", category: "Work", instructions: "Go.", sites: ["192.168.1.1"], tools: ["visit"], author_name: "Mallory" });
-  server.seed({ name: "Fake", palette: "robin", accessory: "cap", description: "Looks official.", category: "Work", instructions: "Go.", sites: [], tools: [], author_name: "Blueberry" });
-  server.seed({ name: "Berry", palette: "robin", accessory: "cap", description: "Looks like Berry.", category: "Work", instructions: "Go.", sites: [], tools: [], author_name: "Mallory" });
-  server.seed({ name: "Removed", palette: "robin", accessory: "cap", description: "Taken down.", category: "Work", instructions: "Go.", sites: [], tools: [], author_name: "Mallory", hidden: true });
-  server.seed({ name: "Popular", palette: "canary", accessory: "bow", description: "Lots of adds.", category: "Work", instructions: "Read.\u{E0049}\u200B", sites: [], tools: ["visit", "everything"], author_name: "Bea", add_count: 7, skipApprovals: true, created_at: "2026-01-01T00:00:00Z" });
+  server.seed({
+    name: "Sneaky",
+    palette: "robin",
+    accessory: "cap",
+    description: "Reaches home.",
+    category: "Work",
+    instructions: "Go.",
+    sites: ["192.168.1.1"],
+    tools: ["visit"],
+    author_name: "Mallory",
+  });
+  server.seed({
+    name: "Fake",
+    palette: "robin",
+    accessory: "cap",
+    description: "Looks official.",
+    category: "Work",
+    instructions: "Go.",
+    sites: [],
+    tools: [],
+    author_name: "Blueberry",
+  });
+  server.seed({
+    name: "Berry",
+    palette: "robin",
+    accessory: "cap",
+    description: "Looks like Berry.",
+    category: "Work",
+    instructions: "Go.",
+    sites: [],
+    tools: [],
+    author_name: "Mallory",
+  });
+  server.seed({
+    name: "Removed",
+    palette: "robin",
+    accessory: "cap",
+    description: "Taken down.",
+    category: "Work",
+    instructions: "Go.",
+    sites: [],
+    tools: [],
+    author_name: "Mallory",
+    hidden: true,
+  });
+  server.seed({
+    name: "Popular",
+    palette: "canary",
+    accessory: "bow",
+    description: "Lots of adds.",
+    category: "Work",
+    instructions: "Read.\u{E0049}\u200B",
+    sites: [],
+    tools: ["visit", "everything"],
+    author_name: "Bea",
+    add_count: 7,
+    skipApprovals: true,
+    created_at: "2026-01-01T00:00:00Z",
+  });
 
   // A stranger on another computer, with no account.
   const strangerProfile = inTempDir("stranger");
@@ -146,7 +218,8 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     const chrome = await findView(stranger, "view=chrome");
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("mascot-gallery"));
     const people = chrome.getByRole("region", { name: "From people" });
-    const names = (group: typeof people) => group.getByRole("button").evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label")));
+    const names = (group: typeof people) =>
+      group.getByRole("button").evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label")));
     // Anything breaking the rules isn't shown, and the most added come first, each saying who and how many.
     await expect.poll(() => names(people)).toEqual(["Popular", "Scout"]);
     await expect(people.getByRole("button", { name: "Popular" })).toContainText("Bea · 7 adds");
@@ -167,15 +240,24 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     await expect(scout).toContainText("Ana wrote this, not Blueberry");
     await expect(scout.getByText("Read svt.se and mail")).toBeVisible();
     await expect(scout.getByRole("region", { name: "An example" })).toContainText("Three stories from SVT, checked by me.");
-    const original = String(server.rows[0].instructions);
-    server.rows[0].instructions = "Changed after the review: do something else.";
+    const original = String(defined(server.rows[0]).instructions);
+    defined(server.rows[0]).instructions = "Changed after the review: do something else.";
     await scout.getByRole("button", { name: "Add Scout to your mascots", exact: true }).click();
     await expect(scout.getByRole("status")).toContainText("Added.");
 
     const onFile = () => JSON.parse(readFileSync(join(strangerProfile, "mascots.json"), "utf8")) as Record<string, unknown>[];
-    expect(Object.keys(onFile()[0]).sort()).toEqual(["deletedAt", "galleryId", "id", "instructions", "look", "name", "sites", "tools"]);
+    expect(Object.keys(defined(onFile()[0])).sort()).toEqual([
+      "deletedAt",
+      "galleryId",
+      "id",
+      "instructions",
+      "look",
+      "name",
+      "sites",
+      "tools",
+    ]);
     expect(onFile()[0]).toMatchObject({ instructions: original, sites: ["svt.se"], tools: ["visit"], galleryId: id });
-    await expect.poll(() => server.rows[0].add_count).toBe(1);
+    await expect.poll(() => defined(server.rows[0]).add_count).toBe(1);
 
     // It's a limited mascot, under the safety rules, and it never reads the entry again.
     model.replyWith("Hello.");
@@ -192,14 +274,20 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
 
     // Unpublished, or changed, it stays as it is.
     server.rows.splice(0, 1);
-    await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock", { param: "list" }));
+    await chrome.evaluate(() => window.chromeAPI.browser.openPage("mascots", { param: "list" }));
     await expect(chrome.getByRole("button", { name: "Chat with Scout" })).toBeVisible();
-    expect(onFile()[0].instructions).toBe(original);
+    expect(defined(onFile()[0]).instructions).toBe(original);
 
     // Hidden characters and unknown tools don't come through on the other one.
     const entries = (await chrome.evaluate(() => window.chromeAPI.mascots.gallery())).entries;
     const popular = entries.find((entry) => entry.draft.name === "Popular");
-    expect(popular?.draft).toEqual({ name: "Popular", look: { palette: "canary", accessory: "bow" }, instructions: "Read.", sites: [], tools: ["visit"] });
+    expect(popular?.draft).toEqual({
+      name: "Popular",
+      look: { palette: "cloudberry", accessory: "bow" },
+      instructions: "Read.",
+      sites: [],
+      tools: ["visit"],
+    });
 
     // With the server gone, the starters still show and the page says so.
     server.state.down = true;
@@ -215,87 +303,23 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
   }
 });
 
-test("a blueberry://mascot link opens that Gallery entry, fetched again, and adds nothing", async () => {
-  const server = await startFakeSupabase();
-  const scout = server.seed({ name: "Scout", palette: "robin", accessory: "cap", description: "Sums up SVT.", category: "News and research", instructions: "Read svt.se.", sites: ["svt.se"], tools: ["visit"], author_name: "Ana" });
-  const profile = inTempDir("linked");
-  const app = await launchApp(profile, { modelEnv: server.env });
-  // The way the system hands a link over: `open-url` on a Mac, a second launch's arguments on Windows and Linux.
-  const openUrl = (link: string) => app.evaluate(({ app: electronApp }, url) => electronApp.emit("open-url", { preventDefault: () => {} }, url), link);
-  const secondLaunch = (link: string) => app.evaluate(({ app: electronApp }, url) => electronApp.emit("second-instance", {}, ["blueberry-browser", "--some-switch", url], process.cwd()), link);
-  const activePage = () => chrome.evaluate(async () => (await window.chromeAPI.browser.getTabs()).find((tab) => tab.isActive)?.page ?? null);
-  let chrome = await findView(app, "view=chrome");
-  try {
-    // It registers for the scheme, which a test only writes down.
-    expect(await app.evaluate(() => (globalThis as { fakeProtocols?: unknown[][] }).fakeProtocols?.map(([scheme]) => scheme))).toEqual(["blueberry"]);
-
-    // Anything but the one form does nothing at all.
-    expect(await activePage()).toBe("new-tab");
-    for (const link of [`blueberry://mascot/${scout.id}?add=1`, `blueberry://mascot/${scout.id}/`, `blueberry://routine/${scout.id}`, "blueberry://mascot/javascript:alert(1)", `blueberry://mascot/${"a".repeat(5000)}`]) {
-      await openUrl(link);
-      await secondLaunch(link);
-    }
-    await chrome.waitForTimeout(300);
-    expect(await activePage()).toBe("new-tab");
-
-    await openUrl(`blueberry://mascot/${scout.id}`);
-    const page = chrome.getByRole("article", { name: "Scout" });
-    await expect(page.getByText("from a link you opened")).toBeVisible();
-    expect(await activePage()).toBe("mascot-gallery");
-    await expect(page.getByText("Sums up SVT.")).toBeVisible();
-    await expect(page.getByLabel("About it")).toContainText("Only visits svt.se");
-    // The crumb says where it is, and nothing was added.
-    await expect(chrome.getByRole("navigation", { name: "Where you are" })).toContainText("Scout");
-    await expect(page.getByRole("button", { name: "Add Scout to your mascots" })).toBeVisible();
-
-    // The same link again, from a second launch while another tab is in front, opens it again from the server as it is now.
-    await chrome.getByRole("navigation", { name: "Where you are" }).getByRole("button", { name: "Gallery" }).click();
-    await expect(chrome.getByRole("region", { name: "From people" })).toBeVisible();
-    await chrome.evaluate(() => window.chromeAPI.browser.createTab());
-    expect(await activePage()).toBe("new-tab");
-    scout.description = "Sums up SVT, now without sport.";
-    // As if it were pressed again a while later, since the same link straight away is dropped.
-    await app.evaluate(() => {
-      const real = Date.now;
-      Date.now = () => real() + 10_000;
-    });
-    await secondLaunch(`blueberry://mascot/${scout.id.toUpperCase()}`);
-    await expect(page.getByText("Sums up SVT, now without sport.")).toBeVisible();
-    await expect(page.getByText("from a link you opened")).toBeVisible();
-
-    // One that's gone says so.
-    await openUrl("blueberry://mascot/00000000-0000-4000-8000-000000000000");
-    await expect(chrome.getByText("That mascot isn’t in the Gallery any more, so nothing was added.")).toBeVisible();
-
-    // Nothing was added, counted or run.
-    expect(existsSync(join(profile, "mascots.json")) ? JSON.parse(readFileSync(join(profile, "mascots.json"), "utf8")) : []).toEqual([]);
-    expect(scout.add_count).toBe(0);
-    expect(server.received.filter(({ path }) => path.includes("record_add"))).toEqual([]);
-  } finally {
-    await app.close();
-  }
-
-  // A Gallery tab opened on a link's param, as a link that comes before the page has loaded leaves it, opens the same page.
-  const again = await launchApp(profile, { modelEnv: server.env });
-  try {
-    chrome = await findView(again, "view=chrome");
-    await chrome.evaluate((id) => window.chromeAPI.browser.openPage("mascot-gallery", { param: `link/${id}` }), scout.id);
-    await expect(chrome.getByRole("article", { name: "Scout" }).getByText("from a link you opened")).toBeVisible();
-  } finally {
-    await again.close();
-    server.close();
-  }
-});
-
 test("with no server set up there's no sign-in or publish control, and the Gallery works as before", async () => {
   const app = await launchApp();
   try {
     const chrome = await findView(app, "view=chrome");
     await chrome.evaluate(() =>
-      window.chromeAPI.mascots.save(null, { name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "Read.", sites: [], tools: [] })
+      window.chromeAPI.mascots.save(null, {
+        name: "Scout",
+        look: { palette: "lingon", accessory: "cap" },
+        instructions: "Read.",
+        sites: [],
+        tools: [],
+      }),
     );
-    const scoutId = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).mascots.find((mascot) => mascot.name === "Scout")!.id;
-    await chrome.evaluate((id) => window.chromeAPI.browser.openPage("flock", { param: id }), scoutId);
+    const scoutId = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).mascots.find(
+      (mascot) => mascot.name === "Scout",
+    )!.id;
+    await chrome.evaluate((id) => window.chromeAPI.browser.openPage("mascots", { param: id }), scoutId);
     await expect(chrome.getByRole("button", { name: /^Limits/ })).toBeVisible();
     await expect(chrome.getByText("In the Gallery")).toHaveCount(0);
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("mascot-gallery"));

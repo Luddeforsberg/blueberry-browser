@@ -3,8 +3,9 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Response } from "express";
-import { ServerError, type ServerSession } from "../../src/main/galleryServer";
+import { ServerError, type ServerSession } from "../../src/main/account/galleryServer";
 import { AGE_LIMIT_MS, IDLE_LIMIT_MS, RelayAuth, redirectAllowed, type RelayAuthOptions } from "./relayAuth";
+import { defined } from "../../src/shared/testing";
 
 const OWNER = "owner@example.com";
 const RESOURCE = new URL("https://relay.example/mcp");
@@ -50,7 +51,10 @@ const formFor = async (auth: RelayAuth) => {
   let html = "";
   const res = { status: () => res, type: () => res, send: (text: string) => void (html = text) } as unknown as Response;
   await auth.authorize(client, { redirectUri: REDIRECT, codeChallenge: "challenge", state: "s" }, res);
-  return { client, request: /name="request" value="([^"]+)"/.exec(html)![1].replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n))) };
+  return {
+    client,
+    request: defined(/name="request" value="([^"]+)"/.exec(html)![1]).replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n))),
+  };
 };
 
 // Through the whole flow by hand, as the SDK's handlers would call it.
@@ -72,7 +76,8 @@ describe("RelayAuth", () => {
     expect(seen.created).toEqual(["owner-access"]);
     expect(seen.signOuts).toEqual(["owner-access"]);
     const kept = readFileSync(stateFile, "utf8");
-    for (const plain of ["owner-access", "owner-refresh", "grant-secret-1", tokens.access_token, tokens.refresh_token!]) expect(kept).not.toContain(plain);
+    for (const plain of ["owner-access", "owner-refresh", "grant-secret-1", tokens.access_token, tokens.refresh_token!])
+      expect(kept).not.toContain(plain);
 
     // Across a restart with the same secret, the connection and its grant are still there.
     const restarted = new RelayAuth(options);

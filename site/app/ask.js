@@ -1,6 +1,6 @@
 import { plausibleCode, withSiteNames } from "../shared.js";
 import * as api from "./api.js";
-import { bird, el, grow, typing } from "./dom.js";
+import { drawMascot, el, grow, typing } from "./dom.js";
 import { liveSlot, placeLive } from "./live.js";
 import { closeSheet, openSheet, sheetBody, sheetKind } from "./sheet.js";
 import { asked, handoffWords, hooks, liveOf, problemWords, state, waiting, wanted } from "./state.js";
@@ -45,9 +45,13 @@ const say = (id, mascot, words) => {
   if (sheetKind() !== "ask" || up?.id !== id) return;
   up = { id, saying: true };
   sheetBody().replaceChildren(
-    el("div", { className: "ask-said", role: "status" },
-      bird(mascot, "rest", 72, { named: false }),
-      el("p", { className: "ask-title", textContent: words })));
+    el(
+      "div",
+      { className: "ask-said", role: "status" },
+      drawMascot(mascot, "rest", 72, { named: false }),
+      el("p", { className: "ask-title", textContent: words }),
+    ),
+  );
   placeLive();
   setTimeout(() => {
     if (sheetKind() !== "ask" || up?.id !== id || !up.saying) return;
@@ -76,7 +80,8 @@ const answering = (entry, problem, allow, said) => async (event) => {
   hold(row, true);
   if (!answered(entry, await decide(entry, allow, null, said), problem)) hold(row, false);
 };
-const big = (text, kind, onClick, type = "button") => el("button", { type, className: `btn big ${kind}`, textContent: text, onclick: onClick });
+const big = (text, kind, onClick, type = "button") =>
+  el("button", { type, className: `btn big ${kind}`, textContent: text, onclick: onClick });
 
 const approval = (entry, problem) => {
   const { job, ask, mascot } = entry;
@@ -90,35 +95,55 @@ const approval = (entry, problem) => {
     problem,
     buttons(
       big("Allow", "fill wider", answering(entry, problem, true, `Allowed. ${mascot.name} carries on.`)),
-      big("Don’t allow", "raised", answering(entry, problem, false, `Not allowed. ${mascot.name} carries on without it.`))),
+      big("Don’t allow", "raised", answering(entry, problem, false, `Not allowed. ${mascot.name} carries on without it.`)),
+    ),
   ];
 };
 
 const question = (entry, problem) => {
   const { ask, mascot } = entry;
-  const box = grow(el("textarea", { className: "field answer", rows: 1, maxLength: 2000, autocomplete: "off", ariaLabel: "Your answer", placeholder: "Your answer" }));
-  const form = el("form", {
-    className: "ask-form",
-    onsubmit: async (event) => {
-      event.preventDefault();
-      const words = box.value.trim();
-      if (!words) return box.focus();
-      // A code only ever goes into the page itself, so nothing shaped like one is sent from here.
-      if (plausibleCode(words)) {
-        box.value = "";
-        problem.replaceChildren(el("p", { className: "problem", role: "alert", textContent: "That looks like a code, so it wasn’t sent. Codes only go into the page itself, never through Blueberry." }));
-        return;
-      }
-      const row = form.querySelector(".two");
-      hold(row, true);
-      if (!answered(entry, await decide(entry, true, words, `Answered. ${mascot.name} carries on.`), problem)) hold(row, false);
+  const box = grow(
+    el("textarea", {
+      className: "field answer",
+      rows: 1,
+      maxLength: 2000,
+      autocomplete: "off",
+      ariaLabel: "Your answer",
+      placeholder: "Your answer",
+    }),
+  );
+  const form = el(
+    "form",
+    {
+      className: "ask-form",
+      onsubmit: async (event) => {
+        event.preventDefault();
+        const words = box.value.trim();
+        if (!words) return box.focus();
+        // A code only ever goes into the page itself, so nothing shaped like one is sent from here.
+        if (plausibleCode(words)) {
+          box.value = "";
+          problem.replaceChildren(
+            el("p", {
+              className: "problem",
+              role: "alert",
+              textContent: "That looks like a code, so it wasn’t sent. Codes only go into the page itself, never through Blueberry.",
+            }),
+          );
+          return;
+        }
+        const row = form.querySelector(".two");
+        hold(row, true);
+        if (!answered(entry, await decide(entry, true, words, `Answered. ${mascot.name} carries on.`), problem)) hold(row, false);
+      },
     },
-  },
-  box,
-  problem,
-  buttons(
-    big("Answer", "fill wider", undefined, "submit"),
-    big("Skip", "raised", answering(entry, problem, false, `Skipped. ${mascot.name} carries on.`))));
+    box,
+    problem,
+    buttons(
+      big("Answer", "fill wider", undefined, "submit"),
+      big("Skip", "raised", answering(entry, problem, false, `Skipped. ${mascot.name} carries on.`)),
+    ),
+  );
   return [
     el("p", { className: "ask-lead", textContent: `${mascot.name} asks` }),
     el("h2", { className: "ask-title", id: "ask-title", textContent: withSiteNames(ask.approval_text) }),
@@ -130,7 +155,10 @@ const handoff = (entry, problem) => {
   const { ask, mascot } = entry;
   return [
     el("h2", { className: "ask-title", id: "ask-title", textContent: handoffWords(mascot.name, ask) }),
-    el("p", { className: "ask-note", textContent: `${mascot.name} has stepped back from the page. Take it over to do it there: what you type goes straight to the site, never through Blueberry.` }),
+    el("p", {
+      className: "ask-note",
+      textContent: `${mascot.name} has stepped back from the page. Take it over to do it there: what you type goes straight to the site, never through Blueberry.`,
+    }),
     problem,
     buttons(
       big("Take over", "fill wider", () => {
@@ -138,7 +166,8 @@ const handoff = (entry, problem) => {
         closeSheet();
         location.hash = `#job/${entry.conversation}/yours`;
       }),
-      big("Not now", "raised", answering(entry, problem, false, `Not now. ${mascot.name} goes on without it.`))),
+      big("Not now", "raised", answering(entry, problem, false, `Not now. ${mascot.name} goes on without it.`)),
+    ),
   ];
 };
 
@@ -153,13 +182,15 @@ const draw = (entry) => {
   const hadKeyboard = body.contains(document.activeElement);
   const kind = entry.ask.approval_kind;
   const content = kind === "question" ? question(entry, problem) : kind === "handoff" ? handoff(entry, problem) : approval(entry, problem);
-  body.replaceChildren(...[
-    all.length > 1 ? el("p", { className: "ask-count", textContent: `${at + 1} of ${all.length}` }) : null,
-    el("div", { className: "asker" }, bird(entry.mascot, "asking", 72, { named: false })),
-    ...content,
-    // What job it's for, which opens it.
-    el("a", { className: "ask-for", href: `#job/${entry.conversation}`, textContent: `For “${entry.job.prompt}”` }),
-  ].filter(Boolean));
+  body.replaceChildren(
+    ...[
+      all.length > 1 ? el("p", { className: "ask-count", textContent: `${at + 1} of ${all.length}` }) : null,
+      el("div", { className: "asker" }, drawMascot(entry.mascot, "asking", 72, { named: false })),
+      ...content,
+      // What job it's for, which opens it.
+      el("a", { className: "ask-for", href: `#job/${entry.conversation}`, textContent: `For “${entry.job.prompt}”` }),
+    ].filter(Boolean),
+  );
   body.closest("[role=dialog]")?.setAttribute("aria-label", asked(entry.mascot.name, entry.ask));
   body.scrollTop = 0;
   if (hadKeyboard) body.closest("[role=dialog]")?.focus({ preventScroll: true });

@@ -1,6 +1,3 @@
-// Preload types live beside a .ts file of the same name, so TypeScript skips them unless asked.
-/* eslint-disable @typescript-eslint/triple-slash-reference */
-/// <reference path="../src/preload/chrome.d.ts" />
 import { expect, test, type Page } from "@playwright/test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
@@ -9,6 +6,7 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
+import { defined } from "../src/shared/testing";
 
 // Bringing a sign-in into the cloud, with a headless Chrome on this computer standing in for Browserbase.
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
@@ -31,7 +29,9 @@ test("a site's sign-in comes into the cloud after confirming, can be taken out, 
     seen.push({ cloud: /HeadlessChrome/.test(request.headers["user-agent"] ?? ""), signedIn, path: request.url ?? "" });
     response.setHeader("content-type", "text/html");
     if (request.url === "/login") response.setHeader("set-cookie", `sid=${SECRET}; HttpOnly; Path=/; Max-Age=3600`);
-    response.end(`<!doctype html><title>Site</title><h1>${signedIn || request.url === "/login" ? "Signed in as Ludde" : "Signed out"}</h1>`);
+    response.end(
+      `<!doctype html><title>Site</title><h1>${signedIn || request.url === "/login" ? "Signed in as Ludde" : "Signed out"}</h1>`,
+    );
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const site = `http://127.0.0.1:${(server.address() as AddressInfo).port}/`;
@@ -80,17 +80,29 @@ test("a site's sign-in comes into the cloud after confirming, can be taken out, 
     const visits = seen.length;
     await list.getByRole("button", { name: "Remove" }).click();
     await expect(list).toHaveCount(0);
-    await expect.poll(() => seen.slice(visits).filter((one) => one.cloud).at(-1)?.signedIn, { timeout: 10_000 }).toBe(false);
+    await expect
+      .poll(
+        () =>
+          seen
+            .slice(visits)
+            .filter((one) => one.cloud)
+            .at(-1)?.signedIn,
+        { timeout: 10_000 },
+      )
+      .toBe(false);
     expect((await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).some((tab) => tab.id === checkTab.id)).toBe(true);
 
     // 5. A job in the cloud asks for a sign-in, and carries on once the user says they're done.
     model.callTools({ name: "open_tab", args: { url: `${site}account` } });
     model.callTools({ name: "hand_to_user", args: { need: "sign-in" } });
     model.replyWith("Carried on");
-    const sent = await chrome.evaluate((address) => window.chromeAPI.chat.send(null, `Check my account on ${address}`, { seePage: false, cloud: true }), site);
+    const sent = await chrome.evaluate(
+      (address) => window.chromeAPI.chat.send(null, `Check my account on ${address}`, { seePage: false, cloud: true }),
+      site,
+    );
     expect(sent).not.toBeNull();
     await expect(chrome.getByRole("tab", { name: /^Chats.*1 needs you/ })).toBeVisible({ timeout: 20_000 });
-    const waiting = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).needsYou[0];
+    const waiting = defined((await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).needsYou[0]);
     expect(waiting.approval.handoff).toMatchObject({ need: "sign-in", site: "127.0.0.1" });
     // It points at the cloud tab, so Go to the tab works.
     expect(waiting.tabId).not.toBeNull();
@@ -103,7 +115,11 @@ test("a site's sign-in comes into the cloud after confirming, can be taken out, 
     const asked = model.requests.length;
     await chrome.getByRole("button", { name: "I’m done" }).first().click();
 
-    await expect.poll(async () => (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id))?.messages.at(-1)?.content, { timeout: 15_000 }).toBe("Carried on");
+    await expect
+      .poll(async () => (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id))?.messages.at(-1)?.content, {
+        timeout: 15_000,
+      })
+      .toBe("Carried on");
     expect(model.requests.length).toBe(asked + 1);
     expect(JSON.stringify(model.requests.at(-1)?.messages.at(-1))).toContain("The user says they're done");
     // The job has the page again, so its strip offers Take over once more.

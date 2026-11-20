@@ -27,7 +27,13 @@ const tab = (id: string, url: string, title: string, more: Partial<TabInfo> = {}
   ...more,
 });
 const saved = (url: string, title: string): Bookmark => ({ id: url, url, title });
-const visited = (url: string, title: string, lastVisit = NOW - 60_000, visits = 1): VisitedPage => ({ url, title, favicon: null, lastVisit, visits });
+const visited = (url: string, title: string, lastVisit = NOW - 60_000, visits = 1): VisitedPage => ({
+  url,
+  title,
+  favicon: null,
+  lastVisit,
+  visits,
+});
 
 const sources = (text: string, more: Partial<SuggestionSources> = {}): SuggestionSources => ({
   text,
@@ -72,7 +78,11 @@ describe("addressSuggestions", () => {
 
   it("shows a page that's both a tab and in history once, as the tab", () => {
     const rows = addressSuggestions(
-      sources("klm", { tabs: [tab("t1", "https://klm.com/trip", "Your trip")], history: [visited("https://klm.com/trip#top", "Your trip")], complete: false })
+      sources("klm", {
+        tabs: [tab("t1", "https://klm.com/trip", "Your trip")],
+        history: [visited("https://klm.com/trip#top", "Your trip")],
+        complete: false,
+      }),
     ).rows;
     expect(rows.map(({ kind }) => kind)).toEqual(["tab", "search", "ask"]);
   });
@@ -91,8 +101,14 @@ describe("addressSuggestions", () => {
 
   it("never offers the page in front, as history or as a completion", () => {
     const tabs = [tab("front", "https://klm.com/", "KLM", { isActive: true })];
-    const done = addressSuggestions(sources("kl", { tabs, history: [visited("https://klm.com/", "KLM"), visited("https://klm.com/flights", "Flights")] }));
-    expect(done.rows.map((row) => ("url" in row && row.kind !== "search" ? row.url : row.kind))).toEqual(["https://klm.com/flights", "search", "ask"]);
+    const done = addressSuggestions(
+      sources("kl", { tabs, history: [visited("https://klm.com/", "KLM"), visited("https://klm.com/flights", "Flights")] }),
+    );
+    expect(done.rows.map((row) => ("url" in row && row.kind !== "search" ? row.url : row.kind))).toEqual([
+      "https://klm.com/flights",
+      "search",
+      "ask",
+    ]);
     expect(done.completion).toBe("klm.com/flights");
   });
 

@@ -41,11 +41,10 @@ if (Number.isFinite(offset)) {
   steady(offset);
   // Every frame of every page, before its own scripts, in the page's world rather than the preload's.
   const preload = join(mkdtempSync(join(tmpdir(), "blueberry-drive-")), "clock.js");
-  writeFileSync(
-    preload,
-    `require("electron").contextBridge.executeInMainWorld({ func: ${steady.toString()}, args: [${offset}] });`
-  );
-  electron.app.whenReady().then(() => electron.session.defaultSession.registerPreloadScript({ id: "drive-clock", type: "frame", filePath: preload }));
+  writeFileSync(preload, `require("electron").contextBridge.executeInMainWorld({ func: ${steady.toString()}, args: [${offset}] });`);
+  electron.app
+    .whenReady()
+    .then(() => electron.session.defaultSession.registerPreloadScript({ id: "drive-clock", type: "frame", filePath: preload }));
 }
 
 electron.app.commandLine.appendSwitch("force-prefers-reduced-motion");

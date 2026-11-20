@@ -2,6 +2,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { defined } from "../src/shared/testing";
 
 // Routines that run with the Mac off, in real Postgres as Supabase's roles, on top of every migration before them.
 const SUPABASE_STANDINS = `
@@ -29,7 +30,11 @@ describe("routines in the cloud", () => {
       await db.exec("reset role");
     }
   };
-  const refused = (uid: string | null, sql: string) => as(uid, sql).then(() => "allowed", (error: Error) => error.message);
+  const refused = (uid: string | null, sql: string) =>
+    as(uid, sql).then(
+      () => "allowed",
+      (error: Error) => error.message,
+    );
   let users = 0;
   const newUser = async () => {
     const id = `00000000-0000-4000-8000-${String(++users).padStart(12, "0")}`;
@@ -42,11 +47,17 @@ describe("routines in the cloud", () => {
   };
   // As the app sends it: the schedule, whether it's paused, and when it would first run it.
   const sync = (uid: string, key = "routine-1", first = "now() - interval '1 minute'", { paused = false, schedule = SCHEDULE } = {}) =>
-    as<{ id: string }>(uid, `select public.sync_cloud_routine('${key}', 'Check the prices', ${MASCOT}, 'risky', null, ${schedule}, 'Europe/Stockholm', ${paused}, ${first}) as id`).then(([row]) => row.id);
-  const due = (runner: string) => as<{ id: string; next_run_at: string }>(runner, "select id, next_run_at from public.runner_due_routines()");
+    as<{ id: string }>(
+      uid,
+      `select public.sync_cloud_routine('${key}', 'Check the prices', ${MASCOT}, 'risky', null, ${schedule}, 'Europe/Stockholm', ${paused}, ${first}) as id`,
+    ).then(([row]) => defined(row).id);
+  const due = (runner: string) =>
+    as<{ id: string; next_run_at: string }>(runner, "select id, next_run_at from public.runner_due_routines()");
   const startRun = async (runner: string, routine: string, dueAt: string, next = "now() + interval '1 day'") =>
-    (await as<{ id: string | null }>(runner, `select public.runner_start_routine('${routine}', '${dueAt}', ${next}) as id`))[0].id;
-  const dueAt = async (routine: string) => (await db.query<{ at: string }>("select next_run_at::text as at from public.cloud_routines where id = $1", [routine])).rows[0].at;
+    defined((await as<{ id: string | null }>(runner, `select public.runner_start_routine('${routine}', '${dueAt}', ${next}) as id`))[0]).id;
+  const dueAt = async (routine: string) =>
+    defined((await db.query<{ at: string }>("select next_run_at::text as at from public.cloud_routines where id = $1", [routine])).rows[0])
+      .at;
 
   let ALICE = "";
   let RUNNER = "";
@@ -55,7 +66,12 @@ describe("routines in the cloud", () => {
   beforeAll(async () => {
     db = new PGlite();
     await db.exec(SUPABASE_STANDINS);
-    for (const file of ["20261102000000_cloud_jobs.sql", "20261103000000_phone.sql", "20261104000000_cloud_conversations.sql", "20261105000000_cloud_routines.sql"]) {
+    for (const file of [
+      "20261102000000_cloud_jobs.sql",
+      "20261103000000_phone.sql",
+      "20261104000000_cloud_conversations.sql",
+      "20261105000000_cloud_routines.sql",
+    ]) {
       await db.exec(readFileSync(join(__dirname, "migrations", file), "utf8"));
     }
   });
@@ -76,14 +92,25 @@ describe("routines in the cloud", () => {
     expect(await as(ALICE, "select routine_key from public.cloud_routines")).toEqual([{ routine_key: "routine-1" }]);
     expect(await as(BOB, "select id from public.cloud_routines")).toEqual([]);
     expect(await as(RUNNER, "select id from public.cloud_routines")).toEqual([]);
-    expect(await refused(ALICE, `insert into public.cloud_routines (routine_key, prompt, mascot, schedule, time_zone) values ('x', 'y', ${MASCOT}, ${SCHEDULE}, 'UTC')`)).toMatch(/permission denied/);
+    expect(
+      await refused(
+        ALICE,
+        `insert into public.cloud_routines (routine_key, prompt, mascot, schedule, time_zone) values ('x', 'y', ${MASCOT}, ${SCHEDULE}, 'UTC')`,
+      ),
+    ).toMatch(/permission denied/);
     expect(await refused(ALICE, `update public.cloud_routines set prompt = 'Something else'`)).toMatch(/permission denied/);
-    expect(await refused(RUNNER, `select public.sync_cloud_routine('r', 'Mine', ${MASCOT}, 'risky', null, ${SCHEDULE}, 'UTC', false, now())`)).toMatch(/A runner can't keep routines/);
-    expect(await refused(null, `select public.sync_cloud_routine('r', 'Mine', ${MASCOT}, 'risky', null, ${SCHEDULE}, 'UTC', false, now())`)).toMatch(/permission denied|Not signed in/);
+    expect(
+      await refused(RUNNER, `select public.sync_cloud_routine('r', 'Mine', ${MASCOT}, 'risky', null, ${SCHEDULE}, 'UTC', false, now())`),
+    ).toMatch(/A runner can't keep routines/);
+    expect(
+      await refused(null, `select public.sync_cloud_routine('r', 'Mine', ${MASCOT}, 'risky', null, ${SCHEDULE}, 'UTC', false, now())`),
+    ).toMatch(/permission denied|Not signed in/);
 
     // Someone with no runner can't keep one, since nothing would run it.
     const lonely = await newUser();
-    expect(await refused(lonely, `select public.sync_cloud_routine('r', 'Mine', ${MASCOT}, 'risky', null, ${SCHEDULE}, 'UTC', false, now())`)).toMatch(/No runner has accepted/);
+    expect(
+      await refused(lonely, `select public.sync_cloud_routine('r', 'Mine', ${MASCOT}, 'risky', null, ${SCHEDULE}, 'UTC', false, now())`),
+    ).toMatch(/No runner has accepted/);
 
     expect(await as(BOB, "select public.forget_cloud_routine('routine-1') as gone")).toEqual([{ gone: false }]);
     expect(await as(ALICE, "select public.forget_cloud_routine('routine-1') as gone")).toEqual([{ gone: true }]);
@@ -104,8 +131,20 @@ describe("routines in the cloud", () => {
     const at = await dueAt(routine);
     const job = await startRun(RUNNER, routine, at);
     expect(job).toBeTruthy();
-    const [row] = (await db.query<Record<string, unknown>>("select owner, prompt, mascot, status, routine_id, conversation_id from public.cloud_jobs where id = $1", [job])).rows;
-    expect(row).toMatchObject({ owner: ALICE, prompt: "Check the prices", mascot: { id: "berry", name: "Berry" }, status: "queued", routine_id: routine, conversation_id: job });
+    const [row] = (
+      await db.query<Record<string, unknown>>(
+        "select owner, prompt, mascot, status, routine_id, conversation_id from public.cloud_jobs where id = $1",
+        [job],
+      )
+    ).rows;
+    expect(row).toMatchObject({
+      owner: ALICE,
+      prompt: "Check the prices",
+      mascot: { id: "berry", name: "Berry" },
+      status: "queued",
+      routine_id: routine,
+      conversation_id: job,
+    });
     // The same run asked for again makes nothing, and it isn't due any more.
     expect(await startRun(RUNNER, routine, at)).toBeNull();
     expect(await due(RUNNER)).toEqual([]);
@@ -119,8 +158,12 @@ describe("routines in the cloud", () => {
     const later = await sync(ALICE, "later", "now() + interval '1 hour'");
     expect(await startRun(RUNNER, later, await dueAt(later))).toBeNull();
     const routine = await sync(ALICE);
-    expect(await refused(RUNNER, `select public.runner_start_routine('${routine}', '${await dueAt(routine)}', now() - interval '1 day')`)).toMatch(/has to come after/);
-    expect(await refused(ALICE, `select public.runner_start_routine('${routine}', '${await dueAt(routine)}', null)`)).toMatch(/Not a linked runner/);
+    expect(
+      await refused(RUNNER, `select public.runner_start_routine('${routine}', '${await dueAt(routine)}', now() - interval '1 day')`),
+    ).toMatch(/has to come after/);
+    expect(await refused(ALICE, `select public.runner_start_routine('${routine}', '${await dueAt(routine)}', null)`)).toMatch(
+      /Not a linked runner/,
+    );
     expect(await db.query("select id from public.cloud_jobs where owner = $1", [ALICE]).then(({ rows }) => rows)).toEqual([]);
   });
 
@@ -189,7 +232,8 @@ describe("routines in the cloud", () => {
     await sync(ALICE, "kept");
     await sync(ALICE, "deleted-on-the-mac");
     await sync(BOB, "bobs");
-    const keys = async (uid: string) => (await as<{ key: string }>(uid, "select k as key from public.my_cloud_routine_keys() k")).map(({ key }) => key).sort();
+    const keys = async (uid: string) =>
+      (await as<{ key: string }>(uid, "select k as key from public.my_cloud_routine_keys() k")).map(({ key }) => key).sort();
     expect(await keys(ALICE)).toEqual(["deleted-on-the-mac", "kept"]);
     expect(await keys(RUNNER)).toEqual([]);
     expect(await as(ALICE, "select public.forget_cloud_routine('deleted-on-the-mac') as gone")).toEqual([{ gone: true }]);

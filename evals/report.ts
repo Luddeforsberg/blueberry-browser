@@ -38,23 +38,19 @@ interface Score {
 }
 
 const cell = (text: string) => text.replace(/\s+/g, " ").replace(/\|/g, "\\|");
-const clip = (text: string, length: number) =>
-  text.length > length ? `${text.slice(0, length - 1)}…` : text;
+const clip = (text: string, length: number) => (text.length > length ? `${text.slice(0, length - 1)}…` : text);
 
 export const writeReport = (results: string, date: string) => {
   const runsFile = join(results, `${date}.runs.json`);
   if (!existsSync(runsFile)) return;
   const runs: RunRecord[] = JSON.parse(readFileSync(runsFile, "utf8"));
   const scoresFile = join(results, `${date}.scores.json`);
-  const scores: Record<string, Score> = existsSync(scoresFile)
-    ? JSON.parse(readFileSync(scoresFile, "utf8"))
-    : {};
+  const scores: Record<string, Score> = existsSync(scoresFile) ? JSON.parse(readFileSync(scoresFile, "utf8")) : {};
   const notesFile = join(results, `${date}.notes.md`);
   const notes = existsSync(notesFile) ? readFileSync(notesFile, "utf8") : "";
 
   const scoreOf = (run: RunRecord) => scores[`${run.job}#${run.run}`];
-  const count = (outcome: Score["outcome"]) =>
-    runs.filter((run) => scoreOf(run)?.outcome === outcome).length;
+  const count = (outcome: Score["outcome"]) => runs.filter((run) => scoreOf(run)?.outcome === outcome).length;
   const total = runs.reduce((sum, run) => sum + run.costUsd, 0);
 
   const lines = [
@@ -83,16 +79,12 @@ export const writeReport = (results: string, date: string) => {
       "",
       `End state read from the page: \`${cell(clip(JSON.stringify(run.endState ?? null), 400))}\``,
       "",
-      ...(run.refused.length
-        ? [`Refused by the safety guard: ${run.refused.join(", ")}`, ""]
-        : []),
+      ...(run.refused.length ? [`Refused by the safety guard: ${run.refused.join(", ")}`, ""] : []),
       `Answer: ${clip(run.answer.trim(), 1200) || "(none)"}`,
       "",
       `Tools: ${run.tools.map((call) => `\`${cell(clip(call, 90))}\``).join(", ") || "none"}`,
       "",
-      ...(run.screenshot
-        ? [`![End state of ${run.job}](${run.screenshot})`, ""]
-        : []),
+      ...(run.screenshot ? [`![End state of ${run.job}](${run.screenshot})`, ""] : []),
     ]),
   ];
   writeFileSync(join(results, `${date}.md`), lines.join("\n") + "\n");

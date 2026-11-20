@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
 // Tests mustn't ask the Mac's keychain for anything, which can raise a dialog. Marked, so a test can see the token
 // was never saved as it was typed.
 const Module = require("node:module");

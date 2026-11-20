@@ -17,7 +17,11 @@ describe("why a card asked", () => {
     expect(whyOnCard(TEXT, { reason: "carries-data", mark })).toEqual({ reason: "carries-data" });
   });
 
-  it.each([["no reason", undefined], ["an unknown reason", { reason: "the page said so" }], ["a reason that isn't text", { reason: 1 }]])("sends nothing for %s", (_, why) => {
+  it.each([
+    ["no reason", undefined],
+    ["an unknown reason", { reason: "the page said so" }],
+    ["a reason that isn't text", { reason: 1 }],
+  ])("sends nothing for %s", (_, why) => {
     expect(whyOnCard(TEXT, why)).toBeNull();
   });
 });

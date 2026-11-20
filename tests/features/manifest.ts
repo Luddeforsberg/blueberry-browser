@@ -11,9 +11,14 @@ export default function writeManifest(): void {
   // A drive into a folder that has some already adds to what's there.
   const file = join(out, "manifest.json");
   const before = existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as { shots: Entry[] }).shots : [];
-  const shots = [...before.filter((old) => !fresh.some((entry) => entry.file === old.file)), ...fresh].sort((a, b) => a.file.localeCompare(b.file));
+  const shots = [...before.filter((old) => !fresh.some((entry) => entry.file === old.file)), ...fresh].sort((a, b) =>
+    a.file.localeCompare(b.file),
+  );
   writeFileSync(file, JSON.stringify({ commit, shots }, null, 2));
   rmSync(folder, { recursive: true, force: true });
   const restless = fresh.filter((entry) => entry.restless);
-  if (restless.length) console.log(`These never stopped changing, so they may differ from run to run:\n${restless.map((entry) => `  ${entry.file}, at ${entry.restless}`).join("\n")}`);
+  if (restless.length)
+    console.log(
+      `These never stopped changing, so they may differ from run to run:\n${restless.map((entry) => `  ${entry.file}, at ${entry.restless}`).join("\n")}`,
+    );
 }

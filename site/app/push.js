@@ -23,7 +23,10 @@ const keyBytes = (base64) => {
 export const turnOn = async () => {
   const registration = (await register()) ?? (await navigator.serviceWorker.ready);
   if ((await Notification.requestPermission()) !== "granted") return false;
-  const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(VAPID_PUBLIC_KEY) });
+  const subscription = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: keyBytes(VAPID_PUBLIC_KEY),
+  });
   const { endpoint, keys } = subscription.toJSON();
   const saved = await rpc("save_push_subscription", { p_endpoint: endpoint, p_p256dh: keys.p256dh, p_auth: keys.auth }).catch(() => false);
   // Not saved, so nothing would ever arrive: this browser shouldn't say it's on.

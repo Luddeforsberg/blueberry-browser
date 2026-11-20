@@ -19,6 +19,6 @@ self.addEventListener("notificationclick", (event) => {
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((open) => {
       const page = open.find((client) => new URL(client.url).pathname.startsWith(new URL(self.registration.scope).pathname));
       return page ? page.focus() : self.clients.openWindow("./");
-    })
+    }),
   );
 });

@@ -1,6 +1,3 @@
-// Preload types live beside a .ts file of the same name, so TypeScript skips them unless asked.
-/* eslint-disable @typescript-eslint/triple-slash-reference */
-/// <reference path="../src/preload/chrome.d.ts" />
 import { expect, test } from "@playwright/test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -10,8 +7,9 @@ import { findView, launchApp } from "./app";
 import { chromeHistoryFile, writeChromiumHistory } from "./chromiumHistory";
 import { startFakeModel } from "./fakeModel";
 import { DEMO_LINES, demoProposals } from "./suggestionReplies";
+import { defined } from "../src/shared/testing";
 
-test("the first run brings in another browser's history, and the birds speak about it on the new tab", async () => {
+test("the first run brings in another browser's history, and the mascots speak about it on the new tab", async () => {
   test.setTimeout(60_000);
   const browsers = mkdtempSync(join(tmpdir(), "blueberry-browsers-"));
   writeChromiumHistory(chromeHistoryFile(browsers), demoVisits()).close();
@@ -46,7 +44,7 @@ test("the first run brings in another browser's history, and the birds speak abo
 
     // What the step says goes out is what went out.
     expect(model.suggestionRequests).toHaveLength(1);
-    const sent = JSON.stringify(model.suggestionRequests[0].messages);
+    const sent = JSON.stringify(defined(model.suggestionRequests[0]).messages);
     expect(sent).toContain("news.ycombinator.com");
     expect(sent).not.toContain("/pull/412");
     expect(sent).not.toContain("Swedbank");

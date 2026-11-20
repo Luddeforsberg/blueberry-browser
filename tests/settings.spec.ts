@@ -1,6 +1,3 @@
-// Preload types live beside a .ts file of the same name, so TypeScript skips them unless asked.
-/* eslint-disable @typescript-eslint/triple-slash-reference */
-/// <reference path="../src/preload/chrome.d.ts" />
 import { expect, test } from "@playwright/test";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -20,7 +17,8 @@ test("the account menu changes the theme and opens Settings, whose sections and 
   try {
     const chrome = await findView(app, "view=chrome");
     const settings = () => chrome.evaluate(() => window.chromeAPI.settings.getSettings());
-    const param = () => chrome.evaluate(async () => (await window.chromeAPI.browser.getTabs()).find((tab) => tab.page === "settings")?.pageParam);
+    const param = () =>
+      chrome.evaluate(async () => (await window.chromeAPI.browser.getTabs()).find((tab) => tab.page === "settings")?.pageParam);
     const sidebar = chrome.getByRole("navigation", { name: "Sidebar" });
     const mac = process.platform === "darwin";
 
@@ -34,7 +32,10 @@ test("the account menu changes the theme and opens Settings, whose sections and 
     await expect(menu).toHaveCount(0);
     await expect(chrome.getByRole("form", { name: "Sign in" })).toBeVisible();
 
-    await chrome.evaluate(([email, password]) => window.chromeAPI.account.signIn(email, password), [EMAIL, PASSWORD]);
+    await chrome.evaluate(([email, password]) => window.chromeAPI.account.signIn(email, password), [EMAIL, PASSWORD] satisfies [
+      string,
+      string,
+    ]);
     const button = sidebar.getByRole("button", { name: `Account, ${EMAIL}` });
     await expect(button).toHaveText("A");
 
@@ -67,12 +68,17 @@ test("the account menu changes the theme and opens Settings, whose sections and 
     await button.click();
     await menu.getByRole("button", { name: /^Settings/ }).click();
     await expect.poll(param).toBe("general");
-    await expect(chrome.getByRole("radiogroup", { name: "Theme" }).getByRole("radio", { name: "Light" })).toHaveAttribute("aria-checked", "true");
+    await expect(chrome.getByRole("radiogroup", { name: "Theme" }).getByRole("radio", { name: "Light" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
 
     // Still in Mascots is the two saved settings, Show Berry on and Keep Berry still on, kept on disk.
     await chrome.getByRole("tab", { name: "Mascots" }).click();
     await chrome.getByRole("radiogroup", { name: "Mascots" }).getByRole("radio", { name: "Still" }).click();
-    await expect.poll(async () => JSON.parse(readFileSync(join(profile, "settings.json"), "utf8"))).toMatchObject({ showBerry: true, keepBerryStill: true });
+    await expect
+      .poll(async () => JSON.parse(readFileSync(join(profile, "settings.json"), "utf8")))
+      .toMatchObject({ showBerry: true, keepBerryStill: true });
     await chrome.getByRole("radiogroup", { name: "Mascots" }).getByRole("radio", { name: "Hidden" }).click();
     await expect.poll(async () => (await settings()).showBerry).toBe(false);
 
@@ -107,12 +113,17 @@ test("the account menu changes the theme and opens Settings, whose sections and 
     // The theme is all the view over the page may change.
     await expect(overlay.evaluate(() => window.chromeAPI.settings.updateSettings({ actionApproval: "never" }))).rejects.toThrow(/Rejected/);
     await over.getByRole("button", { name: /^History/ }).click();
-    await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).find((tab) => tab.isActive)?.page).toBe("history");
+    await expect
+      .poll(async () => (await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).find((tab) => tab.isActive)?.page)
+      .toBe("history");
     await expect(over).toHaveCount(0);
 
     // Sign out is in the menu while signed in, and the button goes back to the person.
     await chrome.getByRole("button", { name: "Account, Robin Lind" }).click();
-    await overlay.getByRole("dialog", { name: "Account" }).getByRole("button", { name: /^Sign out/ }).click();
+    await overlay
+      .getByRole("dialog", { name: "Account" })
+      .getByRole("button", { name: /^Sign out/ })
+      .click();
     await expect(chrome.getByRole("button", { name: "Account, not signed in" })).toBeVisible();
   } finally {
     await app.close();

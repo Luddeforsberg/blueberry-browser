@@ -43,7 +43,8 @@ if (mode === "drive") {
   if (width !== undefined && !/^\d+$/.test(width)) fail("--width is a number of pixels.");
   const out = resolve(option("out") ?? join(root, "baselines", "drive"));
   const [feature, ...rest] = args;
-  if (!feature || rest.length) fail("Usage: pnpm run drive -- <feature> [--state s] [--theme light|dark] [--layout vertical|horizontal] [--width n] [--out dir]");
+  if (!feature || rest.length)
+    fail("Usage: pnpm run drive -- <feature> [--state s] [--theme light|dark] [--layout vertical|horizontal] [--width n] [--out dir]");
   request = { out, commit: label, feature, state, theme, layout, width: width === undefined ? undefined : Number(width) };
 } else if (mode === "baseline") {
   workers = Number(option("workers") ?? 3);
@@ -51,7 +52,8 @@ if (mode === "drive") {
   if (args.length > 1) fail("Usage: pnpm run baseline [dir] [--workers n]");
   const out = resolve(args[0] ?? join(root, "baselines", commit));
   // A baseline is all of one run, so it starts in an empty folder or replaces an earlier baseline.
-  if (existsSync(out) && readdirSync(out).length && !existsSync(join(out, "manifest.json"))) fail(`${out} has files that aren't a baseline. Choose another folder.`);
+  if (existsSync(out) && readdirSync(out).length && !existsSync(join(out, "manifest.json")))
+    fail(`${out} has files that aren't a baseline. Choose another folder.`);
   rmSync(out, { recursive: true, force: true });
   request = { out, commit: label };
 } else {
@@ -62,6 +64,10 @@ mkdirSync(request.out, { recursive: true });
 const started = Date.now();
 const cli = createRequire(import.meta.url).resolve("@playwright/test/cli");
 const env = { ...process.env, BLUEBERRY_DRIVE: JSON.stringify(request), BLUEBERRY_DRIVE_WORKERS: String(workers) };
-const run = spawnSync(process.execPath, [cli, "test", "-c", join(root, "tests", "features", "drive.config.ts")], { cwd: root, env, stdio: "inherit" });
+const run = spawnSync(process.execPath, [cli, "test", "-c", join(root, "tests", "features", "drive.config.ts")], {
+  cwd: root,
+  env,
+  stdio: "inherit",
+});
 if (mode === "baseline") console.log(`Baseline in ${request.out}, ${Math.round((Date.now() - started) / 1000)}s`);
 process.exit(run.status ?? 1);

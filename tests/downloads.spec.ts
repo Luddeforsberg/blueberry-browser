@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/triple-slash-reference */
-/// <reference path="../src/preload/chrome.d.ts" />
 import { expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { createServer, type ServerResponse } from "node:http";
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
@@ -81,7 +79,9 @@ test("a download saves without a dialog and can be followed, paused, cancelled a
   await expect(toolbar).toHaveAccessibleName(/50%/);
 
   await toolbar.click();
-  await expect.poll(() => chrome.evaluate(() => window.chromeAPI.browser.getTabs().then((tabs) => tabs.find((tab) => tab.isActive)!.page))).toBe("downloads");
+  await expect
+    .poll(() => chrome.evaluate(() => window.chromeAPI.browser.getTabs().then((tabs) => tabs.find((tab) => tab.isActive)!.page)))
+    .toBe("downloads");
   const large = chrome.getByRole("listitem", { name: "large.bin" });
   await expect(large.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "50");
   await expect(large.getByText("32.0 KB of 64.0 KB")).toBeVisible();
@@ -97,10 +97,11 @@ test("a download saves without a dialog and can be followed, paused, cancelled a
   expect(readFileSync(join(folder, "large.bin")).length).toBe(SIZE);
 
   // A second one with the same name doesn't overwrite the first. A link to a new tab doesn't leave one behind.
-  const switchToFiles = () => chrome.evaluate(async (url) => {
-    const tabs = await window.chromeAPI.browser.getTabs();
-    await window.chromeAPI.browser.switchTab(tabs.find((tab) => tab.url === url)!.id);
-  }, `${origin}/`);
+  const switchToFiles = () =>
+    chrome.evaluate(async (url) => {
+      const tabs = await window.chromeAPI.browser.getTabs();
+      await window.chromeAPI.browser.switchTab(tabs.find((tab) => tab.url === url)!.id);
+    }, `${origin}/`);
   await switchToFiles();
   await page.click("#fast");
   await expect.poll(() => existsSync(join(folder, "report.txt"))).toBe(true);
@@ -175,7 +176,9 @@ test("a site can't use anything until the user answers, and the answer can be ch
 
   // Only the prompt view can answer: not the chrome, and so not anything that drives it.
   const current = await prompt.evaluate(() => window.chromeAPI.permissions.current());
-  await expect(chrome.evaluate((id) => window.chromeAPI.permissions.decide(id, true), current!.id)).rejects.toThrow(/Rejected permissions:decide/);
+  await expect(chrome.evaluate((id) => window.chromeAPI.permissions.decide(id, true), current!.id)).rejects.toThrow(
+    /Rejected permissions:decide/,
+  );
 
   // It only shows while its tab does.
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings"));
@@ -191,9 +194,15 @@ test("a site can't use anything until the user answers, and the answer can be ch
   await expect.poll(notifications).toBe("granted");
 
   // A block is remembered too, and refuses at once.
-  const blocked = page.evaluate(() => new Promise((resolve) =>
-    navigator.geolocation.getCurrentPosition(() => resolve("position"), (error) => resolve(error.code))
-  ));
+  const blocked = page.evaluate(
+    () =>
+      new Promise((resolve) =>
+        navigator.geolocation.getCurrentPosition(
+          () => resolve("position"),
+          (error) => resolve(error.code),
+        ),
+      ),
+  );
   await expect(card).toContainText("wants to know your location");
   await card.getByRole("button", { name: "Block" }).click();
   expect(await blocked).toBe(1);
@@ -201,7 +210,10 @@ test("a site can't use anything until the user answers, and the answer can be ch
 
   // Screen sharing asks too, and a block needs no picker.
   const screen = page.evaluate(() =>
-    navigator.mediaDevices.getDisplayMedia({ video: true }).then(() => "stream", (error) => error.name)
+    navigator.mediaDevices.getDisplayMedia({ video: true }).then(
+      () => "stream",
+      (error) => error.name,
+    ),
   );
   await expect(card).toContainText("wants to see your entire screen");
   await expect(card).toContainText("Allow is for this time only");
@@ -217,13 +229,14 @@ test("a site can't use anything until the user answers, and the answer can be ch
 
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings", { param: "privacy" }));
   await chrome.getByRole("button", { name: /^Site permissions/ }).click();
-  await chrome.getByRole("radiogroup", { name: `Notifications for ${origin}` }).getByRole("radio", { name: "Block" }).click();
+  await chrome
+    .getByRole("radiogroup", { name: `Notifications for ${origin}` })
+    .getByRole("radio", { name: "Block" })
+    .click();
   await expect.poll(notifications).toBe("denied");
   await chrome.getByRole("button", { name: `Forget Location for ${origin}` }).click();
   await expect(chrome.getByRole("button", { name: `Forget Location for ${origin}` })).toHaveCount(0);
   const saved = await chrome.evaluate(() => window.chromeAPI.permissions.saved());
-  expect(saved.map(({ permission, decision }) => `${permission} ${decision}`).sort()).toEqual([
-    "notifications block", "screen block",
-  ]);
+  expect(saved.map(({ permission, decision }) => `${permission} ${decision}`).sort()).toEqual(["notifications block", "screen block"]);
   await app.close();
 });

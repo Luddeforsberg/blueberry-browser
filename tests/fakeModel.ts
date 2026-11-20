@@ -1,7 +1,7 @@
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 
-export interface FakeModelRequest {
+interface FakeModelRequest {
   messages: Array<{ role: string; content: unknown }>;
   tools?: Array<{ function: { name: string } }>;
 }
@@ -36,7 +36,7 @@ export const startFakeModel = async () => {
   const keys: string[] = [];
   const refused = new Set<string>();
 
-  const server = createServer(async (request, response) => {
+  const respond = async (request: IncomingMessage, response: ServerResponse) => {
     if (request.method !== "POST" || !request.url?.endsWith("/chat/completions")) {
       response.statusCode = 404;
       response.end();
@@ -65,8 +65,17 @@ export const startFakeModel = async () => {
           object: "chat.completion",
           created: 0,
           model: TITLE_MODEL,
-          choices: [{ index: 0, message: { role: "assistant", content: asksWhatToRemember ? memory : asksForSuggestions ? (suggest?.(human) ?? '{"cards":[]}') : title }, finish_reason: "stop" }],
-        })
+          choices: [
+            {
+              index: 0,
+              message: {
+                role: "assistant",
+                content: asksWhatToRemember ? memory : asksForSuggestions ? (suggest?.(human) ?? '{"cards":[]}') : title,
+              },
+              finish_reason: "stop",
+            },
+          ],
+        }),
       );
       return;
     }
@@ -101,7 +110,8 @@ export const startFakeModel = async () => {
     for (const token of reply.slice(1)) response.write(sseChunk({ content: token }, null));
     response.write(sseChunk({}, "stop"));
     response.end("data: [DONE]\n\n");
-  });
+  };
+  const server = createServer((request, response) => void respond(request, response));
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
 
   return {
@@ -140,7 +150,7 @@ export const startFakeModel = async () => {
     suggestFrom(next: (digest: string) => string) {
       suggest = next;
     },
-    // What the cheap model proposes for a bird to remember.
+    // What the cheap model proposes for a mascot to remember.
     proposeMemory(...facts: Array<{ text: string; site: string | null }>) {
       memory = JSON.stringify({ facts });
     },

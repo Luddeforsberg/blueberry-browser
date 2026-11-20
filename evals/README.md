@@ -17,7 +17,7 @@ pnpm exec electron-vite build
 env -u ELECTRON_RUN_AS_NODE BLUEBERRY_BROWSER_DATA=/tmp/blueberry-demo-browsers pnpm exec electron . --user-data-dir=/tmp/blueberry-demo-import
 ```
 
-The birds need a model, so link `.env` into a worktree first. To start again, delete `/tmp/blueberry-demo-import`. The visits are relative to the day they were written, so reseed the browser folder on the day you use it.
+The mascots need a model, so link `.env` into a worktree first. To start again, delete `/tmp/blueberry-demo-import`. The visits are relative to the day they were written, so reseed the browser folder on the day you use it.
 
 ## Filling a profile with sample data
 

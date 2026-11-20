@@ -1,23 +1,23 @@
 import { app, BaseWindow, globalShortcut, session, shell } from "electron";
 import { electronApp } from "@electron-toolkit/utils";
-import { Window } from "./Window";
-import { AppMenu } from "./Menu";
-import { EventManager } from "./EventManager";
-import { SettingsStore } from "./SettingsStore";
-import { BookmarkStore } from "./BookmarkStore";
-import { ChatStore } from "./ChatStore";
-import { RoutineStore } from "./RoutineStore";
-import { MascotStore } from "./MascotStore";
-import { addStarterFlock } from "./starterFlock";
-import { Downloads } from "./Downloads";
-import { SitePermissions } from "./SitePermissions";
-import { installSessionHandlers } from "./sessionHandlers";
-import { HistoryStore } from "./HistoryStore";
-import { SessionStore } from "./Session";
-import { openStore, type StoreProblem } from "./database";
-import { holdQuit } from "./holdQuit";
-import type { CloudTabs } from "./CloudTabs";
-import { LINK_SCHEME, mascotFromArgs, mascotFromLink } from "./mascotLink";
+import { Window } from "./window/Window";
+import { AppMenu } from "./menus/Menu";
+import { EventManager } from "./window/EventManager";
+import { SettingsStore } from "./settings/SettingsStore";
+import { BookmarkStore } from "./library/BookmarkStore";
+import { ChatStore } from "./chats/ChatStore";
+import { RoutineStore } from "./routines/RoutineStore";
+import { MascotStore } from "./mascots/MascotStore";
+import { addStarters } from "./mascots/starters";
+import { Downloads } from "./library/Downloads";
+import { SitePermissions } from "./settings/SitePermissions";
+import { installSessionHandlers } from "./settings/sessionHandlers";
+import { HistoryStore } from "./library/HistoryStore";
+import { SessionStore } from "./tabs/Session";
+import { openStore, type StoreProblem } from "./library/database";
+import { holdQuit } from "./window/holdQuit";
+import type { CloudTabs } from "./cloud/CloudTabs";
+import { LINK_SCHEME, mascotFromArgs, mascotFromLink } from "./mascots/mascotLink";
 import { join } from "path";
 import * as dotenv from "dotenv";
 
@@ -49,12 +49,14 @@ let cloud: CloudTabs | null = null;
 // Said once, after the window it sits on is open.
 let storeNotices: string[] = [];
 
-const storeNotice = (what: string, isAre: "is" | "are") => ({ movedTo }: StoreProblem) =>
-  storeNotices.push(
-    movedTo
-      ? `${what} ${isAre === "is" ? "was" : "were"} damaged and couldn't be read, so Blueberry started empty. The old file is at ${movedTo}.`
-      : `${what} couldn't be opened. The file wasn't changed, but anything new won't be kept after you quit.`
-  );
+const storeNotice =
+  (what: string, isAre: "is" | "are") =>
+  ({ movedTo }: StoreProblem) =>
+    storeNotices.push(
+      movedTo
+        ? `${what} ${isAre === "is" ? "was" : "were"} damaged and couldn't be read, so Blueberry started empty. The old file is at ${movedTo}.`
+        : `${what} couldn't be opened. The file wasn't changed, but anything new won't be kept after you quit.`,
+    );
 
 // Our own card with only OK, once the window's chrome has drawn.
 const showStoreNotices = (window: Window): void => {
@@ -65,26 +67,22 @@ const showStoreNotices = (window: Window): void => {
 
 const createWindow = (): Window => {
   settings ??= new SettingsStore(join(app.getPath("userData"), "settings.json"));
-  chatStore ??= openStore(
-    join(app.getPath("userData"), "chats.db"),
-    (file) => new ChatStore(file),
-    storeNotice("Your saved chats", "are")
-  );
+  chatStore ??= openStore(join(app.getPath("userData"), "chats.db"), (file) => new ChatStore(file), storeNotice("Your saved chats", "are"));
   historyStore ??= openStore(
     join(app.getPath("userData"), "history.db"),
     (file) => new HistoryStore(file),
-    storeNotice("Your browsing history", "is")
+    storeNotice("Your browsing history", "is"),
   );
   const bookmarks = new BookmarkStore(join(app.getPath("userData"), "bookmarks.json"));
   const pinned = new BookmarkStore(join(app.getPath("userData"), "pinned.json"));
   routineStore ??= openStore(
     join(app.getPath("userData"), "routines.db"),
     (file, recovered) => new RoutineStore(file, recovered),
-    storeNotice("Your routines", "are")
+    storeNotice("Your routines", "are"),
   );
   mascotStore ??= new MascotStore(join(app.getPath("userData"), "mascots.json"));
   try {
-    addStarterFlock(mascotStore, settings);
+    addStarters(mascotStore, settings);
   } catch (error) {
     // Tried again on the next launch, since it was never marked done.
     console.error("Failed to add the starter mascots:", error);
@@ -101,7 +99,18 @@ const createWindow = (): Window => {
     installSessionHandlers(session.defaultSession, sitePermissions, downloads);
   }
   const sessionStore = new SessionStore(join(app.getPath("userData"), "session.json"));
-  const window = new Window(settings, chatStore, bookmarks, pinned, routineStore, mascotStore, downloads, sitePermissions, historyStore, sessionStore);
+  const window = new Window(
+    settings,
+    chatStore,
+    bookmarks,
+    pinned,
+    routineStore,
+    mascotStore,
+    downloads,
+    sitePermissions,
+    historyStore,
+    sessionStore,
+  );
   cloud = window.cloud;
   showStoreNotices(window);
   menu = new AppMenu(window);
@@ -135,7 +144,7 @@ app.on("second-instance", (_event, argv) => {
   else if (!argv.some((arg) => arg.toLowerCase().startsWith(`${LINK_SCHEME}:`))) mainWindow?.bringForward();
 });
 
-app.whenReady().then(() => {
+void app.whenReady().then(() => {
   if (!firstCopy) return;
   electronApp.setAppUserModelId("com.ludwigforsberg.blueberry");
   // A packaged app gets the icon from its bundle. Unpackaged, the Dock would show Electron's.
@@ -151,7 +160,7 @@ app.whenReady().then(() => {
     if (BaseWindow.getAllWindows().length === 0) {
       mainWindow = createWindow();
     } else if (mainWindow && !mainWindow.baseWindow.isVisible() && !mainWindow.baseWindow.isMinimized()) {
-      // Hidden on its own, with the bird still out on the desktop.
+      // Hidden on its own, with the mascot still out on the desktop.
       mainWindow.show();
       mainWindow.focus();
     }

@@ -24,18 +24,10 @@ const FALLBACK_PRICE: [number, number, number] = [10, 1, 50];
 
 export const costOf = (calls: ModelCall[]): number =>
   calls.reduce((total, call) => {
-    const match = Object.keys(PRICES).find((name) =>
-      call.model.startsWith(name),
-    );
-    const [input, cached, output] = match ? PRICES[match] : FALLBACK_PRICE;
+    const price = Object.entries(PRICES).find(([name]) => call.model.startsWith(name))?.[1];
+    const [input, cached, output] = price ?? FALLBACK_PRICE;
     const fresh = call.inputTokens - call.cachedTokens;
-    return (
-      total +
-      (fresh * input +
-        call.cachedTokens * cached +
-        call.outputTokens * output) /
-        1_000_000
-    );
+    return total + (fresh * input + call.cachedTokens * cached + call.outputTokens * output) / 1_000_000;
   }, 0);
 
 const RESULT_CLIP = 400;
@@ -48,20 +40,14 @@ export const installMeter = (app: ElectronApplication) =>
     (globalThis as unknown as { __evalCalls: unknown[] }).__evalCalls = calls;
     const realFetch = globalThis.fetch;
     globalThis.fetch = async (input, init) => {
-      const url =
-        typeof input === "string"
-          ? input
-          : input instanceof URL
-            ? input.href
-            : input.url;
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       const response = await realFetch(input, init);
       if (!url.includes("api.openai.com")) return response;
 
       const body = typeof init?.body === "string" ? init.body : "";
       let toolResults: string[] = [];
       try {
-        const items: Array<{ type?: string; output?: unknown }> =
-          JSON.parse(body).input ?? [];
+        const items: Array<{ type?: string; output?: unknown }> = JSON.parse(body).input ?? [];
         const trailing: string[] = [];
         for (const item of [...items].reverse()) {
           if (item.type !== "function_call_output") break;
@@ -95,8 +81,7 @@ export const installMeter = (app: ElectronApplication) =>
       }) => {
         call.model = result.model ?? call.model;
         call.inputTokens = result.usage?.input_tokens ?? 0;
-        call.cachedTokens =
-          result.usage?.input_tokens_details?.cached_tokens ?? 0;
+        call.cachedTokens = result.usage?.input_tokens_details?.cached_tokens ?? 0;
         call.outputTokens = result.usage?.output_tokens ?? 0;
         call.toolCalls = (result.output ?? [])
           .filter((item) => item.type === "function_call")
@@ -119,11 +104,7 @@ export const installMeter = (app: ElectronApplication) =>
             return;
           }
           for (const line of text.split("\n")) {
-            if (
-              !line.startsWith("data:") ||
-              !line.includes('"response.completed"')
-            )
-              continue;
+            if (!line.startsWith("data:") || !line.includes('"response.completed"')) continue;
             finished(JSON.parse(line.slice(5)).response);
           }
         })
@@ -135,30 +116,22 @@ export const installMeter = (app: ElectronApplication) =>
   }, RESULT_CLIP);
 
 export const readCalls = (app: ElectronApplication): Promise<ModelCall[]> =>
-  app.evaluate(
-    () => (globalThis as unknown as { __evalCalls: ModelCall[] }).__evalCalls,
-  );
+  app.evaluate(() => (globalThis as unknown as { __evalCalls: ModelCall[] }).__evalCalls);
 
 // Refuses addresses that look like the last step of something real, as a backstop to the job's own instruction.
-const FINAL_STEP =
-  /\/(checkout|buy|payment|purchase|place-?order|signup|sign-up|register)(\/|\?|$)|\/gp\/buy\/|\/book\.[a-z-]+\.html/i;
-const TEST_SITES =
-  /(^|\.)(saucedemo\.com|herokuapp\.com|demoqa\.com|todomvc\.com|toscrape\.com|127\.0\.0\.1)$/;
+const FINAL_STEP = /\/(checkout|buy|payment|purchase|place-?order|signup|sign-up|register)(\/|\?|$)|\/gp\/buy\/|\/book\.[a-z-]+\.html/i;
+const TEST_SITES = /(^|\.)(saucedemo\.com|herokuapp\.com|demoqa\.com|todomvc\.com|toscrape\.com|127\.0\.0\.1)$/;
 
 // Records what it refused on a global, so the report can say so.
 export const installGuard = (app: ElectronApplication) =>
   app.evaluate(
     ({ session }, { finalStep, testSites }) => {
       const refused: string[] = [];
-      (globalThis as unknown as { __evalRefused: string[] }).__evalRefused =
-        refused;
+      (globalThis as unknown as { __evalRefused: string[] }).__evalRefused = refused;
       const final = new RegExp(finalStep, "i");
       const test = new RegExp(testSites);
       session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
-        const stop =
-          details.resourceType === "mainFrame" &&
-          final.test(details.url) &&
-          !test.test(new URL(details.url).hostname);
+        const stop = details.resourceType === "mainFrame" && final.test(details.url) && !test.test(new URL(details.url).hostname);
         if (stop) refused.push(details.url.slice(0, 200));
         callback({ cancel: stop });
       });
@@ -167,6 +140,4 @@ export const installGuard = (app: ElectronApplication) =>
   );
 
 export const readRefused = (app: ElectronApplication): Promise<string[]> =>
-  app.evaluate(
-    () => (globalThis as unknown as { __evalRefused: string[] }).__evalRefused,
-  );
+  app.evaluate(() => (globalThis as unknown as { __evalRefused: string[] }).__evalRefused);

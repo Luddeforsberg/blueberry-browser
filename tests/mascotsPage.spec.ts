@@ -1,6 +1,3 @@
-// Preload types live beside a .ts file of the same name, so TypeScript skips them unless asked.
-/* eslint-disable @typescript-eslint/triple-slash-reference */
-/// <reference path="../src/preload/chrome.d.ts" />
 import { expect, test } from "@playwright/test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -17,11 +14,13 @@ test("a mascot is made in four steps, its limits are changed from its page, and 
   let app = await launchApp(profile, { modelEnv: model.env });
   try {
     let chrome = await findView(app, "view=chrome");
-    const param = () => chrome.evaluate(async () => (await window.chromeAPI.browser.getTabs()).find((tab) => tab.page === "flock")?.pageParam);
+    const param = () =>
+      chrome.evaluate(async () => (await window.chromeAPI.browser.getTabs()).find((tab) => tab.page === "mascots")?.pageParam);
     const back = () => chrome.getByRole("button", { name: "Back", exact: true }).click();
-    const page = () => chrome.getByRole("list", { name: "Your mascots" }).filter({ has: chrome.getByRole("button", { name: /^Chat with/ }) });
+    const page = () =>
+      chrome.getByRole("list", { name: "Your mascots" }).filter({ has: chrome.getByRole("button", { name: /^Chat with/ }) });
 
-    await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock"));
+    await chrome.evaluate(() => window.chromeAPI.browser.openPage("mascots"));
     await expect(page().getByRole("listitem")).toHaveCount(1);
     await expect(page()).toContainText("Does whatever you ask, wherever you let it.");
 
@@ -66,7 +65,12 @@ test("a mascot is made in four steps, its limits are changed from its page, and 
     await expect(made).toContainText("Only visits 127.0.0.1.nip.io");
     await made.getByRole("button", { name: "Done" }).click();
     const scout = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).mascots.find((mascot) => mascot.name === "Scout")!;
-    expect(scout).toMatchObject({ look: { palette: "robin", accessory: "crown" }, instructions: "Find the cheapest cable.", sites: ["127.0.0.1.nip.io"], tools: ["visit", "click"] });
+    expect(scout).toMatchObject({
+      look: { palette: "lingon", accessory: "crown" },
+      instructions: "Find the cheapest cable.",
+      sites: ["127.0.0.1.nip.io"],
+      tools: ["visit", "click"],
+    });
     await expect.poll(param).toBe(scout.id);
 
     // It's in the list, which the toolbar's Back goes to.
@@ -95,7 +99,7 @@ test("a mascot is made in four steps, its limits are changed from its page, and 
     await start.press("Enter");
     await expect(chrome.getByRole("listitem", { name: "Offer to remember" })).toBeVisible();
 
-    await chrome.evaluate((id) => window.chromeAPI.browser.openPage("flock", { param: id }), scout.id);
+    await chrome.evaluate((id) => window.chromeAPI.browser.openPage("mascots", { param: id }), scout.id);
     await chrome.getByRole("button", { name: /^What it remembers/ }).click();
     await expect.poll(param).toBe(`${scout.id}/memory`);
     const offer = chrome.getByRole("region", { name: "Offer to remember" });
@@ -111,7 +115,7 @@ test("a mascot is made in four steps, its limits are changed from its page, and 
     app = await launchApp(profile, { modelEnv: model.env });
     chrome = await findView(app, "view=chrome");
     await chrome.evaluate(async () => {
-      const tab = (await window.chromeAPI.browser.getTabs()).find((each) => each.page === "flock");
+      const tab = (await window.chromeAPI.browser.getTabs()).find((each) => each.page === "mascots");
       if (tab) await window.chromeAPI.browser.switchTab(tab.id);
     });
     await expect(chrome.getByRole("heading", { name: "What Scout remembers" })).toBeVisible();

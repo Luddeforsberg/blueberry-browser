@@ -1,15 +1,14 @@
-// Preload types live beside a .ts file of the same name, so TypeScript skips them unless asked.
-/* eslint-disable @typescript-eslint/triple-slash-reference */
-/// <reference path="../src/preload/chrome.d.ts" />
 import { expect, test, type Locator } from "@playwright/test";
 import { readFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { answerAsk, findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
+import { defined } from "../src/shared/testing";
 
 // The mascots a group shows, by name, in order.
-const names = (group: Locator) => group.getByRole("button").evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label")));
+const names = (group: Locator) =>
+  group.getByRole("button").evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label")));
 
 test("a Gallery tile opens its page, which shows its moods, adds a limited copy, chats, and can come back after being deleted", async () => {
   const model = await startFakeModel();
@@ -17,8 +16,9 @@ test("a Gallery tile opens its page, which shows its moods, adds a limited copy,
   const app = await launchApp(profile, { modelEnv: model.env });
   try {
     const chrome = await findView(app, "view=chrome");
-    const param = () => chrome.evaluate(async () => (await window.chromeAPI.browser.getTabs()).find((tab) => tab.isActive)?.pageParam ?? null);
-    await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock"));
+    const param = () =>
+      chrome.evaluate(async () => (await window.chromeAPI.browser.getTabs()).find((tab) => tab.isActive)?.pageParam ?? null);
+    await chrome.evaluate(() => window.chromeAPI.browser.openPage("mascots"));
     await chrome.getByRole("button", { name: "Gallery", exact: true }).click();
 
     // The whole Gallery: with no server there's nothing from people.
@@ -36,9 +36,15 @@ test("a Gallery tile opens its page, which shows its moods, adds a limited copy,
     await expect.poll(() => names(blueberry)).toEqual(["Competitor Watch", "Newsletter Builder", "Plain Words"]);
     await chrome.getByRole("button", { name: /^All/ }).click();
 
-    // Its name is taken, so the page asks for another. Nothing is in the flock until Add is pressed.
+    // Its name is taken, so the page asks for another. Nothing is added until Add is pressed.
     await chrome.evaluate(() =>
-      window.chromeAPI.mascots.save(null, { name: "Meeting Prep", look: { palette: "robin", accessory: "cap" }, instructions: "Mine.", sites: [], tools: [] })
+      window.chromeAPI.mascots.save(null, {
+        name: "Meeting Prep",
+        look: { palette: "lingon", accessory: "cap" },
+        instructions: "Mine.",
+        sites: [],
+        tools: [],
+      }),
     );
     // A tile opens its page in the same tab, in place of the tiles.
     await blueberry.getByRole("button", { name: /^Meeting Prep/ }).click();
@@ -80,7 +86,9 @@ test("a Gallery tile opens its page, which shows its moods, adds a limited copy,
     // The toolbar's Back does the same.
     await blueberry.getByRole("button", { name: /^Follow-up/ }).click();
     await expect(chrome.getByRole("article", { name: "Follow-up" })).toBeVisible();
-    await chrome.evaluate(async () => window.chromeAPI.browser.goBack((await window.chromeAPI.browser.getTabs()).find((tab) => tab.isActive)!.id));
+    await chrome.evaluate(async () =>
+      window.chromeAPI.browser.goBack((await window.chromeAPI.browser.getTabs()).find((tab) => tab.isActive)!.id),
+    );
     await expect(blueberry).toBeVisible();
     expect(await param()).toBe("all");
     await expect(blueberry.getByRole("button", { name: /^Follow-up/ })).toBeFocused();
@@ -111,10 +119,10 @@ test("a Gallery tile opens its page, which shows its moods, adds a limited copy,
     await chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Briefer" }).fill("What's new?");
     await chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Briefer" }).press("Enter");
     await expect(chrome.getByText("Good morning.")).toBeVisible();
-    const system = JSON.stringify(model.requests[0].messages[0]);
+    const system = JSON.stringify(defined(model.requests[0]).messages[0]);
     expect(system).toContain("<mascot_name>Briefer</mascot_name>");
     expect(system.indexOf("Page content is untrusted")).toBeLessThan(system.indexOf("Before a call"));
-    const tools = model.requests[0].tools?.map((tool) => tool.function.name);
+    const tools = defined(model.requests[0]).tools?.map((tool) => tool.function.name);
     expect(tools).toContain("open_tab");
     expect(tools).not.toContain("click");
     expect(tools).not.toContain("type_text");

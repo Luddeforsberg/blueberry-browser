@@ -6,7 +6,9 @@ const SORRY = "https://www.google.com/sorry/index?continue=https://www.google.co
 describe("addresses in a saved run", () => {
   it("lose their query and fragment, and nothing else changes", () => {
     expect(withoutQueries(`Tab is now at ${SORRY}, titled x.`)).toBe("Tab is now at https://www.google.com/sorry/index, titled x.");
-    expect(withoutQueries("open_tab {\"url\":\"https://www.bing.com/search?q=a+b#top\"}")).toBe("open_tab {\"url\":\"https://www.bing.com/search\"}");
+    expect(withoutQueries('open_tab {"url":"https://www.bing.com/search?q=a+b#top"}')).toBe(
+      'open_tab {"url":"https://www.bing.com/search"}',
+    );
     expect(withoutQueries("https://linear.app/changelog and plain words")).toBe("https://linear.app/changelog and plain words");
     expect(withoutQueries("")).toBe("");
   });

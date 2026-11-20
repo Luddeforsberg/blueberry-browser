@@ -1,13 +1,25 @@
 import { describe, expect, it, vi } from "vitest";
-import type { GalleryServer, ServerSession } from "../../src/main/galleryServer";
+import type { GalleryServer, ServerSession } from "../../src/main/account/galleryServer";
 import { runnerSession, supabaseDb, type DbConfig } from "./db";
+import { defined } from "../../src/shared/testing";
 
-const CONFIG: DbConfig = { url: "https://abc.supabase.co", key: "sb_publishable_x", email: "runner@example.com", password: "pw", owner: "ana@example.com" };
+const CONFIG: DbConfig = {
+  url: "https://abc.supabase.co",
+  key: "sb_publishable_x",
+  email: "runner@example.com",
+  password: "pw",
+  owner: "ana@example.com",
+};
 
 // Sign-ins and refreshes as Supabase's Auth answers them, each with a new token.
 const fakeAuth = ({ refreshWorks = true, expiresInMs = 3_600_000 } = {}) => {
   let made = 0;
-  const session = (): ServerSession => ({ accessToken: `token-${++made}`, refreshToken: `refresh-${made}`, expiresAt: Date.now() + expiresInMs, email: CONFIG.email });
+  const session = (): ServerSession => ({
+    accessToken: `token-${++made}`,
+    refreshToken: `refresh-${made}`,
+    expiresAt: Date.now() + expiresInMs,
+    email: CONFIG.email,
+  });
   return {
     signIn: vi.fn(async () => session()),
     refresh: vi.fn(async () => {
@@ -45,7 +57,7 @@ describe("the runner's own sign-in", () => {
     const sent: string[] = [];
     const send = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
       const authorization = (init?.headers as Record<string, string>).authorization;
-      sent.push(authorization);
+      sent.push(defined(authorization));
       return new Response(authorization === "Bearer token-1" ? "" : "true", { status: authorization === "Bearer token-1" ? 401 : 200 });
     });
     const db = supabaseDb(CONFIG, runnerSession(CONFIG, auth as unknown as GalleryServer), send as unknown as typeof fetch);
@@ -58,13 +70,13 @@ describe("the runner's writes", () => {
   it("cuts a reply, an error and steps to the row's limits, so how a job ended is saved", async () => {
     const bodies: Record<string, unknown>[] = [];
     const send = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
-      bodies.push(JSON.parse(String(init?.body)));
+      bodies.push(JSON.parse(await new Response(init?.body).text()));
       return new Response("false", { status: 200 });
     });
     const db = supabaseDb(CONFIG, runnerSession(CONFIG, fakeAuth() as unknown as GalleryServer), send as unknown as typeof fetch);
     const steps = Array.from({ length: 501 }, (_, index) => ({ text: `Step ${index}`, done: true }));
     expect(await db.update("job-1", { status: "done", reply: "🫐".repeat(40_001), error: "x".repeat(501), steps })).toBe(false);
-    const [body] = bodies as { p_status: string; p_reply: string; p_error: string; p_steps: unknown[] }[];
+    const body = defined((bodies as { p_status: string; p_reply: string; p_error: string; p_steps: unknown[] }[])[0]);
     expect(body.p_status).toBe("done");
     expect(Array.from(body.p_reply)).toHaveLength(40_000);
     expect(body.p_reply.endsWith(" (cut short)")).toBe(true);

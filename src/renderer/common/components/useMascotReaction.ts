@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { missing } from "@shared/missing";
 
 // `look` and `toss` are poses, drawn by Mascot. The rest are movement, played on the drawing as a whole.
 export type Reaction = "hop" | "look" | "toss" | "ruffle" | "turn" | "nudge";
@@ -15,7 +16,14 @@ const MOVES: Partial<Record<Reaction, { frames: string[]; offsets?: number[]; ms
     ms: MS.hop,
   },
   ruffle: {
-    frames: ["none", "rotate(-5deg) scale(1.05, 0.97)", "rotate(5deg) scale(1.07, 0.96)", "rotate(-4deg) scale(1.05, 0.97)", "rotate(3deg) scale(1.02, 0.99)", "none"],
+    frames: [
+      "none",
+      "rotate(-5deg) scale(1.05, 0.97)",
+      "rotate(5deg) scale(1.07, 0.96)",
+      "rotate(-4deg) scale(1.05, 0.97)",
+      "rotate(3deg) scale(1.02, 0.99)",
+      "none",
+    ],
     ms: 460,
   },
   // Round to face away, a moment with its back to you, and back again.
@@ -27,7 +35,7 @@ const MOVES: Partial<Record<Reaction, { frames: string[]; offsets?: number[]; ms
   nudge: { frames: ["none", "scale(1.04, 0.94)", "none"], ms: MS.nudge },
 };
 
-// What a click gets next. Only a bird with nothing to say swaps pose, so a mood that means something stays on screen.
+// What a click gets next. Only a mascot with nothing to say swaps pose, so a mood that means something stays on screen.
 const CYCLES: Record<string, Reaction[]> = {
   rest: ["hop", "look", "toss", "ruffle"],
   sitting: ["hop", "ruffle"],
@@ -76,7 +84,11 @@ export const useMascotReaction = (element: React.RefObject<SVGSVGElement | null>
       if (planned) {
         move.current =
           element.current?.animate(
-            planned.frames.map((transform, index) => ({ transform, transformOrigin: FEET, ...(planned.offsets && { offset: planned.offsets[index] }) })),
+            planned.frames.map((transform, index) => ({
+              transform,
+              transformOrigin: FEET,
+              ...(planned.offsets && { offset: planned.offsets[index] }),
+            })),
             { duration: planned.ms, easing: "ease-out" },
           ) ?? null;
       }
@@ -101,7 +113,7 @@ export const useMascotReaction = (element: React.RefObject<SVGSVGElement | null>
       clicks.current = [];
       return play("turn");
     }
-    play(cycle[next.current++ % cycle.length]);
+    play(cycle[next.current++ % cycle.length] ?? missing(`a reaction for ${mood}`));
   }, [enabled, mood, play]);
 
   return { reaction, react };

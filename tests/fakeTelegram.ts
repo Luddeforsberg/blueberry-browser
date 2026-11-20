@@ -1,4 +1,4 @@
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 
 export const FAKE_BOT_TOKEN = "123456:fake-token-for-tests-only-abcdef";
@@ -40,7 +40,7 @@ export const startFakeTelegram = async () => {
     return message_id;
   };
 
-  const server = createServer(async (request, response) => {
+  const respond = async (request: IncomingMessage, response: ServerResponse) => {
     let body = "";
     for await (const part of request) body += part;
     const params = body ? JSON.parse(body) : {};
@@ -90,7 +90,8 @@ export const startFakeTelegram = async () => {
     }
     response.statusCode = 400;
     response.end(JSON.stringify({ ok: false, error_code: 400, description: "Unknown method" }));
-  });
+  };
+  const server = createServer((request, response) => void respond(request, response));
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
 
   return {
@@ -106,7 +107,14 @@ export const startFakeTelegram = async () => {
     userSends: (text: string, replyTo?: number) => message(text, USER_CHAT, replyTo),
     strangerSends: (text: string) => message(text, 999),
     userPresses: (button: { callback_data: string }, messageId: number) =>
-      push({ callback_query: { id: `press-${messageId}`, from: { id: USER_CHAT }, message: { message_id: messageId, chat: { id: USER_CHAT, type: "private" } }, data: button.callback_data } }),
+      push({
+        callback_query: {
+          id: `press-${messageId}`,
+          from: { id: USER_CHAT },
+          message: { message_id: messageId, chat: { id: USER_CHAT, type: "private" } },
+          data: button.callback_data,
+        },
+      }),
     close: () => {
       wake?.();
       server.closeAllConnections();

@@ -1,9 +1,10 @@
 import "../theme.js";
-import { BIRDS } from "../birds.js";
+import { DRAWINGS } from "../mascots.js";
 import { GET_BLUEBERRY_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "../config.js";
 import { isUuid, parsePublishedRow, permissionsInWords, plainFromMarkdown } from "../shared.js";
 
-const COLUMNS = "id,name,palette,accessory,description,category,instructions,sites,tools,author_name,example_prompt,example_answer,add_count,created_at";
+const COLUMNS =
+  "id,name,palette,accessory,description,category,instructions,sites,tools,author_name,example_prompt,example_answer,add_count,created_at";
 
 // Everything from the server was written by a stranger, so it only ever goes in as text. The one piece of markup is our
 // own drawing, chosen by a key that has already been checked.
@@ -16,14 +17,19 @@ const el = (tag, props = {}, ...children) => {
 
 const page = document.getElementById("page");
 
-const say = (title, words) => page.replaceChildren(el("h1", { textContent: title }), el("p", { className: "lede muted", textContent: words }), el("div", { className: "actions" }, el("a", { className: "button outline", href: GET_BLUEBERRY_URL, textContent: "About Blueberry" })));
+const say = (title, words) =>
+  page.replaceChildren(
+    el("h1", { textContent: title }),
+    el("p", { className: "lede muted", textContent: words }),
+    el("div", { className: "actions" }, el("a", { className: "button outline", href: GET_BLUEBERRY_URL, textContent: "About Blueberry" })),
+  );
 
-const bird = ({ look, name }) => {
-  const holder = el("div", { className: "bird" });
-  holder.innerHTML = BIRDS[look.accessory];
+const drawMascot = ({ look, name }) => {
+  const holder = el("div", { className: "mascot" });
+  holder.innerHTML = DRAWINGS[look.accessory];
   const drawing = holder.querySelector("svg");
   drawing.dataset.mascot = look.palette;
-  drawing.setAttribute("aria-label", `A bird called ${name}`);
+  drawing.setAttribute("aria-label", `A mascot called ${name}`);
   return holder;
 };
 
@@ -44,28 +50,74 @@ const lock = (open) => {
 
 const show = ({ id, draft, author, description, example, addCount }) => {
   document.title = `${draft.name}, a mascot for Blueberry`;
-  const permissions = el("ul", { className: "permissions" }, ...permissionsInWords(draft).map(({ text, open }) => el("li", {}, lock(open), text)));
+  const permissions = el(
+    "ul",
+    { className: "permissions" },
+    ...permissionsInWords(draft).map(({ text, open }) => el("li", {}, lock(open), text)),
+  );
   page.replaceChildren(
-    el("header", { className: "hero" },
-      el("div", { className: "hero-text" },
+    el(
+      "header",
+      { className: "hero" },
+      el(
+        "div",
+        { className: "hero-text" },
         el("h1", { textContent: draft.name }),
         el("p", { className: "meta", textContent: `By ${author} · ${addCount === 1 ? "1 add" : `${addCount} adds`}` }),
         el("p", { className: "lede", textContent: description }),
-        el("div", { className: "actions" },
+        el(
+          "div",
+          { className: "actions" },
           // Only this mascot's id, checked as a uuid. Blueberry shows it for review and adds nothing by itself.
           el("a", { className: "button", href: `blueberry://mascot/${id}`, textContent: "Open in Blueberry" }),
-          el("a", { className: "button outline", href: GET_BLUEBERRY_URL, textContent: "Get Blueberry" })),
-        el("p", { className: "small", textContent: "Blueberry shows you all of this again, and nothing is added until you press Add. Don’t have it? It isn’t out for download yet." })),
-      bird(draft)),
-    el("section", {}, el("h2", { textContent: "What it’s allowed to do" }), permissions,
-      el("p", { className: "small", textContent: `${draft.sites.length > 0 ? "A site includes its subdomains, and it can’t use any other site. " : ""}It asks before anything risky, with the same approval cards as Berry.` })),
-    el("section", {}, el("h2", { textContent: "What it’s told, word for word" }), el("p", { className: "words", textContent: draft.instructions })),
+          el("a", { className: "button outline", href: GET_BLUEBERRY_URL, textContent: "Get Blueberry" }),
+        ),
+        el("p", {
+          className: "small",
+          textContent:
+            "Blueberry shows you all of this again, and nothing is added until you press Add. Don’t have it? It isn’t out for download yet.",
+        }),
+      ),
+      drawMascot(draft),
+    ),
+    el(
+      "section",
+      {},
+      el("h2", { textContent: "What it’s allowed to do" }),
+      permissions,
+      el("p", {
+        className: "small",
+        textContent: `${draft.sites.length > 0 ? "A site includes its subdomains, and it can’t use any other site. " : ""}It asks before anything risky, with the same approval cards as Berry.`,
+      }),
+    ),
+    el(
+      "section",
+      {},
+      el("h2", { textContent: "What it’s told, word for word" }),
+      el("p", { className: "words", textContent: draft.instructions }),
+    ),
     ...(example
-      ? [el("section", {}, el("h2", { textContent: "An example" }),
-          el("h3", { textContent: "I asked this" }), el("p", { className: "words", textContent: example.prompt }),
-          el("h3", { textContent: "And here’s what it gave me" }), el("p", { className: "words", textContent: plainFromMarkdown(example.answer) }))]
+      ? [
+          el(
+            "section",
+            {},
+            el("h2", { textContent: "An example" }),
+            el("h3", { textContent: "I asked this" }),
+            el("p", { className: "words", textContent: example.prompt }),
+            el("h3", { textContent: "And here’s what it gave me" }),
+            el("p", { className: "words", textContent: plainFromMarkdown(example.answer) }),
+          ),
+        ]
       : []),
-    el("section", {}, el("p", { className: "muted", textContent: "Someone using Blueberry wrote this, and we haven’t checked it. Adding it gives you your own copy, which nothing here can change." })),
+    el(
+      "section",
+      {},
+      el("p", {
+        className: "muted",
+        textContent:
+          "Someone using Blueberry wrote this, and we haven’t checked it. Adding it gives you your own copy, which nothing here can change.",
+      }),
+    ),
   );
 };
 
@@ -75,7 +127,9 @@ const load = async () => {
   if (!isUuid(id)) return say("No mascot here", "There’s no mascot at this address. Check the link you were sent.");
   let rows;
   try {
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/mascots?select=${COLUMNS}&id=eq.${encodeURIComponent(id)}`, { headers: { apikey: SUPABASE_PUBLISHABLE_KEY } });
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/mascots?select=${COLUMNS}&id=eq.${encodeURIComponent(id)}`, {
+      headers: { apikey: SUPABASE_PUBLISHABLE_KEY },
+    });
     if (!response.ok) throw new Error(`Answered ${response.status}`);
     rows = await response.json();
   } catch {

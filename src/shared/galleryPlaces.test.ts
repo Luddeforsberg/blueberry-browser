@@ -14,7 +14,12 @@ describe("where the Gallery is", () => {
   });
 
   it("comes back from its param as the same place", () => {
-    const places: GalleryPlace[] = [{ page: "all" }, { page: "mascot", id: "meeting-prep" }, { page: "mascot", id: ID }, { page: "linked", id: ID }];
+    const places: GalleryPlace[] = [
+      { page: "all" },
+      { page: "mascot", id: "meeting-prep" },
+      { page: "mascot", id: ID },
+      { page: "linked", id: ID },
+    ];
     for (const place of places) expect(galleryPlace(galleryParam(place))).toEqual(place);
   });
 

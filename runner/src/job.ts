@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { streamReply as agentReply, type StreamReply } from "../../src/main/agent";
-import { isLiveView } from "../../src/main/browserbase";
-import { Chats, type ChatCloud, type ChatStoreLike, type TaskProgress } from "../../src/main/Chats";
-import { approvalToAsk, mascotFromSnapshot } from "../../src/main/cloudJobs";
-import type { CloudSessions } from "../../src/main/cloudBrowser";
+import { streamReply as agentReply, type StreamReply } from "../../src/main/chats/agent";
+import { isLiveView } from "../../src/main/cloud/browserbase";
+import { Chats, type ChatCloud, type ChatStoreLike, type TaskProgress } from "../../src/main/chats/Chats";
+import { approvalToAsk, mascotFromSnapshot } from "../../src/main/remoteJobs/cloudJobs";
+import type { CloudSessions } from "../../src/main/cloud/cloudBrowser";
 import type { ChatApproval } from "../../src/shared/library";
 import type { ClaimedJob, JobUpdate, RunnerDb } from "./db";
 import type { PushKind } from "./push";
@@ -20,7 +20,7 @@ const FINAL_TRIES = 3;
 
 export const NO_ANSWER = "Nobody answered in time, so the job stopped there. Nothing waiting was done.";
 export const SHUT_DOWN = "The runner was restarting, so the job stopped there.";
-const BAD_MASCOT = "The bird this job was sent as couldn't be read, so it didn't run.";
+const BAD_MASCOT = "The mascot this job was sent as couldn't be read, so it didn't run.";
 
 // The cloud browser for one job, which ends with it, so nothing is left running or costing.
 export interface JobBrowser {
@@ -108,13 +108,21 @@ export interface RunJobOptions {
   answerTimeoutMs?: number;
   log?: (line: string) => void;
   // Tells the owner's phone, with no content: when the job asks them, and when it ends other than by their own Stop.
-  notify?: (kind: PushKind) => Promise<void>;
+  notify?: ((kind: PushKind) => Promise<void>) | undefined;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const runJob = async (job: ClaimedJob, options: RunJobOptions): Promise<"done" | "failed" | "stopped"> => {
-  const { db, streamReply = agentReply, signal, pollMs = POLL_MS, heartbeatMs = HEARTBEAT_MS, answerTimeoutMs = ANSWER_TIMEOUT_MS, log = console.log } = options;
+  const {
+    db,
+    streamReply = agentReply,
+    signal,
+    pollMs = POLL_MS,
+    heartbeatMs = HEARTBEAT_MS,
+    answerTimeoutMs = ANSWER_TIMEOUT_MS,
+    log = console.log,
+  } = options;
   const notify = (kind: PushKind) => void options.notify?.(kind).catch(() => {});
   const mascot = mascotFromSnapshot(job.mascot);
   if (!mascot) {
@@ -138,7 +146,7 @@ export const runJob = async (job: ClaimedJob, options: RunJobOptions): Promise<"
     { onChunk: () => {}, onThread: () => {}, onListChanged: () => {}, onWorkingTabs: () => {} },
     () => mascot,
     null,
-    browser.cloud
+    browser.cloud,
   );
 
   // Why it was stopped from here, if it was. A stop the user asked for needs no words.

@@ -19,17 +19,17 @@ export type SettingsPage = keyof typeof SETTINGS_PAGES;
 export type SettingsPlace = SettingsSection | SettingsPage;
 
 // What the sections were called before there were five, by other pages and in saved sessions.
-const OLD_NAMES: Record<string, SettingsPlace> = {
-  Appearance: "general",
-  Downloads: "general",
-  Berry: "mascots",
-  "Data and privacy": "privacy",
-  "Site permissions": "site-permissions",
-  Phone: "phone",
-  Claude: "claude",
-  Cloud: "cloud",
-  Account: "account",
-};
+const OLD_NAMES = new Map<string, SettingsPlace>([
+  ["Appearance", "general"],
+  ["Downloads", "general"],
+  ["Berry", "mascots"],
+  ["Data and privacy", "privacy"],
+  ["Site permissions", "site-permissions"],
+  ["Phone", "phone"],
+  ["Claude", "claude"],
+  ["Cloud", "cloud"],
+  ["Account", "account"],
+]);
 
 const isSection = (value: string): value is SettingsSection => (SETTINGS_SECTIONS as readonly string[]).includes(value);
 const isPage = (value: string): value is SettingsPage => Object.hasOwn(SETTINGS_PAGES, value);
@@ -37,7 +37,7 @@ const isPage = (value: string): value is SettingsPage => Object.hasOwn(SETTINGS_
 // Where a param lands, or null for none or one nobody knows, which leaves Settings where it is.
 export const settingsPlace = (param: string | null): { section: SettingsSection; page: SettingsPage | null } | null => {
   if (param === null) return null;
-  const place = Object.hasOwn(OLD_NAMES, param) ? OLD_NAMES[param] : param;
+  const place = OLD_NAMES.get(param) ?? param;
   if (isSection(place)) return { section: place, page: null };
   if (isPage(place)) return { section: SETTINGS_PAGES[place], page: place };
   return null;

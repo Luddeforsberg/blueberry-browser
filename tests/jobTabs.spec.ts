@@ -1,6 +1,3 @@
-// Preload types live beside a .ts file of the same name, so TypeScript skips them unless asked.
-/* eslint-disable @typescript-eslint/triple-slash-reference */
-/// <reference path="../src/preload/chrome.d.ts" />
 import { expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -30,7 +27,11 @@ test.describe("a job's tabs", () => {
     model = await startFakeModel();
     site = await startSite();
     app = await launchApp(undefined, { modelEnv: model.env });
-    await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].setSize(1400, 860));
+    await app.evaluate(({ BaseWindow }) => {
+      const [main] = BaseWindow.getAllWindows();
+      if (!main) throw new Error("No window");
+      return main.setSize(1400, 860);
+    });
     chrome = await findView(app, "view=chrome");
   });
 
@@ -45,7 +46,10 @@ test.describe("a job's tabs", () => {
     paths.forEach((path) => model.callTools({ name: "open_tab", args: { url: `${site.origin}${path}` } }));
     model.replyWith(reply);
     const finish = model.holdBeforeFirstToken();
-    const sent = await chrome.evaluate((origin) => window.chromeAPI.chat.send(null, `Find it on ${origin} and add it to my cart`, { seePage: false }), site.origin);
+    const sent = await chrome.evaluate(
+      (origin) => window.chromeAPI.chat.send(null, `Find it on ${origin} and add it to my cart`, { seePage: false }),
+      site.origin,
+    );
     await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), sent!.id);
     return { chatId: sent!.id, finish };
   };
@@ -63,7 +67,9 @@ test.describe("a job's tabs", () => {
     finish();
     await expect(chrome.getByRole("list", { name: "Pages it used" }).getByRole("button")).toHaveCount(3);
     // The last page it worked in is where the reply sends you, so it's yours now. The others have gone.
-    await expect.poll(async () => (await tabs()).filter(({ url }) => url.startsWith(site.origin)).map(({ url, jobChatId }) => [url, jobChatId])).toEqual([[`${site.origin}/c`, null]]);
+    await expect
+      .poll(async () => (await tabs()).filter(({ url }) => url.startsWith(site.origin)).map(({ url, jobChatId }) => [url, jobChatId]))
+      .toEqual([[`${site.origin}/c`, null]]);
     await expect(underChat()).toHaveCount(0);
     await expect(userTabs().getByText("Page /c")).toBeVisible();
     // Not in history until the user goes there, and then it is.
@@ -96,7 +102,28 @@ test.describe("a job's tabs", () => {
 
     finish();
     await expect(chrome.getByRole("list", { name: "Pages it used" }).getByRole("button")).toHaveCount(1);
-    await expect.poll(async () => (await tabs()).filter(({ url }) => url.startsWith(site.origin)).map(({ url }) => url)).toEqual([`${site.origin}/a`]);
+    await expect
+      .poll(async () => (await tabs()).filter(({ url }) => url.startsWith(site.origin)).map(({ url }) => url))
+      .toEqual([`${site.origin}/a`]);
     await chrome.screenshot({ path: join(SHOTS, "3-taken-over.png") });
+  });
+
+  test("go under their chat even when one opens before the chat's own tab", async () => {
+    model.callTools({ name: "open_tab", args: { url: `${site.origin}/a` } });
+    model.replyWith("It's on 127.0.0.1.");
+    const finish = model.holdBeforeFirstToken();
+    const sent = await chrome.evaluate(
+      (origin) => window.chromeAPI.chat.send(null, `Find it on ${origin}`, { seePage: false }),
+      site.origin,
+    );
+    await expect.poll(async () => (await tabs()).some(({ jobChatId }) => jobChatId === sent!.id)).toBe(true);
+    await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), sent!.id);
+
+    finish();
+    // The reply points to its page, so that stays, as the user's, under the chat.
+    const order = async () => (await tabs()).filter(({ page, url }) => page === "chat" || url.startsWith(site.origin));
+    await expect
+      .poll(async () => (await order()).map(({ page, url, jobChatId }) => page ?? `${url} ${jobChatId ?? "theirs"}`))
+      .toEqual(["chat", `${site.origin}/a theirs`]);
   });
 });

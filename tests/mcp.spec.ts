@@ -1,6 +1,3 @@
-// Preload types live beside a .ts file of the same name, so TypeScript skips them unless asked.
-/* eslint-disable @typescript-eslint/triple-slash-reference */
-/// <reference path="../src/preload/chrome.d.ts" />
 import { expect, test, type ElectronApplication } from "@playwright/test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -8,25 +5,34 @@ import { createServer, request } from "node:http";
 import type { AddressInfo } from "node:net";
 import { findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
+import { defined } from "../src/shared/testing";
 
 const connect = async (url: string, token: string) => {
   const client = new Client({ name: "test", version: "1.0.0" });
-  await client.connect(new StreamableHTTPClientTransport(new URL(url), { requestInit: { headers: { Authorization: `Bearer ${token}`, "X-Blueberry-Client": "Claude Code" } } }));
+  await client.connect(
+    new StreamableHTTPClientTransport(new URL(url), {
+      requestInit: { headers: { Authorization: `Bearer ${token}`, "X-Blueberry-Client": "Claude Code" } },
+    }),
+  );
   return client;
 };
 
 // fetch won't send another Host, which is what a page reaching this computer through its own name would do.
 const statusWithHost = (url: string, host: string, token: string) =>
   new Promise<number>((resolve, reject) => {
-    const sent = request(url, { method: "POST", headers: { host, authorization: `Bearer ${token}`, "content-type": "application/json" } }, (response) => {
-      response.resume();
-      resolve(response.statusCode ?? 0);
-    });
+    const sent = request(
+      url,
+      { method: "POST", headers: { host, authorization: `Bearer ${token}`, "content-type": "application/json" } },
+      (response) => {
+        response.resume();
+        resolve(response.statusCode ?? 0);
+      },
+    );
     sent.on("error", reject);
     sent.end("{}");
   });
 
-const textOf = (result: Awaited<ReturnType<Client["callTool"]>>) => (result.content as Array<{ text: string }>)[0].text;
+const textOf = (result: Awaited<ReturnType<Client["callTool"]>>) => defined((result.content as Array<{ text: string }>)[0]).text;
 const jsonOf = (result: Awaited<ReturnType<Client["callTool"]>>) => JSON.parse(textOf(result).replace(/^[^[{]*/, ""));
 
 // The real token, as Copy puts it on the clipboard. The clipboard is swapped first, so a test never touches the real one.
@@ -59,17 +65,19 @@ test("Claude gives Berry a job over MCP, can't allow its action, and the user do
     const { url, snippets } = await chrome.evaluate(() => window.chromeAPI.mcp.setOn(true));
     expect(url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/mcp$/);
     // The renderer never gets the token.
-    expect(snippets[0].text).toContain("Bearer ••••••••");
+    expect(defined(snippets[0]).text).toContain("Bearer ••••••••");
     const token = await copiedToken(app);
 
     // Without the token, or through another name for this computer, it's refused.
     expect((await fetch(url!, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).status).toBe(401);
     const port = new URL(url!).port;
-    expect(await statusWithHost(url!, `evil.example:${port}`, token)).toBe(403);
+    expect(await statusWithHost(url!, `evil.example:${port}`, defined(token))).toBe(403);
 
-    const client = await connect(url!, token);
+    const client = await connect(url!, defined(token));
     const { tools } = await client.listTools();
-    expect(tools.map(({ name }) => name)).toEqual(expect.arrayContaining(["list_agents", "run_browser_task", "get_task", "respond_to_task", "read_page"]));
+    expect(tools.map(({ name }) => name)).toEqual(
+      expect.arrayContaining(["list_agents", "run_browser_task", "get_task", "respond_to_task", "read_page"]),
+    );
     expect(jsonOf(await client.callTool({ name: "list_agents", arguments: {} }))[0].name).toBe("Berry");
 
     model.callTools({ name: "open_tab", args: { url: address } });
@@ -79,7 +87,9 @@ test("Claude gives Berry a job over MCP, can't allow its action, and the user do
     const { taskId } = jsonOf(await client.callTool({ name: "run_browser_task", arguments: { goal: "Find the cheapest cable" } }));
 
     // Opening a tab asks, with "always". Claude is told it's waiting, and can't say yes.
-    await expect.poll(async () => jsonOf(await client.callTool({ name: "get_task", arguments: { taskId } })).status).toBe("waiting_for_approval");
+    await expect
+      .poll(async () => jsonOf(await client.callTool({ name: "get_task", arguments: { taskId } })).status)
+      .toBe("waiting_for_approval");
     const refused = await client.callTool({ name: "respond_to_task", arguments: { taskId, answer: "Allow" } });
     expect(refused.isError).toBe(true);
     expect(textOf(refused)).toMatch(/Only the user can allow this/);
@@ -87,11 +97,16 @@ test("Claude gives Berry a job over MCP, can't allow its action, and the user do
     // The chat says where it came from, and the user allows it on Needs you.
     const library = await chrome.evaluate(() => window.chromeAPI.library.getLibrary());
     expect(library.chats.find(({ id }) => id === taskId)).toMatchObject({ from: "Claude Code" });
-    const [waiting] = library.needsYou;
+    const waiting = defined(library.needsYou[0]);
     expect(waiting).toMatchObject({ id: taskId, from: "Claude Code" });
-    await chrome.evaluate(({ id, approvalId }) => window.chromeAPI.chat.decide(id, approvalId, true), { id: waiting.id, approvalId: waiting.approval.id });
+    await chrome.evaluate(({ id, approvalId }) => window.chromeAPI.chat.decide(id, approvalId, true), {
+      id: waiting.id,
+      approvalId: waiting.approval.id,
+    });
 
-    await expect.poll(async () => jsonOf(await client.callTool({ name: "get_task", arguments: { taskId } })).status, { timeout: 15_000 }).toBe("done");
+    await expect
+      .poll(async () => jsonOf(await client.callTool({ name: "get_task", arguments: { taskId } })).status, { timeout: 15_000 })
+      .toBe("done");
     const done = await client.callTool({ name: "get_task", arguments: { taskId } });
     expect(textOf(done)).toMatch(/^Titles, addresses, page text/);
     expect(jsonOf(done)).toMatchObject({ reply: "Cables on 127.0.0.1 from €4.", from: "Claude Code" });
@@ -114,7 +129,7 @@ test("Claude gives Berry a job over MCP, can't allow its action, and the user do
 
     // Revoking means the old token no longer works.
     await chrome.evaluate(() => window.chromeAPI.mcp.revoke());
-    await expect(connect(url!, token)).rejects.toThrow();
+    await expect(connect(url!, defined(token))).rejects.toThrow();
     expect(await copiedToken(app)).not.toBe(token);
 
     await chrome.evaluate(() => window.chromeAPI.mcp.setOn(false));

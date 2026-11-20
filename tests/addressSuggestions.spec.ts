@@ -1,6 +1,3 @@
-// Preload types live beside a .ts file of the same name, so TypeScript skips them unless asked.
-/* eslint-disable @typescript-eslint/triple-slash-reference */
-/// <reference path="../src/preload/chrome.d.ts" />
 import { expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -41,14 +38,14 @@ const tabs = () => chrome.evaluate(() => window.chromeAPI.browser.getTabs());
 const activeTab = async () => (await tabs()).find((tab) => tab.isActive);
 
 const listVisible = () =>
-  app.evaluate(({ BaseWindow }) =>
-    BaseWindow.getAllWindows()[0].contentView.children.some(
+  app.evaluate(({ BaseWindow }) => {
+    const [main] = BaseWindow.getAllWindows();
+    if (!main) throw new Error("No window");
+    return main.contentView.children.some(
       (view) =>
-        "webContents" in view &&
-        (view as Electron.WebContentsView).webContents.getURL().includes("view=suggestions") &&
-        view.getVisible()
-    )
-  );
+        "webContents" in view && (view as Electron.WebContentsView).webContents.getURL().includes("view=suggestions") && view.getVisible(),
+    );
+  });
 
 const editAddress = async () => {
   await chrome.getByRole("button", { name: "Address" }).click();

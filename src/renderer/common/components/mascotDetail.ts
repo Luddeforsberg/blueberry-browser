@@ -2,5 +2,4 @@
 // texture, but the shine, the shade and the mouth; under that only the outline, what grows on top and heavier eyes.
 export type MascotDetail = "full" | "mid" | "small";
 
-export const mascotDetail = (size: number): MascotDetail =>
-  size >= 48 ? "full" : size >= 28 ? "mid" : "small";
+export const mascotDetail = (size: number): MascotDetail => (size >= 48 ? "full" : size >= 28 ? "mid" : "small");

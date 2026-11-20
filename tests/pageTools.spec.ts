@@ -1,6 +1,3 @@
-// Preload types live beside a .ts file of the same name, so TypeScript skips them unless asked.
-/* eslint-disable @typescript-eslint/triple-slash-reference */
-/// <reference path="../src/preload/chrome.d.ts" />
 import { expect, test, type ElectronApplication } from "@playwright/test";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
@@ -19,19 +16,18 @@ const clickMenu = (app: ElectronApplication, label: string) =>
   }, label);
 
 const findBarVisible = (app: ElectronApplication) =>
-  app.evaluate(({ BaseWindow }) =>
-    BaseWindow.getAllWindows()[0].contentView.children.some(
-      (view) =>
-        "webContents" in view &&
-        (view as Electron.WebContentsView).webContents.getURL().includes("view=find") &&
-        view.getVisible()
-    )
-  );
+  app.evaluate(({ BaseWindow }) => {
+    const [main] = BaseWindow.getAllWindows();
+    if (!main) throw new Error("No window");
+    return main.contentView.children.some(
+      (view) => "webContents" in view && (view as Electron.WebContentsView).webContents.getURL().includes("view=find") && view.getVisible(),
+    );
+  });
 
 test("find, zoom and the page menu on a web page", async () => {
   const server = createServer((_, response) => {
     response.setHeader("content-type", "text/html");
-    response.end(`<!doctype html><title>Birds</title><body>
+    response.end(`<!doctype html><title>Jackdaws</title><body>
       <p>jackdaw one, jackdaw two, jackdaw three</p>
       <a id="link" href="/next">a link</a>
       <input id="field" value="text">
@@ -47,7 +43,7 @@ test("find, zoom and the page menu on a web page", async () => {
     await chrome.evaluate((url) => window.chromeAPI.browser.createTab(url), origin);
     const page = await findView(app, origin);
     const find = await findView(app, "view=find");
-    await expect(page).toHaveTitle("Birds");
+    await expect(page).toHaveTitle("Jackdaws");
 
     // Find: counts matches, steps through them, and closes on Esc.
     await clickMenu(app, "Find…");
@@ -75,9 +71,9 @@ test("find, zoom and the page menu on a web page", async () => {
     await page.locator("#link").click({ button: "right" });
     await expect.poll(() => openMenuRows(app)).toContain("Open Link in New Tab");
     await chooseFromMenu(app, "Open Link in New Tab");
-    await expect.poll(() => chrome.evaluate(() => window.chromeAPI.browser.getTabs().then((tabs) => tabs.at(-1)?.url))).toBe(
-      `${origin}/next`
-    );
+    await expect
+      .poll(() => chrome.evaluate(() => window.chromeAPI.browser.getTabs().then((tabs) => tabs.at(-1)?.url)))
+      .toBe(`${origin}/next`);
     await chrome.evaluate(async (url) => {
       const tabs = await window.chromeAPI.browser.getTabs();
       await window.chromeAPI.browser.switchTab(tabs.find((tab) => tab.url === url)!.id);
@@ -97,7 +93,9 @@ test("find, zoom and the page menu on a web page", async () => {
     await clickMenu(app, "Zoom In");
     const badge = chrome.getByRole("button", { name: "Zoom 110%, reset to 100%" });
     await expect(badge).toBeVisible();
-    await expect.poll(() => page.evaluate(() => window.devicePixelRatio)).toBeCloseTo(1.1 * (await chrome.evaluate(() => window.devicePixelRatio)));
+    await expect
+      .poll(() => page.evaluate(() => window.devicePixelRatio))
+      .toBeCloseTo(1.1 * (await chrome.evaluate(() => window.devicePixelRatio)));
   } finally {
     await app.close();
   }

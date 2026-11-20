@@ -1,8 +1,29 @@
 {
   "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
-  "include": ["electron.vite.config.*", "src/main/**/*", "src/preload/**/*", "src/shared/**/*", "tests/**/*", "evals/**/*", "supabase/**/*", "runner/**/*", "playwright.config.ts", "vitest.config.ts"],
+  // chrome.d.ts sits beside chrome.ts, so the include globs skip it. Tests and evals need it for window.chromeAPI.
+  "files": ["src/preload/chrome.d.ts"],
+  "include": [
+    "electron.vite.config.*",
+    "src/main/**/*",
+    "src/preload/**/*",
+    "src/shared/**/*",
+    "tests/**/*",
+    "evals/**/*",
+    "supabase/**/*",
+    "runner/**/*",
+    "playwright.config.ts",
+    "vitest.config.ts",
+    "knip.config.ts"
+  ],
   "compilerOptions": {
     "composite": true,
+    // Off or unset in @electron-toolkit/tsconfig. Each one costs nothing to keep on.
+    "noImplicitAny": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "noUncheckedIndexedAccess": true,
     "types": ["electron-vite/node"]
   }
 }

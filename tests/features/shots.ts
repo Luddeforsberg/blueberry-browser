@@ -34,5 +34,17 @@ export const readRequest = (): Request => {
   return JSON.parse(raw) as Request;
 };
 
-export const shotFile = ({ feature, state, look, layouts, width }: { feature: string; state: string; look: Look; layouts: string; width: number | null }): string =>
+export const shotFile = ({
+  feature,
+  state,
+  look,
+  layouts,
+  width,
+}: {
+  feature: string;
+  state: string;
+  look: Look;
+  layouts: string;
+  width: number | null;
+}): string =>
   [feature, state, look.theme, layouts === "none" ? null : look.layout, width ? `w${width}` : null].filter(Boolean).join("--") + ".png";

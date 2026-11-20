@@ -1,9 +1,9 @@
 import { PGlite } from "@electric-sql/pglite";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-// The phone page's tables, in real Postgres as Supabase's roles, on top of the cloud jobs' migration.
+// The phone page's tables, in real Postgres as Supabase's roles, on top of every migration.
 const SUPABASE_STANDINS = `
   create role anon nologin;
   create role authenticated nologin;
@@ -16,7 +16,21 @@ const SUPABASE_STANDINS = `
   alter default privileges in schema public grant all on functions to anon, authenticated;
 `;
 
-const SCOUT = { id: "m-1", name: "Scout", palette: "robin", accessory: "cap", instructions: "Find cables.", sites: ["webhallen.com"], tools: ["visit", "click"], from_gallery: false };
+// Every migration, so the tables are tested as they are now, with the mascots' new names.
+const MIGRATIONS = readdirSync(join(__dirname, "migrations"))
+  .filter((file) => file.endsWith(".sql"))
+  .sort();
+
+const SCOUT = {
+  id: "m-1",
+  name: "Scout",
+  palette: "lingon",
+  accessory: "cap",
+  instructions: "Find cables.",
+  sites: ["webhallen.com"],
+  tools: ["visit", "click"],
+  from_gallery: false,
+};
 const ENDPOINT = "https://fcm.googleapis.com/fcm/send/abc";
 const KEYS = `'BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM', 'tBHItJI5svbpez7KI4CCXg'`;
 
@@ -40,8 +54,10 @@ describe("the phone page's database rules", () => {
     await as(owner, `select public.link_cloud_runner('${`user${Number(runner.slice(-12))}@example.com`}')`);
     await as(runner, `select public.accept_cloud_runner_link('${`user${Number(owner.slice(-12))}@example.com`}')`);
   };
-  const sync = (uid: string | null, birds: unknown) => as(uid, `select public.sync_cloud_flock('${JSON.stringify(birds)}'::jsonb) as kept`);
-  const subscribe = (uid: string | null, endpoint = ENDPOINT) => as(uid, `select public.save_push_subscription('${endpoint}', ${KEYS}) as ok`);
+  const sync = (uid: string | null, mascots: unknown) =>
+    as(uid, `select public.sync_cloud_mascots('${JSON.stringify(mascots)}'::jsonb) as kept`);
+  const subscribe = (uid: string | null, endpoint = ENDPOINT) =>
+    as(uid, `select public.save_push_subscription('${endpoint}', ${KEYS}) as ok`);
 
   let ALICE = "";
   let RUNNER = "";
@@ -49,8 +65,7 @@ describe("the phone page's database rules", () => {
   beforeAll(async () => {
     db = new PGlite();
     await db.exec(SUPABASE_STANDINS);
-    await db.exec(readFileSync(join(__dirname, "migrations/20261102000000_cloud_jobs.sql"), "utf8"));
-    await db.exec(readFileSync(join(__dirname, "migrations/20261103000000_phone.sql"), "utf8"));
+    for (const file of MIGRATIONS) await db.exec(readFileSync(join(__dirname, "migrations", file), "utf8"));
     ALICE = await newUser();
     RUNNER = await newUser();
     BOB = await newUser();
@@ -58,32 +73,38 @@ describe("the phone page's database rules", () => {
   });
   afterAll(() => db.close());
 
-  it("keeps each flock to its owner, replaced whole on every sync", async () => {
+  it("keeps each owner's mascots to that owner, replaced whole on every sync", async () => {
     expect(await sync(ALICE, [SCOUT, { ...SCOUT, id: "m-2", name: "Penny" }])).toEqual([{ kept: 2 }]);
     expect(await sync(ALICE, [SCOUT])).toEqual([{ kept: 1 }]);
-    expect(await as(ALICE, "select id, name, position, sites, tools from public.cloud_flock")).toEqual([
+    expect(await as(ALICE, "select id, name, position, sites, tools from public.cloud_mascots")).toEqual([
       { id: "m-1", name: "Scout", position: 0, sites: ["webhallen.com"], tools: ["visit", "click"] },
     ]);
     // Nobody else reads it: not another user, not her runner, not anyone signed out.
-    expect(await as(BOB, "select id from public.cloud_flock")).toEqual([]);
-    expect(await as(RUNNER, "select id from public.cloud_flock")).toEqual([]);
-    await expect(as(null, "select id from public.cloud_flock")).rejects.toThrow(/permission denied/);
+    expect(await as(BOB, "select id from public.cloud_mascots")).toEqual([]);
+    expect(await as(RUNNER, "select id from public.cloud_mascots")).toEqual([]);
+    await expect(as(null, "select id from public.cloud_mascots")).rejects.toThrow(/permission denied/);
     // Only through the function, which a runner can't use.
-    await expect(as(ALICE, `insert into public.cloud_flock (id, position, name, palette, accessory, instructions) values ('x', 0, 'X', 'robin', 'cap', 'Y')`)).rejects.toThrow(/permission denied/);
-    await expect(sync(RUNNER, [SCOUT])).rejects.toThrow(/runner has no flock/);
+    await expect(
+      as(
+        ALICE,
+        `insert into public.cloud_mascots (id, position, name, palette, accessory, instructions) values ('x', 0, 'X', 'robin', 'cap', 'Y')`,
+      ),
+    ).rejects.toThrow(/permission denied/);
+    await expect(sync(RUNNER, [SCOUT])).rejects.toThrow(/runner has no mascots/);
     await expect(sync(null, [SCOUT])).rejects.toThrow(/permission denied/);
     // Bob's sync never touches hers.
     await sync(BOB, []);
-    expect(await as(ALICE, "select id from public.cloud_flock")).toEqual([{ id: "m-1" }]);
+    expect(await as(ALICE, "select id from public.cloud_mascots")).toEqual([{ id: "m-1" }]);
   });
 
-  it("refuses a bird that couldn't have come from the app", async () => {
+  it("refuses a mascot that couldn't have come from the app", async () => {
+    await sync(ALICE, [SCOUT]);
     await expect(sync(ALICE, [{ ...SCOUT, tools: ["visit", "pay"] }])).rejects.toThrow(/tools_shape/);
     await expect(sync(ALICE, [{ ...SCOUT, id: "berry" }])).rejects.toThrow(/id_shape/);
     await expect(sync(ALICE, [{ ...SCOUT, palette: "red" }])).rejects.toThrow(/look_shape/);
     await expect(sync(ALICE, [{ ...SCOUT, name: "" }])).rejects.toThrow(/name_shape/);
     // A refused sync leaves the last one.
-    expect(await as(ALICE, "select id from public.cloud_flock")).toEqual([{ id: "m-1" }]);
+    expect(await as(ALICE, "select id from public.cloud_mascots")).toEqual([{ id: "m-1" }]);
   });
 
   it("gives the runner its own owner's push addresses only, and nothing else of them", async () => {
@@ -96,7 +117,9 @@ describe("the phone page's database rules", () => {
     await expect(as(BOB, "select * from public.runner_push_subscriptions()")).rejects.toThrow(/Not a linked runner/);
     // A runner can't be notified itself, and can only drop its owner's.
     await expect(subscribe(RUNNER, "https://fcm.googleapis.com/fcm/send/runner")).rejects.toThrow(/can't be notified/);
-    expect(await as(RUNNER, "select public.runner_forget_push_subscription('https://web.push.apple.com/bobs') as ok")).toEqual([{ ok: false }]);
+    expect(await as(RUNNER, "select public.runner_forget_push_subscription('https://web.push.apple.com/bobs') as ok")).toEqual([
+      { ok: false },
+    ]);
     expect(await as(RUNNER, `select public.runner_forget_push_subscription('${ENDPOINT}') as ok`)).toEqual([{ ok: true }]);
     expect(await as(RUNNER, "select endpoint from public.runner_push_subscriptions()")).toEqual([]);
   });
@@ -105,7 +128,9 @@ describe("the phone page's database rules", () => {
     const alices = "https://fcm.googleapis.com/fcm/send/alices-phone";
     expect(await subscribe(ALICE, alices)).toEqual([{ ok: true }]);
     expect(await subscribe(BOB, alices)).toEqual([{ ok: false }]);
-    expect((await db.query("select owner from public.cloud_push_subscriptions where endpoint = $1", [alices])).rows).toEqual([{ owner: ALICE }]);
+    expect((await db.query("select owner from public.cloud_push_subscriptions where endpoint = $1", [alices])).rows).toEqual([
+      { owner: ALICE },
+    ]);
     expect(await subscribe(ALICE, alices)).toEqual([{ ok: true }]);
     // Nor take it away.
     expect(await as(BOB, `select public.forget_push_subscription('${alices}') as ok`)).toEqual([{ ok: false }]);

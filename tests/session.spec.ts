@@ -1,6 +1,3 @@
-// Preload types live beside a .ts file of the same name, so TypeScript skips them unless asked.
-/* eslint-disable @typescript-eslint/triple-slash-reference */
-/// <reference path="../src/preload/chrome.d.ts" />
 import { expect, test, type Page } from "@playwright/test";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -9,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { answerAsk, findView, launchApp } from "./app";
 import { startFakeModel, type FakeModel } from "./fakeModel";
+import { defined } from "../src/shared/testing";
 
 let server: Server;
 let origin: string;
@@ -62,8 +60,8 @@ test("a restart brings tabs back without loading them all, and history is kept",
   await open(chrome, "page-four");
   // Four goes before three now, and three is the tab being looked at.
   const before = await tabs(chrome);
-  await chrome.evaluate(([id]) => window.chromeAPI.browser.moveTab(id, 1), [before[2].id]);
-  await chrome.evaluate(([id]) => window.chromeAPI.browser.switchTab(id), [before[1].id]);
+  await chrome.evaluate(([id]) => window.chromeAPI.browser.moveTab(id, 1), [defined(before[2]).id] satisfies [string]);
+  await chrome.evaluate(([id]) => window.chromeAPI.browser.switchTab(id), [defined(before[1]).id] satisfies [string]);
   await chrome.evaluate(() => window.chromeAPI.layout.toggleSidebar());
   await app.close();
 
@@ -71,24 +69,26 @@ test("a restart brings tabs back without loading them all, and history is kept",
   // Only the pages that exist in a view. A restored page can come from the cache, so the server can't tell.
   const loaded = () =>
     app.evaluate(({ webContents }) =>
-      webContents.getAllWebContents().map((contents) => contents.getURL()).filter((url) => url.startsWith("http")).sort()
+      webContents
+        .getAllWebContents()
+        .map((contents) => contents.getURL())
+        .filter((url) => url.startsWith("http"))
+        .sort(),
     );
-  await expect.poll(async () => (await tabs(chrome)).map((tab) => tab.title)).toEqual([
-    "Title of page-two",
-    "Title of page-four",
-    "Title of page-three",
-  ]);
+  await expect
+    .poll(async () => (await tabs(chrome)).map((tab) => tab.title))
+    .toEqual(["Title of page-two", "Title of page-four", "Title of page-three"]);
   expect((await tabs(chrome)).map((tab) => tab.isActive)).toEqual([false, false, true]);
   expect((await chrome.evaluate(() => window.chromeAPI.layout.getLayout())).sidebarOpen).toBe(false);
   await expect.poll(loaded).toEqual([`${origin}/page-three`]);
 
   // Going to a tab loads it, with its back button working.
-  const [first] = await tabs(chrome);
+  const first = defined((await tabs(chrome))[0]);
   await chrome.evaluate((id) => window.chromeAPI.browser.switchTab(id), first.id);
   await expect.poll(loaded).toEqual([`${origin}/page-three`, `${origin}/page-two`]);
   await expect.poll(async () => (await tabs(chrome))[0]).toMatchObject({ canGoBack: true, isLoading: false });
   await chrome.evaluate((id) => window.chromeAPI.browser.goBack(id), first.id);
-  await expect.poll(async () => (await tabs(chrome))[0].title).toBe("Title of page-one");
+  await expect.poll(async () => defined((await tabs(chrome))[0]).title).toBe("Title of page-one");
 
   // Coming back after a restart wasn't a visit, but going back was.
   await chrome.evaluate(() => window.chromeAPI.layout.toggleSidebar());
@@ -173,7 +173,10 @@ test("a crashed page stays in its tab, tells Berry so, and reloads; damaged data
 
   const crash = () =>
     app.evaluate(({ webContents }) =>
-      webContents.getAllWebContents().find((c) => c.getURL().endsWith("/page-doomed"))!.forcefullyCrashRenderer()
+      webContents
+        .getAllWebContents()
+        .find((c) => c.getURL().endsWith("/page-doomed"))!
+        .forcefullyCrashRenderer(),
     );
   await crash();
   const notice = chrome.getByRole("alert").filter({ hasText: "This page crashed" });
@@ -195,8 +198,11 @@ test("a crashed page stays in its tab, tells Berry so, and reloads; damaged data
   await expect
     .poll(() =>
       app.evaluate(({ webContents }) =>
-        webContents.getAllWebContents().find((c) => c.getURL().endsWith("/page-doomed"))!.isCrashed()
-      )
+        webContents
+          .getAllWebContents()
+          .find((c) => c.getURL().endsWith("/page-doomed"))!
+          .isCrashed(),
+      ),
     )
     .toBe(false);
   // A crash while the reload is still loading is only a load that goes on in a new process, so it has to have finished.
@@ -217,6 +223,23 @@ test("a crashed page stays in its tab, tells Berry so, and reloads; damaged data
   await expect.poll(async () => (await tabs(chrome)).length).toBe(1);
   expect(readdirSync(profile).filter((file) => file.includes(".corrupt-"))).toHaveLength(3);
   expect(await chrome.evaluate(() => window.chromeAPI.library.getLibrary().then(({ chats }) => chats))).toEqual([]);
+  await app.close();
+});
+
+test("files saved before the mascots were called mascots open as they did", async () => {
+  const profile = mkdtempSync(join(tmpdir(), "blueberry-test-"));
+  writeFileSync(join(profile, "settings.json"), JSON.stringify({ onboarded: true, startersAdded: true, birdOnPages: false }));
+  writeFileSync(join(profile, "session.json"), JSON.stringify({ tabs: [{ page: "flock", param: null, title: "" }], active: 0 }));
+  const scout = { id: "scout", name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "Read.", sites: [], tools: [] };
+  writeFileSync(join(profile, "mascots.json"), JSON.stringify([scout]));
+  const { app, chrome } = await launch(profile);
+
+  await expect.poll(async () => (await tabs(chrome)).map((tab) => tab.page)).toEqual(["mascots"]);
+  const list = chrome.getByRole("list", { name: "Your mascots" }).first();
+  await expect(list.getByRole("listitem")).toHaveCount(2);
+  // Saved as a robin, which was always drawn as the lingon.
+  await expect(list.getByRole("listitem").nth(1).locator("svg[data-mascot]").first()).toHaveAttribute("data-mascot", "lingon");
+  expect((await chrome.evaluate(() => window.chromeAPI.settings.getSettings())).mascotOnPages).toBe(false);
   await app.close();
 });
 

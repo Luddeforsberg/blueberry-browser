@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { StreamReply } from "../../src/main/agent";
-import type { ChatCloud } from "../../src/main/Chats";
-import { mascotSnapshot } from "../../src/main/cloudJobs";
+import type { StreamReply } from "../../src/main/chats/agent";
+import type { ChatCloud } from "../../src/main/chats/Chats";
+import { mascotSnapshot } from "../../src/main/remoteJobs/cloudJobs";
 import { BERRY } from "../../src/shared/mascots";
 import { dbConfig, type ClaimedJob, type Decision, type JobUpdate, type RunnerDb } from "./db";
 import { NO_ANSWER, runJob, SHUT_DOWN, UnreleasedBrowsers, type JobBrowser } from "./job";
@@ -14,7 +14,14 @@ const askingReply: StreamReply = async function* (_messages, _signal, { approve 
   yield allowed ? "Ordered it" : "Left it";
 };
 
-const JOB: ClaimedJob = { id: "job-1", prompt: "Order the thing", history: [], mascot: mascotSnapshot(BERRY), actionApproval: "risky", contextId: "ctx-1" };
+const JOB: ClaimedJob = {
+  id: "job-1",
+  prompt: "Order the thing",
+  history: [],
+  mascot: mascotSnapshot(BERRY),
+  actionApproval: "risky",
+  contextId: "ctx-1",
+};
 
 // The runner's side of the database, recording everything it's asked to do. It has nothing that could decide.
 const fakeDb = (answers: (Decision | "stop")[] = []) => {
@@ -81,7 +88,11 @@ const options = { pollMs: 5, heartbeatMs: 1_000, answerTimeoutMs: 1_000, log: ()
 
 describe("a job on the runner", () => {
   it("writes the approval and waits until the user decides", async () => {
-    const { db, calls, final } = fakeDb([{ decision: null, answer: null }, { decision: null, answer: null }, { decision: "allow", answer: null }]);
+    const { db, calls, final } = fakeDb([
+      { decision: null, answer: null },
+      { decision: null, answer: null },
+      { decision: "allow", answer: null },
+    ]);
     const { seen, browser } = fakeBrowser();
     expect(await runJob(JOB, { ...options, db, browser, streamReply: askingReply })).toBe("done");
     expect(calls.find(({ name }) => name === "ask")?.args).toEqual(["job-1", { kind: "approval", text: ASKED, need: null, site: null }]);
@@ -142,7 +153,9 @@ describe("a job on the runner", () => {
     const { db, final } = fakeDb();
     const shutdown = new AbortController();
     setTimeout(() => shutdown.abort(), 20);
-    expect(await runJob(JOB, { ...options, db, browser: fakeBrowser().browser, streamReply: askingReply, signal: shutdown.signal })).toBe("stopped");
+    expect(await runJob(JOB, { ...options, db, browser: fakeBrowser().browser, streamReply: askingReply, signal: shutdown.signal })).toBe(
+      "stopped",
+    );
     expect(final()).toMatchObject({ status: "stopped", error: SHUT_DOWN });
   });
 
@@ -157,11 +170,17 @@ describe("a job on the runner", () => {
   it("doesn't tell the phone about a stop the user asked for", async () => {
     const { db } = fakeDb(["stop"]);
     const sent: string[] = [];
-    await runJob(JOB, { ...options, db, browser: fakeBrowser().browser, streamReply: askingReply, notify: async (kind) => void sent.push(kind) });
+    await runJob(JOB, {
+      ...options,
+      db,
+      browser: fakeBrowser().browser,
+      streamReply: askingReply,
+      notify: async (kind) => void sent.push(kind),
+    });
     expect(sent).toEqual(["needs-you"]);
   });
 
-  it("doesn't run as a bird it can't read", async () => {
+  it("doesn't run as a mascot it can't read", async () => {
     const { db, final } = fakeDb();
     const { seen, browser } = fakeBrowser();
     const job = { ...JOB, mascot: { id: "scout", name: "Scout", instructions: "", sites: [], tools: [] } };
@@ -181,7 +200,13 @@ describe("the runner's keys", () => {
   };
 
   it("takes its own account and the publishable key", () => {
-    expect(dbConfig(env)).toEqual({ url: "https://abc.supabase.co", key: "sb_publishable_x", email: "runner@example.com", password: "long and random", owner: "ana@example.com" });
+    expect(dbConfig(env)).toEqual({
+      url: "https://abc.supabase.co",
+      key: "sb_publishable_x",
+      email: "runner@example.com",
+      password: "long and random",
+      owner: "ana@example.com",
+    });
   });
 
   it.each([

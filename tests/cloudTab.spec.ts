@@ -1,6 +1,3 @@
-// Preload types live beside a .ts file of the same name, so TypeScript skips them unless asked.
-/* eslint-disable @typescript-eslint/triple-slash-reference */
-/// <reference path="../src/preload/chrome.d.ts" />
 import { expect, test, type Page } from "@playwright/test";
 import { existsSync, mkdirSync } from "node:fs";
 import { createServer } from "node:http";
@@ -30,7 +27,7 @@ const shoot = async (chrome: Page, name: string) => {
 
 test.skip(process.platform !== "darwin" || !existsSync(CHROME), "Needs Google Chrome");
 
-test("a bird does a job in a cloud tab, asking before it clicks, and the user can take over", async () => {
+test("a mascot does a job in a cloud tab, asking before it clicks, and the user can take over", async () => {
   test.setTimeout(60_000);
   const server = createServer((_, response) => {
     response.setHeader("content-type", "text/html");
@@ -48,7 +45,10 @@ test("a bird does a job in a cloud tab, asking before it clicks, and the user ca
     model.callTools({ name: "read_page", args: {} });
     // Naming the site keeps its cloud tab open once the job is done.
     model.replyWith("Ordered it on 127.0.0.1");
-    const sent = await chrome.evaluate((address) => window.chromeAPI.chat.send(null, `Order the thing on ${address}`, { seePage: false, cloud: true }), shop);
+    const sent = await chrome.evaluate(
+      (address) => window.chromeAPI.chat.send(null, `Order the thing on ${address}`, { seePage: false, cloud: true }),
+      shop,
+    );
     expect(sent).not.toBeNull();
 
     // The same approval as anywhere, in Needs you and on the chat.
@@ -58,7 +58,11 @@ test("a bird does a job in a cloud tab, asking before it clicks, and the user ca
     await expect(card.locator("p").getByText(`Click the button “Place order” on ${shop}`)).toBeVisible();
     await card.getByRole("button", { name: "Allow", exact: true }).click();
 
-    await expect.poll(async () => (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id))?.messages.at(-1)?.content, { timeout: 15_000 }).toBe("Ordered it on 127.0.0.1");
+    await expect
+      .poll(async () => (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id))?.messages.at(-1)?.content, {
+        timeout: 15_000,
+      })
+      .toBe("Ordered it on 127.0.0.1");
     // Real input reached the page in the cloud browser, and nothing opened in this window.
     expect(JSON.stringify(model.requests.at(-1)?.messages.at(-1))).toContain("Order placed");
     const tabs = await chrome.evaluate(() => window.chromeAPI.browser.getTabs());
@@ -104,18 +108,25 @@ test("a cloud job shows in the working view beside its chat, and pressing the pi
   const model = await startFakeModel();
   const app = await launchApp(undefined, { modelEnv: { ...model.env, BLUEBERRY_CLOUD_LOCAL: "1", BLUEBERRY_CLOUD_CHROME: CHROME } });
   try {
-    await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].setSize(1500, 900));
+    await app.evaluate(({ BaseWindow }) => {
+      const [main] = BaseWindow.getAllWindows();
+      if (!main) throw new Error("No window");
+      return main.setSize(1500, 900);
+    });
     const chrome = await findView(app, "view=chrome");
     model.callTools({ name: "open_tab", args: { url: shop } });
     model.replyWith("Had a look");
     const finish = model.holdBeforeFirstToken();
-    const sent = await chrome.evaluate((address) => window.chromeAPI.chat.send(null, `Have a look at the shop on ${address}`, { seePage: false, cloud: true }), shop);
+    const sent = await chrome.evaluate(
+      (address) => window.chromeAPI.chat.send(null, `Have a look at the shop on ${address}`, { seePage: false, cloud: true }),
+      shop,
+    );
     await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), sent!.id);
 
     const view = chrome.getByRole("complementary", { name: /working on/ });
     const goThere = view.getByRole("button", { name: "Go to the tab on 127.0.0.1" });
     await expect(goThere).toBeVisible({ timeout: 20_000 });
-    // The local test browser's own pictures, and the bird on the window's edge, as there's none in a cloud page.
+    // The local test browser's own pictures, and the mascot on the window's edge, as there's none in a cloud page.
     await expect(view.locator("img[src^='data:image/jpeg']")).toBeVisible({ timeout: 10_000 });
     await expect(view.getByRole("status")).toHaveText("Berry is on 127.0.0.1");
     await expect(chrome.getByText(/Opened/).first()).toBeVisible();
@@ -129,7 +140,11 @@ test("a cloud job shows in the working view beside its chat, and pressing the pi
     await expect(chrome.getByRole("button", { name: "Take over" })).toBeVisible();
 
     finish();
-    await expect.poll(async () => (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id))?.messages.at(-1)?.content, { timeout: 15_000 }).toBe("Had a look");
+    await expect
+      .poll(async () => (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id))?.messages.at(-1)?.content, {
+        timeout: 15_000,
+      })
+      .toBe("Had a look");
     const saved = JSON.stringify(await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id));
     expect(saved).not.toContain("data:image");
     expect(JSON.stringify(model.requests)).not.toContain("data:image");

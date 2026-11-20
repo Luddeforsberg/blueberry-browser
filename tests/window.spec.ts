@@ -1,6 +1,3 @@
-// Preload types live beside a .ts file of the same name, so TypeScript skips them unless asked.
-/* eslint-disable @typescript-eslint/triple-slash-reference */
-/// <reference path="../src/preload/chrome.d.ts" />
 import { expect, test } from "@playwright/test";
 import { mkdtempSync } from "node:fs";
 import { createServer } from "node:http";
@@ -9,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { answerAsk, findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
+import { defined } from "../src/shared/testing";
 
 const startSite = async () => {
   const server = createServer((_request, response) => {
@@ -46,20 +44,33 @@ test("the address field is the status of a job in the tab in front: working, tak
     const taken = (await job())!.id;
     await field.getByRole("button", { name: "Take over" }).click();
     await expect(chrome.getByRole("button", { name: "Address" })).toBeVisible();
-    await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).find((tab) => tab.id === taken)?.berryWorking).toBe(false);
-    await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).chats.some((chat) => chat.running), { timeout: 20_000 }).toBe(false);
+    await expect
+      .poll(async () => (await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).find((tab) => tab.id === taken)?.berryWorking)
+      .toBe(false);
+    await expect
+      .poll(async () => (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).chats.some((chat) => chat.running), {
+        timeout: 20_000,
+      })
+      .toBe(false);
 
     // Next, a job that waits to go to an address with data in it: the field says so, and Answer opens its chat.
     model.thinkFor(0);
     model.callTools({ name: "open_tab", args: { url: `${site.origin}/flights` } });
     model.callTools({ name: "go_to", args: { url: `${site.origin}/flights?from=ARN&to=LIS` } });
     model.replyWith("Done.");
-    const sent = await chrome.evaluate((text) => window.chromeAPI.chat.send(null, text, { seePage: false }), `Find flights on ${site.origin}/flights`);
-    await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).needsYou.length, { timeout: 20_000 }).toBe(1);
+    const sent = await chrome.evaluate(
+      (text) => window.chromeAPI.chat.send(null, text, { seePage: false }),
+      `Find flights on ${site.origin}/flights`,
+    );
+    await expect
+      .poll(async () => (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).needsYou.length, { timeout: 20_000 })
+      .toBe(1);
     await chrome.evaluate(async (id) => window.chromeAPI.browser.switchTab(id), (await job())!.id);
     await expect(field).toContainText("Waiting for you");
     await field.getByRole("button", { name: "Answer" }).click();
-    await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).find((tab) => tab.isActive)?.pageParam).toBe(sent!.id);
+    await expect
+      .poll(async () => (await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).find((tab) => tab.isActive)?.pageParam)
+      .toBe(sent!.id);
   } finally {
     await app.close();
     model.close();
@@ -72,7 +83,13 @@ test("choosing a mascot on the new tab changes the pill, the greeting and the li
   try {
     const chrome = await findView(app, "view=chrome");
     await chrome.evaluate(() =>
-      window.chromeAPI.mascots.save(null, { name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "News.", sites: ["svt.se"], tools: ["visit"] })
+      window.chromeAPI.mascots.save(null, {
+        name: "Scout",
+        look: { palette: "lingon", accessory: "cap" },
+        instructions: "News.",
+        sites: ["svt.se"],
+        tools: ["visit"],
+      }),
     );
     const pill = chrome.getByRole("button", { name: /Choose who to ask/ });
     const limits = chrome.getByText("Only visits svt.se.");
@@ -91,7 +108,10 @@ test("choosing a mascot on the new tab changes the pill, the greeting and the li
     await chrome.getByRole("menuitemradio", { name: /^Scout/ }).click();
     await expect(pill).toHaveAccessibleName("Asking Scout. Choose who to ask");
     await expect(chrome.getByRole("heading", { name: "Where to?" }).getByRole("img", { name: /^Scout/ })).toBeVisible();
-    await expect(chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Scout" })).toHaveAttribute("placeholder", "Ask Scout, or type an address");
+    await expect(chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Scout" })).toHaveAttribute(
+      "placeholder",
+      "Ask Scout, or type an address",
+    );
     await expect(limits).toBeVisible();
     expect((await chrome.evaluate(() => window.chromeAPI.settings.getSettings())).chosenMascotId).not.toBeNull();
 
@@ -135,7 +155,9 @@ test("a new profile starts with four mascots beside Berry, once, and a deleted o
     expect((await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).chats).toEqual([]);
     await box.fill("");
 
-    const plainWords = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).mascots.find((mascot) => mascot.name === "Plain Words")!;
+    const plainWords = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).mascots.find(
+      (mascot) => mascot.name === "Plain Words",
+    )!;
     // Deleting asks first, in our own card, which only the person at the computer can press.
     const deleted = chrome.evaluate((id) => window.chromeAPI.mascots.delete(id), plainWords.id);
     await answerAsk(app, "Delete");
@@ -158,12 +180,20 @@ test("in the horizontal layout, Chats and a mascot's card open over a web page, 
   try {
     const chrome = await findView(app, "view=chrome");
     await chrome.evaluate(() =>
-      window.chromeAPI.mascots.save(null, { name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "News.", sites: ["svt.se"], tools: ["visit"] })
+      window.chromeAPI.mascots.save(null, {
+        name: "Scout",
+        look: { palette: "lingon", accessory: "cap" },
+        instructions: "News.",
+        sites: ["svt.se"],
+        tools: ["visit"],
+      }),
     );
     model.titleWith("Flights to Lisbon");
     model.replyWith("Three flights.");
     const chat = await chrome.evaluate(() => window.chromeAPI.chat.send(null, "Find flights to Lisbon", { seePage: false }));
-    await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).chats.some((each) => each.running)).toBe(false);
+    await expect
+      .poll(async () => (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).chats.some((each) => each.running))
+      .toBe(false);
     await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ layoutMode: "horizontal" }));
     await chrome.evaluate((url) => window.chromeAPI.browser.createTab(url), `${site.origin}/`);
     await (await findView(app, `${site.origin}/`)).waitForLoadState();
@@ -175,18 +205,20 @@ test("in the horizontal layout, Chats and a mascot's card open over a web page, 
     await expect(panel).toBeVisible();
     await expect(pill).toHaveAttribute("aria-expanded", "true");
     // Over the page: the overlay's view is showing, above the tab's view, and covers where the page is.
-    const stack = await app.evaluate(({ BaseWindow, WebContentsView }) =>
-      BaseWindow.getAllWindows()[0].contentView.children.map((view) => ({
+    const stack = await app.evaluate(({ BaseWindow, WebContentsView }) => {
+      const [main] = BaseWindow.getAllWindows();
+      if (!main) throw new Error("No window");
+      return main.contentView.children.map((view) => ({
         url: view instanceof WebContentsView ? view.webContents.getURL() : "",
         visible: view.getVisible(),
         bounds: view.getBounds(),
-      }))
-    );
+      }));
+    });
     const overlayAt = stack.findIndex(({ url }) => url.includes("view=overlay"));
     const pageAt = stack.findIndex(({ url }) => url.startsWith(site.origin));
-    expect(stack[overlayAt].visible).toBe(true);
+    expect(defined(stack[overlayAt]).visible).toBe(true);
     expect(overlayAt).toBeGreaterThan(pageAt);
-    expect(stack[overlayAt].bounds.y).toBeLessThanOrEqual(stack[pageAt].bounds.y);
+    expect(defined(stack[overlayAt]).bounds.y).toBeLessThanOrEqual(defined(stack[pageAt]).bounds.y);
 
     await overlay.keyboard.press("Escape");
     await expect(panel).toBeHidden();
@@ -214,7 +246,9 @@ test("in the horizontal layout, Chats and a mascot's card open over a web page, 
     await face.click();
     await card.getByRole("button", { name: "New chat with Scout" }).click();
     await expect(card).toBeHidden();
-    await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).find((tab) => tab.isActive)?.page).toBe("new-tab");
+    await expect
+      .poll(async () => (await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).find((tab) => tab.isActive)?.page)
+      .toBe("new-tab");
     await expect(chrome.getByRole("button", { name: /Choose who to ask/ })).toHaveAccessibleName("Asking Scout. Choose who to ask");
   } finally {
     await app.close();

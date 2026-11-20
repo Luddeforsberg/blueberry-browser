@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/explicit-function-return-type, @typescript-eslint/no-empty-function */
 // Loaded into the test app's main process, so test runs don't take over the developer's screen.
 // The window opens far off-screen and the app never becomes the active one, with no Dock icon.
 // Sampled during a run with `lsappinfo front`, which is how to check this still holds.
@@ -24,9 +23,11 @@ class BackgroundWindow extends electron.BaseWindow {
     this.showInactive();
   }
 
-  focus() {}
+  focus() {
+    // Nothing: a test window never takes the keyboard from whatever's in front.
+  }
 
-  // A window that moves itself, like the bird on the desktop, stays off-screen by the same distance.
+  // A window that moves itself, like the mascot on the desktop, stays off-screen by the same distance.
   setBounds(bounds, ...rest) {
     super.setBounds({ ...bounds, x: bounds.x + OFF_SCREEN.x, y: bounds.y + OFF_SCREEN.y }, ...rest);
   }
@@ -50,7 +51,7 @@ Module._load = function (request, ...rest) {
   return request === "electron" ? wrapped : load.call(this, request, ...rest);
 };
 
-// Bringing the app forward is the one thing a click on the desktop bird does outside its own window.
+// Bringing the app forward is the one thing a click on the desktop mascot does outside its own window.
 electron.app.focus = () => {};
 electron.app.show = () => {};
 

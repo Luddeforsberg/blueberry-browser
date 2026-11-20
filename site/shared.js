@@ -4,13 +4,14 @@
 // src/shared/mascots.ts
 var BERRY_ID = "berry";
 var PALETTES = [
-  { id: "kingfisher", label: "Blueberry" },
-  { id: "robin", label: "Lingon" },
-  { id: "canary", label: "Cloudberry" },
-  { id: "parakeet", label: "Gooseberry" },
-  { id: "flamingo", label: "Raspberry" },
-  { id: "jackdaw", label: "Currant" }
+  { id: "blueberry", label: "Blueberry", oldId: "kingfisher" },
+  { id: "lingon", label: "Lingon", oldId: "robin" },
+  { id: "cloudberry", label: "Cloudberry", oldId: "canary" },
+  { id: "gooseberry", label: "Gooseberry", oldId: "parakeet" },
+  { id: "raspberry", label: "Raspberry", oldId: "flamingo" },
+  { id: "currant", label: "Currant", oldId: "jackdaw" }
 ];
+var paletteOf = (value) => PALETTES.find(({ id, oldId }) => value === id || value === oldId)?.id ?? null;
 var ACCESSORIES = [
   { id: "none", label: "Nothing" },
   { id: "crown", label: "Crown" },
@@ -28,7 +29,7 @@ var BERRY = {
   id: BERRY_ID,
   name: "Berry",
   // The blueberry, with nothing on.
-  look: { palette: "kingfisher", accessory: "none" },
+  look: { palette: "blueberry", accessory: "none" },
   instructions: "",
   sites: [],
   tools: MASCOT_TOOLS.map(({ id }) => id),
@@ -59,8 +60,9 @@ var parseMascotDraft = (input) => {
   const cleanInstructions = typeof instructions === "string" ? instructions.trim() : "";
   if (!cleanInstructions) return { error: "Say what it\u2019s for." };
   if (cleanInstructions.length > MAX_MASCOT_INSTRUCTIONS) return { error: `Keep this under ${MAX_MASCOT_INSTRUCTIONS} characters.` };
-  const { palette, accessory } = look ?? {};
-  if (!isOneOf(PALETTES, palette) || !isOneOf(ACCESSORIES, accessory)) return { error: "Choose a look." };
+  const { palette: savedPalette, accessory } = look ?? {};
+  const palette = paletteOf(savedPalette);
+  if (!palette || !isOneOf(ACCESSORIES, accessory)) return { error: "Choose a look." };
   if (!Array.isArray(sites) || !Array.isArray(tools)) return { error: "Choose where it can go and what it can do." };
   if (sites.length > MAX_SITES) return { error: `Keep it to ${MAX_SITES} sites.` };
   const cleanSites = [];
@@ -108,7 +110,8 @@ var parsePublicDraft = (input) => {
   if ("error" in parsed) return parsed;
   const { draft } = parsed;
   if (!SAFE_NAME.test(draft.name)) return { error: "To publish it, its name can only have letters, numbers, spaces and ' . & -." };
-  if (["berry", "blueberry"].includes(draft.name.toLowerCase())) return { error: "That name is taken by Blueberry itself. Give it its own." };
+  if (["berry", "blueberry"].includes(draft.name.toLowerCase()))
+    return { error: "That name is taken by Blueberry itself. Give it its own." };
   const local = draft.sites.find((site) => !isPublicSite(site));
   if (local) return { error: `${local} is only reachable from your own computer or network, so it can\u2019t be published.` };
   return { draft };
@@ -119,7 +122,8 @@ var parseExample = (input) => {
   const clean = { prompt: withoutInvisible(prompt), answer: withoutInvisible(answer) };
   if (!clean.prompt || !clean.answer) return { error: "An example needs both what was asked and what it gave. Or choose no example." };
   if (clean.prompt.length > MAX_EXAMPLE_PROMPT) return { error: `Keep what was asked under ${MAX_EXAMPLE_PROMPT} characters.` };
-  if (clean.answer.length > MAX_EXAMPLE_ANSWER) return { error: `Keep the answer under ${MAX_EXAMPLE_ANSWER} characters. Cut it down to what shows the mascot best.` };
+  if (clean.answer.length > MAX_EXAMPLE_ANSWER)
+    return { error: `Keep the answer under ${MAX_EXAMPLE_ANSWER} characters. Cut it down to what shows the mascot best.` };
   return { example: clean };
 };
 var authorProblem = (author) => {
@@ -135,12 +139,20 @@ var isUuid = (value) => typeof value === "string" && UUID.test(value);
 var parsePublishedRow = (input) => {
   const row = input ?? {};
   if (!isUuid(row.id)) return null;
-  const parsed = parsePublicDraft({ name: row.name, look: { palette: row.palette, accessory: row.accessory }, instructions: row.instructions, sites: row.sites, tools: row.tools });
+  const parsed = parsePublicDraft({
+    name: row.name,
+    look: { palette: row.palette, accessory: row.accessory },
+    instructions: row.instructions,
+    sites: row.sites,
+    tools: row.tools
+  });
   if ("error" in parsed) return null;
   const author = cleanLine(row.author_name);
   const description = cleanLine(row.description);
   if (authorProblem(author) || !description || description.length > MAX_DESCRIPTION) return null;
-  const example = parseExample(row.example_prompt === null && row.example_answer === null ? null : { prompt: row.example_prompt, answer: row.example_answer });
+  const example = parseExample(
+    row.example_prompt === null && row.example_answer === null ? null : { prompt: row.example_prompt, answer: row.example_answer }
+  );
   const publishedAt = Date.parse(String(row.created_at));
   return {
     id: row.id,
@@ -169,16 +181,16 @@ var linkWords = (text, href) => {
 var plainFromMarkdown = (markdown) => markdown.replace(/^\s*(```|~~~).*$/gm, "").replace(/^\s{0,3}(?:[-*_]\s*){3,}$/gm, "").replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/\[([^\]]*)\]\(\s*<?([^)\s>]*)>?(?:\s+"[^"]*")?\s*\)/g, (_, text, href) => linkWords(text, href)).replace(/<(https?:\/\/[^>\s]+)>/g, (_, href) => linkWords(href, href)).replace(/^\s{0,3}#{1,6}\s+/gm, "").replace(/^\s{0,3}>\s?/gm, "").replace(/^(\s*)[-*+]\s+/gm, "$1\u2022 ").replace(/(\*\*|__)(?=\S)(.+?)(?<=\S)\1/g, "$2").replace(/(^|[^\w*])[*_](?=\S)(.+?)(?<=\S)[*_](?=[^\w*]|$)/g, "$1$2").replace(/~~(.+?)~~/g, "$1").replace(/`([^`]+)`/g, "$1").replace(/\n{3,}/g, "\n\n").trim();
 
 // src/shared/phone.ts
-var flockFromRows = (rows) => {
-  const birds = [BERRY];
+var mascotsFromSharedRows = (rows) => {
+  const mascots = [BERRY];
   for (const row of Array.isArray(rows) ? rows : []) {
     const { id, name, palette, accessory, instructions, sites, tools, from_gallery: fromGallery } = row ?? {};
-    if (typeof id !== "string" || !/^[\w-]{1,100}$/.test(id) || id === BERRY_ID || birds.some((bird) => bird.id === id)) continue;
+    if (typeof id !== "string" || !/^[\w-]{1,100}$/.test(id) || id === BERRY_ID || mascots.some((mascot) => mascot.id === id)) continue;
     const parsed = parseMascotDraft({ name, look: { palette, accessory }, instructions, sites, tools });
     if ("error" in parsed) continue;
-    birds.push({ ...parsed.draft, id, deletedAt: null, ...fromGallery === true ? { galleryId: "gallery" } : {} });
+    mascots.push({ ...parsed.draft, id, deletedAt: null, ...fromGallery === true ? { galleryId: "gallery" } : {} });
   }
-  return birds;
+  return mascots;
 };
 var mascotSnapshot = ({ id, name, instructions, sites, tools, galleryId }) => ({
   id,
@@ -191,7 +203,11 @@ var mascotSnapshot = ({ id, name, instructions, sites, tools, galleryId }) => ({
 var MAX_HISTORY = 40;
 var MAX_HISTORY_TEXT = 8e3;
 var MAX_HISTORY_BYTES = 9e4;
-var asHistoryMessage = ({ role, content, steps }) => ({
+var asHistoryMessage = ({
+  role,
+  content,
+  steps
+}) => ({
   role,
   content: steps?.length ? `<steps>
 ${steps.map((step) => `- ${step.text}`).join("\n")}
@@ -201,7 +217,9 @@ ${content}` : content
 });
 var bytes = (text) => new TextEncoder().encode(text).length;
 var fitHistory = (input) => {
-  const messages = (Array.isArray(input) ? input : []).filter((message) => (message?.role === "user" || message?.role === "assistant") && typeof message.content === "string").slice(-MAX_HISTORY).map(({ role, content }) => ({ role, content: content.slice(0, MAX_HISTORY_TEXT) }));
+  const messages = (Array.isArray(input) ? input : []).filter(
+    (message) => (message?.role === "user" || message?.role === "assistant") && typeof message.content === "string"
+  ).slice(-MAX_HISTORY).map(({ role, content }) => ({ role, content: content.slice(0, MAX_HISTORY_TEXT) }));
   while (messages.length > 0 && bytes(JSON.stringify(messages)) > MAX_HISTORY_BYTES) messages.shift();
   return messages;
 };
@@ -239,9 +257,21 @@ var fetchWithin = async (url, init, ms = CALL_DEADLINE_MS, fetcher = fetch) => {
 };
 var oneAtATime = (work) => {
   let out = null;
-  return () => out ??= work().finally(() => {
+  let again = null;
+  const run = () => out = work().finally(() => {
     out = null;
   });
+  return () => {
+    if (!out) return run();
+    const settled = out.then(
+      () => void 0,
+      () => void 0
+    );
+    return again ??= settled.then(() => {
+      again = null;
+      return run();
+    });
+  };
 };
 var runnerLinkDue = (checkedAt, now) => checkedAt === null || now - checkedAt >= RUNNER_LINK_EVERY_MS;
 
@@ -265,7 +295,7 @@ var siteParts = (text) => {
   return parts.filter((part) => part.text);
 };
 var withSiteNames = (text) => siteParts(text).map((part) => part.text).join("");
-var asContinuation = (text) => /^[A-Z][a-z]/.test(text) ? text[0].toLowerCase() + text.slice(1) : text;
+var asContinuation = (text) => /^[A-Z][a-z]/.test(text) ? text.charAt(0).toLowerCase() + text.slice(1) : text;
 
 // src/renderer/chrome/src/shortWords.ts
 var DAY_MS = 864e5;
@@ -304,7 +334,7 @@ var rowTime = (time, { now = Date.now(), going = false } = {}) => {
   return dayOf(now) - dayOf(time) < 7 ? weekday(time) : dayAndMonth(time);
 };
 
-// src/main/phoneReplies.ts
+// src/main/phone/phoneReplies.ts
 var MIN_CODE_LENGTH = 4;
 var MAX_CODE_LENGTH = 12;
 var plausibleCode = (text) => {
@@ -317,14 +347,13 @@ var plausibleCode = (text) => {
 export {
   BERRY_ID,
   asContinuation,
-  conversationIdOf,
   conversationsOf,
   fetchWithin,
   finishedWhen,
-  flockFromRows,
   followUpHistory,
   isUuid,
   mascotSnapshot,
+  mascotsFromSharedRows,
   oneAtATime,
   parsePublishedRow,
   permissionsInWords,

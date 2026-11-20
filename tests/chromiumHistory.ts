@@ -7,7 +7,10 @@ const CHROMIUM_EPOCH_MS = 11_644_473_600_000n;
 export const chromiumTime = (ms: number): bigint => (BigInt(ms) + CHROMIUM_EPOCH_MS) * 1000n;
 
 // A History file in Chromium's format, with only the tables and columns that matter. Left open for the caller to close.
-export const writeChromiumHistory = (file: string, visits: { url: string; title: string; visitedAt: number; hidden?: boolean }[]): DatabaseSync => {
+export const writeChromiumHistory = (
+  file: string,
+  visits: { url: string; title: string; visitedAt: number; hidden?: boolean }[],
+): DatabaseSync => {
   mkdirSync(dirname(file), { recursive: true });
   const db = new DatabaseSync(file);
   db.exec(`

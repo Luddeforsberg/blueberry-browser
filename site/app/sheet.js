@@ -45,10 +45,20 @@ const draggable = (handle, node) => {
 export const openSheet = ({ kind, label, top = [], onClose }) => {
   if (current) closeSheet({ instant: true });
   const returnTo = document.activeElement;
-  const cross = el("button", { type: "button", className: "round soft sheet-close", ariaLabel: "Close", onclick: () => closeSheet() }, icon("close"));
+  const cross = el(
+    "button",
+    { type: "button", className: "round soft sheet-close", ariaLabel: "Close", onclick: () => closeSheet() },
+    icon("close"),
+  );
   const handle = el("div", { className: "sheet-top" }, el("i", { className: "grab", ariaHidden: "true" }), ...top);
   const body = el("div", { className: "sheet-body", dataClip: "" });
-  const node = el("section", { className: `sheet ${kind}`, role: "dialog", ariaModal: "true", ariaLabel: label, tabIndex: -1, dataLayer: "2" }, handle, cross, body);
+  const node = el(
+    "section",
+    { className: `sheet ${kind}`, role: "dialog", ariaModal: "true", ariaLabel: label, tabIndex: -1, dataLayer: "2" },
+    handle,
+    cross,
+    body,
+  );
   const veil = el("div", { className: "veil", ariaHidden: "true", onclick: () => closeSheet() });
   document.getElementById("sheets").append(veil, node);
   document.getElementById("app").inert = true;

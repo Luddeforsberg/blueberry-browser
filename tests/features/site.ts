@@ -11,13 +11,25 @@ input{display:block;margin:6px 0 14px;padding:8px;width:320px}button{padding:8px
 <body>${body}</body></html>`;
 
 const PAGES: Record<string, string> = {
-  "/": page("Cheap Cables", "<h1>Cheap Cables</h1><p>USB-C cables, cheaper than anywhere.</p><ul><li>1 m cable, 49 kr</li><li>2 m cable, 79 kr</li><li>3 m braided cable, 129 kr</li></ul><button>Add to cart</button>"),
+  "/": page(
+    "Cheap Cables",
+    "<h1>Cheap Cables</h1><p>USB-C cables, cheaper than anywhere.</p><ul><li>1 m cable, 49 kr</li><li>2 m cable, 79 kr</li><li>3 m braided cable, 129 kr</li></ul><button>Add to cart</button>",
+  ),
   "/cart": page("Your cart", "<h1>Your cart</h1><p>1 m cable, 49 kr</p><button>Place order</button>"),
-  "/news": page("Morning News", "<h1>Morning News</h1><ol><li>Swifts are back over the city</li><li>A new bridge opens on Monday</li><li>The jackdaw count is up again</li></ol>"),
+  "/news": page(
+    "Morning News",
+    "<h1>Morning News</h1><ol><li>Swifts are back over the city</li><li>A new bridge opens on Monday</li><li>The jackdaw count is up again</li></ol>",
+  ),
   "/flights": page("Lisbon fares", "<h1>Flights to Lisbon</h1><p>Three flights under €200 this weekend.</p>"),
   "/birds": page("Birds", "<h1>Birds</h1><p>A jackdaw on the roof. A jackdaw on the wall. A jackdaw in the tree, and a magpie.</p>"),
-  "/account": page("Sign in", '<h1>Sign in</h1><label>Email<input id="email" type="email"></label><label>Password<input id="password" type="password"></label><button>Sign in</button>'),
-  "/notify": page("Alerts", "<h1>Price alerts</h1><p>Get told when a cable gets cheaper.</p><script>Notification.requestPermission()</script>"),
+  "/account": page(
+    "Sign in",
+    '<h1>Sign in</h1><label>Email<input id="email" type="email"></label><label>Password<input id="password" type="password"></label><button>Sign in</button>',
+  ),
+  "/notify": page(
+    "Alerts",
+    "<h1>Price alerts</h1><p>Get told when a cable gets cheaper.</p><script>Notification.requestPermission()</script>",
+  ),
 };
 
 export interface Site {

@@ -28,8 +28,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run typecheck
+      - run: pnpm run format:check
       - run: pnpm run lint
+      - run: pnpm run knip
       - run: pnpm run test
       - run: pnpm exec electron-vite build
-      # No end-to-end tests here: 15 of them need a real screen, where the bird on the page has its poses, and
+      # No end-to-end tests here: 15 of them need a real screen, where the mascot on the page has its poses, and
       # GitHub's runners have none. They run on a Mac with `pnpm run verify` before every PR.

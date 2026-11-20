@@ -30,7 +30,11 @@ export const writeBrowserHistory = (folder: string, visits: ReturnType<typeof ha
   const helper = pathToFileURL(join(__dirname, "..", "chromiumHistory.ts")).href;
   const script = `import { chromeHistoryFile, writeChromiumHistory } from ${JSON.stringify(helper)};
 writeChromiumHistory(chromeHistoryFile(${JSON.stringify(folder)}), ${JSON.stringify(visits)}).close();`;
-  const run = spawnSync(process.execPath, ["--experimental-strip-types", "--disable-warning=ExperimentalWarning", "--input-type=module", "-e", script], { encoding: "utf8" });
+  const run = spawnSync(
+    process.execPath,
+    ["--experimental-strip-types", "--disable-warning=ExperimentalWarning", "--input-type=module", "-e", script],
+    { encoding: "utf8" },
+  );
   if (run.status !== 0) throw new Error(`Couldn't write the browser history: ${run.stderr}`);
 };
 
@@ -42,12 +46,30 @@ interface Session {
 // What the cheap model proposes from that history, citing the digest's real sessions, as tests/suggestionReplies.ts
 // does for the evals' history.
 export const habitProposals = (digest: string): string => {
-  const { sessions } = JSON.parse(digest.replace(/^<browsing_digest>\n/, "").replace(/\n<\/browsing_digest>$/, "")) as { sessions: Session[] };
+  const { sessions } = JSON.parse(digest.replace(/^<browsing_digest>\n/, "").replace(/\n<\/browsing_digest>$/, "")) as {
+    sessions: Session[];
+  };
   const on = (site: string) => sessions.filter(({ pages }) => pages.some((page) => page.site === site)).map(({ id }) => id);
   return JSON.stringify({
     cards: [
-      { kind: "prompt", line: "Shall I check the cable prices again?", why: "You keep going back to Cheap Cables", evidence: on("shop.example"), sites: ["shop.example"], prompt: "Check the USB-C cable prices on shop.example and tell me the cheapest." },
-      { kind: "routine", line: "Want the morning news picked out by 8:15?", why: "You read Morning News around half past eight", evidence: on("news.example"), sites: ["news.example"], name: "Morning news", instructions: "Read the Morning News page and list the stories worth my time.", schedule: { kind: "daily", time: "08:15" } },
+      {
+        kind: "prompt",
+        line: "Shall I check the cable prices again?",
+        why: "You keep going back to Cheap Cables",
+        evidence: on("shop.example"),
+        sites: ["shop.example"],
+        prompt: "Check the USB-C cable prices on shop.example and tell me the cheapest.",
+      },
+      {
+        kind: "routine",
+        line: "Want the morning news picked out by 8:15?",
+        why: "You read Morning News around half past eight",
+        evidence: on("news.example"),
+        sites: ["news.example"],
+        name: "Morning news",
+        instructions: "Read the Morning News page and list the stories worth my time.",
+        schedule: { kind: "daily", time: "08:15" },
+      },
     ],
   });
 };

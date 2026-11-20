@@ -1,12 +1,32 @@
 import { describe, expect, it } from "vitest";
-import { linkSite, parsePublicDraft, parsePublishChoices, parsePublishedRow, plainFromMarkdown, publicRow, publishWarnings } from "./publishing";
+import {
+  linkSite,
+  parsePublicDraft,
+  parsePublishChoices,
+  parsePublishedRow,
+  plainFromMarkdown,
+  publicRow,
+  publishWarnings,
+} from "./publishing";
 import { MAX_MASCOT_INSTRUCTIONS, MAX_MASCOT_NAME } from "./mascots";
 
 const ID = "00000000-0000-4000-8000-000000000001";
-const draft = { name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "Read.", sites: ["svt.se"], tools: ["visit"] };
+const draft = { name: "Scout", look: { palette: "lingon", accessory: "cap" }, instructions: "Read.", sites: ["svt.se"], tools: ["visit"] };
 const row = {
-  id: ID, name: "Scout", palette: "robin", accessory: "cap", description: "Reads.", category: "Work", instructions: "Read.", sites: ["svt.se"], tools: ["visit"],
-  author_name: "Ana", example_prompt: "Q", example_answer: "A", add_count: 3, created_at: "2026-11-01T10:00:00Z",
+  id: ID,
+  name: "Scout",
+  palette: "robin",
+  accessory: "cap",
+  description: "Reads.",
+  category: "Work",
+  instructions: "Read.",
+  sites: ["svt.se"],
+  tools: ["visit"],
+  author_name: "Ana",
+  example_prompt: "Q",
+  example_answer: "A",
+  add_count: 3,
+  created_at: "2026-11-01T10:00:00Z",
 };
 const choices = { author: "Ana", description: "Reads.", category: "Work", example: null };
 
@@ -39,9 +59,22 @@ describe("what strangers publish", () => {
   it("reads a good row, dropping anything else on it", () => {
     const parsed = parsePublishedRow({ ...row, owner: "someone", hidden: false, skipApprovals: true, tools: ["visit", "everything"] });
     expect(parsed).toEqual({
-      id: ID, author: "Ana", category: "Work", description: "Reads.", example: { prompt: "Q", answer: "A" }, addCount: 3, publishedAt: Date.parse(row.created_at),
+      id: ID,
+      author: "Ana",
+      category: "Work",
+      description: "Reads.",
+      example: { prompt: "Q", answer: "A" },
+      addCount: 3,
+      publishedAt: Date.parse(row.created_at),
       draft: { ...draft, tools: ["visit"] },
     });
+  });
+
+  it("reads a row under a palette's old id, from any version of the app, as its berry, and publishes under the new id", () => {
+    expect(parsePublishedRow(row)?.draft.look).toEqual({ palette: "lingon", accessory: "cap" });
+    expect(parsePublishedRow({ ...row, palette: "lingon" })?.draft.look).toEqual({ palette: "lingon", accessory: "cap" });
+    // The server takes both since 20261119000000_berry_palettes.sql.
+    expect(publicRow(draft as never, choices).palette).toBe("lingon");
   });
 
   it.each([
@@ -73,7 +106,19 @@ describe("what strangers publish", () => {
     const parsed = parsePublishChoices({ ...choices, email: "a@b.se", chats: ["x"] });
     if ("error" in parsed) throw new Error(parsed.error);
     const sent = publicRow({ ...draft, id: "local", deletedAt: null, galleryId: "x", publishedId: "y" } as never, parsed.choices);
-    expect(Object.keys(sent).sort()).toEqual(["accessory", "author_name", "category", "description", "example_answer", "example_prompt", "instructions", "name", "palette", "sites", "tools"]);
+    expect(Object.keys(sent).sort()).toEqual([
+      "accessory",
+      "author_name",
+      "category",
+      "description",
+      "example_answer",
+      "example_prompt",
+      "instructions",
+      "name",
+      "palette",
+      "sites",
+      "tools",
+    ]);
   });
 
   it.each([
@@ -102,8 +147,12 @@ describe("what strangers publish", () => {
   });
 
   it("stays quiet about ordinary words, and looks in the example too", () => {
-    expect(publishWarnings({ instructions: "Check the password reset page on github.com and tell me about 2026-11-01." }, choices)).toEqual([]);
-    expect(publishWarnings({ instructions: "Read." }, { ...choices, example: { prompt: "Mail a@b.se", answer: "Done" } })).toEqual(["There may be an email address in the example’s question."]);
+    expect(publishWarnings({ instructions: "Check the password reset page on github.com and tell me about 2026-11-01." }, choices)).toEqual(
+      [],
+    );
+    expect(publishWarnings({ instructions: "Read." }, { ...choices, example: { prompt: "Mail a@b.se", answer: "Done" } })).toEqual([
+      "There may be an email address in the example’s question.",
+    ]);
   });
 });
 
@@ -128,7 +177,16 @@ describe("a stranger's example as plain words", () => {
       "```",
     ].join("\n");
     expect(plainFromMarkdown(answer)).toBe(
-      ["Morning briefing", "", "• Sweden: a vote on Tuesday. Ekot (sverigesradio.se)", "• See svt.se and code", "Quoted old words", "A chart", "", "plain"].join("\n")
+      [
+        "Morning briefing",
+        "",
+        "• Sweden: a vote on Tuesday. Ekot (sverigesradio.se)",
+        "• See svt.se and code",
+        "Quoted old words",
+        "A chart",
+        "",
+        "plain",
+      ].join("\n"),
     );
   });
 

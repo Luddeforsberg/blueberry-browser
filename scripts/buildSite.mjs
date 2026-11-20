@@ -1,6 +1,5 @@
-/* eslint-disable @typescript-eslint/explicit-function-return-type */
 // Writes what comes from the app: in site/, so the public page has the same drawing, the same words for permissions and
-// the same checks on a row, and src/main/pageActorArt.ts, for the bird on web pages. Run with `pnpm run site:build` after
+// the same checks on a row, and src/main/tools/pageActorArt.ts, for the mascot on web pages. Run with `pnpm run site:build` after
 // changing any of them.
 import { build } from "esbuild";
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -17,15 +16,15 @@ await build({
     contents: [
       `export { isUuid, parsePublishedRow, plainFromMarkdown } from "./src/shared/publishing";`,
       `export { BERRY_ID, permissionsInWords } from "./src/shared/mascots";`,
-      // The phone page: the flock as the app shares it, conversations and their history, the words for an approval, and what
+      // The phone page: the mascots as the app shares them, conversations and their history, the words for an approval, and what
       // counts as a code.
-      `export { conversationIdOf, conversationsOf, flockFromRows, followUpHistory, mascotSnapshot } from "./src/shared/phone";`,
+      `export { conversationsOf, mascotsFromSharedRows, followUpHistory, mascotSnapshot } from "./src/shared/phone";`,
       // How it calls the server: a deadline on every call, one poll at a time, and how often to ask about the link.
       `export { fetchWithin, oneAtATime, runnerLinkDue } from "./src/shared/phoneCalls";`,
       `export { asContinuation, withSiteNames } from "./src/renderer/chrome/src/siteNames";`,
       // Times written the one way the app writes them.
       `export { finishedWhen, rowTime } from "./src/renderer/chrome/src/shortWords";`,
-      `export { plausibleCode } from "./src/main/phoneReplies";`,
+      `export { plausibleCode } from "./src/main/phone/phoneReplies";`,
     ].join("\n"),
     resolveDir: root,
     loader: "ts",
@@ -38,20 +37,20 @@ await build({
 });
 
 // Every accessory in the resting pose, still. Each drawing carries every berry's body, and the `data-mascot` it's given
-// where it's shown picks one, so colours and shapes come from tokens.css and the rules written to birds.css below.
+// where it's shown picks one, so colours and shapes come from tokens.css and the rules written to mascots.css below.
 const temp = mkdtempSync(join(tmpdir(), "blueberry-site-"));
-const script = join(temp, "birds.mjs");
+const script = join(temp, "drawings.mjs");
 await build({
   stdin: {
     contents: `
       import { createElement } from "react";
       import { renderToStaticMarkup } from "react-dom/server";
-      import { BERRY_KIND, Mascot } from "./src/renderer/common/components/Mascot";
-      import { ACCESSORIES } from "./src/shared/mascots";
-      export { BERRY_KIND };
-      export { PIP_MARKS, PIP_PATTERNS, pipOpacities, STEP_PIPS } from "./src/renderer/common/components/Pips";
-      const pose = (mood, accessory, size = 120) => renderToStaticMarkup(createElement(Mascot, { mood, size, still: true, anyLook: true, look: { palette: "jackdaw", accessory } }));
-      // What the bird on a web page is drawn from, by \`src/main/pageActorScript.ts\`.
+      import { Mascot } from "./src/renderer/common/components/Mascot";
+      import { ACCESSORIES, PALETTES } from "./src/shared/mascots";
+      export { PALETTES };
+      export { PIP_MARKS, PIP_PATTERNS, pipOpacities, STEP_PIPS } from "./src/renderer/common/components/pipPatterns";
+      const pose = (mood, accessory, size = 120) => renderToStaticMarkup(createElement(Mascot, { mood, size, still: true, anyLook: true, look: { palette: "currant", accessory } }));
+      // What the mascot on a web page is drawn from, by \`src/main/tools/pageActorScript.ts\`.
       export const actorArt = Object.fromEntries(ACCESSORIES.map(({ id }) => [id, {
         flying: pose("fetching", id),
         rest: pose("rest", id),
@@ -67,7 +66,7 @@ await build({
       const still = (mood, accessory) => pose(mood, accessory).replace(/ style="[^"]*"/g, "");
       const PHONE_MOODS = ["rest", "fetching", "asking", "delivered", "oops"];
       export const poses = Object.fromEntries(ACCESSORIES.map(({ id }) => [id, Object.fromEntries(PHONE_MOODS.map((mood) => [mood, still(mood, id)]))]));
-      export const birds = Object.fromEntries(ACCESSORIES.map(({ id }) => [id, pose("rest", id, 160)]));
+      export const drawings = Object.fromEntries(ACCESSORIES.map(({ id }) => [id, pose("rest", id, 160)]));
     `,
     resolveDir: root,
     loader: "ts",
@@ -78,10 +77,12 @@ await build({
   jsx: "automatic",
   alias: { "@shared": join(root, "src/shared") },
   // Bundled React still asks for Node's built-ins by require, so those are given to it.
-  banner: { js: `import { createRequire } from "node:module"; const require = createRequire(${JSON.stringify(join(root, "package.json"))});` },
+  banner: {
+    js: `import { createRequire } from "node:module"; const require = createRequire(${JSON.stringify(join(root, "package.json"))});`,
+  },
   outfile: script,
 });
-const { birds, actorArt, poses, BERRY_KIND, PIP_MARKS, PIP_PATTERNS, pipOpacities, STEP_PIPS } = await import(pathToFileURL(script).href);
+const { drawings, actorArt, poses, PALETTES, PIP_MARKS, PIP_PATTERNS, pipOpacities, STEP_PIPS } = await import(pathToFileURL(script).href);
 rmSync(temp, { recursive: true, force: true });
 
 // The pips (DESIGN.md section 6) for the phone page, as CSS from the app's own frames: a grid of nine dots, each
@@ -98,16 +99,27 @@ for (const pattern of [...PIP_PATTERNS, ...PIP_MARKS]) {
     const values = frames.map((frame) => round(frame[dot]));
     const name = `pips-${pattern}-${dot + 1}`;
     const moves = values.some((value) => value !== values[0]);
-    pipRules.push(`.pips[data-pips="${pattern}"] i:nth-child(${dot + 1}) { opacity: ${values[0]};${moves ? ` animation: ${name} ${ms * frames.length}ms step-end infinite;` : ""} }`);
-    if (moves) pipRules.push(`@keyframes ${name} { ${values.map((value, at) => `${round((at / values.length) * 100)}% { opacity: ${value}; }`).join(" ")} }`);
+    pipRules.push(
+      `.pips[data-pips="${pattern}"] i:nth-child(${dot + 1}) { opacity: ${values[0]};${moves ? ` animation: ${name} ${ms * frames.length}ms step-end infinite;` : ""} }`,
+    );
+    if (moves)
+      pipRules.push(
+        `@keyframes ${name} { ${values.map((value, at) => `${round((at / values.length) * 100)}% { opacity: ${value}; }`).join(" ")} }`,
+      );
   }
 }
-writeFileSync(join(site, "app", "pips.css"), `/* Generated by scripts/buildSite.mjs from Pips.tsx. Don't edit this. */\n${pipRules.join("\n")}\n`);
+writeFileSync(
+  join(site, "app", "pips.css"),
+  `/* Generated by scripts/buildSite.mjs from Pips.tsx. Don't edit this. */\n${pipRules.join("\n")}\n`,
+);
 writeFileSync(join(site, "app", "pips.js"), `${NOTE}export const STEP_PIPS = ${JSON.stringify(STEP_PIPS, null, 2)};\n`);
 
 // Geist and Geist Mono, served by the site itself (DESIGN.md section 5), with their licence.
 mkdirSync(join(site, "fonts"), { recursive: true });
-for (const [family, file] of [["geist", "geist-latin-wght-normal.woff2"], ["geist-mono", "geist-mono-latin-wght-normal.woff2"]]) {
+for (const [family, file] of [
+  ["geist", "geist-latin-wght-normal.woff2"],
+  ["geist-mono", "geist-mono-latin-wght-normal.woff2"],
+]) {
   const from = join(root, "node_modules", "@fontsource-variable", family);
   copyFileSync(join(from, "files", file), join(site, "fonts", file));
   copyFileSync(join(from, "LICENSE"), join(site, "fonts", `${family}-LICENSE.txt`));
@@ -116,17 +128,18 @@ for (const [family, file] of [["geist", "geist-latin-wght-normal.woff2"], ["geis
 // Of the bodies every drawing carries, only its own mascot's shows.
 const rules = [
   "[data-berry] { display: none; }",
-  ...Object.entries(BERRY_KIND).map(([palette, kind]) => `[data-mascot="${palette}"] [data-berry="${kind}"] { display: inline; }`),
+  ...PALETTES.map(({ id }) => `[data-mascot="${id}"] [data-berry="${id}"] { display: inline; }`),
 ];
-writeFileSync(join(site, "birds.js"), `${NOTE}export const BIRDS = ${JSON.stringify(birds, null, 2)};\n`);
+writeFileSync(join(site, "mascots.js"), `${NOTE}export const DRAWINGS = ${JSON.stringify(drawings, null, 2)};\n`);
 writeFileSync(join(site, "app", "poses.js"), `${NOTE}export const POSES = ${JSON.stringify(poses)};\n`);
-writeFileSync(join(site, "birds.css"), `/* Generated by scripts/buildSite.mjs. Don't edit this. */\n${rules.join("\n")}\n`);
+writeFileSync(join(site, "mascots.css"), `/* Generated by scripts/buildSite.mjs. Don't edit this. */\n${rules.join("\n")}\n`);
 copyFileSync(join(root, "src/renderer/common/tokens.css"), join(site, "tokens.css"));
 
-// The same drawings for the bird on a web page, as a tree of plain data. A page's Trusted Types can refuse innerHTML even
-// from an isolated world, so that bird is made element by element, and its colours come from the same tokens.
+// The same drawings for the mascot on a web page, as a tree of plain data. A page's Trusted Types can refuse innerHTML even
+// from an isolated world, so that mascot is made element by element, and its colours come from the same tokens.
 const toTree = (markup, pose) => {
-  const unescape = (value) => value.replaceAll("&quot;", '"').replaceAll("&amp;", "&").replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&#x27;", "'");
+  const unescape = (value) =>
+    value.replaceAll("&quot;", '"').replaceAll("&amp;", "&").replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&#x27;", "'");
   const stack = [["root", {}]];
   for (const [, closing, tag, attributes, empty] of markup.matchAll(/<(\/?)([a-zA-Z]+)((?:\s+[\w:-]+="[^"]*")*)\s*(\/?)>/g)) {
     if (closing) {
@@ -153,28 +166,49 @@ const toTree = (markup, pose) => {
   return stack[0][2];
 };
 const tree = Object.fromEntries(
-  Object.entries(actorArt).map(([accessory, poses]) => [accessory, Object.fromEntries(Object.entries(poses).map(([pose, markup]) => [pose, toTree(markup, pose)]))])
+  Object.entries(actorArt).map(([accessory, poses]) => [
+    accessory,
+    Object.fromEntries(Object.entries(poses).map(([pose, markup]) => [pose, toTree(markup, pose)])),
+  ]),
 );
 
 const tokens = readFileSync(join(root, "src/renderer/common/tokens.css"), "utf8").replace(/\r\n/g, "\n");
-// The tokens the bird and its line use, from one block of tokens.css.
+// The tokens the mascot and its line use, from one block of tokens.css.
 const block = (selector) => {
   const at = tokens.indexOf(`${selector} {`);
-  return tokens.slice(at, tokens.indexOf("}", at)).match(/--(?:berry-[a-z-]+|sheet|ink|ask): [^;]+;/g).join(" ");
+  return tokens
+    .slice(at, tokens.indexOf("}", at))
+    .match(/--(?:berry-[a-z-]+|sheet|ink|ask): [^;]+;/g)
+    .join(" ");
 };
 // The rules that give a mascot its eyes, as tokens.css writes them.
 const eyes = tokens.match(/(?:\[data-mascot="[a-z]+"\],?\s*)+\{[^}]*\}/g).map((rule) => rule.replace(/\s+/g, " "));
 const sheet = [`.sky { ${block(":root")} }`, `.sky.dark { ${block(".dark")} }`, ...eyes, ...rules].join("\n");
 writeFileSync(
-  join(root, "src/main/pageActorArt.ts"),
-  `${NOTE}export type ArtNode = [tag: string, attributes: Record<string, string>, ...children: ArtNode[]];\n\nexport const ACTOR_ART = ${JSON.stringify(tree)} as unknown as Record<string, Record<string, ArtNode>>;\n\nexport const ACTOR_ART_SHEET = ${JSON.stringify(sheet)};\n\n// Which berry each saved palette draws as, so a page gets only that one's parts.\nexport const ACTOR_BERRY: Record<string, string> = ${JSON.stringify(BERRY_KIND)};\n`
+  join(root, "src/main/tools/pageActorArt.ts"),
+  `${NOTE}export type ArtNode = [tag: string, attributes: Record<string, string>, ...children: ArtNode[]];\n\nexport const ACTOR_ART = ${JSON.stringify(tree)} as unknown as Record<string, Record<string, ArtNode>>;\n\nexport const ACTOR_ART_SHEET = ${JSON.stringify(sheet)};\n\n// Every berry, by the palette id a look draws it with, so a page gets only its own one's parts.\nexport const ACTOR_BERRIES: string[] = ${JSON.stringify(PALETTES.map(({ id }) => id))};\n`,
 );
+
+// Where the site is. A link preview only reads the share picture from a whole address, so the pages' tags are written from
+// this. Change it here and run this to move the site.
+const SITE_ORIGIN = "https://blueberry-flock.netlify.app";
+for (const page of ["index.html", "m/index.html"]) {
+  const file = join(site, page);
+  writeFileSync(file, readFileSync(file, "utf8").replace(/content="https:\/\/[^"]+\/share\.png"/g, `content="${SITE_ORIGIN}/share.png"`));
+}
 
 // The picture a shared link shows, since a link preview can't run the page: the mascots in a row, on `ground` in light mode. It's
 // drawn by the Chrome on this computer, so without one it says so and leaves the old picture.
-const SHARE_FLOCK = [["none", "kingfisher"], ["cap", "robin"], ["glasses", "canary"], ["headphones", "flamingo"], ["bow", "parakeet"], ["crown", "jackdaw"]];
+const SHARE_MASCOTS = [
+  ["none", "blueberry"],
+  ["cap", "lingon"],
+  ["glasses", "cloudberry"],
+  ["headphones", "raspberry"],
+  ["bow", "gooseberry"],
+  ["crown", "currant"],
+];
 const shareCard = `<!doctype html><html><head><meta charset="utf-8"><style>${readFileSync(join(site, "tokens.css"), "utf8")}
-${readFileSync(join(site, "birds.css"), "utf8")}
+${readFileSync(join(site, "mascots.css"), "utf8")}
 * { box-sizing: border-box; margin: 0; }
 body { width: 1200px; height: 630px; background: rgb(var(--ground)); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 .card { height: 100%; padding: 100px 108px 36px; display: flex; flex-direction: column; }
@@ -182,14 +216,14 @@ h1 { font-size: 72px; font-weight: 500; letter-spacing: -0.025em; color: rgb(var
 p { margin-top: 12px; font-size: 30px; color: rgb(var(--ink-2)); }
 .wire { margin-top: auto; display: flex; justify-content: space-between; margin-bottom: 72px; }
 .wire svg { width: 150px; height: 150px; overflow: visible; }
-</style></head><body><div class="card"><h1>Blueberry</h1><p>An AI browser that works on your behalf.</p><div class="wire">${SHARE_FLOCK.map(([accessory, palette]) => `<div>${birds[accessory].replace('data-mascot="jackdaw"', `data-mascot="${palette}"`)}</div>`).join("")}</div></div></body></html>`;
+</style></head><body><div class="card"><h1>Blueberry</h1><p>An AI browser that works on your behalf.</p><div class="wire">${SHARE_MASCOTS.map(([accessory, palette]) => `<div>${drawings[accessory].replace('data-mascot="currant"', `data-mascot="${palette}"`)}</div>`).join("")}</div></div></body></html>`;
 try {
   const { chromium } = await import("playwright-core");
   const browser = await chromium.launch({ channel: "chrome" });
   const page = await browser.newPage({ viewport: { width: 1200, height: 630 }, colorScheme: "light" });
   await page.setContent(shareCard);
-  await page.screenshot({ path: join(site, "flock.png") });
+  await page.screenshot({ path: join(site, "share.png") });
   await browser.close();
 } catch (error) {
-  console.warn(`Couldn't draw site/flock.png, so it wasn't changed: ${error.message.split("\n")[0]}`);
+  console.warn(`Couldn't draw site/share.png, so it wasn't changed: ${error.message.split("\n")[0]}`);
 }

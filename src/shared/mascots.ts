@@ -4,15 +4,25 @@ import type { MascotAccessory, MascotDraft, MascotPalette, MascotProfile, Mascot
 
 export const BERRY_ID = "berry";
 
-// The ids are the old birds', kept because looks are saved under them. Each is drawn and named as a berry.
-export const PALETTES: { id: MascotPalette; label: string }[] = [
-  { id: "kingfisher", label: "Blueberry" },
-  { id: "robin", label: "Lingon" },
-  { id: "canary", label: "Cloudberry" },
-  { id: "parakeet", label: "Gooseberry" },
-  { id: "flamingo", label: "Raspberry" },
-  { id: "jackdaw", label: "Currant" },
+// Each palette is a berry, by its id. `oldId` is what a look was saved as before that, and still is in mascots.json and
+// suggestions.json from an older version, Gallery rows any version published, and the phone's shared mascots. A look is
+// read through `paletteOf` wherever it comes from, so those keep their berry for good.
+export const PALETTES: { id: MascotPalette; label: string; oldId: string }[] = [
+  { id: "blueberry", label: "Blueberry", oldId: "kingfisher" },
+  { id: "lingon", label: "Lingon", oldId: "robin" },
+  { id: "cloudberry", label: "Cloudberry", oldId: "canary" },
+  { id: "gooseberry", label: "Gooseberry", oldId: "parakeet" },
+  { id: "raspberry", label: "Raspberry", oldId: "flamingo" },
+  { id: "currant", label: "Currant", oldId: "jackdaw" },
 ];
+
+export const paletteOf = (value: unknown): MascotPalette | null =>
+  PALETTES.find(({ id, oldId }) => value === id || value === oldId)?.id ?? null;
+
+// What mascots.json still gets: the old id, since an older version run on the same computer drops a mascot whose palette
+// it doesn't know, and its next save loses it for good. Writing the new ids there is a later step, once going back no
+// longer matters. The server gets the new ids, which it takes since 20261119000000_berry_palettes.sql.
+export const paletteOnDisk = (palette: MascotPalette): string => PALETTES.find(({ id }) => id === palette)?.oldId ?? palette;
 
 export const ACCESSORIES: { id: MascotAccessory; label: string }[] = [
   { id: "none", label: "Nothing" },
@@ -29,12 +39,12 @@ export const MASCOT_TOOLS: { id: MascotTool; label: string; hint: string }[] = [
   { id: "type", label: "Type", hint: "Fill in fields and press keys." },
 ];
 
-// The first of the flock. Always there, never limited, and it can't be changed or deleted.
+// The first of the mascots. Always there, never limited, and it can't be changed or deleted.
 export const BERRY: MascotProfile = {
   id: BERRY_ID,
   name: "Berry",
   // The blueberry, with nothing on.
-  look: { palette: "kingfisher", accessory: "none" },
+  look: { palette: "blueberry", accessory: "none" },
   instructions: "",
   sites: [],
   tools: MASCOT_TOOLS.map(({ id }) => id),
@@ -83,7 +93,10 @@ export const NOWHERE = "nowhere.invalid";
 export const narrowSites = (first: readonly string[], second: readonly string[]): string[] => {
   if (first.length === 0) return [...second];
   if (second.length === 0) return [...first];
-  const both = [...first.filter((site) => siteAllowed(`https://${site}`, second)), ...second.filter((site) => siteAllowed(`https://${site}`, first))];
+  const both = [
+    ...first.filter((site) => siteAllowed(`https://${site}`, second)),
+    ...second.filter((site) => siteAllowed(`https://${site}`, first)),
+  ];
   return both.length > 0 ? [...new Set(both)] : [NOWHERE];
 };
 
@@ -99,8 +112,9 @@ export const parseMascotDraft = (input: unknown): { draft: MascotDraft } | { err
   const cleanInstructions = typeof instructions === "string" ? instructions.trim() : "";
   if (!cleanInstructions) return { error: "Say what it’s for." };
   if (cleanInstructions.length > MAX_MASCOT_INSTRUCTIONS) return { error: `Keep this under ${MAX_MASCOT_INSTRUCTIONS} characters.` };
-  const { palette, accessory } = (look ?? {}) as Record<string, unknown>;
-  if (!isOneOf(PALETTES, palette) || !isOneOf(ACCESSORIES, accessory)) return { error: "Choose a look." };
+  const { palette: savedPalette, accessory } = (look ?? {}) as Record<string, unknown>;
+  const palette = paletteOf(savedPalette);
+  if (!palette || !isOneOf(ACCESSORIES, accessory)) return { error: "Choose a look." };
   if (!Array.isArray(sites) || !Array.isArray(tools)) return { error: "Choose where it can go and what it can do." };
   if (sites.length > MAX_SITES) return { error: `Keep it to ${MAX_SITES} sites.` };
   const cleanSites: string[] = [];
@@ -120,20 +134,6 @@ export const parseMascotDraft = (input: unknown): { draft: MascotDraft } | { err
   };
 };
 
-// What it can do, in words, for its card and the live preview.
-export const sitesInWords = (sites: readonly string[]): string => {
-  if (sites.length === 0) return "Any site";
-  return sites.length === 1 ? `Only ${sites[0]}` : `Only ${sites[0]} and ${sites.length - 1} more`;
-};
-
-const TOOL_VERBS: Record<MascotTool, string> = { visit: "visits", click: "clicks", type: "types" };
-
-export const toolsInWords = (tools: readonly MascotTool[]): string => {
-  const can = MASCOT_TOOLS.filter(({ id }) => tools.includes(id));
-  if (can.length === 0) return "Only reads";
-  return `Reads, ${can.map(({ id }) => TOOL_VERBS[id]).join(", ")}`;
-};
-
 const inList = (items: readonly string[]): string =>
   items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 
@@ -144,7 +144,7 @@ export interface PermissionLine {
 }
 
 // What a mascot may do, for the Gallery. It reads the same `sites` and `tools` the tool layer enforces, and nothing else.
-export const permissionsInWords = ({ sites, tools }: Pick<MascotDraft, "sites" | "tools">): PermissionLine[] => {
+export const permissionsInWords = ({ sites, tools }: Pick<MascotDraft, "sites" | "tools">): [PermissionLine, ...PermissionLine[]] => {
   const visits = tools.includes("visit");
   const clicks = tools.includes("click");
   const types = tools.includes("type");

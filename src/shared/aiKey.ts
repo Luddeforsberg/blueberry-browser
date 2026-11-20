@@ -18,7 +18,7 @@ export type AiKeyTried = "works" | "refused" | "unreachable" | "not-a-key" | "no
 // A key is its service's prefix, then letters, digits, dashes and underscores. The longest real ones are a little over
 // 200. Anthropic's start with OpenAI's prefix too, so OpenAI's shape leaves those out. Being this strict is what keeps a
 // password on the clipboard from coming back through Paste, and one service's key from being sent to the other.
-export const AI_KEY_LENGTH = { min: 20, max: 400 };
+const AI_KEY_LENGTH = { min: 20, max: 400 };
 const PREFIXES: Record<AiService, string> = { openai: "sk-", anthropic: "sk-ant-" };
 const KEY_SHAPE: Record<AiService, RegExp> = { openai: /^sk-(?!ant-)[A-Za-z0-9_-]+$/, anthropic: /^sk-ant-[A-Za-z0-9_-]+$/ };
 export const looksLikeAiKey = (service: AiService, key: string): boolean =>

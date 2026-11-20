@@ -18,11 +18,11 @@ What each feature in the [README](../../README.md) looks like in the app, in the
 <td width="25%"><img src="phone/list.jpg" alt="The phone app's list of jobs"><br>Every job in one list.</td>
 <td width="25%"><img src="phone/approval.jpg" alt="A job asking to click Place order, with Allow and Don't allow"><br>Allow or refuse a step.</td>
 <td width="25%"><img src="phone/handoff.jpg" alt="A sign-in page in the live view, with an email and a code typed in"><br>Type a code straight into the page. It never goes through Blueberry.</td>
-<td width="25%"><img src="phone/start.jpg" alt="A new job being written on the phone, with Berry, Scout and Penny to choose from"><br>Start a new job, as any bird in your flock.</td>
+<td width="25%"><img src="phone/start.jpg" alt="A new job being written on the phone, with Berry, Scout and Penny to choose from"><br>Start a new job, as any of your mascots.</td>
 </tr>
 </table>
 
-## Your birds, from ChatGPT and Claude
+## Your mascots, from ChatGPT and Claude
 
 <table>
 <tr>
@@ -44,15 +44,15 @@ What each feature in the [README](../../README.md) looks like in the app, in the
 
 <table>
 <tr>
-<td width="33%"><img src="gallery/gallery.jpg" alt="The Gallery, a list of birds with what each may do"><br>Birds other people made, with what each may do.</td>
-<td width="33%"><img src="gallery/review-before-adding.jpg" alt="The review of a bird before adding it: its permissions, its instructions word for word and an example"><br>Before you add one: its permissions and its instructions, word for word.</td>
-<td width="33%"><img src="gallery/public-page.jpg" alt="A bird's public web page with Open in Blueberry"><br>Each published bird has a public page to send to someone.</td>
+<td width="33%"><img src="gallery/gallery.jpg" alt="The Gallery, a list of mascots with what each may do"><br>Mascots other people made, with what each may do.</td>
+<td width="33%"><img src="gallery/review-before-adding.jpg" alt="The review of a mascot before adding it: its permissions, its instructions word for word and an example"><br>Before you add one: its permissions and its instructions, word for word.</td>
+<td width="33%"><img src="gallery/public-page.jpg" alt="A mascot's public web page with Open in Blueberry"><br>Each published mascot has a public page to send to someone.</td>
 </tr>
 </table>
 
 ## Suggestions that keep coming
 
-<img src="../images/new-tab.jpg" alt="The new tab page with three suggestions: a prompt, a routine and a new bird">
+<img src="../images/new-tab.jpg" alt="The new tab page with three suggestions: a prompt, a routine and a new mascot">
 
 Three suggestions on the new tab page, each from something you did, with the reason under it.
 
@@ -61,7 +61,7 @@ Three suggestions on the new tab page, each from something you did, with the rea
 <table>
 <tr>
 <td width="50%"><img src="../images/approval.jpg" alt="An approval card with the exact text Berry would type"><br>An approval card says exactly what will happen before anything does.</td>
-<td width="50%"><img src="../images/flock.jpg" alt="The Flock page with Berry and four birds"><br>The flock: Berry and the birds you made, each with its own limits.</td>
+<td width="50%"><img src="../images/mascots.jpg" alt="Your mascots, with Berry and four more"><br>Your mascots: Berry and the ones you made, each with its own limits.</td>
 </tr>
 </table>
 

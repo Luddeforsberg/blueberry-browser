@@ -1,7 +1,7 @@
-import { modelConfig } from "../../src/main/agent";
-import { browserbase } from "../../src/main/browserbase";
-import { CloudSessions, type CloudBrowser } from "../../src/main/cloudBrowser";
-import { isLocalEndpoint, localChrome } from "../../src/main/localChrome";
+import { modelConfig } from "../../src/main/chats/agent";
+import { browserbase } from "../../src/main/cloud/browserbase";
+import { CloudSessions, type CloudBrowser } from "../../src/main/cloud/cloudBrowser";
+import { isLocalEndpoint, localChrome } from "../../src/main/cloud/localChrome";
 import { DbError, dbConfig, runnerSession, supabaseDb, type ClaimedJob } from "./db";
 import { runJob, sessionBrowser, UnreleasedBrowsers } from "./job";
 import { pushConfig, pusher } from "./push";
@@ -73,7 +73,7 @@ if (relaySettings) {
   // Cloud jobs go on without it. Only the words: the error could say more than the log should.
   void startRelay(relaySettings, settings, db).then(
     () => console.log(`Relay listening on port ${relaySettings.port}, for ChatGPT and Claude.`),
-    () => console.error("Relay couldn't start.")
+    () => console.error("Relay couldn't start."),
   );
 } else {
   console.log("No RELAY_PUBLIC_URL and RELAY_SECRET, so ChatGPT and Claude can't connect.");
@@ -96,14 +96,21 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Until the owner has linked this runner in Blueberry, there's nothing it may do.
 const LINK_RETRY_MS = 30_000;
-const NOT_LINKED = "Not linked yet: its owner has to link this runner's account in Blueberry, in Settings > Cloud. Trying again in 30 seconds.";
+const NOT_LINKED =
+  "Not linked yet: its owner has to link this runner's account in Blueberry, in Settings > Cloud. Trying again in 30 seconds.";
 let linked = false;
 const link = async (): Promise<void> => {
   try {
     linked = await db.accept();
   } catch (error) {
     linked = false;
-    console.error(error instanceof DbError && error.status === 401 ? "Couldn't sign in as the runner. Check BLUEBERRY_RUNNER_EMAIL and BLUEBERRY_RUNNER_PASSWORD." : error instanceof Error ? error.message : "Couldn't reach Supabase.");
+    console.error(
+      error instanceof DbError && error.status === 401
+        ? "Couldn't sign in as the runner. Check BLUEBERRY_RUNNER_EMAIL and BLUEBERRY_RUNNER_PASSWORD."
+        : error instanceof Error
+          ? error.message
+          : "Couldn't reach Supabase.",
+    );
     return;
   }
   console.log(linked ? "Linked to its owner." : NOT_LINKED);

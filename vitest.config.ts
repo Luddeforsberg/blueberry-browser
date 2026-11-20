@@ -12,5 +12,6 @@ export default defineConfig({
     // GitHub's macOS runners are slow enough that starting Postgres or Chrome can pass vitest's defaults.
     testTimeout: 20_000,
     hookTimeout: 60_000,
+    globalSetup: ["tests/tempRun.ts"],
   },
 });

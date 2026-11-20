@@ -1,9 +1,4 @@
-import {
-  _electron as electron,
-  errors,
-  type ElectronApplication,
-  type Page,
-} from "@playwright/test";
+import { _electron as electron, errors, type ElectronApplication, type Page } from "@playwright/test";
 import electronPath from "electron";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
@@ -18,7 +13,7 @@ const CLOSE_TIMEOUT_MS = 10_000;
 
 // Now and then on Windows CI the app starts and Playwright connects to it, and then the launch never
 // finishes. We don't know why yet, and the next launch works. This line in a log means it happened again.
-export async function retryStuckLaunch<T>(launch: () => Promise<T>): Promise<T> {
+async function retryStuckLaunch<T>(launch: () => Promise<T>): Promise<T> {
   try {
     return await launch();
   } catch (error) {
@@ -31,7 +26,7 @@ export async function retryStuckLaunch<T>(launch: () => Promise<T>): Promise<T> 
 // Now and then on Windows CI the app is told to quit and its process never exits, which used to fail the
 // test, hold up the worker for another 30 seconds and leave the app running. This line in a log means it
 // happened again.
-export async function closeWithin(close: () => Promise<void>, kill: () => void, timeoutMs = CLOSE_TIMEOUT_MS) {
+async function closeWithin(close: () => Promise<void>, kill: () => void, timeoutMs = CLOSE_TIMEOUT_MS) {
   let timer: NodeJS.Timeout | undefined;
   const timedOut = new Promise<boolean>((resolve) => {
     timer = setTimeout(() => resolve(true), timeoutMs);
@@ -55,7 +50,7 @@ const isRunning = (pid: number): boolean => {
 
 // Windows needs the whole tree named, or the app's helper processes stay behind. taskkill fails when part of the tree has
 // already ended while it worked, which is only a failure if the app is still running.
-export const killApp = (app: ElectronApplication) => {
+const killApp = (app: ElectronApplication) => {
   const { pid } = app.process();
   if (process.platform !== "win32" || !pid) {
     app.process().kill("SIGKILL");
@@ -80,7 +75,7 @@ export async function launchApp(
     starters = false,
     modelEnv = {},
     preload = [],
-  }: { firstLaunch?: boolean; starters?: boolean; modelEnv?: Record<string, string>; preload?: string[] } = {}
+  }: { firstLaunch?: boolean; starters?: boolean; modelEnv?: Record<string, string>; preload?: string[] } = {},
 ): Promise<ElectronApplication> {
   const settingsFile = join(userDataDir, "settings.json");
   if (!firstLaunch && !existsSync(settingsFile)) {
@@ -112,10 +107,21 @@ export async function launchApp(
     electron.launch({
       executablePath: electronPath as unknown as string,
       // A fresh profile keeps tests apart and away from the developer's real browsing data.
-      args: [...background, ...preload.flatMap((file) => ["-r", file]), "-r", join(__dirname, "fakeKeychain.cjs"), "-r", join(__dirname, "fakeShortcut.cjs"), "-r", join(__dirname, "fakeProtocol.cjs"), ".", `--user-data-dir=${userDataDir}`],
+      args: [
+        ...background,
+        ...preload.flatMap((file) => ["-r", file]),
+        "-r",
+        join(__dirname, "fakeKeychain.cjs"),
+        "-r",
+        join(__dirname, "fakeShortcut.cjs"),
+        "-r",
+        join(__dirname, "fakeProtocol.cjs"),
+        ".",
+        `--user-data-dir=${userDataDir}`,
+      ],
       env,
       timeout: LAUNCH_TIMEOUT_MS,
-    })
+    }),
   );
   console.log(`App launched in ${Date.now() - started}ms`);
   app.process().stderr?.on("data", (data) => console.log(`[app stderr] ${data}`));
@@ -149,10 +155,7 @@ export async function answerAsk(app: ElectronApplication, button: string): Promi
 
 // Each WebContentsView shows up as its own Playwright window. A window can exist before it reaches
 // its address, and no event says when it does, so this keeps looking.
-export async function findView(
-  app: Pick<ElectronApplication, "windows">,
-  urlPart: string
-): Promise<Page> {
+export async function findView(app: Pick<ElectronApplication, "windows">, urlPart: string): Promise<Page> {
   const started = Date.now();
   while (Date.now() - started < VIEW_TIMEOUT_MS) {
     const view = app.windows().find((page) => page.url().includes(urlPart));

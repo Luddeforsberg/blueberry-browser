@@ -2,8 +2,9 @@ import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findChrome } from "../../src/main/localChrome";
+import { findChrome } from "../../src/main/cloud/localChrome";
 import type { Site } from "./site";
+import { defined } from "../../src/shared/testing";
 
 // The cloud browser for a cloud tab: a headless Chrome on this computer, as tests/cloudTab.spec.ts uses, started here
 // rather than by the app so it gets the same host rules and its addresses read shop.example. The app is pointed at it
@@ -14,8 +15,20 @@ export async function startCloudBrowser(site: Site): Promise<{ env: Record<strin
   const profile = mkdtempSync(join(tmpdir(), "blueberry-drive-cloud-"));
   const child = spawn(
     chrome,
-    ["--headless=new", "--remote-debugging-port=0", "--remote-debugging-address=127.0.0.1", `--user-data-dir=${profile}`, "--no-first-run", "--no-default-browser-check", "--window-size=1280,800", "--force-device-scale-factor=1", "--hide-scrollbars", `--host-resolver-rules=${site.hostRules}`, "about:blank"],
-    { stdio: ["ignore", "ignore", "pipe"] }
+    [
+      "--headless=new",
+      "--remote-debugging-port=0",
+      "--remote-debugging-address=127.0.0.1",
+      `--user-data-dir=${profile}`,
+      "--no-first-run",
+      "--no-default-browser-check",
+      "--window-size=1280,800",
+      "--force-device-scale-factor=1",
+      "--hide-scrollbars",
+      `--host-resolver-rules=${site.hostRules}`,
+      "about:blank",
+    ],
+    { stdio: ["ignore", "ignore", "pipe"] },
   );
   // Its profile can only go once Chrome has let go of its files.
   const close = async () => {
@@ -36,7 +49,7 @@ export async function startCloudBrowser(site: Site): Promise<{ env: Record<strin
       clearTimeout(timer);
       child.stderr.removeAllListeners("data");
       child.stderr.resume();
-      resolve(found[1]);
+      resolve(defined(found[1]));
     });
   }).catch(async (error) => {
     await close();

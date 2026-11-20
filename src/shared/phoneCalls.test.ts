@@ -1,7 +1,8 @@
 import { createServer, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { fetchWithin, oneAtATime, RUNNER_LINK_EVERY_MS, runnerLinkDue } from "./phoneCalls";
+import { defined } from "./testing";
 
 describe("a call from the phone page", () => {
   let server: Server;
@@ -47,24 +48,34 @@ describe("a call from the phone page", () => {
 });
 
 describe("one poll at a time", () => {
-  it("gives a call made while one is out that same one, and runs again once it's over", async () => {
+  it("runs once more after the one that's out for calls made meanwhile, never two at once", async () => {
     let runs = 0;
-    let finish = () => {};
+    let running = 0;
+    let most = 0;
+    const finishes: (() => void)[] = [];
     const poll = oneAtATime(() => {
       runs++;
-      return new Promise<void>((resolve) => (finish = resolve));
+      most = Math.max(most, ++running);
+      return new Promise<void>((resolve) => finishes.push(() => (running--, resolve())));
     });
 
     const first = poll();
+    // Asked for while the first is out, as after sending a follow-up: what the first read may be from before it.
     const second = poll();
-    expect(second).toBe(first);
+    const third = poll();
+    expect(third).toBe(second);
     expect(runs).toBe(1);
-    finish();
+    defined(finishes[0])();
     await first;
+    await vi.waitFor(() => expect(runs).toBe(2));
+    defined(finishes[1])();
+    await second;
+    expect(most).toBe(1);
 
+    // With nothing out, a call is a run of its own at once.
     void poll();
-    expect(runs).toBe(2);
-    finish();
+    expect(runs).toBe(3);
+    defined(finishes[2])();
   });
 
   it("runs again after one that failed", async () => {

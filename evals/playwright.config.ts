@@ -7,5 +7,6 @@ export default defineConfig({
   outputDir: "../test-results/evals",
   retries: 0,
   workers: 1,
+  globalSetup: "../tests/tempRun.ts",
   reporter: "list",
 });

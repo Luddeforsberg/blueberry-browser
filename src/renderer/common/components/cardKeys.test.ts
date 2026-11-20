@@ -23,7 +23,19 @@ describe("keys on a card", () => {
 });
 
 describe("what a key on a card does", () => {
-  const onAllow = { key: "Enter", modified: false, field: false, onCard: false, picks: 0, canEnter: true, canEscape: true, inside: true, repeat: false, at: 6000, armedAt: 1000 };
+  const onAllow = {
+    key: "Enter",
+    modified: false,
+    field: false,
+    onCard: false,
+    picks: 0,
+    canEnter: true,
+    canEscape: true,
+    inside: true,
+    repeat: false,
+    at: 6000,
+    armedAt: 1000,
+  };
 
   it("leaves a fresh Enter on a focused button to press that button", () => {
     expect(keyAction(onAllow)).toBe("ignore");

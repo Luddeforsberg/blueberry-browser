@@ -1,0 +1,75 @@
+// Files over a limit in eslint.config.mjs today, each held at what it has now. A number here only goes down:
+// lower it when the file improves, and remove the line once the file is within the limit. Never add a file, except
+// when a split moves a function over a limit into a new one: its number moves with it, unchanged.
+
+// Lines in the file, against 400.
+export const linesOver = {};
+
+// The most complex function in the file, against 20.
+export const complexityOver = {
+  "evals/run.spec.ts": 51,
+  "runner/src/job.ts": 22,
+  "runner/src/relayAuth.ts": 23,
+  "src/main/window/AddressSuggestions.ts": 23,
+  "src/main/chats/Chats.ts": 53,
+  "src/main/chats/Replies.ts": 24,
+  "src/main/window/Layout.ts": 28,
+  "src/main/tools/PageActor.ts": 23,
+  "src/main/routines/Routines.ts": 27,
+  "src/main/remoteJobs/RunnerJobs.ts": 25,
+  "src/main/chats/agent.ts": 22,
+  "src/main/tools/askFirst.ts": 21,
+  "src/main/tools/pointerTools.ts": 24,
+  "src/main/tools/typingTools.ts": 22,
+  "src/main/desktop/desktopBerryState.ts": 21,
+  "src/main/mcp/mcpTasks.ts": 21,
+  "src/main/menus/ownMenu.ts": 23,
+  "src/main/recordings/recordingTrail.ts": 38,
+  "src/main/suggestions/suggestionProposals.ts": 33,
+  "src/renderer/chrome/src/DesktopApp.tsx": 59,
+  "src/renderer/chrome/src/DesktopBox.tsx": 24,
+  "src/renderer/chrome/src/components/AddressBar.tsx": 37,
+  "src/renderer/chrome/src/components/Chat.tsx": 49,
+  "src/renderer/chrome/src/components/ChatMessage.tsx": 41,
+  "src/renderer/chrome/src/components/Composer.tsx": 44,
+  "src/renderer/chrome/src/components/FirstRun.tsx": 46,
+  "src/renderer/chrome/src/components/MenuSheet.tsx": 21,
+  "src/renderer/chrome/src/components/RoutineRunRow.tsx": 33,
+  "src/renderer/chrome/src/components/Tabs.tsx": 32,
+  "src/renderer/chrome/src/components/Toolbar.tsx": 22,
+  "src/renderer/chrome/src/pages/ChatPage.tsx": 55,
+  "src/renderer/chrome/src/pages/CloudPage.tsx": 26,
+  "src/renderer/chrome/src/pages/MascotGalleryPage.tsx": 34,
+  "src/renderer/chrome/src/pages/NewTabPage.tsx": 26,
+  "src/renderer/chrome/src/pages/PublishMascot.tsx": 34,
+  "src/renderer/chrome/src/pages/RoutineAnswers.tsx": 21,
+  "src/renderer/common/components/Mascot.tsx": 25,
+  "tests/fakeModel.ts": 23,
+  "tests/fakeSupabase.ts": 53,
+};
+
+// The most parameters a function in the file takes, against 4.
+export const paramsOver = {
+  "runner/src/relayAuth.ts": 5,
+  "src/main/tools/CdpTab.ts": 6,
+  "src/main/chats/Chats.ts": 9,
+  "src/main/chats/Approvals.ts": 5,
+  "src/main/chats/Handoffs.ts": 5,
+  "src/main/chats/JobTools.ts": 5,
+  "src/main/chats/Replies.ts": 6,
+  "src/main/mascots/Gallery.ts": 6,
+  "src/main/window/desktopPlaces.ts": 5,
+  "src/main/remoteJobs/MacJobs.ts": 5,
+  "src/main/menus/MenuView.ts": 5,
+  "src/main/routines/RoutineStore.ts": 5,
+  "src/main/routines/Routines.ts": 5,
+  "src/main/remoteJobs/RunnerJobs.ts": 5,
+  "src/main/tabs/Tab.ts": 5,
+  "src/main/tabs/WebPage.ts": 5,
+  "src/main/window/Window.ts": 10,
+  "src/main/window/WindowMenus.ts": 5,
+  "src/main/tools/askFirst.test.ts": 5,
+  "src/main/cloud/cloudBrowser.ts": 5,
+  "src/main/routines/routineSchedule.test.ts": 5,
+  "src/renderer/chrome/src/galleryView.test.ts": 5,
+};
