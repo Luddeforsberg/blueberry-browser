@@ -11,7 +11,7 @@ import {
   type Proposal,
 } from "./suggestionProposals";
 import { NOTHING_SAVED, readSuggestions, type SavedSuggestions } from "./suggestionsFile";
-import { saveFile } from "../library/savedFile";
+import { bestEffort, saveFile } from "../library/savedFile";
 
 const HOUR_MS = 3_600_000;
 // A failed call doesn't count, but being offline mustn't mean a model call on every new tab.
@@ -222,10 +222,12 @@ export class Suggestions {
     }
   }
 
-  // What the cards are now, kept or not. Not kept only means they're as they were after a restart, and the model may be
-  // asked again sooner.
-  private save(next: SavedSuggestions): boolean {
+  // What the cards are now, kept or not.
+  private save(next: SavedSuggestions): void {
     this.saved = next;
-    return saveFile(this.file, JSON.stringify(next, null, 2));
+    bestEffort(
+      saveFile(this.file, JSON.stringify(next, null, 2)),
+      "The cards are as they were after a restart, and the model may be asked again sooner.",
+    );
   }
 }

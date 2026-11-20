@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import type { MascotProfile } from "../../shared/library";
 import { BERRY, BERRY_ID, paletteOnDisk, parseMascotDraft } from "../../shared/mascots";
 import { fieldsOf } from "../../shared/fields";
-import { readJsonFile, savedEntries, saveFile, type Saved } from "../library/savedFile";
+import { CANT_SAVE, readJsonFile, savedEntries, saveFile, type Saved } from "../library/savedFile";
 
 // Stands in for a mascot that isn't on file, such as after the file was lost. It can do nothing but talk, because a
 // chat or routine limited to one site mustn't turn into Berry and get them all.
@@ -99,8 +99,8 @@ export class MascotStore {
   }
 
   // Kept on file, so its chats keep their look and limits. False if there was none to delete, or it couldn't be saved.
-  delete(id: string): boolean {
-    if (!this.mascots.some((mascot) => mascot.id === id && mascot.deletedAt === null)) return false;
+  delete(id: string): Saved {
+    if (!this.mascots.some((mascot) => mascot.id === id && mascot.deletedAt === null)) return CANT_SAVE;
     return this.write(this.mascots.map((mascot) => (mascot.id === id ? { ...mascot, deletedAt: Date.now() } : mascot)));
   }
 

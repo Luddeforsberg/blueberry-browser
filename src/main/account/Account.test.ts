@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync } from "fs";
+import { mkdirSync, mkdtempSync, readFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { describe, expect, it, vi } from "vitest";
@@ -44,6 +44,16 @@ describe("Account", () => {
     expect(saved).not.toContain("hunter2");
     expect(Buffer.from(saved, "base64").toString()).not.toContain("access-one");
     expect(await start({}, file).account.accessToken()).toBe("access-one");
+  });
+
+  it("leaves no earlier sign-in on file when a new one can't be saved, so the next launch does what it says", async () => {
+    const { account, file } = start({ signIn: async () => session("one") });
+    await account.signIn("ana@example.com", "pw");
+    // The write goes beside the file first, so a folder in that place makes it fail.
+    mkdirSync(`${file}.tmp`);
+    const other = start({ signIn: async () => ({ ...session("two"), email: "bo@example.com" }) }, file);
+    expect((await other.account.signIn("bo@example.com", "pw")).problem).toContain("sign in again next time");
+    expect(await start({}, file).account.accessToken()).toBeNull();
   });
 
   it.each([

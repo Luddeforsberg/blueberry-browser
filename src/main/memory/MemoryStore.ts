@@ -3,7 +3,7 @@ import type { MemoryFact, MemoryOffer, MemoryResult, MemoryState } from "../../s
 import { normaliseSite } from "../../shared/mascots";
 import { factProblem, MAX_FACTS_PER_MASCOT } from "../../shared/memory";
 import { cleanLine } from "../../shared/publishing";
-import { readJsonFile, savedEntries, saveFile, type Saved } from "../library/savedFile";
+import { NOTHING_TO_SAVE, readJsonFile, savedEntries, saveFile, type Saved } from "../library/savedFile";
 import { MEMORY_PROMPT, parseProposals, proposalData, covers, type KnownFact, type JobToRemember } from "./mascotMemory";
 
 // Waiting offers are only worth so much, and a new one matters more than an old one nobody answered.
@@ -135,15 +135,15 @@ export class MemoryStore {
       : { ok: false, error: NOT_SAVED };
   }
 
-  // False if there was nothing to forget, or it couldn't be saved, so it's still remembered.
-  forget(factId: string): boolean {
-    if (!this.facts.some(({ id }) => id === factId)) return false;
+  // False if it couldn't be saved, so it's still remembered.
+  forget(factId: string): Saved {
+    if (!this.facts.some(({ id }) => id === factId)) return NOTHING_TO_SAVE;
     return this.write(this.facts.filter(({ id }) => id !== factId));
   }
 
   // Everything about one mascot, waiting offers too. Also what deleting that mascot does. False if its facts couldn't be
   // saved as gone, so they're still remembered.
-  clear(mascotId: string): boolean {
+  clear(mascotId: string): Saved {
     this.cleared.set(mascotId, (this.cleared.get(mascotId) ?? 0) + 1);
     this.offers = this.offers.filter((offer) => offer.mascotId !== mascotId);
     this.declined.delete(mascotId);

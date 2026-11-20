@@ -5,7 +5,7 @@ import { basename, extname, isAbsolute, join } from "path";
 import type { DownloadItem } from "electron";
 import type { DownloadAction, DownloadInfo, DownloadState, Settings } from "../../shared/ipc";
 import { replaceControlCharacters } from "./controlCharacters";
-import { readJsonFile, savedEntries, saveFile } from "./savedFile";
+import { bestEffort, readJsonFile, savedEntries, saveFile } from "./savedFile";
 
 type Item = Pick<
   DownloadItem,
@@ -282,13 +282,11 @@ export class Downloads {
       .reverse();
   }
 
-  // Only changes of state reach the disk, so progress never writes the file many times a second.
-  // False if it couldn't be kept. The list shows the downloads as they are either way, and the next launch shows it as
-  // it was kept last, so there's nothing to tell anyone.
-  private saved(): boolean {
-    const kept = saveFile(this.file, JSON.stringify(this.records, null, 2));
+  // Only changes of state reach the disk, so progress never writes the file many times a second. The list shows the
+  // downloads as they are either way, so nobody is told it was kept.
+  private saved(): void {
+    bestEffort(saveFile(this.file, JSON.stringify(this.records, null, 2)), "The next launch lists the downloads as they were kept last.");
     this.notify();
-    return kept;
   }
 
   private notify(): void {

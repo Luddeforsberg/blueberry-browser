@@ -4,12 +4,17 @@ import { join } from "path";
 import { describe, expect, it, vi } from "vitest";
 import { McpConnector } from "./McpConnector";
 
+// Encrypting can fail even when it's available, as when the keychain refuses.
+const keychain = vi.hoisted(() => ({ refuses: false }));
 vi.mock("electron", () => ({
   app: { isPackaged: false, getVersion: () => "1.0.0" },
   clipboard: { writeText: async () => {} },
   safeStorage: {
     isEncryptionAvailable: () => true,
-    encryptString: (text: string) => Buffer.from(text),
+    encryptString: (text: string) => {
+      if (keychain.refuses) throw new Error("Error while encrypting the text provided to encryptString.");
+      return Buffer.from(text);
+    },
     decryptString: (data: Buffer) => data.toString(),
   },
 }));
@@ -51,6 +56,8 @@ describe("McpConnector", () => {
 
     expect(mcp.revoke()).toMatchObject({ on: false, url: null, problem: expect.stringContaining("old token is still saved") });
     await expect(fetch(url!, { method: "POST", body: "{}" })).rejects.toThrow();
+    // Turning it on again can't save the new one either, so it stays off and still says so.
+    expect(await mcp.setOn(true)).toMatchObject({ on: false, url: null, problem: expect.stringContaining("old token is still saved") });
     // What the next launch does, as it said.
     const next = connector(file);
     next.start();
@@ -67,5 +74,17 @@ describe("McpConnector", () => {
     const after = connector(file);
     after.start();
     expect(after.state.on).toBe(false);
+  });
+
+  it("still goes off, and says what a restart does, when the keychain refuses", async () => {
+    const mcp = connector();
+    const { url } = await mcp.setOn(true);
+    keychain.refuses = true;
+    try {
+      expect(await mcp.setOn(false)).toMatchObject({ on: false, problem: expect.stringContaining("on again after a restart") });
+      await expect(fetch(url!, { method: "POST", body: "{}" })).rejects.toThrow();
+    } finally {
+      keychain.refuses = false;
+    }
   });
 });

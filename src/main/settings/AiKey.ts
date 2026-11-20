@@ -3,7 +3,7 @@ import { isAiService, looksLikeAiKey, type AiKeyState, type AiKeyTried } from ".
 import type { SavedKey } from "../chats/agent";
 import { Latest } from "../../shared/lateWork";
 import { fieldsOf } from "../../shared/fields";
-import { readJsonFile, removeFile, saveFile } from "../library/savedFile";
+import { readJsonFile, removeFile, saveFile, type Saved } from "../library/savedFile";
 import { tryAiKey, type TryOutcome } from "./aiKeyTry";
 
 // The user's own AI key, kept as the cloud's key is: encrypted with `safeStorage` in its own file, and never sent back to
@@ -79,8 +79,8 @@ export class AiKey {
     return { removed, state: this.state };
   }
 
-  private save({ service, key }: SavedKey): boolean {
-    return saveFile(this.file, JSON.stringify({ service, key: safeStorage.encryptString(key).toString("base64") }), { secret: true });
+  private save({ service, key }: SavedKey): Saved {
+    return saveFile(this.file, () => JSON.stringify({ service, key: safeStorage.encryptString(key).toString("base64") }), { secret: true });
   }
 
   private load(): SavedKey | null {

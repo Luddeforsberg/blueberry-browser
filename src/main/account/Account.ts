@@ -1,7 +1,7 @@
 import { safeStorage } from "electron";
 import type { AccountState } from "../../shared/ipc";
 import { Latest } from "../../shared/lateWork";
-import { readTextFile, removeFile, saveFile } from "../library/savedFile";
+import { bestEffort, readTextFile, removeFile, saveFile, type Saved } from "../library/savedFile";
 import { ServerError, type GalleryServer, type ServerSession } from "./galleryServer";
 
 // Who's signed in, for publishing. The session stays in here: main never sends a token to a renderer, no tool can reach
@@ -13,6 +13,8 @@ const NO_NETWORK = "Couldn’t reach the sign-in service. Try again in a moment.
 const SIGN_IN_AGAIN = "Your sign-in has ended. Please sign in again.";
 const NOT_SAVED = "You’re signed in until you quit. This computer has no safe place to keep it, so you’ll sign in again next time.";
 const NOT_WRITTEN = "You’re signed in until you quit. This couldn’t be saved on this computer, so you’ll sign in again next time.";
+const EARLIER_KEPT =
+  "You’re signed in until you quit. This couldn’t be saved on this computer, and an earlier sign-in still is, so that’s the one you’ll have after a restart.";
 const NOT_FORGOTTEN =
   "You’re signed out for now, but the saved sign-in couldn’t be removed from this computer, so you’ll be signed in again after a restart. Sign in and out again to try once more.";
 const CONFIRM_FIRST = "Check your email to confirm the address, then sign in here.";
@@ -153,7 +155,7 @@ export class Account {
       if (this.session === session) {
         this.session = null;
         // One left on file has ended too, so the next launch only asks again.
-        this.forget();
+        bestEffort(this.forget(), "The ended sign-in is still on file, and the next launch finds it has ended too.");
         this.say(SIGN_IN_AGAIN);
       }
       return null;
@@ -173,8 +175,9 @@ export class Account {
       this.problem = NOT_SAVED;
       return;
     }
-    if (!saveFile(this.file, safeStorage.encryptString(JSON.stringify(session)).toString("base64"), { secret: true }))
-      this.problem = NOT_WRITTEN;
+    const sealed = () => safeStorage.encryptString(JSON.stringify(session)).toString("base64");
+    // One left on file from before, perhaps another account's, would be who the next launch signs in as.
+    if (!saveFile(this.file, sealed, { secret: true })) this.problem = this.forget() ? NOT_WRITTEN : EARLIER_KEPT;
   }
 
   private load(): ServerSession | null {
@@ -193,7 +196,7 @@ export class Account {
   }
 
   // False if the saved sign-in is still on file.
-  private forget(): boolean {
+  private forget(): Saved {
     return removeFile(this.file);
   }
 }

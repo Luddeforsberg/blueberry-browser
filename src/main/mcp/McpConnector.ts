@@ -176,10 +176,9 @@ export class McpConnector {
       this.saved.token = randomBytes(32).toString("base64url");
     }
     this.saved.on = on === true;
-    const kept = this.save();
+    this.settle(this.save());
     if (this.saved.on) await this.listen();
     else this.close();
-    if (!kept && this.onDisk.on !== this.saved.on) this.problem = this.saved.on ? NOT_SAVED_ON : NOT_SAVED_OFF;
     this.onChange();
     return this.state;
   }
@@ -190,15 +189,7 @@ export class McpConnector {
     this.problem = null;
     this.saved.token = randomBytes(32).toString("base64url");
     this.activity = [];
-    // The old token is still on file, and would turn the server on with it at the next launch. Off is the one thing
-    // that's true now and then.
-    if (!this.save() && this.onDisk.on) {
-      this.saved.on = false;
-      this.close();
-      this.problem = NOT_REVOKED;
-    } else if (this.onDisk.on !== this.saved.on) {
-      this.problem = NOT_SAVED_ON;
-    }
+    this.settle(this.save());
     this.onChange();
     return this.state;
   }
@@ -349,9 +340,24 @@ export class McpConnector {
 
   // Only what was really saved becomes what the next launch starts from.
   private save(): boolean {
-    const token = this.saved.token && safeStorage.encryptString(this.saved.token).toString("base64");
-    if (!saveFile(this.file, JSON.stringify({ on: this.saved.on, token, port: this.saved.port }), { secret: true })) return false;
+    const { on, token, port } = this.saved;
+    const sealed = () => JSON.stringify({ on, token: token && safeStorage.encryptString(token).toString("base64"), port });
+    if (!saveFile(this.file, sealed, { secret: true })) return false;
     this.onDisk = { ...this.saved };
     return true;
+  }
+
+  // After a save that didn't work, what's true now and after a restart.
+  private settle(kept: boolean): void {
+    if (kept) return;
+    // A token that was replaced is still on file, and would turn the server on with it at the next launch. Off is the
+    // one thing that's true now and then.
+    if (this.onDisk.on && this.onDisk.token !== this.saved.token) {
+      this.saved.on = false;
+      this.close();
+      this.problem = NOT_REVOKED;
+    } else if (this.onDisk.on !== this.saved.on) {
+      this.problem = this.saved.on ? NOT_SAVED_ON : NOT_SAVED_OFF;
+    }
   }
 }

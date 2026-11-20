@@ -1,4 +1,5 @@
-import { readJsonFile, removeFile, saveFile } from "../library/savedFile";
+import { fieldsOf } from "../../shared/fields";
+import { bestEffort, readJsonFile, removeFile, saveFile } from "../library/savedFile";
 import type { InternalPage } from "../../shared/ipc";
 
 export interface SavedEntry {
@@ -85,7 +86,7 @@ const sanitizeTab = (raw: unknown): SavedTab | null => {
     url: tab.url,
     title: text(tab.title),
     favicon: typeof tab.favicon === "string" ? tab.favicon : null,
-    ...savedEntries(Array.isArray(tab.entries) ? tab.entries : [], Number(tab.index)),
+    ...savedEntries(Array.isArray(tab.entries) ? tab.entries.map(fieldsOf) : [], Number(tab.index)),
   };
 };
 
@@ -128,20 +129,22 @@ export class SessionStore {
     this.timer ??= setTimeout(() => this.flush(), WRITE_DELAY_MS);
   }
 
-  // False if what's open couldn't be kept, which only means the next launch opens what was kept before.
-  flush(): boolean {
+  flush(): void {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
     const read = this.read;
     this.read = null;
-    if (!read) return true;
+    if (!read) return;
     let session: Session | null;
     try {
       session = read();
     } catch (error) {
       console.error("Failed to read the open tabs:", error);
-      return false;
+      return;
     }
-    return session ? saveFile(this.file, JSON.stringify(session)) : removeFile(this.file);
+    bestEffort(
+      session ? saveFile(this.file, JSON.stringify(session)) : removeFile(this.file),
+      "The next launch opens the tabs kept before.",
+    );
   }
 }

@@ -8,7 +8,7 @@ import { GalleryServer, publicPageLink, ServerError, Unreachable } from "../acco
 import { starterMascots } from "./mascotCatalog";
 import type { MascotStore } from "./MascotStore";
 import { fieldsOf } from "../../shared/fields";
-import { readJsonFile, saveFile } from "../library/savedFile";
+import { bestEffort, readJsonFile, saveFile } from "../library/savedFile";
 
 const NO_SERVER = "Publishing isn’t set up in this copy of Blueberry.";
 const CANT_PUBLISH = "This mascot can’t be published.";
@@ -257,8 +257,7 @@ export class Gallery {
     return fresh;
   }
 
-  // False if they couldn't be kept, which only means this install could count once more, and the author is asked again.
-  private save(): boolean {
-    return saveFile(this.file, JSON.stringify(this.saved));
+  private save(): void {
+    bestEffort(saveFile(this.file, JSON.stringify(this.saved)), "This install could count once more, and the author is asked again.");
   }
 }

@@ -83,6 +83,9 @@ describe("sanitizeSession", () => {
     expect(restored?.tabs).toHaveLength(3);
     expect(restored?.active).toBe(1);
     expect(restored?.tabs[1]).toEqual({ page: "settings", param: null, title: "" });
+    // A page in a tab's history that isn't one at all only drops that page.
+    const odd = { ...web("https://a.example/"), entries: [null, 7, { url: "https://a.example/", title: "T" }], index: 2 };
+    expect(sanitizeSession({ tabs: [odd] })?.tabs[0]).toMatchObject({ entries: [{ url: "https://a.example/", title: "T" }], index: 0 });
   });
 
   it("falls back to the first tab and the usual layout for bad values", () => {

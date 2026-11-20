@@ -1,8 +1,9 @@
 import { randomUUID } from "crypto";
+import { existsSync } from "fs";
 import { join } from "path";
 import type { Bookmark, SavedSiteList } from "../../shared/library";
 import { fieldsOf } from "../../shared/fields";
-import { NOTHING_TO_SAVE, readJsonFile, savedEntries, saveFile, type Saved } from "./savedFile";
+import { CANT_SAVE, NOTHING_TO_SAVE, readJsonFile, savedEntries, saveFile, type Saved } from "./savedFile";
 
 const WEB = /^https?:\/\//i;
 // A page names its own icon, so it could name one of any length. Longer than this, the site shows its letter.
@@ -44,6 +45,8 @@ const oncePerSite = ({ pinned, bookmarks }: SavedSites): SavedSites => {
 export class BookmarkStore {
   private readonly file: string;
   private lists: SavedSites;
+  // False while an old file couldn't be read: saving without what's in it would lose it for good.
+  private readAll = true;
 
   constructor(folder: string) {
     this.file = join(folder, "saved-sites.json");
@@ -58,7 +61,10 @@ export class BookmarkStore {
     }
     const before = (name: string) => {
       const file = join(folder, name);
-      return savedEntries(file, readJsonFile(file), savedSite);
+      const saved = readJsonFile(file);
+      // Still there after reading it means it couldn't be read.
+      if (saved === undefined && existsSync(file)) this.readAll = false;
+      return savedEntries(file, saved, savedSite);
     };
     this.lists = oncePerSite({ pinned: before("pinned.json"), bookmarks: before("bookmarks.json") });
     // The old files stay as they were. Until this is saved, the next launch reads them in again, the same way.
@@ -110,7 +116,7 @@ export class BookmarkStore {
   }
 
   private save(lists: SavedSites): Saved {
-    const saved = saveFile(this.file, JSON.stringify(lists, null, 2));
+    const saved = this.readAll ? saveFile(this.file, JSON.stringify(lists, null, 2)) : CANT_SAVE;
     if (saved) this.lists = lists;
     return saved;
   }

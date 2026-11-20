@@ -6,7 +6,7 @@ import { cleanAccountName } from "../../shared/accountName";
 import { FIRST_JOBS, FIRST_RUN_STEPS, knownOnly } from "../../shared/firstRun";
 import { APP_ICON_GROUNDS } from "../../shared/appIcon";
 import { BERRY_ID } from "../../shared/mascots";
-import { readJsonFile, saveFile } from "../library/savedFile";
+import { bestEffort, readJsonFile, saveFile } from "../library/savedFile";
 
 export const DEFAULT_SETTINGS: Settings = {
   layoutMode: "vertical",
@@ -126,11 +126,13 @@ export class SettingsStore {
     return this.settings;
   }
 
-  // False if they couldn't be kept: they stay as they are for this launch, and the next change or quitting tries again.
-  flush(): boolean {
+  flush(): void {
     if (this.writeTimer) clearTimeout(this.writeTimer);
     this.writeTimer = null;
-    return saveFile(this.file, JSON.stringify(this.settings, null, 2));
+    bestEffort(
+      saveFile(this.file, JSON.stringify(this.settings, null, 2)),
+      "Settings stay as they are until Blueberry quits, and the next change or quitting tries again.",
+    );
   }
 
   private read(): Settings {

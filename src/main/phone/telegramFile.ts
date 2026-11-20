@@ -26,4 +26,4 @@ export const readTelegramFile = (file: string): SavedBot | null => {
 };
 
 export const writeTelegramFile = (file: string, { token, botName, chatId }: SavedBot): Saved =>
-  saveFile(file, JSON.stringify({ token: safeStorage.encryptString(token).toString("base64"), botName, chatId }), { secret: true });
+  saveFile(file, () => JSON.stringify({ token: safeStorage.encryptString(token).toString("base64"), botName, chatId }), { secret: true });

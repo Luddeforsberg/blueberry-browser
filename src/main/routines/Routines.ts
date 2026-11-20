@@ -110,8 +110,9 @@ export class Routines {
       const routine = this.store.routine(id);
       if (!routine || this.active.has(id)) this.requested.delete(id);
       else if (this.hasFreePlace) {
-        this.requested.delete(id);
+        // Still asked for until its run is saved.
         const runId = this.begin(routine, (startedAt) => this.store.startRun(routine.id, startedAt, null));
+        this.requested.delete(id);
         onStart?.(runId);
       }
     });

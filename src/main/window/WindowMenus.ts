@@ -7,6 +7,7 @@ import { isMac } from "./windowFrame";
 import type { ChromeRegion, MenuAnchor } from "../../shared/ipc";
 import type { PublishResult } from "../../shared/library";
 import { BERRY } from "../../shared/mascots";
+import { bestEffort } from "../library/savedFile";
 import type { WindowParts, WindowStores } from "./WindowParts";
 
 // The menus the window opens from its views, and the questions it asks before deleting something or after something
@@ -83,7 +84,7 @@ export class WindowMenus {
     const words = deleteMascotWords(mascot, runs.length, Boolean(mascot.publishedId), !this.w.settings.showBerry);
     if (!(await this.w.menus.ask(words))) return false;
     if (!this.stores.mascotStore.delete(id)) return false;
-    this.w.memory.clear(id);
+    bestEffort(this.w.memory.clear(id), "The deleted mascot's remembered facts are still on file.");
     runs.forEach((routine) => this.w.routines.setPaused(routine.id, true));
     this.w.library.mascotsChanged();
     return true;

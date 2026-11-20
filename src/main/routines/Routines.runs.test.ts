@@ -32,6 +32,24 @@ describe("a run", () => {
     expect(store.routine(id)?.nextRunAt).toBe(NOW + 60 * MINUTE + DAY);
   });
 
+  it("stays asked for when a run asked for now can't be saved, and starts once it can", async () => {
+    const file = join(mkdtempSync(join(tmpdir(), "blueberry-routines-")), "routines.db");
+    const { routines, store } = setup(new RoutineStore(file));
+    const id = save(routines, daily("11:00"));
+    const db = new DatabaseSync(file);
+    db.exec("CREATE TRIGGER no_room BEFORE INSERT ON runs BEGIN SELECT RAISE(ABORT, 'database or disk is full'); END;");
+    started(routines);
+    const onStart = vi.fn();
+
+    expect(routines.runNow(id, onStart)).toBe(true);
+    expect(onStart).not.toHaveBeenCalled();
+    db.exec("DROP TRIGGER no_room;");
+    db.close();
+    await vi.advanceTimersByTimeAsync(DAY);
+    expect(onStart).toHaveBeenCalledWith(store.latestRun(id)?.id);
+    expect(store.latestRun(id)).not.toBeNull();
+  });
+
   it("shows what it's doing, and how it ended", async () => {
     const { routines, store, started: runs, events } = setup();
     const id = save(routines, daily());

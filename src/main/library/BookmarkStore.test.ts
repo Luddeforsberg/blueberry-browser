@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { describe, expect, it } from "vitest";
@@ -130,5 +130,18 @@ describe("BookmarkStore", () => {
     // From then on the one file is what counts.
     writeFileSync(join(folder, "pinned.json"), JSON.stringify([{ id: "x", title: "X", url: "https://x.example/" }]));
     expect(lists(new BookmarkStore(folder))).toEqual(expected);
+  });
+
+  it("saves nothing while an old file can't be read, so none of it is lost", () => {
+    const folder = tempFolder();
+    // A folder in its place can't be read as a file, as a locked one couldn't.
+    mkdirSync(join(folder, "pinned.json"));
+    writeFileSync(join(folder, "bookmarks.json"), JSON.stringify([site]));
+
+    const store = new BookmarkStore(folder);
+    expect(lists(store)).toEqual({ pinned: [], bookmarks: [site] });
+    expect(store.add("bookmarks", "https://b.example/", "B")).toBe(false);
+    expect(store.bookmarks).toEqual([site]);
+    expect(existsSync(join(folder, "saved-sites.json"))).toBe(false);
   });
 });
