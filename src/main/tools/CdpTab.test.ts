@@ -89,7 +89,7 @@ describe.skipIf(!findChrome())("a page in a browser over CDP", () => {
     expect(ref).toMatch(/^e\d+$/);
     const result = await tool("click").run({ ref });
     expect(result).toMatch(/^Done\./);
-    expect(result).not.toMatch(/scripted/);
+    expect(result, `full result: ${result}`).not.toMatch(/scripted/);
     expect(await tab.runInPage("document.getElementById('count').textContent")).toBe("Cart: 1");
   });
 
