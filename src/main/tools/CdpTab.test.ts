@@ -209,7 +209,7 @@ describe.skipIf(!findChrome())("a page in a browser over CDP", () => {
     try {
       await long.settled();
       // Where it answered, and where the page was a moment later. When it answers, late starts included, is held in
-      // src/page/tools/scroll.test.ts, since a real browser's frames on a busy runner aren't this test's to time.
+      // scrollPage.test.ts, since a real browser's frames on a busy runner aren't this test's to time.
       const scroll = async (direction: "up" | "down", page = long) => {
         const { top } = await page.runInPage<{ top: number }>(scrollPage(direction, true));
         await new Promise((resolve) => setTimeout(resolve, 300));
