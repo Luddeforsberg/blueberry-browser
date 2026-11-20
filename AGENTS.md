@@ -25,7 +25,7 @@ An AI browser built with Electron, React and TypeScript. [DESIGN.md](./DESIGN.md
 | `pnpm run site:deploy` | Deploy `site/` to Netlify, as it is, with `netlify.toml`. Needs `npx netlify login` and a linked site first |
 | `pnpm run push:keys` | Print a new VAPID key pair for notifications on the phone page. See `runner/README.md` |
 | `pnpm run runner:build` | Bundle the cloud runner into `runner/dist/`. `pnpm run runner:start` runs it. See `runner/README.md` |
-| `pnpm run verify` | Typecheck, format check, lint, knip, unit tests, build and end-to-end tests, the same as CI on macOS |
+| `pnpm run verify` | Typecheck, format check, lint, knip, unit tests, build and end-to-end tests: CI's checks plus the end-to-end tests |
 
 CI runs typecheck, the format check, lint, knip, unit tests and build on macOS and Windows. It doesn't run the end-to-end tests, because 15 of them need a real screen and GitHub's runners have none, and it doesn't package the app. The end-to-end tests run on a Mac with `pnpm run verify`, and nothing checks them on Windows yet.
 
@@ -33,7 +33,7 @@ CI runs typecheck, the format check, lint, knip, unit tests and build on macOS a
 
 - **One branch and one PR per working feature, from the latest `main`.** Don't stack PRs. Each runs in its own worktree.
 - **Every PR goes through `self-check`, proof and `file-pr`.** `review-loop` only for changes that touch what Berry may do, permissions or secrets, for as many rounds as the size of the change calls for.
-- **Run `pnpm run verify` before filing.** It runs what CI runs on macOS. Put the result in the PR.
+- **Run `pnpm run verify` before filing.** It runs CI's checks plus the end-to-end tests. Put the result in the PR.
 - **The project manager agent merges.** It merges PRs one at a time and reruns `verify` on anything `main` has moved under.
 - **The user merges anything that lets Berry do more without asking.** Say so at the top of the PR.
 - **Tests stay small:** one end-to-end test of the main flow, plus unit tests only for real logic. If a test fails with no link to the change, rerun it once and move on. Look into it only if the same test keeps failing. Don't write tests for test helpers.
@@ -46,8 +46,8 @@ CI runs typecheck, the format check, lint, knip, unit tests and build on macOS a
 Each line is a section of [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md), in the same order. Read the section before changing its area: it says what the area must never do.
 
 - `src/main/window/` and `menus/`: the window and its views. Read `Window.ts`, then `WindowParts.ts`. `Layout.ts` places every region.
-- `src/shared/ipc/`, `src/preload/chrome.ts` and `src/main/window/EventManager.ts`: the IPC contract. A channel goes in `ipc/invoke.ts` or `ipc/events.ts`, then `CHANNEL_REGIONS` in `src/main/window/ipc.ts`, then the preload.
-- `src/main/tabs/` and `library/`: tabs, the session, history, bookmarks and downloads. Read `Tab.ts`.
+- `src/shared/ipc/`, `src/preload/chrome.ts` and `src/main/window/EventManager.ts`: the IPC contract. A new invoke channel goes in `ipc/invoke.ts`, then `CHANNEL_REGIONS` in `src/main/window/ipc.ts`, then the preload. An event goes in `ipc/events.ts`.
+- `src/main/tabs/`, `library/` and `settings/SitePermissions.ts`: tabs, the session, history, bookmarks, downloads and site permissions. Read `Tab.ts`.
 - `src/main/chats/`: every chat and job, attachments too. Read `Chats.ts`, then `agent.ts`.
 - `src/main/tools/` and `src/page/`: what Berry can do in a page. Read `browserTools.ts`, then `pageTarget.ts`.
 - `src/main/tools/askFirst.ts`, `src/main/chats/Handoffs.ts` and `src/main/phone/`: approvals, handoffs and Needs you from the phone.
@@ -58,19 +58,19 @@ Each line is a section of [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md), in the
 - `src/main/desktop/`: the mascot on the desktop. Read `DesktopBerry.ts`.
 - `src/main/cloud/`, `remoteJobs/`, `runner/`, `site/` and `supabase/`: the cloud browser, the runner, the relay, the phone page and the server. Read `CloudTabs.ts`, `RunnerJobs.ts` and `runner/src/index.ts`.
 - `src/main/mcp/`: apps on this computer over MCP. Read `McpConnector.ts`.
-- `src/main/account/` and `settings/`: the account, settings, the AI key and site permissions. Read `SettingsStore.ts`.
+- `src/main/account/` and `settings/`: the account, settings and the AI key. Read `SettingsStore.ts`.
 - `src/renderer/chrome/` and `src/renderer/common/`: the one chrome renderer and what it shares. Read `src/renderer/chrome/src/main.tsx`.
 
 ## Rules no check holds
 
-Most rules are checks, and each says why when it fails: `eslint.boundaries.mjs` who may import or call what, `eslint.fences.mjs` where `fetch`, renderer timers, raw controls and `as unknown as` may go, `eslint.limits.mjs` the size limits, `scripts/oldNames.mjs` the old names and `scripts/runnerElectron.mjs` the runner without Electron. These are the ones they can't hold:
+Most rules are checks, and each says why when it fails: `eslint.boundaries.mjs` who may import what, `eslint.calls.mjs` who may use a few members, `eslint.fences.mjs` where `fetch`, renderer timers, raw controls and `as unknown as` may go, `eslint.limits.mjs` the size limits, `scripts/oldNames.mjs` the old names and `scripts/runnerElectron.mjs` the runner without Electron. These are the ones they can't hold:
 
 - Only `Layout.ts`, with `floatingPlaces.ts` and `desktopPlaces.ts`, decides where regions go. Don't hard-code a size anywhere else.
 - Limits only narrow. A mascot's tools and sites, a routine's sites, and the sites, tools and ask level a job arrives with can take away, never add. A deleted or missing mascot never falls back to Berry.
 - Only the user answers an approval or a handoff. Nothing on the runner or the relay, no MCP app and no model can. An app, the phone page or the desktop mascot may answer a question, but never with anything shaped like a code.
 - The words on an approval card come from code, never from the model or a page.
 - Anything from a page, a server, a link or another app is a stranger's: check it where it comes in, show it as text, and label it untrusted for the model.
-- A code, cookie, session, token or key stays in main. It never goes to a renderer, the model or a log, and reaches the disk only encrypted with `safeStorage`, if at all.
+- Each secret goes only the way Secrets in ARCHITECTURE.md says. Don't give one a new route.
 - No service key or secret belongs in the repo or the app. Supabase gets the publishable key only.
 - Where ARCHITECTURE.md says something has no route to a tool, a mascot, the model, MCP, the relay, the phone or the disk, don't add one.
 - A `BLUEBERRY_*` switch for tests works only in an unpackaged app, and one that takes an address only on 127.0.0.1.
