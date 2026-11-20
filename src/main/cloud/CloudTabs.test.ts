@@ -1,17 +1,25 @@
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { CdpTab } from "../tools/CdpTab";
 
-vi.mock("electron", () => ({ safeStorage: { isEncryptionAvailable: () => false }, app: { isPackaged: true } }));
+const encryption = vi.hoisted(() => ({ available: false }));
+vi.mock("electron", () => ({
+  safeStorage: {
+    isEncryptionAvailable: () => encryption.available,
+    encryptString: (text: string) => Buffer.from(text),
+    decryptString: (sealed: Buffer) => sealed.toString(),
+  },
+  app: { isPackaged: true },
+}));
 
 const { CloudSessions } = await import("./cloudBrowser");
 const { CloudTabs } = await import("./CloudTabs");
 
-const makeTabs = () =>
+const makeTabs = (file = join(mkdtempSync(join(tmpdir(), "cloud-tabs-")), "cloud.json")) =>
   new CloudTabs(
-    join(mkdtempSync(join(tmpdir(), "cloud-tabs-")), "cloud.json"),
+    file,
     {
       chrome: () => ({ isDestroyed: () => true }) as never,
       openTab: () => "tab-1",
@@ -99,6 +107,61 @@ describe("CloudTabs", () => {
     expect(pages.get("tab-b")?.watch.mock.calls.filter(([onFrame]) => onFrame)).toEqual([]);
     expect(pages.get("tab-c")?.watch).toHaveBeenLastCalledWith(expect.any(Function));
     vi.restoreAllMocks();
+  });
+
+  it("asks the browser for a tab's pictures again after it wouldn't start them", async () => {
+    const watch = vi.fn<(onFrame: unknown) => Promise<void>>().mockRejectedValueOnce(new Error("Page.startScreencast failed"));
+    watch.mockResolvedValue();
+    vi.spyOn(CloudSessions.prototype, "page").mockReturnValue({ id: "tab-a", watch } as unknown as CdpTab);
+    const tabs = makeTabs();
+    tabs.start();
+    await tabs.watch("tab-a");
+    await tabs.watch("tab-a");
+    expect(watch.mock.calls.filter(([onFrame]) => onFrame)).toHaveLength(2);
+    vi.restoreAllMocks();
+  });
+
+  it("keeps the key, and the session's id, until the session it may still be running on has ended", async () => {
+    encryption.available = true;
+    const file = join(mkdtempSync(join(tmpdir(), "cloud-tabs-")), "cloud.json");
+    // Sealed as the mocked safeStorage seals, which is no more than base64.
+    const sealed = (text: string) => Buffer.from(text).toString("base64");
+    writeFileSync(file, JSON.stringify({ apiKey: sealed("bb_old"), projectId: sealed("proj"), contextId: "ctx-1", sessionId: "sess-1" }));
+    const saved = () => JSON.parse(readFileSync(file, "utf8")) as Record<string, string | null>;
+    vi.spyOn(CloudSessions.prototype, "end").mockResolvedValue();
+    const unreleased = vi.spyOn(CloudSessions.prototype, "unreleased", "get").mockReturnValue(true);
+    const tabs = makeTabs(file);
+    tabs.start();
+    expect((await tabs.saveKey("bb_new", "proj")).problem).toMatch(/didn't confirm it ended/);
+    expect((await tabs.forget()).problem).toMatch(/didn't confirm it ended/);
+    expect(saved()).toEqual({ apiKey: sealed("bb_old"), projectId: sealed("proj"), contextId: "ctx-1", sessionId: "sess-1" });
+
+    unreleased.mockReturnValue(false);
+    expect((await tabs.saveKey("bb_new", "proj")).problem).toBeNull();
+    expect(saved()).toEqual({ apiKey: sealed("bb_new"), projectId: sealed("proj"), contextId: null, sessionId: null });
+    vi.restoreAllMocks();
+    encryption.available = false;
+  });
+
+  it("takes a new key, or forgets one, when Browserbase no longer takes the old one, keeping its session for the new key", async () => {
+    encryption.available = true;
+    const file = join(mkdtempSync(join(tmpdir(), "cloud-tabs-")), "cloud.json");
+    const sealed = (text: string) => Buffer.from(text).toString("base64");
+    writeFileSync(file, JSON.stringify({ apiKey: sealed("bb_old"), projectId: sealed("proj"), contextId: "ctx-1", sessionId: "sess-1" }));
+    const saved = () => JSON.parse(readFileSync(file, "utf8")) as Record<string, string | null>;
+    const ended = vi.spyOn(CloudSessions.prototype, "end").mockResolvedValue();
+    vi.spyOn(CloudSessions.prototype, "unreleased", "get").mockReturnValue(true);
+    vi.spyOn(CloudSessions.prototype, "keyRefused", "get").mockReturnValue(true);
+    const tabs = makeTabs(file);
+    tabs.start();
+    await tabs.saveKey("bb_new", "proj");
+    expect(saved()).toEqual({ apiKey: sealed("bb_new"), projectId: sealed("proj"), contextId: null, sessionId: "sess-1" });
+    // Ended once more, with the new key.
+    expect(ended).toHaveBeenCalledTimes(2);
+    expect((await tabs.forget()).problem).toMatch(/ends on its own within an hour/);
+    expect(saved()).toEqual({ apiKey: null, projectId: null, contextId: null, sessionId: null });
+    vi.restoreAllMocks();
+    encryption.available = false;
   });
 
   it("lets the session wind down only once the last tab the user has there closes", async () => {

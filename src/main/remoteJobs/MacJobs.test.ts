@@ -1,9 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AccountState } from "../../shared/ipc";
 import type { ChatStep, MascotProfile } from "../../shared/library";
 import { BERRY } from "../../shared/mascots";
 import type { EndedReply } from "../chats/Chats";
 import type { GalleryServer } from "../account/galleryServer";
+import { JOB_LEASE_MS } from "./cloudJobs";
 import { MacJobs, RELAY_FROM } from "./MacJobs";
 import { defined } from "../../shared/testing";
 
@@ -80,6 +81,8 @@ const setUp = ({ enabled = true, mascot = SCOUT as unknown }: { enabled?: boolea
 };
 
 describe("MacJobs", () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it("claims one job at a time, runs it as a chat from the relay, and writes its reply back", async () => {
     const { jobs, host, chats, rows, queue, presence } = setUp();
     queue.push({
@@ -225,6 +228,109 @@ describe("MacJobs", () => {
     await jobs.tick();
     expect(presence).toEqual([true, true]);
     expect(server.macClaimJob).toHaveBeenCalledTimes(3);
+  });
+
+  it("stops the chat once the server hasn't answered for as long as its lease, though the site is still there", async () => {
+    const { jobs, server, host, later } = setUp();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await jobs.tick();
+    vi.mocked(server.macUpdateJob).mockRejectedValue(new Error("Couldn't reach Supabase."));
+    later(JOB_LEASE_MS - 1);
+    await jobs.tick();
+    expect(host.stop).not.toHaveBeenCalled();
+    later(1);
+    await jobs.tick();
+    expect(host.stop).toHaveBeenCalledWith("chat-1");
+  });
+
+  it("writes how it ended once the server answers again, while the lease holds", async () => {
+    const { jobs, server, chats, rows, later } = setUp();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await jobs.tick();
+    chats.get("chat-1")!.end({ reply: "It's £4.", steps: [], outcome: "done", error: null });
+    // Six rounds go unanswered, a minute in all.
+    for (let round = 0; round < 6; round++) vi.mocked(server.macUpdateJob).mockRejectedValueOnce(new Error("Couldn't reach Supabase."));
+    for (let round = 0; round < 6; round++) {
+      await jobs.tick();
+      later(10_000);
+    }
+    expect(jobs.running).not.toBeNull();
+    await jobs.tick();
+    expect(rows.get("job-1")).toMatchObject({ status: "done", reply: "It's £4." });
+    expect(jobs.running).toBeNull();
+  });
+
+  it("leaves how it ended to time out there once the lease has run out with no answer", async () => {
+    const { jobs, server, chats, rows, later } = setUp();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    await jobs.tick();
+    chats.get("chat-1")!.end({ reply: "It's £4.", steps: [], outcome: "done", error: null });
+    vi.mocked(server.macUpdateJob).mockRejectedValue(new Error("Couldn't reach Supabase."));
+    await jobs.tick();
+    expect(jobs.running).not.toBeNull();
+    later(JOB_LEASE_MS);
+    await jobs.tick();
+    expect(jobs.running).toBeNull();
+    expect(rows.get("job-1")?.status).toBe("running");
+    expect(log).toHaveBeenCalledWith("Mac job job-1: couldn't write how it ended, so it's left to time out there.");
+  });
+
+  it("counts an answer from when its write was sent, so a slow one doesn't stretch the lease", async () => {
+    const { jobs, server, host, later } = setUp();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await jobs.tick();
+    later(20_000);
+    // Answered ten seconds after it was sent, and nothing after that is.
+    const answer = vi.mocked(server.macUpdateJob).getMockImplementation()!;
+    vi.mocked(server.macUpdateJob)
+      .mockImplementationOnce(async (...args) => {
+        later(10_000);
+        return answer(...args);
+      })
+      .mockRejectedValue(new Error("Couldn't reach Supabase."));
+    await jobs.tick();
+    later(JOB_LEASE_MS - 10_000);
+    await jobs.tick();
+    expect(host.stop).toHaveBeenCalledWith("chat-1");
+  });
+
+  it("counts the lease from when the claim was sent, not when its answer came", async () => {
+    const { jobs, server, host, later } = setUp();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const claim = vi.mocked(server.macClaimJob).getMockImplementation()!;
+    vi.mocked(server.macClaimJob).mockImplementationOnce(async (token) => {
+      later(10_000);
+      return claim(token);
+    });
+    await jobs.tick();
+    vi.mocked(server.macUpdateJob).mockRejectedValue(new Error("Couldn't reach Supabase."));
+    later(JOB_LEASE_MS - 10_000);
+    await jobs.tick();
+    expect(host.stop).toHaveBeenCalledWith("chat-1");
+  });
+
+  it("says when the server had already ended the job it ended here", async () => {
+    const { jobs, chats, rows } = setUp();
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    await jobs.tick();
+    rows.get("job-1")!.status = "failed";
+    chats.get("chat-1")!.end({ reply: "It's £4.", steps: [], outcome: "done", error: null });
+    await jobs.tick();
+    expect(jobs.running).toBeNull();
+    expect(log).toHaveBeenCalledWith("Mac job job-1: done here, but the server had already ended it or been asked to stop it.");
+  });
+
+  it("writes that a job it couldn't start failed once the server answers again", async () => {
+    const { jobs, server, host, rows } = setUp({ mascot: null });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(server.macUpdateJob).mockRejectedValueOnce(new Error("Couldn't reach Supabase."));
+    await jobs.tick();
+    expect(rows.get("job-1")?.status).toBe("running");
+    await jobs.tick();
+    expect(rows.get("job-1")).toMatchObject({ status: "failed", error: expect.stringMatching(/didn't pass Blueberry's checks/) });
+    expect(host.start).not.toHaveBeenCalled();
+    expect(host.stop).not.toHaveBeenCalled();
   });
 
   it("does nothing signed out, and a job of the last account stops here", async () => {

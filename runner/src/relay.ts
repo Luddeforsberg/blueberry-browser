@@ -178,6 +178,40 @@ export const relayApp = (config: RelayConfig, supabase: { url: string; key: stri
   return { app, auth, resource };
 };
 
+// Where Settings says ChatGPT and Claude connect: the relay's address once it's listening, and none before that or if it
+// couldn't start, so Settings never shows one that isn't there. Shared with Blueberry again until it has heard it.
+export class RelayAddress {
+  private listening: string | null = null;
+  // What Blueberry last heard. Undefined until it has heard anything since the runner was linked.
+  private shared: string | null | undefined;
+
+  constructor(private readonly publish: (url: string | null) => Promise<void>) {}
+
+  // `url` is null for an address that's only for trying it out, which Settings never shows.
+  async listen(start: () => Promise<unknown>, url: string | null): Promise<void> {
+    await start();
+    this.listening = url;
+  }
+
+  // While linked. False if Blueberry couldn't be told, so it's tried again.
+  async share(): Promise<boolean> {
+    const url = this.listening;
+    if (this.shared === url) return true;
+    try {
+      await this.publish(url);
+    } catch {
+      return false;
+    }
+    this.shared = url;
+    return true;
+  }
+
+  // A new link has heard nothing yet.
+  unlinked(): void {
+    this.shared = undefined;
+  }
+}
+
 export const startRelay = (config: RelayConfig, supabase: { url: string; key: string; owner: string }, db: RelayDb): Promise<Server> => {
   const { app } = relayApp(config, supabase, db);
   // Express hands a server error, such as the port being taken, to this callback rather than throwing it.

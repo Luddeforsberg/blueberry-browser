@@ -146,3 +146,6 @@ evals/results/*/
 
 # Pictures from `pnpm run drive` and `pnpm run baseline`, kept on disk only.
 baselines/
+
+# What `railway config migrate cutover` saves, to undo it. It belongs to the checkout that ran it.
+.railway/.cac-migration.json

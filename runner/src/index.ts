@@ -6,7 +6,7 @@ import { DbError, dbConfig, runnerSession, supabaseDb, type ClaimedJob } from ".
 import { runJob, sessionBrowser, UnreleasedBrowsers } from "./job";
 import { pushConfig, pusher } from "./push";
 import { quietConsole } from "./quietConsole";
-import { relayConfig, startRelay } from "./relay";
+import { RelayAddress, relayConfig, startRelay } from "./relay";
 import { startDueRoutines } from "./routines";
 
 quietConsole();
@@ -67,14 +67,17 @@ if (!notify) console.log("No VAPID keys, so no notifications go to the phone.");
 const relay = relayConfig(process.env);
 if (typeof relay === "string") fail(relay);
 const relaySettings = relay && typeof relay !== "string" ? relay : null;
-// Only an https address is shown in Settings, so one for trying it locally isn't sent.
-const relayUrl = relaySettings?.origin.startsWith("https://") ? `${relaySettings.origin}/mcp` : null;
+const relayAddress = new RelayAddress((url) => db.setRelayUrl(url));
 if (relaySettings) {
+  // Only an https address is shown in Settings, so one for trying it locally isn't sent.
+  const url = relaySettings.origin.startsWith("https://") ? `${relaySettings.origin}/mcp` : null;
   // Cloud jobs go on without it. Only the words: the error could say more than the log should.
-  void startRelay(relaySettings, settings, db).then(
-    () => console.log(`Relay listening on port ${relaySettings.port}, for ChatGPT and Claude.`),
-    () => console.error("Relay couldn't start."),
-  );
+  void relayAddress
+    .listen(() => startRelay(relaySettings, settings, db), url)
+    .then(
+      () => console.log(`Relay listening on port ${relaySettings.port}, for ChatGPT and Claude.`),
+      () => console.error("Relay couldn't start, so Settings won't show its address."),
+    );
 } else {
   console.log("No RELAY_PUBLIC_URL and RELAY_SECRET, so ChatGPT and Claude can't connect.");
 }
@@ -100,6 +103,7 @@ const NOT_LINKED =
   "Not linked yet: its owner has to link this runner's account in Blueberry, in Settings > Cloud. Trying again in 30 seconds.";
 let linked = false;
 const link = async (): Promise<void> => {
+  relayAddress.unlinked();
   try {
     linked = await db.accept();
   } catch (error) {
@@ -114,14 +118,13 @@ const link = async (): Promise<void> => {
     return;
   }
   console.log(linked ? "Linked to its owner." : NOT_LINKED);
-  // Before the relay's migration has run this fails, and nothing else depends on it.
-  if (linked) await db.setRelayUrl(relayUrl).catch(() => console.error("Couldn't share the relay's address with Blueberry."));
 };
 
 const loop = async () => {
   console.log(`Runner started, using ${local ? "a local Chrome" : "Browserbase"}.`);
   let unreachable = false;
   let routinesFailing = false;
+  let addressFailing = false;
   while (!shutdown.signal.aborted) {
     await unreleased.retry();
     if (!linked) {
@@ -131,7 +134,12 @@ const loop = async () => {
         continue;
       }
     }
+    // Tried every round until Blueberry has the relay's address, as it is now. Nothing else depends on it.
+    const shared = await relayAddress.share();
+    if (!shared && !addressFailing) console.error("Couldn't share the relay's address with Blueberry. Trying again.");
+    addressFailing = !shared;
     let job: ClaimedJob | null = null;
+    let claimedAt = 0;
     try {
       // A routine that's due becomes a queued job first, so it's taken in turn like any other. Routines failing, as before
       // their migration has run, never stops jobs from being taken.
@@ -142,6 +150,7 @@ const loop = async () => {
       });
       if (routineJobs) routinesFailing = false;
       routineJobs?.forEach((id) => console.log(`Job ${id}: started from a routine.`));
+      claimedAt = Date.now();
       job = await db.claim();
       if (unreachable) console.log("Reached Supabase again.");
       unreachable = false;
@@ -162,6 +171,7 @@ const loop = async () => {
     const { id } = job;
     working = runJob(job, {
       db,
+      claimedAt,
       browser: (contextId) => sessionBrowser(new CloudSessions(cloudBrowser(contextId))),
       signal: shutdown.signal,
       unreleased,

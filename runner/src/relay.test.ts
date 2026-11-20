@@ -2,7 +2,7 @@ import { createServer } from "http";
 import type { AddressInfo } from "net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { relayConfig, startRelay } from "./relay";
+import { RelayAddress, relayConfig, startRelay } from "./relay";
 import {
   asOwner,
   authorizeUrl,
@@ -56,6 +56,34 @@ describe("startRelay", () => {
     } finally {
       taken.close();
     }
+  });
+});
+
+describe("the relay's address in Settings", () => {
+  it("is shown only once the relay is listening, never for one that couldn't start, and sent again until Blueberry has it", async () => {
+    const sent: (string | null)[] = [];
+    let failing = 0;
+    const address = new RelayAddress(async (url) => {
+      sent.push(url);
+      if (failing-- > 0) throw new Error("Couldn't reach Supabase.");
+    });
+    // Before it's listening, Settings is told there's none, in case an old address is there.
+    expect(await address.share()).toBe(true);
+    await expect(address.listen(() => Promise.reject(new Error("EADDRINUSE")), "https://relay.example/mcp")).rejects.toThrow();
+    expect(await address.share()).toBe(true);
+    expect(sent).toEqual([null]);
+
+    await address.listen(async () => {}, "https://relay.example/mcp");
+    failing = 1;
+    expect(await address.share()).toBe(false);
+    expect(await address.share()).toBe(true);
+    expect(await address.share()).toBe(true);
+    expect(sent).toEqual([null, "https://relay.example/mcp", "https://relay.example/mcp"]);
+
+    // Linked again, it's sent again.
+    address.unlinked();
+    await address.share();
+    expect(sent).toHaveLength(4);
   });
 });
 

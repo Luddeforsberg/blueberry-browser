@@ -64,6 +64,7 @@ export const createRunnerJobs = (w: WindowParts, server: GalleryServer | null, s
     adopt: ({ prompt, mascotId }) => w.chats.adoptRunnerChat(prompt, mascotId),
     followedUp: (chatId, prompt) => w.chats.runnerFollowedUp(chatId, prompt),
     routinesSettled: () => w.routines.cloudChanged(),
+    routineIds: () => w.routines.list().map(({ id }) => id),
     routines: () =>
       w.routines.cloudRows((id) => stores.mascotStore.resolve(id), {
         actionApproval: w.settings.actionApproval,
