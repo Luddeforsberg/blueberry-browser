@@ -348,7 +348,8 @@ export class RunnerJobs implements ChatRunner {
   // signed in is checked again once it's here, and nothing is sent with it otherwise.
   private async tokenFor(account: string): Promise<string | null | typeof SWITCHED_ACCOUNT> {
     const token = await this.account.accessToken();
-    return this.signedIn === account ? token : SWITCHED_ACCOUNT;
+    // A token that is the word "switched" counted as a switch when that word was the answer, and still does.
+    return this.signedIn === account && token !== "switched" ? token : SWITCHED_ACCOUNT;
   }
 
   private async withToken<T>(account: string, call: (token: string) => Promise<T>): Promise<T | null> {

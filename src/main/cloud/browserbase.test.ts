@@ -14,6 +14,12 @@ interface Call {
   body: Record<string, unknown> | null;
 }
 
+// Every request with a body sends it as JSON text, so anything else fails the test.
+const jsonText = (body: BodyInit): string => {
+  if (typeof body !== "string") throw new Error("Expected a JSON string body");
+  return body;
+};
+
 const stub = (answers: Record<string, { status?: number; body: unknown }>) => {
   const calls: Call[] = [];
   const send = (async (url: string, init: RequestInit) => {
@@ -22,7 +28,7 @@ const stub = (answers: Record<string, { status?: number; body: unknown }>) => {
       method,
       url,
       key: new Headers(init.headers).get("X-BB-API-Key"),
-      body: typeof init.body === "string" ? JSON.parse(init.body) : null,
+      body: init.body ? JSON.parse(jsonText(init.body)) : null,
     });
     const answer = answers[`${method} ${url.replace("https://api.browserbase.com/v1", "")}`];
     if (!answer) return new Response("{}", { status: 404 });
