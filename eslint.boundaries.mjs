@@ -1,7 +1,8 @@
-// Who may import or call what, as checks. Each rule says which files it holds for (`in`, minus `except`), which
-// imports it refuses there, and why. `types: true` refuses `import type` too, for a module whose type alone means
-// something was handed it. A regex is matched against what the import says. Static imports, `export … from` and
-// `import()` all count. Every place named here must exist, so a rename can't quietly turn a rule off.
+// Who may import what, as checks, and what a types-only file may hold: who may use a member is in eslint.calls.mjs.
+// Each rule says which files it holds for (`in`, minus `except`), which imports it refuses there, and why.
+// `types: true` refuses `import type` too, for a module whose type alone means something was handed it. A regex is
+// matched against what the import says. Static imports, `export … from` and `import()` all count. Every place named
+// here must exist, so a rename can't quietly turn a rule off.
 //
 // What the runner bundles is checked as a whole by scripts/runnerElectron.mjs, since a rule here only sees one file.
 // Where a module may only be imported by a few files, every one of them is named here, tests too: add one only with a
@@ -50,13 +51,6 @@ const onlyFrom = (what, imports, allowed, says) => ({
   imports,
   types: true,
   message: `${says} Only ${allowed.join(", ")} may import ${what}.`,
-});
-// The same for calls to a method, by its name, in the app's main process and the runner.
-const calledOnlyFrom = (method, allowed, says) => ({
-  in: ["src/main", "runner/src"],
-  except: main(...allowed),
-  syntax: `CallExpression[callee.property.name="${method}"]`,
-  message: `${says} Only ${allowed.join(", ")} may use ${method}.`,
 });
 
 const rules = [
@@ -330,24 +324,6 @@ const rules = [
     ["cloud/CloudTabs.ts"],
     "The cloud's key and live view go to the chrome only, never to a tool or a chat.",
   ),
-  // Calls no import rule sees: who may take a page's pixels, get past a tab held for the user, or read the clipboard.
-  calledOnlyFrom("capturePage", ["tabs/Tab.ts", "tabs/TabPage.ts"], "A page's pixels are taken in Tab alone."),
-  calledOnlyFrom(
-    "picture",
-    ["window/WorkViews.ts", "tabs/TabPreviews.ts"],
-    "Tab.picture keeps the mascot in, so it goes to the working view and tab previews alone, never a tool, a chat or the disk.",
-  ),
-  calledOnlyFrom(
-    "sendInputWhileHeld",
-    ["tabs", "phone/codeEntry.ts"],
-    "Nothing gets past the hold on a tab handed to the user but a code from the phone, typed by codeEntry.ts.",
-  ),
-  {
-    in: [...main("desktop"), ...["App", "Box", "Drop", "Panel", "Sheets"].map((part) => `src/renderer/chrome/src/Desktop${part}.tsx`)],
-    syntax:
-      "MemberExpression[property.name=/^(clipboard|desktopCapturer)$/], ImportSpecifier[imported.name=/^(clipboard|desktopCapturer)$/]",
-    message: "The mascot on the desktop never reads the screen, the clipboard or another app.",
-  },
   onlyFrom(
     "the parts of RunnerJobs",
     file("CloudSharing", "RunnerDiscovery", "RunnerPolls", "runnerJobsFile", "runnerTypes", "runnerJobsTesting"),
