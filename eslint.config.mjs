@@ -4,6 +4,7 @@ import eslintPluginReact from "eslint-plugin-react";
 import eslintPluginReactHooks from "eslint-plugin-react-hooks";
 import eslintPluginReactRefresh from "eslint-plugin-react-refresh";
 import { boundaries } from "./eslint.boundaries.mjs";
+import { fenceBlocks } from "./eslint.fences.mjs";
 import { complexityOver, linesOver, paramsOver } from "./eslint.limits.mjs";
 
 export default tseslint.config(
@@ -165,6 +166,8 @@ export default tseslint.config(
   },
   // Who may import what: the rules AGENTS.md states, and page code only through src/main/tools/pageCode.ts.
   ...boundaries,
+  // Risky things written in one place each: fetch, timers in renderers, raw controls and double casts.
+  ...fenceBlocks,
   ...Object.entries(linesOver).map(([file, max]) => ({ files: [file], rules: { "max-lines": ["error", max] } })),
   ...Object.entries(complexityOver).map(([file, max]) => ({ files: [file], rules: { complexity: ["error", max] } })),
   ...Object.entries(paramsOver).map(([file, max]) => ({ files: [file], rules: { "max-params": ["error", max] } })),

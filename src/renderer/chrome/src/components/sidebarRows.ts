@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useNow } from "@common/lib/timers";
 import type { ChatThreadSummary, Routine } from "@shared/library";
 import { cn } from "@common/lib/utils";
 import { openRoutines } from "../routinesView";
@@ -21,11 +21,7 @@ export const CURRENT = "bg-sheet text-ink shadow-up";
 // A tick for rows that say when: every second while something is going, since that counts seconds, and otherwise
 // often enough for minutes.
 export const useTick = (going: boolean) => {
-  const [, setNow] = useState(0);
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), going ? 1000 : 30_000);
-    return () => window.clearInterval(timer);
-  }, [going]);
+  useNow(going ? 1000 : 30_000);
 };
 
 export const openChat = (chat: Pick<ChatThreadSummary, "id" | "title">) =>

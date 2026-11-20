@@ -160,6 +160,25 @@ const rules = [
     ["library/browserHistory.test.ts", "window/BrowsingHistory.ts"],
     "No tool can reach another browser's history.",
   ),
+  // Shared code reaches renderers too, so it's fenced as well. Page code imports no package at all.
+  {
+    ...onlyFrom(
+      "node:sqlite",
+      "^(node:)?sqlite$",
+      [
+        "library/database.ts",
+        "library/HistoryStore.ts",
+        "library/browserHistory.ts",
+        "chats/ChatStore.ts",
+        "routines/RoutineStore.ts",
+        "library/database.test.ts",
+        "library/browserHistory.test.ts",
+        "chats/ChatStore.test.ts",
+      ],
+      "A database belongs to the store that opens it, and its rows are read with rowOf and rowsOf in library/database.ts.",
+    ),
+    in: ["src/main", "src/shared", "src/preload", "src/renderer", "runner/src"],
+  },
   onlyFrom(
     "codeEntry.ts",
     file("codeEntry"),

@@ -7,6 +7,7 @@ import { ExactWords } from "@common/components/ApprovalCard";
 import { Button } from "@common/components/Button";
 import { Mascot } from "@common/components/Mascot";
 import { Pips } from "@common/components/Pips";
+import { useNow } from "@common/lib/timers";
 import { cn } from "@common/lib/utils";
 import { HANDOFF_TITLE } from "./components/approvalWords";
 import { FADES_IN, clockTime, elapsed } from "./desktopShape";
@@ -15,15 +16,6 @@ import { asContinuation, withSiteNames } from "./siteNames";
 import { desktop, FOCUS } from "./desktopPanelParts";
 
 // Part of the desktop panel (DesktopPanel.tsx): the tray and the ask beside the drop.
-
-const useNow = (every: number): number => {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), every);
-    return () => clearInterval(timer);
-  }, [every]);
-  return now;
-};
 
 const Label: React.FC<{ ask?: boolean; count?: number; children: React.ReactNode }> = ({ ask = false, count, children }) => (
   <h3 className={cn("mt-3 mb-1 px-2.5 flex items-baseline gap-[7px] text-12 font-medium", ask ? "text-ask" : "text-ink-2")}>

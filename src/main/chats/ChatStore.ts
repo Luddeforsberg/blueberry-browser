@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import type { ChatThreadMessage, ChatThreadSummary } from "../../shared/library";
 import type { FileKind } from "../../shared/attachments";
 import type { PreparedFile } from "./Attachments";
-import { migrate } from "../library/database";
+import { migrate, rowOf, rowsOf } from "../library/database";
 
 export interface StoredChat extends ChatThreadSummary {
   messages: ChatThreadMessage[];
@@ -72,43 +72,36 @@ export class ChatStore {
   }
 
   summaries(): ChatThreadSummary[] {
-    const rows = this.db
-      .prepare(
+    const rows = rowsOf<ChatThreadSummary & { seen: number }>(
+      this.db.prepare(
         'SELECT id, title, updated_at AS updatedAt, mascot_id AS mascotId, source AS "from", seen FROM chats ORDER BY updated_at DESC, rowid DESC',
-      )
-      .all() as unknown as Array<ChatThreadSummary & { seen: number }>;
+      ),
+    );
     return rows.map(({ seen, ...chat }) => ({ ...chat, unseen: seen === 0 }));
   }
 
   // What each of the newest chats began with, for noticing what the user keeps asking. A chat another app started
   // isn't something the user asked.
   firstMessages(limit: number): Array<ChatThreadSummary & { firstMessage: string; replied: boolean }> {
-    return this.db
-      .prepare(
+    return rowsOf<ChatThreadSummary & { firstMessage: string | null; replied: number }>(
+      this.db.prepare(
         `SELECT id, title, updated_at AS updatedAt, mascot_id AS mascotId,
            source AS "from",
            (SELECT content FROM messages WHERE chat_id = chats.id AND role = 'user' ORDER BY id LIMIT 1) AS firstMessage,
            EXISTS (SELECT 1 FROM messages WHERE chat_id = chats.id AND role = 'assistant' AND content <> '') AS replied
          FROM chats WHERE source IS NULL ORDER BY updated_at DESC, rowid DESC LIMIT ?`,
-      )
-      .all(limit)
-      .flatMap((row) => {
-        const { firstMessage, replied, ...summary } = row as unknown as ChatThreadSummary & {
-          firstMessage: string | null;
-          replied: number;
-        };
-        return firstMessage ? [{ ...summary, firstMessage, replied: replied === 1 }] : [];
-      });
+      ),
+      limit,
+    ).flatMap(({ firstMessage, replied, ...summary }) => (firstMessage ? [{ ...summary, firstMessage, replied: replied === 1 }] : []));
   }
 
   chat(id: string): StoredChat | null {
-    const summary = this.db
-      .prepare('SELECT id, title, updated_at AS updatedAt, mascot_id AS mascotId, source AS "from" FROM chats WHERE id = ?')
-      .get(id) as unknown as ChatThreadSummary | undefined;
+    const summary = rowOf<ChatThreadSummary>(
+      this.db.prepare('SELECT id, title, updated_at AS updatedAt, mascot_id AS mascotId, source AS "from" FROM chats WHERE id = ?'),
+      id,
+    );
     if (!summary) return null;
-    const rows = this.db
-      .prepare("SELECT role, content, steps, memory, pages, attached, work FROM messages WHERE chat_id = ? ORDER BY id")
-      .all(id) as unknown as Array<
+    const rows = rowsOf<
       Pick<ChatThreadMessage, "role" | "content"> & {
         steps: string | null;
         memory: string | null;
@@ -116,7 +109,7 @@ export class ChatStore {
         attached: string | null;
         work: string | null;
       }
-    >;
+    >(this.db.prepare("SELECT role, content, steps, memory, pages, attached, work FROM messages WHERE chat_id = ? ORDER BY id"), id);
     const messages = rows.map(
       ({ steps, memory, pages, attached, work, ...message }): ChatThreadMessage => ({
         ...message,
@@ -195,14 +188,8 @@ export class ChatStore {
 
   // The files that went with each of a chat's messages, in the order of its messages, for the model and nothing else.
   filesOf(chatId: string): StoredFile[][] {
-    const messages = this.db.prepare("SELECT id FROM messages WHERE chat_id = ? ORDER BY id").all(chatId) as unknown as Array<{
-      id: number;
-    }>;
-    const rows = this.db
-      .prepare(
-        "SELECT message_id AS messageId, kind, name, fact, mime, data, text FROM message_files WHERE chat_id = ? ORDER BY message_id, id",
-      )
-      .all(chatId) as unknown as Array<{
+    const messages = rowsOf<{ id: number }>(this.db.prepare("SELECT id FROM messages WHERE chat_id = ? ORDER BY id"), chatId);
+    const rows = rowsOf<{
       messageId: number;
       kind: FileKind;
       name: string;
@@ -210,7 +197,12 @@ export class ChatStore {
       mime: string | null;
       data: Uint8Array | null;
       text: string | null;
-    }>;
+    }>(
+      this.db.prepare(
+        "SELECT message_id AS messageId, kind, name, fact, mime, data, text FROM message_files WHERE chat_id = ? ORDER BY message_id, id",
+      ),
+      chatId,
+    );
     return messages.map(({ id }) =>
       rows
         .filter(({ messageId }) => messageId === id)

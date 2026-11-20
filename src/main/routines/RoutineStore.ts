@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { dirname } from "path";
 import { DatabaseSync } from "node:sqlite";
 import type { ChatApproval, ChatStep, RoutineDraft, RoutineRun, RoutineRunStatus, RoutineSchedule } from "../../shared/library";
+import { rowOf, rowsOf } from "../library/database";
 
 export interface StoredRoutine {
   id: string;
@@ -115,21 +116,22 @@ export class RoutineStore {
   }
 
   routines(): StoredRoutine[] {
-    const rows = this.db.prepare(`SELECT ${ROUTINE_COLUMNS} FROM routines ORDER BY created_at, rowid`).all();
-    return (rows as unknown as RoutineRow[]).map(toRoutine);
+    return rowsOf<RoutineRow>(this.db.prepare(`SELECT ${ROUTINE_COLUMNS} FROM routines ORDER BY created_at, rowid`)).map(toRoutine);
   }
 
   routine(id: string): StoredRoutine | null {
-    const row = this.db.prepare(`SELECT ${ROUTINE_COLUMNS} FROM routines WHERE id = ?`).get(id);
-    return row ? toRoutine(row as unknown as RoutineRow) : null;
+    const row = rowOf<RoutineRow>(this.db.prepare(`SELECT ${ROUTINE_COLUMNS} FROM routines WHERE id = ?`), id);
+    return row ? toRoutine(row) : null;
   }
 
   // Oldest first, so whatever has waited longest gets the next free place. One in the cloud is the cloud's to run.
   due(now: number): StoredRoutine[] {
-    const rows = this.db
-      .prepare(`SELECT ${ROUTINE_COLUMNS} FROM routines WHERE paused = 0 AND in_cloud = 0 AND next_run_at <= ? ORDER BY next_run_at, rowid`)
-      .all(now);
-    return (rows as unknown as RoutineRow[]).map(toRoutine);
+    return rowsOf<RoutineRow>(
+      this.db.prepare(
+        `SELECT ${ROUTINE_COLUMNS} FROM routines WHERE paused = 0 AND in_cloud = 0 AND next_run_at <= ? ORDER BY next_run_at, rowid`,
+      ),
+      now,
+    ).map(toRoutine);
   }
 
   soonest(): number | null {
@@ -263,10 +265,9 @@ export class RoutineStore {
   // Whatever was still going when the app stopped, even if it never got to say so. The approval stays on the row,
   // so the run can say what it was waiting to do and didn't.
   interruptUnfinished(now: number): void {
-    const open = this.db.prepare("SELECT id, steps FROM runs WHERE status IN ('running', 'needs-approval')").all() as unknown as Array<{
-      id: string;
-      steps: string;
-    }>;
+    const open = rowsOf<{ id: string; steps: string }>(
+      this.db.prepare("SELECT id, steps FROM runs WHERE status IN ('running', 'needs-approval')"),
+    );
     open.forEach(({ id, steps }) => {
       const finished = (JSON.parse(steps) as ChatStep[]).map((step) => ({ ...step, done: true }));
       this.db
@@ -276,17 +277,18 @@ export class RoutineStore {
   }
 
   latestRun(routineId: string): RoutineRun | null {
-    const row = this.db
-      .prepare(`SELECT ${RUN_COLUMNS} FROM runs WHERE routine_id = ? ORDER BY started_at DESC, rowid DESC LIMIT 1`)
-      .get(routineId);
-    return row ? toRun(row as unknown as RunRow) : null;
+    const row = rowOf<RunRow>(
+      this.db.prepare(`SELECT ${RUN_COLUMNS} FROM runs WHERE routine_id = ? ORDER BY started_at DESC, rowid DESC LIMIT 1`),
+      routineId,
+    );
+    return row ? toRun(row) : null;
   }
 
   runs(routineId: string): RoutineRun[] {
-    const rows = this.db
-      .prepare(`SELECT ${RUN_COLUMNS} FROM runs WHERE routine_id = ? ORDER BY started_at DESC, rowid DESC`)
-      .all(routineId);
-    return (rows as unknown as RunRow[]).map(toRun);
+    return rowsOf<RunRow>(
+      this.db.prepare(`SELECT ${RUN_COLUMNS} FROM runs WHERE routine_id = ? ORDER BY started_at DESC, rowid DESC`),
+      routineId,
+    ).map(toRun);
   }
 
   hasUnseen(routineId: string): boolean {

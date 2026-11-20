@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import type { ChatStep, SaidOnTheWay } from "@shared/library";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { clock, foldedWords, keptWhenFolded, latestEntries, workEntries, type WorkEntry } from "../workLine";
@@ -6,6 +6,7 @@ import { trailFor } from "../stepTrail";
 import { Pips } from "@common/components/Pips";
 import { STEP_PIPS, type PipMark, type PipPattern } from "@common/components/pipPatterns";
 import { useStill } from "@common/components/motion";
+import { useNow } from "@common/lib/timers";
 import { cn } from "@common/lib/utils";
 import { FOCUS } from "./chipClass";
 
@@ -100,11 +101,7 @@ export const StepTrail: React.FC<{ steps: ChatStep[]; running?: boolean; cutShor
 
 // Ticks while a reply works, in mono like the line it's on.
 const Elapsed: React.FC<{ since: number }> = ({ since }) => {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+  const now = useNow(1000);
   return <span className="text-ink-3 tabular-nums">{clock(now - since)}</span>;
 };
 
