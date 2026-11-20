@@ -208,7 +208,7 @@ put(
 
 // Where the site is. A link preview only reads the share picture from a whole address, so the pages' tags are written from
 // this. Change it here and run this to move the site.
-const SITE_ORIGIN = "https://blueberry-flock.netlify.app";
+const SITE_ORIGIN = "https://blueberry-browser.netlify.app";
 for (const page of ["index.html", "m/index.html"]) {
   const file = join(site, page);
   put(file, readFileSync(file, "utf8").replace(/content="https:\/\/[^"]+\/share\.png"/g, `content="${SITE_ORIGIN}/share.png"`));
