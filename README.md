@@ -10,11 +10,11 @@ Blueberry is an AI browser that can do jobs in your tabs. Ask Berry to research 
 
 ### Browse and work in the same window
 
-Blueberry has tabs, history, bookmarks, downloads, find, zoom and site permissions. Choose a vertical sidebar or horizontal tabs, and a light or dark appearance. In the Pips design, small grids of dots mark what a mascot is doing and when it needs you.
+Blueberry has tabs, history, bookmarks, downloads, find, zoom and site permissions. Choose a vertical sidebar or horizontal tabs, and a light or dark appearance. Small grids of dots show what a mascot is doing and when it needs you.
 
 The new tab page is where you type an address or ask a mascot to do something. It shows jobs waiting for you and suggests chats to pick up, jobs to try, or routines and mascots based on your recent activity. Import history from Chrome, Brave or Edge to help it get started. On macOS you can also import from Arc.
 
-![The new tab page suggests comparing GitHub and GitLab and picking Hacker News stories before standup](docs/images/new-tab.webp)
+![The new tab page suggests comparing GitHub and GitLab and checking weekly updates from GitHub Status and Linear](docs/images/new-tab.webp)
 
 ### Jobs that keep going when you leave
 
@@ -36,7 +36,7 @@ You can review a Gallery mascot's instructions and permissions before adding it.
 
 Open Show Berry how from Routines, do the job once in the browser and press **Done**. Read the notes, leave out any steps you don't need, and turn what's left into a draft routine. It watches the tab in front while recording and keeps passwords out of the notes.
 
-![The What I watched page shows the sites visited during a recording and a button to turn the notes into a routine](docs/images/show-berry-how.webp)
+![The What I watched page shows the steps Berry recorded while researching hosted runners and a button to turn the notes into a routine](docs/images/show-berry-how.webp)
 
 ### Use Blueberry from other apps
 
