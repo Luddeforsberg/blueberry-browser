@@ -123,8 +123,14 @@ export class Tab implements PageTarget {
   get backUrl(): string | null {
     return this.web.backUrl;
   }
-  goBack(byAgent = false): void {
-    this.web.goBack(byAgent);
+  // The user going back, from the toolbar or a menu.
+  goBack(): void {
+    this.web.goBack(false);
+  }
+  // The window's history goes back at once or not at all, so there's nothing to wait for.
+  async agentGoBack(): Promise<void> {
+    if (!this.canGoBack) throw new Error("There's no earlier page");
+    this.web.goBack(true);
   }
   goForward(): void {
     this.web.goForward();

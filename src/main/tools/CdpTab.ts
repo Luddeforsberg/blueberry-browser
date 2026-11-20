@@ -3,6 +3,7 @@ import type { TabLoadError, TabTrouble } from "../../shared/ipc";
 import type { AgentInput, PageFrame, PageTarget } from "./pageTarget";
 import { CdpInput } from "./cdpInput";
 import { CdpNavigationLimits } from "./cdpNavigationLimits";
+import { CdpScreencast } from "./cdpScreencast";
 
 // A page in a browser reached over the Chrome DevTools Protocol, such as one in the cloud, behind the same interface as
 // the window's own tabs, so Berry's tools work on it unchanged. Plain Node: no Electron, so a runner without a window can
@@ -18,8 +19,6 @@ const MAX_FRAMES_READ = 30;
 const FRAME_TEXT = `innerWidth > 1 && innerHeight > 1 ? document.body?.innerText ?? "" : ""`;
 const LOAD_START_MS = 300;
 const LOAD_END_MS = 10_000;
-const SCREENCAST_QUALITY = 60;
-const SCREENCAST_WIDTH = 1280;
 
 const withTimeout = async <T>(work: Promise<T>, ms: number, what: string): Promise<T> => {
   let timer: NodeJS.Timeout | undefined;
@@ -64,8 +63,8 @@ export class CdpTab implements PageTarget {
   private readonly frames = new WeakMap<Frame, PageFrame>();
   private readonly input: CdpInput;
   private readonly limits: CdpNavigationLimits;
+  private readonly screencast: CdpScreencast;
   private closed = false;
-  private screencast: ((jpeg: string) => void) | null = null;
 
   private constructor(
     readonly id: string,
@@ -77,6 +76,7 @@ export class CdpTab implements PageTarget {
   ) {
     this.input = new CdpInput(session);
     this.limits = new CdpNavigationLimits(session);
+    this.screencast = new CdpScreencast(session);
   }
 
   // Takes charge of a page Playwright already has open.
@@ -121,10 +121,6 @@ export class CdpTab implements PageTarget {
     });
     session.on("Runtime.executionContextsCleared", () => {
       this.world = null;
-    });
-    session.on("Page.screencastFrame", ({ data, sessionId }) => {
-      void session.send("Page.screencastFrameAck", { sessionId }).catch(() => {});
-      this.screencast?.(data);
     });
     session.on("Fetch.requestPaused", ({ requestId, request, frameId, resourceType }) => {
       const refused = resourceType === "Document" && isMain(frameId) && this.refusesNavigation(request.url);
@@ -322,9 +318,10 @@ export class CdpTab implements PageTarget {
     }
   }
 
-  goBack(): void {
+  async agentGoBack(): Promise<void> {
     const back = this.history.entries[this.history.index - 1];
-    if (back) void this.session.send("Page.navigateToHistoryEntry", { entryId: back.id }).catch(() => {});
+    if (!back) throw new Error("There's no earlier page");
+    await this.fromPage(() => this.session.send("Page.navigateToHistoryEntry", { entryId: back.id }));
   }
 
   async settled(): Promise<void> {
@@ -357,25 +354,15 @@ export class CdpTab implements PageTarget {
     await this.page.setViewportSize({ width, height }).catch(() => {});
   }
 
-  // Pictures of the page as it changes, for the user's screen and nothing else. Null stops them.
+  // Pictures of the page as it changes, for the user's screen and nothing else. Null stops them. Rejects if the browser
+  // wouldn't start them, and asking again tries again.
   async watch(onFrame: ((jpeg: string) => void) | null): Promise<void> {
-    const was = this.screencast;
-    this.screencast = onFrame;
-    if (this.closed || !!was === !!onFrame) return;
-    await (
-      onFrame
-        ? this.session.send("Page.startScreencast", {
-            format: "jpeg",
-            quality: SCREENCAST_QUALITY,
-            maxWidth: SCREENCAST_WIDTH,
-            everyNthFrame: 1,
-          })
-        : this.session.send("Page.stopScreencast")
-    ).catch(() => {});
+    if (this.closed) return;
+    await this.screencast.watch(onFrame);
   }
 
   async close(): Promise<void> {
-    this.screencast = null;
+    this.screencast.end();
     if (!this.closed) await this.page.close().catch(() => {});
     this.closed = true;
   }

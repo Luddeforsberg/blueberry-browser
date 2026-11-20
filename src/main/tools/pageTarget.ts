@@ -3,6 +3,8 @@ import type { PageActor } from "./PageActor";
 
 // What Berry's tools need from a tab, and nothing more. `Tab` is the Electron one, and `CdpTab` is a page in a browser
 // reached over the Chrome DevTools Protocol, such as one in the cloud. Types only, so the tools load in plain Node.
+// Anything that acts resolves once the browser has taken it and rejects if it didn't, so a tool never reports what was
+// turned down. Whether the page then got it is `Outcome` in `pageInput.ts`.
 
 // A frame from another origin. Its scripts run in its own page's world, so nothing it says about itself is believed.
 export interface PageFrame {
@@ -38,15 +40,17 @@ export interface PageTarget {
   runInFrame<T = unknown>(frame: PageFrame, code: string): Promise<T>;
   // The page and what's in its frames, each frame labelled with where it really comes from.
   getTextWithFrames(allowsFrame: (origin: string) => boolean): Promise<string>;
-  // A JPEG of what's on screen, no wider than `maxWidth`, or null if nothing has been drawn yet.
+  // A JPEG of what's on screen, no wider than `maxWidth`, or null if nothing has been drawn yet. Rejects if the user was
+  // handed the tab, or a code went in, at any point while it was being taken.
   screenshotJpeg(maxWidth: number, quality: number): Promise<Buffer | null>;
   sendAgentInput(event: AgentInput): void | Promise<void>;
 
   loadURL(url: string): Promise<void>;
-  // `byAgent` is always true from a tool. Anything else going back is the user.
-  goBack(byAgent: boolean): void;
+  // Berry going back, which leaves the tab the job's. Anything else going back is the user.
+  agentGoBack(): Promise<void>;
   // Waits for whatever an action started to load, within reason.
   settled(): Promise<void>;
   // For as long as `act` runs, the page can't take this tab anywhere `allows` says no to. Says which addresses it stopped.
+  // `act` only runs once the limit is on, and if it can't be put on this rejects without running it.
   withNavigationLimit<T>(allows: (url: string) => boolean, act: () => Promise<T>): Promise<{ result: T; refused: string[] }>;
 }

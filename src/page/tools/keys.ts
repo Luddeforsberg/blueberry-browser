@@ -1,5 +1,5 @@
 import { expectKey } from "../lib/aim";
-import { activeNear, isFrame, type AnyElement } from "../lib/dom";
+import { activeNear, isFrame, type AnyElement, type PageElement } from "../lib/dom";
 import { nameOf, roleOf } from "../lib/names";
 import { state, withElement } from "../lib/state";
 
@@ -32,6 +32,20 @@ export const keyLanded = (): boolean | null => state.keyed ?? null;
 
 const NOT_A_FIELD: (string | undefined)[] = ["checkbox", "radio", "button", "submit", "reset", "image", "file"];
 
+// Text as a rich editor shows it: a new line may come back as a block, which reads as one or more, a space as one that
+// doesn't break, an empty line held open by a character with no width, and an empty editor as a single line break.
+const asShown = (text: string): string =>
+  text
+    .replace(/\r\n?/g, "\n")
+    .replace(/\u00a0/g, " ")
+    .replace(/[\u200b\ufeff]/g, "")
+    .replace(/\n+/g, "\n")
+    .replace(/\n$/, "");
+
+// Whether the field holds exactly what was typed, and nothing it had before.
+const holds = (el: PageElement, text: string): boolean =>
+  el.isContentEditable ? asShown(el.innerText) === asShown(text) : el.value === text;
+
 export const typeIntoElement = ({ ref, text }: { ref: string; text: string }): string | null =>
   withElement(ref, (el) => {
     if (el.tagName === "SELECT") return "dropdown";
@@ -54,7 +68,7 @@ export const typeIntoElement = ({ ref, text }: { ref: string; text: string }): s
       el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
     }
     el.dispatchEvent(new Event("change", { bubbles: true }));
-    if (el.isContentEditable ? !el.innerText.includes(text) : el.value !== text) return "not-kept";
+    if (!holds(el, text)) return "not-kept";
     return "done";
   });
 
@@ -84,11 +98,10 @@ export const typeChunk = ({ ref, chunk }: { ref: string; chunk: string }): boole
 
 export const finishTyping = ({ ref, text }: { ref: string; text: string }): "again" | "done" | null =>
   withElement(ref, (el) => {
-    const isThere = (): boolean => (el.isContentEditable ? el.innerText.includes(text) : el.value === text);
-    if (!isThere()) return "again";
+    if (!holds(el, text)) return "again";
     el.dispatchEvent(new Event("change", { bubbles: true }));
     // A page's own listener can change it, and what comes next mustn't go ahead on something else.
-    return isThere() ? "done" : "again";
+    return holds(el, text) ? "done" : "again";
   });
 
 // A real key goes wherever the focus is, and a page can move that after typing.

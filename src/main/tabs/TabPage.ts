@@ -109,10 +109,19 @@ export class TabPage {
     return await this.fromPage(() => this.tab.view.webContents.executeJavaScriptInIsolatedWorld(AGENT_WORLD, [{ code }], true));
   }
 
+  // Checked again once it's taken, because the user may have been handed the tab while the capture was on its way, and
+  // even finished and given it back, as the tab's picture is.
   async screenshot(): Promise<NativeImage> {
-    this.refuseWhileHeld();
-    if (this.mayShowCode) throw new Error("This page may show a code");
-    return await this.fromPage(() => this.tab.actor.whileHidden(() => this.tab.view.webContents.capturePage()));
+    const mayCapture = () => {
+      this.refuseWhileHeld();
+      if (this.mayShowCode) throw new Error("This page may show a code");
+    };
+    mayCapture();
+    const { holdsStarted } = this;
+    const image = await this.fromPage(() => this.tab.actor.whileHidden(() => this.tab.view.webContents.capturePage()));
+    mayCapture();
+    if (holdsStarted !== this.holdsStarted) throw new Error("The user had this tab");
+    return image;
   }
 
   // For the model: no wider than it needs, and null for a page that hasn't drawn anything yet.

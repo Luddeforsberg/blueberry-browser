@@ -22,31 +22,34 @@ export class CdpNavigationLimits {
   }
 
   // Only while a limit is on does every new document wait to be checked, so a page with no limit loads as fast as any.
+  // A guard is only as good as Chromium taking it, so `act` runs only once it has, and this rejects without acting if
+  // it didn't.
   async withNavigationLimit<T>(allows: (url: string) => boolean, act: () => Promise<T>): Promise<{ result: T; refused: string[] }> {
     const limit = (url: string) => allows(url);
     const refused = new Set<string>();
     this.navigationLimits.add(limit);
     this.refusalListeners.add(refused);
-    await this.setFetching();
     try {
+      await this.setFetching();
       const result = await act();
       return { result, refused: [...refused] };
     } finally {
       this.navigationLimits.delete(limit);
       this.refusalListeners.delete(refused);
-      await this.setFetching();
+      // Left on, each new document only waits for the listener, which lets it through with no limit to hold it.
+      await this.setFetching().catch(() => {});
     }
   }
 
+  // One change at a time, in order. The next goes ahead however this one went, and the caller hears how it went.
   private setFetching(): Promise<unknown> {
     const on = this.navigationLimits.size > 0;
-    this.fetching = this.fetching
-      .then(() =>
-        on
-          ? this.session.send("Fetch.enable", { patterns: [{ urlPattern: "*", resourceType: "Document", requestStage: "Request" }] })
-          : this.session.send("Fetch.disable"),
-      )
-      .catch(() => {});
-    return this.fetching;
+    const change = this.fetching.then(() =>
+      on
+        ? this.session.send("Fetch.enable", { patterns: [{ urlPattern: "*", resourceType: "Document", requestStage: "Request" }] })
+        : this.session.send("Fetch.disable"),
+    );
+    this.fetching = change.catch(() => {});
+    return change;
   }
 }

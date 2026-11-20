@@ -157,4 +157,15 @@ describe("a mascot's limits", () => {
     });
     expect(await setUp([tab]).tool("read_page").run({})).not.toContain("the other site's words");
   });
+
+  it("does nothing on a page whose browser didn't take the limit", async () => {
+    const tab = web("tab-1", "https://github.com/", {
+      withNavigationLimit: async () => {
+        throw new Error("Fetch.enable failed");
+      },
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await setUp([tab]).tool("click").run({ ref: "e1" })).toMatch(/^Nothing was done, because the limit on where Scout may go/);
+    expect(tab.runInPage).not.toHaveBeenCalled();
+  });
 });

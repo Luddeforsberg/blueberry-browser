@@ -48,7 +48,12 @@ export const tabTools = <T extends PageTarget>(context: ToolContext<T>) => {
           if (back && !allowed(back)) return offLimits(back).message;
           await actorOn(tab)?.say("Going back", "flying");
           if (!carryOn(tab)) return leftOff(tab);
-          tab.goBack(true);
+          try {
+            await tab.agentGoBack();
+          } catch (error) {
+            console.error("The browser didn't go back:", error);
+            return `The browser didn't go back, so tab ${tab.id} is still at ${tab.url}.`;
+          }
           return whereNow(tab);
         }),
     }),
