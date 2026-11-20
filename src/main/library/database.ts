@@ -10,7 +10,7 @@ export const migrate = (db: DatabaseSync, steps: string[]): void => {
 };
 
 // node:sqlite gives each row as a record of whatever its columns held, and a statement's own SQL says which those are.
-// So a store names the shape of its rows here, the one place a row is cast, rather than casting each by hand.
+// So a store names the shape of its rows here rather than casting each by hand.
 export const rowOf = <Row>(statement: StatementSync, ...params: SQLInputValue[]): Row | undefined =>
   statement.get(...params) as Row | undefined;
 
