@@ -249,7 +249,7 @@ test("only the drop takes the pointer, pointed at it says what a press does, and
     await expect.poll(passing).toBe(false);
     await expect(drop).toHaveAttribute("data-says", "job");
     await expect(drop).toContainText("Give Berry a job");
-    await expect(drop.locator("kbd")).toHaveText(["Alt", "Space"]);
+    await expect(drop.locator("kbd")).toHaveText([process.platform === "darwin" ? "⌥" : "Alt", "Space"]);
     const pointed = (await drop.boundingBox())!;
     expect(Math.round(pointed.height)).toBe(36);
     expect(pointed.width).toBeGreaterThan(150);
