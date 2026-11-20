@@ -2,8 +2,6 @@
 
 Blueberry is an AI browser that can do jobs in your tabs. Ask Berry to research a question, compare sites or follow a process you repeat. Watch it work beside the chat and step in when it needs you.
 
-[Visit the Blueberry website](https://blueberry-browser.netlify.app).
-
 ![Berry compares GitHub and GitLab plans while the GitHub pricing page is visible beside the chat](docs/images/working-view.webp)
 
 ## What it does
