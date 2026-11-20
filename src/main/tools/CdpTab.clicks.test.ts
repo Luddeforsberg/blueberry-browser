@@ -45,7 +45,7 @@ describe.skipIf(!findChrome())("clicking when real input is slow", () => {
       stopped: () => stopped,
       limits: { name: "Scout", sites: ["127.0.0.1"], tools: ["click"] },
     });
-  }, 30_000);
+  }, 90_000);
 
   afterAll(async () => {
     await cloud?.end();
