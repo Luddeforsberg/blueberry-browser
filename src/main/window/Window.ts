@@ -3,23 +3,17 @@ import type { MenuView } from "../menus/MenuView";
 import { appMenuItems } from "../menus/Menu";
 import type { Tab } from "../tabs/Tab";
 import type { TabPreviews } from "../tabs/TabPreviews";
-import type { SessionStore } from "../tabs/Session";
-import type { SettingsStore } from "../settings/SettingsStore";
 import type { SiteZoom } from "../settings/siteZoom";
 import type { SitePermissions } from "../settings/SitePermissions";
 import type { PermissionPromptView } from "../settings/PermissionPromptView";
 import type { AiKey } from "../settings/AiKey";
-import type { BookmarkStore } from "../library/BookmarkStore";
-import type { HistoryStore } from "../library/HistoryStore";
 import type { Downloads } from "../library/Downloads";
-import type { ChatStore } from "../chats/ChatStore";
 import type { Chats } from "../chats/Chats";
 import type { Attachments } from "../chats/Attachments";
 import type { Recordings } from "../recordings/Recordings";
 import type { TelegramChannel } from "../phone/TelegramChannel";
 import type { RoutineStore } from "../routines/RoutineStore";
 import type { Routines } from "../routines/Routines";
-import type { MascotStore } from "../mascots/MascotStore";
 import type { Gallery } from "../mascots/Gallery";
 import type { Account } from "../account/Account";
 import type { Suggestions } from "../suggestions/Suggestions";
@@ -37,7 +31,7 @@ import type { AppIcon } from "./AppIcon";
 import type { Layout } from "./Layout";
 import { isMac } from "./windowFrame";
 import type { BrowserTab, Popup } from "./TabStrip";
-import { WindowParts } from "./WindowParts";
+import { WindowParts, type WindowStores } from "./WindowParts";
 import { cloudLoginSuggestions } from "./makeCloud";
 import type { FirstJob } from "../../shared/firstRun";
 import type {
@@ -64,18 +58,11 @@ export { WEB_PAGE_MENU_IDS } from "./PageCommands";
 export class Window {
   private readonly parts: WindowParts;
   constructor(
-    settingsStore: SettingsStore,
-    chatStore: ChatStore,
-    bookmarkStore: BookmarkStore,
-    pinnedStore: BookmarkStore,
+    stores: WindowStores,
     routineStore: RoutineStore,
-    mascotStore: MascotStore,
     readonly downloads: Downloads,
     readonly sitePermissions: SitePermissions,
-    history: HistoryStore,
-    sessionStore: SessionStore,
   ) {
-    const stores = { settingsStore, chatStore, bookmarkStore, pinnedStore, mascotStore, history, sessionStore };
     this.parts = new WindowParts(stores, routineStore, downloads, sitePermissions);
   }
 
@@ -390,8 +377,8 @@ export class Window {
   showTooltip(request: unknown): void {
     this.parts.pageCommands.showTooltip(request);
   }
-  pickAddressSuggestion(index: unknown): void {
-    this.parts.pageCommands.pickAddressSuggestion(index);
+  pickAddressSuggestion(listId: unknown, index: unknown): void {
+    this.parts.pageCommands.pickAddressSuggestion(listId, index);
   }
   focusAddressBar(): void {
     this.parts.pageCommands.focusAddressBar();

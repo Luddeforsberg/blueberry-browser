@@ -6,6 +6,7 @@ import { galleryParam, galleryPlace } from "@shared/galleryPlaces";
 import { Button } from "@common/components/Button";
 import { useStill } from "@common/components/motion";
 import { cn } from "@common/lib/utils";
+import { useLatest } from "@common/lib/latest";
 import { useMascots } from "../contexts/useLibrary";
 import { Berry } from "../components/Berry";
 import { EmptyPage, PageHeader, SearchField } from "../components/PageFrame";
@@ -183,14 +184,14 @@ export const MascotGalleryPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     return () => watch.disconnect();
   }, []);
 
-  const asked = useRef(0);
+  const lists = useLatest();
   const load = useCallback(() => {
-    const ask = ++asked.current;
+    const ask = lists.next();
     void window.chromeAPI.mascots
       .gallery()
       .catch((): GalleryListing => ({ entries: [], status: "unreachable" }))
-      .then((answer) => ask === asked.current && setListing(answer));
-  }, []);
+      .then((answer) => ask.current && setListing(answer));
+  }, [lists]);
   useEffect(load, [load, ownPublished]);
 
   // A link's entry is asked of the server again, rather than taken from the list.

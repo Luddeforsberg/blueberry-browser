@@ -2,6 +2,7 @@ import { safeStorage } from "electron";
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "fs";
 import { dirname } from "path";
 import type { AccountState } from "../../shared/ipc";
+import { Latest } from "../../shared/lateWork";
 import { ServerError, type GalleryServer, type ServerSession } from "./galleryServer";
 
 // Who's signed in, for publishing. The session stays in here: main never sends a token to a renderer, no tool can reach
@@ -50,9 +51,10 @@ export class Account {
   private session: ServerSession | null = null;
   private problem: string | null = null;
   private problemAbout: AccountState["problemAbout"] = null;
-  private refreshing: Promise<string | null> | null = null;
-  // Counts every sign-in and sign-out, so the answer to one that's been overtaken changes nothing.
-  private generation = 0;
+  // A refresh token works once, so calls for one session share its refresh.
+  private refreshing: { session: ServerSession; token: Promise<string | null> } | null = null;
+  // Only the newest sign-in or sign-out counts, so the answer to one that's been overtaken changes nothing.
+  private readonly signIns = new Latest();
 
   constructor(
     // Null when no server is set up, and then nothing here does anything.
@@ -90,11 +92,11 @@ export class Account {
     const secret = typeof password === "string" ? password : "";
     if (!address || !secret) return this.say("Enter your email and a password.");
     if (secret.length < minLength) return this.say(SHORT_PASSWORD, "password");
-    const generation = ++this.generation;
+    const turn = this.signIns.next();
     try {
       const session = await call(this.server, address, secret);
       // Signed out, or in again, while it was on its way. Its session is ended there, as nobody here will use it.
-      if (generation !== this.generation) {
+      if (!turn.current) {
         if (session) void this.server.signOut(session.accessToken).catch(() => console.error("Couldn't end the session on the server."));
         return this.state;
       }
@@ -103,7 +105,7 @@ export class Account {
       this.problemAbout = null;
       this.keep(session);
     } catch (error) {
-      return generation === this.generation ? this.say(...inWords(error)) : this.state;
+      return turn.current ? this.say(...inWords(error)) : this.state;
     }
     this.onChange();
     return this.state;
@@ -111,7 +113,7 @@ export class Account {
 
   // Forgets it here whatever the server says, as nothing else can be done about a server that can't be reached.
   async signOut(): Promise<AccountState> {
-    this.generation++;
+    this.signIns.end();
     const token = this.session?.accessToken;
     this.session = null;
     this.problem = null;
@@ -122,16 +124,18 @@ export class Account {
     return this.state;
   }
 
-  // A token that works for a while yet, or null if nobody's signed in. Throws if the server can't say.
+  // A token that works for a while yet for whoever is signed in now, or null if nobody is, or if they sign out or someone
+  // else signs in before it's here. Throws if the server can't say.
   accessToken(): Promise<string | null> {
     const { session } = this;
     if (!session) return Promise.resolve(null);
     if (session.expiresAt - Date.now() > REFRESH_BEFORE_MS) return Promise.resolve(session.accessToken);
-    // A refresh token works once, so two calls share one refresh.
-    this.refreshing ??= this.refresh(session).finally(() => {
-      this.refreshing = null;
+    if (this.refreshing?.session === session) return this.refreshing.token;
+    const token = this.refresh(session).finally(() => {
+      if (this.refreshing?.token === token) this.refreshing = null;
     });
-    return this.refreshing;
+    this.refreshing = { session, token };
+    return token;
   }
 
   private async refresh(session: ServerSession): Promise<string | null> {
@@ -139,7 +143,8 @@ export class Account {
     try {
       const fresh = await this.server.refresh(session.refreshToken, session.email);
       if (!fresh) throw new ServerError(400, "");
-      if (this.session !== session) return this.session?.accessToken ?? null;
+      // The session it was for has gone, and the caller asked as that account, so it gets nobody's token.
+      if (this.session !== session) return null;
       this.keep(fresh);
       return fresh.accessToken;
     } catch (error) {

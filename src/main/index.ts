@@ -14,6 +14,8 @@ import { SitePermissions } from "./settings/SitePermissions";
 import { installSessionHandlers } from "./settings/sessionHandlers";
 import { HistoryStore } from "./library/HistoryStore";
 import { SessionStore } from "./tabs/Session";
+import type { AiKey } from "./settings/AiKey";
+import { appAiKey } from "./window/makeAccount";
 import { openStore, type StoreProblem } from "./library/database";
 import { holdQuit } from "./window/holdQuit";
 import type { CloudTabs } from "./cloud/CloudTabs";
@@ -44,6 +46,7 @@ let mascotStore: MascotStore | null = null;
 let downloads: Downloads | null = null;
 let sitePermissions: SitePermissions | null = null;
 let historyStore: HistoryStore | null = null;
+let aiKey: AiKey | null = null;
 // Kept after its window closes, so Quit can wait for its session to end.
 let cloud: CloudTabs | null = null;
 // Said once, after the window it sits on is open.
@@ -99,17 +102,21 @@ const createWindow = (): Window => {
     installSessionHandlers(session.defaultSession, sitePermissions, downloads);
   }
   const sessionStore = new SessionStore(join(app.getPath("userData"), "session.json"));
+  aiKey ??= appAiKey();
   const window = new Window(
-    settings,
-    chatStore,
-    bookmarks,
-    pinned,
+    {
+      settingsStore: settings,
+      chatStore,
+      bookmarkStore: bookmarks,
+      pinnedStore: pinned,
+      mascotStore,
+      history: historyStore,
+      sessionStore,
+      aiKey,
+    },
     routineStore,
-    mascotStore,
     downloads,
     sitePermissions,
-    historyStore,
-    sessionStore,
   );
   cloud = window.cloud;
   showStoreNotices(window);

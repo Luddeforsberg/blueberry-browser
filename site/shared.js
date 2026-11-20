@@ -245,6 +245,28 @@ var conversationsOf = (jobs) => {
   return [...groups].map(([id, grouped]) => ({ id, jobs: grouped, latest: grouped.at(-1) })).sort((a, b) => b.latest.created_at.localeCompare(a.latest.created_at));
 };
 
+// src/shared/lateWork.ts
+var OneAtATime = class {
+  last = /* @__PURE__ */ new Map();
+  busy(key) {
+    return this.last.has(key);
+  }
+  run(work, key) {
+    const before = this.last.get(key);
+    let release = () => {
+    };
+    const after = new Promise((resolve) => release = resolve);
+    this.last.set(key, after);
+    const result = before ? before.then(work) : new Promise((resolve) => resolve(work()));
+    const settled = () => {
+      if (this.last.get(key) === after) this.last.delete(key);
+      release();
+    };
+    void result.then(settled, settled);
+    return result;
+  }
+};
+
 // src/shared/phoneCalls.ts
 var CALL_DEADLINE_MS = 15e3;
 var RUNNER_LINK_EVERY_MS = 6e4;
@@ -259,20 +281,13 @@ var fetchWithin = async (url, init, ms = CALL_DEADLINE_MS, fetcher = fetch) => {
   }
 };
 var oneAtATime = (work) => {
-  let out = null;
+  const queue = new OneAtATime();
   let again = null;
-  const run = () => out = work().finally(() => {
-    out = null;
-  });
   return () => {
-    if (!out) return run();
-    const settled = out.then(
-      () => void 0,
-      () => void 0
-    );
-    return again ??= settled.then(() => {
+    if (!queue.busy()) return queue.run(work);
+    return again ??= queue.run(() => {
       again = null;
-      return run();
+      return work();
     });
   };
 };

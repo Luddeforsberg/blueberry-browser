@@ -50,7 +50,7 @@ import { BrowsingHistory } from "./BrowsingHistory";
 import { SettingsChanges } from "./SettingsChanges";
 import { PageCommands } from "./PageCommands";
 import { createMenuView, createPermissionPrompt, createPreviews, createSiteZoom, watchDownloads } from "./makeViews";
-import { createAccount, createAiKey, createGallery, createPhone, createTelegram } from "./makeAccount";
+import { createAccount, listenToAiKey, createGallery, createPhone, createTelegram } from "./makeAccount";
 import { createChats, createMemory, createWorkViews } from "./makeChats";
 import { createCloud, createMacJobs, createRunnerJobs } from "./makeCloud";
 import { createRecordings, createRoutines, createSuggestions } from "./makeRoutines";
@@ -70,6 +70,7 @@ export interface WindowStores {
   mascotStore: MascotStore;
   history: HistoryStore;
   sessionStore: SessionStore;
+  aiKey: AiKey;
 }
 
 // Everything the window is made of: its `BaseWindow` and the views stacked in it, the services wired to them, and the
@@ -177,7 +178,8 @@ export class WindowParts {
     const config = serverConfig(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, app.isPackaged);
     const server = config && new GalleryServer(config);
     this.account = createAccount(this, server);
-    this.aiKey = createAiKey(this);
+    this.aiKey = stores.aiKey;
+    listenToAiKey(this);
     this.gallery = createGallery(this, server, stores);
     this.telegram = createTelegram(this);
     this.phone = createPhone(this);

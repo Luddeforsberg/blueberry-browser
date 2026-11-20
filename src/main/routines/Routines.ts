@@ -6,6 +6,7 @@ import { lastResult, prompt, routinePrompt } from "./routineWords";
 import type { ActionApproval } from "../../shared/ipc";
 import { mascotSnapshot, type CloudRoutineRow } from "../remoteJobs/cloudJobs";
 import { narrowSites } from "../../shared/mascots";
+import { Latest } from "../../shared/lateWork";
 
 // Runs that may start while this many are working. A run waiting for the user's OK uses nothing, so it doesn't count,
 // and once allowed it goes straight on even past this, because the user is waiting on it.
@@ -53,6 +54,8 @@ interface ActiveRun {
 // so even a crash leaves a record of how far it got.
 export class Routines {
   private readonly active = new Map<string, ActiveRun>();
+  // Each routine's name being written, by its id.
+  private readonly naming = new Latest<string>();
   // Run now, when every place was taken, each with whoever asked to hear which run it became.
   private readonly requested = new Map<string, ((runId: string) => void) | undefined>();
   private timer: NodeJS.Timeout | null = null;
@@ -291,15 +294,26 @@ export class Routines {
     }
     this.events.onChanged();
     this.tick();
-    if (toWrite) void this.writeName(savedId, draft.instructions);
+    this.named(savedId, existing?.instructions, draft.instructions, toWrite);
     return { ok: true, id: savedId };
   }
 
-  // Never rejects: it keeps the name from its first words until this works.
+  // A name still being written for words it no longer has never lands, even when no new one is asked for.
+  private named(id: string, before: string | undefined, instructions: string, write: boolean): void {
+    if (before !== undefined && before !== instructions) this.naming.end(id);
+    if (write) void this.writeName(id, instructions);
+  }
+
+  // Never rejects: it keeps the name from its first words until this works. Only the answer for what it does now counts,
+  // so one for words it was edited away from while the model wrote never names it.
   private async writeName(id: string, instructions: string): Promise<void> {
     if (!this.events.writeName) return;
+    const turn = this.naming.next(id);
     try {
       const name = await this.events.writeName(instructions);
+      // Closed meanwhile: the window that reopens has its own, which this one can't overtake.
+      if (!turn.current || this.stopped) return;
+      this.naming.end(id);
       if (name && this.store.setWrittenName(id, name)) this.events.onChanged();
     } catch (error) {
       console.error("Failed to name a routine:", error);
@@ -321,6 +335,7 @@ export class Routines {
     const run = this.active.get(id);
     if (run) this.runner.stop(run.runId);
     this.requested.delete(id);
+    this.naming.end(id);
     if (!this.store.delete(id)) return false;
     this.events.onChanged();
     return true;

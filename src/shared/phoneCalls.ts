@@ -1,5 +1,7 @@
 // How the phone page asks the server, bundled into site/shared.js. Plain code with no DOM, so it can be tested here.
 
+import { OneAtATime } from "./lateWork";
+
 // A call that hangs would hold up everything waiting on it, the polling and a shared token refresh among them.
 export const CALL_DEADLINE_MS = 15_000;
 // The page only learns that a runner was linked or unlinked from the Mac by asking again, so it does every so often.
@@ -30,24 +32,16 @@ export const fetchWithin = async (
 };
 
 // Never two at once, so nothing that wakes the page, such as it coming back to the front, can set a second round of
-// polling going. A call made while one is out gets one more run after it, shared with every other call made meanwhile,
-// since the one that's out may have read before what the caller just did, such as sending a follow-up.
+// polling going. A call made while one is out gets one more run after it, shared with every other call made before that
+// run starts, since the one that's out may have read before what the caller just did, such as sending a follow-up.
 export const oneAtATime = <T>(work: () => Promise<T>): (() => Promise<T>) => {
-  let out: Promise<T> | null = null;
+  const queue = new OneAtATime();
   let again: Promise<T> | null = null;
-  const run = (): Promise<T> =>
-    (out = work().finally(() => {
-      out = null;
-    }));
   return () => {
-    if (!out) return run();
-    const settled = out.then(
-      () => undefined,
-      () => undefined,
-    );
-    return (again ??= settled.then(() => {
+    if (!queue.busy()) return queue.run(work);
+    return (again ??= queue.run(() => {
       again = null;
-      return run();
+      return work();
     }));
   };
 };

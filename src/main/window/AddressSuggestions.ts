@@ -5,6 +5,7 @@ import { suggestionsRect } from "./floatingPlaces";
 import type { AddressSuggestion, AddressSuggestionsRequest, Rect, ThemeState } from "../../shared/ipc";
 import type { MascotLook } from "../../shared/library";
 import { ACCESSORIES, PALETTES } from "../../shared/mascots";
+import { Latest, type Turn } from "../../shared/lateWork";
 
 const MAX_ROWS = 6;
 const MAX_TEXT = 2048;
@@ -13,8 +14,10 @@ const MAX_TEXT = 2048;
 // The chrome works out the rows and handles the keys. This only draws them, and hands a pressed row back to the chrome.
 export class AddressSuggestions {
   readonly chromeView: ChromeView = createChromeView("suggestions");
-  // What's showing, kept after it hides: a press in the list can reach main after the field's blur has closed it.
-  private rows: AddressSuggestion[] = [];
+  // What's showing, kept after it hides: a press in the list can reach main after the field's blur has closed it. Only a
+  // press on the newest list counts, and only once.
+  private readonly lists = new Latest();
+  private shown: { list: Turn; rows: AddressSuggestion[] } | null = null;
 
   constructor(private readonly parent: View) {
     this.chromeView.view.setVisible(false);
@@ -35,12 +38,13 @@ export class AddressSuggestions {
       rows.some(({ kind }) => kind === "ask"),
       window,
     );
-    this.rows = rows;
+    const list = this.lists.next();
+    this.shown = { list, rows };
     // Adding a view again moves it to the top, above tabs opened since.
     this.parent.addChildView(this.chromeView.view);
     this.chromeView.view.setBounds(view);
     this.chromeView.view.setVisible(true);
-    sendToRenderer(this.contents, "address:suggestions", { rows, selected, sheet });
+    sendToRenderer(this.contents, "address:suggestions", { listId: list.id, rows, selected, sheet });
   }
 
   close(): void {
@@ -49,9 +53,13 @@ export class AddressSuggestions {
     sendToRenderer(this.contents, "address:suggestions", null);
   }
 
-  // The row at that place in what was last shown, if there is one.
-  pick(index: unknown): AddressSuggestion | null {
-    const row = typeof index === "number" && Number.isInteger(index) ? this.rows[index] : undefined;
+  // The row at that place in the list it was pressed in, if that's still the newest and nothing was taken from it yet.
+  pick(listId: unknown, index: unknown): AddressSuggestion | null {
+    const { shown } = this;
+    // A press on a list that's been replaced does nothing at all, so the newer list stays open.
+    if (!shown?.list.current || listId !== shown.list.id) return null;
+    const row = typeof index === "number" && Number.isInteger(index) ? shown.rows[index] : undefined;
+    if (row) this.lists.end();
     this.close();
     return row ?? null;
   }

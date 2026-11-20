@@ -132,7 +132,7 @@ const chromeAPI: ChromeAPI = {
     suggestHistory: (text) => invoke("history:suggest", text),
     show: (request) => invoke("address:show", request),
     close: () => invoke("address:close"),
-    pick: (index) => invoke("address:pick", index),
+    pick: (listId, index) => invoke("address:pick", listId, index),
     onSuggestions: (callback) => subscribe("address:suggestions", callback),
     onPicked: (callback) => subscribe("address:picked", callback),
   },

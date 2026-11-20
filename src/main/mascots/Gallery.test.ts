@@ -46,6 +46,65 @@ describe("Gallery.unpublish", () => {
   });
 });
 
+describe("Gallery.publish", () => {
+  it("publishes one mascot once, however many times it's asked at once, and updates it after", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "blueberry-gallery-"));
+    const mascots = new MascotStore(join(dir, "mascots.json"));
+    const saved = mascots.save(null, {
+      name: "Scout",
+      look: { palette: "lingon", accessory: "cap" },
+      instructions: "Read.",
+      sites: [],
+      tools: [],
+    });
+    if (!saved.ok) throw new Error(saved.error);
+    const tokens: (() => void)[] = [];
+    // The token is slow, as a refresh is, so both publishes are past their checks before either has one.
+    const account = {
+      state: { email: "ana@example.com" },
+      accessToken: () => new Promise<string>((resolve) => tokens.push(() => resolve("token"))),
+    } as unknown as Account;
+    const insertMascot = vi.fn(async () => ID);
+    const updateMascot = vi.fn(async () => true);
+    const server = { insertMascot, updateMascot } as unknown as GalleryServer;
+    const gallery = new Gallery(server, account, mascots, join(dir, "gallery.json"), undefined, () => {});
+    const choices = { author: "Ana", description: "Reads pages.", category: "Work", example: null };
+    const first = gallery.publish(saved.id, choices);
+    const second = gallery.publish(saved.id, choices);
+    await vi.waitFor(() => expect(tokens.length).toBeGreaterThan(0));
+    tokens.forEach((give) => give());
+    expect(await first).toMatchObject({ ok: true, id: ID });
+    await vi.waitFor(() => expect(tokens).toHaveLength(2));
+    defined(tokens[1])();
+    expect(await second).toMatchObject({ ok: true, id: ID });
+    expect(insertMascot).toHaveBeenCalledOnce();
+    expect(updateMascot).toHaveBeenCalledOnce();
+
+    // One waiting behind another publishes nothing once someone else has signed in.
+    const slow = gallery.publish(saved.id, choices);
+    const queued = gallery.publish(saved.id, choices);
+    await vi.waitFor(() => expect(tokens).toHaveLength(3));
+    account.state.email = "bob@example.com";
+    defined(tokens[2])();
+    await slow;
+    expect(await queued).toMatchObject({ ok: false, error: expect.stringContaining("account changed") });
+    expect(tokens).toHaveLength(3);
+
+    // One waiting sends what was reviewed when it was pressed, not an edit made while it waited.
+    account.state.email = "ana@example.com";
+    const ahead = gallery.publish(saved.id, choices);
+    const behind = gallery.publish(saved.id, choices);
+    mascots.save(saved.id, { name: "Scout", look: { palette: "lingon", accessory: "cap" }, instructions: "Edited.", sites: [], tools: [] });
+    await vi.waitFor(() => expect(tokens).toHaveLength(4));
+    defined(tokens[3])();
+    await ahead;
+    await vi.waitFor(() => expect(tokens).toHaveLength(5));
+    defined(tokens[4])();
+    await behind;
+    expect(updateMascot.mock.calls.at(-1)).toEqual([expect.anything(), ID, expect.objectContaining({ instructions: "Read." })]);
+  });
+});
+
 describe("Gallery.linked", () => {
   const row = {
     id: ID,
