@@ -31,9 +31,11 @@ const useSaved = {
       if (isSaved(node)) context.report({ node, message: MESSAGE });
     };
     const FUNCTIONS = new Set(["FunctionDeclaration", "FunctionExpression", "ArrowFunctionExpression"]);
+    // What an async function resolves to, since that's what its callers get.
     const returnType = (fn) => {
       const signature = checker.getSignatureFromDeclaration(services.esTreeNodeToTSNodeMap.get(fn));
-      return signature && checker.getReturnTypeOfSignature(signature);
+      const type = signature && checker.getReturnTypeOfSignature(signature);
+      return type && fn.async ? checker.getAwaitedType(type) : type;
     };
     // A callback where a function giving back nothing is expected, so whatever it gives back is thrown away.
     const thrownAway = (fn) => {
@@ -43,9 +45,8 @@ const useSaved = {
         (signature) => (checker.getReturnTypeOfSignature(signature).flags & ts.TypeFlags.Void) !== 0,
       );
     };
-    // An async function's answer can't be dropped either, since no-floating-promises refuses that.
     const passedOn = (node, fn) => {
-      if (!fn || fn.async || !isSaved(node)) return;
+      if (!fn || !isSaved(node)) return;
       if (!isSavedType(returnType(fn))) context.report({ node, message: WIDENED });
       else if (thrownAway(fn)) context.report({ node, message: MESSAGE });
     };

@@ -132,6 +132,14 @@ describe("BookmarkStore", () => {
     expect(lists(new BookmarkStore(folder))).toEqual(expected);
   });
 
+  it("never goes back to the old files once there's one, even when it's damaged", () => {
+    const folder = tempFolder();
+    writeFileSync(join(folder, "bookmarks.json"), JSON.stringify([site]));
+    new BookmarkStore(folder).removeUrl(site.url);
+    writeFileSync(join(folder, "saved-sites.json"), "not json");
+    expect(lists(new BookmarkStore(folder))).toEqual({ pinned: [], bookmarks: [] });
+  });
+
   it("saves nothing while an old file can't be read, so none of it is lost", () => {
     const folder = tempFolder();
     // A folder in its place can't be read as a file, as a locked one couldn't.

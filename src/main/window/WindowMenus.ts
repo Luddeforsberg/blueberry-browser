@@ -7,7 +7,6 @@ import { isMac } from "./windowFrame";
 import type { ChromeRegion, MenuAnchor } from "../../shared/ipc";
 import type { PublishResult } from "../../shared/library";
 import { BERRY } from "../../shared/mascots";
-import { bestEffort } from "../library/savedFile";
 import type { WindowParts, WindowStores } from "./WindowParts";
 
 // The menus the window opens from its views, and the questions it asks before deleting something or after something
@@ -83,8 +82,11 @@ export class WindowMenus {
     const runs = this.w.routines.list().filter((routine) => routine.mascotId === id);
     const words = deleteMascotWords(mascot, runs.length, Boolean(mascot.publishedId), !this.w.settings.showBerry);
     if (!(await this.w.menus.ask(words))) return false;
-    if (!this.stores.mascotStore.delete(id)) return false;
-    bestEffort(this.w.memory.clear(id), "The deleted mascot's remembered facts are still on file.");
+    // The question said what it remembers is forgotten, so it's forgotten first, and nothing is deleted if it can't be.
+    if (!this.w.memory.clear(id)) return this.notSaved(`Could not delete “${mascot.name}”`, "Nothing was deleted or forgotten.");
+    if (!this.stores.mascotStore.delete(id)) {
+      return this.notSaved(`Could not delete “${mascot.name}”`, "What it remembered is forgotten, but it's still here.");
+    }
     runs.forEach((routine) => this.w.routines.setPaused(routine.id, true));
     this.w.library.mascotsChanged();
     return true;
@@ -93,7 +95,13 @@ export class WindowMenus {
   async confirmClearMemory(mascotId: string): Promise<boolean> {
     const count = this.w.memory.factsOf(mascotId).length;
     if (count === 0 || !(await this.w.menus.ask(clearMemoryWords(this.w.library.mascotName(mascotId), count)))) return false;
-    return this.w.memory.clear(mascotId);
+    if (!this.w.memory.clear(mascotId)) return this.notSaved("Could not forget what it remembers", "It still remembers everything.");
+    return true;
+  }
+
+  private async notSaved(question: string, detail: string): Promise<false> {
+    await this.notice(question, `${detail} Check that there is space on your disk and try again.`);
+    return false;
   }
 
   showBerryMenu(anchor: unknown): void {

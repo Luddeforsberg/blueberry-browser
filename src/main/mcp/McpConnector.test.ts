@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
-import { join } from "path";
+import { dirname, join } from "path";
 import { describe, expect, it, vi } from "vitest";
 import { McpConnector } from "./McpConnector";
 
@@ -74,6 +74,18 @@ describe("McpConnector", () => {
     const after = connector(file);
     after.start();
     expect(after.state.on).toBe(false);
+  });
+
+  it("says what a restart does over anything starting said, when turning on can't be saved", async () => {
+    const file = join(mkdtempSync(join(tmpdir(), "mcp-")), "mcp.json");
+    mkdirSync(`${file}.tmp`);
+    mkdirSync(join(dirname(file), "mcp-bridge.cjs.tmp"));
+    const mcp = connector(file);
+    try {
+      expect(await mcp.setOn(true)).toMatchObject({ on: true, problem: expect.stringContaining("off after a restart") });
+    } finally {
+      await mcp.setOn(false);
+    }
   });
 
   it("still goes off, and says what a restart does, when the keychain refuses", async () => {

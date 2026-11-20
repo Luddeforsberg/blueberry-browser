@@ -177,7 +177,7 @@ export class TelegramChannel implements PhoneChannel {
     this.chatId = null;
     this.pairing = null;
     this.notSaved = false;
-    this.problem = removeFile(this.file) ? null : NOT_REMOVED;
+    this.problem = removeFile(this.file, { secret: true }) ? null : NOT_REMOVED;
     this.onChange();
     return this.state;
   }

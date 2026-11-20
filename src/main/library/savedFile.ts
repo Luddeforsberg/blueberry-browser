@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "fs";
-import { basename, dirname } from "path";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "fs";
+import { basename, dirname, join } from "path";
 import { entriesOf, fieldsOf } from "../../shared/fields";
 
 // Every file a store keeps is written, moved and removed here, and nowhere else (eslint.fences.mjs).
@@ -55,10 +55,15 @@ export const saveFile = (file: string, contents: string | Uint8Array | (() => st
   }
 };
 
-// True once the file isn't there, including when it never was.
-export const removeFile = (file: string): Saved => {
+// True once the file isn't there, including when it never was. A secret's copies moved aside go too, so removing a key
+// or a sign-in leaves none of it behind.
+export const removeFile = (file: string, { secret = false } = {}): Saved => {
   try {
     rmSync(file, { force: true });
+    if (secret) {
+      const aside = `${basename(file)}.corrupt-`;
+      for (const name of readdirSync(dirname(file))) if (name.startsWith(aside)) rmSync(join(dirname(file), name), { force: true });
+    }
     unread.delete(file);
     return outcome(true);
   } catch (error) {

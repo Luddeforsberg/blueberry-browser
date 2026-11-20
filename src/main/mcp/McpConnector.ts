@@ -176,9 +176,12 @@ export class McpConnector {
       this.saved.token = randomBytes(32).toString("base64url");
     }
     this.saved.on = on === true;
-    this.settle(this.save());
+    this.save();
+    this.settle();
     if (this.saved.on) await this.listen();
     else this.close();
+    // What a restart does matters more than anything starting it said, so it has the last word.
+    this.settle();
     this.onChange();
     return this.state;
   }
@@ -189,7 +192,8 @@ export class McpConnector {
     this.problem = null;
     this.saved.token = randomBytes(32).toString("base64url");
     this.activity = [];
-    this.settle(this.save());
+    this.save();
+    this.settle();
     this.onChange();
     return this.state;
   }
@@ -347,9 +351,8 @@ export class McpConnector {
     return true;
   }
 
-  // After a save that didn't work, what's true now and after a restart.
-  private settle(kept: boolean): void {
-    if (kept) return;
+  // While what's on file isn't what's in use, what's true now and after a restart. After a save that worked, nothing.
+  private settle(): void {
     // A token that was replaced is still on file, and would turn the server on with it at the next launch. Off is the
     // one thing that's true now and then.
     if (this.onDisk.on && this.onDisk.token !== this.saved.token) {

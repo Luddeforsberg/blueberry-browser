@@ -2,7 +2,7 @@ import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { readJsonFile, saveFile } from "./savedFile";
+import { readJsonFile, removeFile, saveFile } from "./savedFile";
 
 // A read or a rename this says no to fails as a busy or locked file would.
 const refuse = vi.hoisted<{ read: (file: string) => boolean; rename: (from: string) => boolean }>(() => ({
@@ -67,5 +67,20 @@ describe("saveFile", () => {
     refuse.rename = () => false;
     expect(saveFile(file, "[]")).toBe(true);
     expect(movedAside()).toEqual(["not json"]);
+  });
+});
+
+describe("removeFile", () => {
+  it("removes a secret's copies moved aside too, and leaves anything else's", () => {
+    const secret = savedFileWith("not json");
+    readJsonFile(secret.file);
+    expect(secret.movedAside()).toEqual(["not json"]);
+    expect(removeFile(secret.file, { secret: true })).toBe(true);
+    expect(secret.movedAside()).toEqual([]);
+
+    const plain = savedFileWith("not json");
+    readJsonFile(plain.file);
+    expect(removeFile(plain.file)).toBe(true);
+    expect(plain.movedAside()).toEqual(["not json"]);
   });
 });

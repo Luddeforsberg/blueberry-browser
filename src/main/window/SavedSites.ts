@@ -64,7 +64,7 @@ export class SavedSites {
     if (!saved) {
       void this.w.windowMenus.notice(
         "Could not save your pinned sites and bookmarks",
-        "Nothing was changed. Check that there is space on your disk and try again.",
+        "Nothing was changed. Check that there is space on your disk, or restart Blueberry, and try again.",
       );
       return;
     }

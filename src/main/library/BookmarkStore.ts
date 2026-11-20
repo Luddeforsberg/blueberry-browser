@@ -45,13 +45,18 @@ const oncePerSite = ({ pinned, bookmarks }: SavedSites): SavedSites => {
 export class BookmarkStore {
   private readonly file: string;
   private lists: SavedSites;
-  // False while an old file couldn't be read: saving without what's in it would lose it for good.
+  // False while a file couldn't be read: saving without what's in it would lose it for good. The next launch reads it
+  // again.
   private readAll = true;
 
   constructor(folder: string) {
     this.file = join(folder, "saved-sites.json");
-    const saved = readJsonFile(this.file);
-    if (saved !== undefined) {
+    // Still there after reading it means it couldn't be read.
+    const unreadable = (file: string, saved: unknown) => saved === undefined && existsSync(file);
+    // Once there's one file, the old ones are never read again, even if it's damaged: they're older than it.
+    if (existsSync(this.file)) {
+      const saved = readJsonFile(this.file);
+      if (unreadable(this.file, saved)) this.readAll = false;
       const { pinned, bookmarks } = fieldsOf(saved);
       this.lists = oncePerSite({
         pinned: savedEntries(this.file, pinned, savedSite),
@@ -62,8 +67,7 @@ export class BookmarkStore {
     const before = (name: string) => {
       const file = join(folder, name);
       const saved = readJsonFile(file);
-      // Still there after reading it means it couldn't be read.
-      if (saved === undefined && existsSync(file)) this.readAll = false;
+      if (unreadable(file, saved)) this.readAll = false;
       return savedEntries(file, saved, savedSite);
     };
     this.lists = oncePerSite({ pinned: before("pinned.json"), bookmarks: before("bookmarks.json") });

@@ -197,6 +197,6 @@ export class Account {
 
   // False if the saved sign-in is still on file.
   private forget(): Saved {
-    return removeFile(this.file);
+    return removeFile(this.file, { secret: true });
   }
 }

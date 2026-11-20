@@ -71,7 +71,7 @@ export class AiKey {
   // stays in use now too, and `removed` says so.
   remove(): { removed: boolean; state: AiKeyState } {
     this.tries.end();
-    const removed = removeFile(this.file);
+    const removed = removeFile(this.file, { secret: true });
     if (removed) {
       this.saved = null;
       this.changed();
