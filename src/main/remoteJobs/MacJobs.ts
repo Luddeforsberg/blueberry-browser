@@ -57,6 +57,8 @@ interface Current {
   why: string | null;
   // Renewed by every write the server answers.
   lease: Lease;
+  // How it ended, once it has, written every round until the server has it.
+  final: Update | null;
 }
 
 type Update = { status?: string; steps?: ChatStep[]; reply?: string; error?: string };
@@ -137,7 +139,8 @@ export class MacJobs {
   private stopHere(job: Current, why: string): void {
     if (job.stopped) return;
     Object.assign(job, { stopped: true, why });
-    this.host.stop(job.chatId);
+    // One that never started has no chat to stop.
+    if (job.chatId) this.host.stop(job.chatId);
   }
 
   private async round(): Promise<void> {
@@ -166,8 +169,22 @@ export class MacJobs {
     const row = await this.withToken(account, (token) => this.server!.macClaimJob(token));
     if (!row) return;
     const jobId = String(row.id);
-    const fail = (error: string) =>
-      this.withToken(account, (token) => this.server!.macUpdateJob(token, jobId, { status: "failed", error }));
+    // Claimed just now, which was the server's answer.
+    const job: Current = {
+      account,
+      jobId,
+      chatId: "",
+      ended: null,
+      stopped: false,
+      why: null,
+      lease: new Lease(JOB_LEASE_MS, this.now),
+      final: null,
+    };
+    // Ends there without starting, as any job ends.
+    const fail = (error: string) => {
+      this.current = job;
+      return this.end(job, { status: "failed", error });
+    };
     // Turned off, unlinked, signed out or quit while it was being taken: it doesn't start. Signed out, it times out there.
     if (!this.wanted(account)) {
       await fail(this.destroyed ? QUIT_BEFORE : OFF_BEFORE);
@@ -179,7 +196,6 @@ export class MacJobs {
       await fail(BAD_MASCOT);
       return;
     }
-    const job: Current = { account, jobId, chatId: "", ended: null, stopped: false, why: null, lease: new Lease(JOB_LEASE_MS, this.now) };
     const chatId = this.host.start(
       String(row.prompt),
       { mascot, askAtLeast: actionApprovalFromRow(row.action_approval), from: RELAY_FROM },
@@ -204,7 +220,10 @@ export class MacJobs {
       this.current = null;
       return;
     }
+    if (job.final) return this.end(job, job.final);
     if (!this.wanted(job.account)) this.stopHere(job, SWITCHED_OFF);
+    // Checked before anything is written, so a write that never comes back can't keep it going.
+    if (!job.lease.live) this.stopHere(job, LOST_TOUCH);
     const { ended } = job;
     if (ended) {
       const error = ended.outcome === "stopped" ? job.why : ended.error;
@@ -213,29 +232,34 @@ export class MacJobs {
     const now = this.host.progress(job.chatId);
     if (!now) return this.end(job, { status: "stopped", error: DELETED });
     const stop = await this.write(job, { status: now.waiting ? "waiting" : "running", steps: stepsFromRow(now.steps), reply: now.reply });
-    if (stop === null && !job.lease.live) this.stopHere(job, LOST_TOUCH);
     if (stop === true && !job.stopped && !job.ended && !this.destroyed) {
       job.stopped = true;
       this.host.stop(job.chatId);
     }
   }
 
-  // How it ended, tried every round while the lease holds. After that the server ends it as failed on its own.
+  // How it ended, tried every round while the lease holds. After that the server ends it as failed on its own. True from
+  // the server means it had already ended the job or been asked to stop it, which for the relay's own Stop is how it ended.
   private async end(job: Current, update: Update): Promise<void> {
-    const written = await this.write(job, update);
-    if (written === null && job.lease.live) return;
+    job.final = update;
+    const answer = await this.write(job, update);
+    if (answer === null && job.lease.live) return;
+    const relayStop = update.status === "stopped" && !update.error;
     console.log(
-      written === null
+      answer === null
         ? `Mac job ${job.jobId}: couldn't write how it ended, so it's left to time out there.`
-        : `Mac job ${job.jobId}: ${update.status}.`,
+        : answer && !relayStop
+          ? `Mac job ${job.jobId}: ${update.status} here, but the server had already ended it or been asked to stop it.`
+          : `Mac job ${job.jobId}: ${update.status}.`,
     );
     this.current = null;
   }
 
   // Cut to the row's limits, as the runner's are, so how it ended is always saved. Null when the server didn't answer.
   private async write(job: Current, update: Update): Promise<boolean | null> {
+    const sentAt = this.now();
     const stopping = await this.withToken(job.account, (token) => this.server!.macUpdateJob(token, job.jobId, fitJobUpdate(update)));
-    if (stopping !== null) job.lease.renew();
+    if (stopping !== null) job.lease.renew(sentAt);
     return stopping;
   }
 

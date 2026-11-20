@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -114,6 +114,7 @@ describe("routines kept in the cloud", () => {
   ) => {
     const keys = new Set(onServer);
     let failing = failForgets;
+    const myCloudRoutineKeys = vi.fn(async () => [...keys]);
     const syncCloudRoutine = vi.fn(async (_token: string, sent: CloudRoutineRow) => void keys.add(sent.key));
     const forgetCloudRoutine = vi.fn(async (_token: string, key: string) => {
       if (failing-- > 0) throw new ServerError(500, "");
@@ -124,7 +125,7 @@ describe("routines kept in the cloud", () => {
       syncCloudMascots: async () => {},
       syncCloudRoutine,
       forgetCloudRoutine,
-      myCloudRoutineKeys: async () => [...keys],
+      myCloudRoutineKeys,
       cloudConversationJobs: async () => [],
     } as unknown as GalleryServer;
     const file = join(mkdtempSync(join(tmpdir(), "runner-jobs-")), "runner-jobs.json");
@@ -136,7 +137,14 @@ describe("routines kept in the cloud", () => {
       { changed: vi.fn(), finished: vi.fn(), contextId: () => null, routines: rows, routineIds: here },
       5,
     );
-    return { runner, keys, syncCloudRoutine, forgetCloudRoutine };
+    return {
+      runner,
+      keys,
+      syncCloudRoutine,
+      forgetCloudRoutine,
+      myCloudRoutineKeys,
+      saved: () => JSON.parse(readFileSync(file, "utf8")) as Record<string, string[]>,
+    };
   };
 
   it("sends each routine once, again when it changes or is paused but not as its first time moves on, and forgets one that went", async () => {
@@ -209,6 +217,26 @@ describe("routines kept in the cloud", () => {
     expect([...fresh.keys]).toEqual(["other-mac"]);
     expect([...keys].sort()).toEqual(["mine", "other-mac"]);
     fresh.runner.destroy();
+  });
+
+  it("takes away a routine whose send landed with its answer lost, once it's deleted, even after a restart", async () => {
+    const first = make([], () => [row("r1")]);
+    // The server stores it, the answer never comes back, and the connection is gone before its keys can be read.
+    first.syncCloudRoutine.mockImplementationOnce(async (_token, sent) => {
+      first.keys.add(sent.key);
+      throw new Error("Couldn't reach Supabase.");
+    });
+    first.myCloudRoutineKeys.mockRejectedValue(new Error("Couldn't reach Supabase."));
+    await settle();
+    first.runner.destroy();
+    // Deleted here before the next launch could hear about it.
+    const { runner, forgetCloudRoutine } = make([...first.keys], () => [], {
+      here: () => [],
+      sentBefore: first.saved().routinesSentFromHere,
+    });
+    await settle();
+    expect(forgetCloudRoutine).toHaveBeenCalledWith("token", "r1");
+    runner.destroy();
   });
 
   it("says a routine couldn't be sent, and stops saying so once it is", async () => {

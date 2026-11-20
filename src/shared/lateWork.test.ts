@@ -134,4 +134,19 @@ describe("Lease", () => {
     time += 100;
     expect(lease.live).toBe(false);
   });
+
+  it("counts an answer from when its call was sent, and never moves back", () => {
+    let time = 0;
+    const lease = new Lease(100, () => time);
+    time = 150;
+    // Sent at 60 and answered only now: the other side heard it at 60 at the earliest.
+    lease.renew(60);
+    expect(lease.live).toBe(true);
+    time = 160;
+    expect(lease.live).toBe(false);
+    lease.renew(120);
+    lease.renew(90);
+    time = 219;
+    expect(lease.live).toBe(true);
+  });
 });

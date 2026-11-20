@@ -79,12 +79,19 @@ export const browserbase = ({
     return (await response.json()) as T;
   };
 
-  // Null only when Browserbase says there's no such session. A lookup that fails says nothing about it, so it throws.
-  const lookUp = (id: string): Promise<Session | null> =>
-    call<Session>("GET", `/sessions/${encodeURIComponent(id)}`).catch((error: unknown) => {
+  // Null only when Browserbase says there's no such session. A lookup that fails, or answers with no status, says nothing
+  // about it, so it throws.
+  const lookUp = async (id: string): Promise<Session | null> => {
+    let known: Partial<Session> | null;
+    try {
+      known = await call<Partial<Session> | null>("GET", `/sessions/${encodeURIComponent(id)}`);
+    } catch (error) {
       if (error instanceof BrowserbaseError && error.status === 404) return null;
       throw error;
-    });
+    }
+    if (typeof known?.status !== "string") throw new Error("Browserbase didn't say how the session is.");
+    return { id, status: known.status, ...(typeof known.connectUrl === "string" ? { connectUrl: known.connectUrl } : {}) };
+  };
 
   const context = async (): Promise<string> => {
     if (saved.contextId) return saved.contextId;

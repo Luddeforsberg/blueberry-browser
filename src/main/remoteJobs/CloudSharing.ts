@@ -82,12 +82,17 @@ export class CloudSharing {
     for (const row of rows) {
       const shape = JSON.stringify({ ...row, firstRunAt: null });
       if (shared.rows.get(row.key) === shape) continue;
+      // Counted as there and saved before it's sent, since a send whose answer is lost may still have landed. One that
+      // didn't is let go once the server's keys show it isn't there.
+      if (!this.routinesThere.has(row.key)) {
+        this.routinesThere.add(row.key);
+        this.save();
+      }
       // Tried again on the next change or the next look at the link.
       const synced = await this.withToken(account, (token) => this.server!.syncCloudRoutine(token, row).then(() => true));
       if (this.destroyed) return;
       if (synced) {
         shared.rows.set(row.key, shape);
-        this.routinesThere.add(row.key);
         this.routinesFailed.delete(row.key);
       } else this.routinesFailed.add(row.key);
     }

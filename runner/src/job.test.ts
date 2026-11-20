@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { StreamReply } from "../../src/main/chats/agent";
 import type { ChatCloud } from "../../src/main/chats/Chats";
-import { mascotSnapshot } from "../../src/main/remoteJobs/cloudJobs";
+import { JOB_LEASE_MS, mascotSnapshot } from "../../src/main/remoteJobs/cloudJobs";
 import { BERRY } from "../../src/shared/mascots";
 import { dbConfig, type ClaimedJob, type Decision, type JobUpdate, type RunnerDb } from "./db";
 import { followLiveView, LOST_TOUCH, NO_ANSWER, runJob, SHUT_DOWN, UnreleasedBrowsers, type JobBrowser } from "./job";
@@ -195,11 +195,12 @@ describe("a job on the runner", () => {
     const lines: string[] = [];
     const sent: string[] = [];
     return {
+      clock,
       updates,
       lines,
       sent,
-      run: (streamReply: StreamReply) =>
-        runJob(JOB, {
+      run: (streamReply: StreamReply, job = JOB) =>
+        runJob(job, {
           ...options,
           heartbeatMs: 5,
           now: () => clock.time,
@@ -250,6 +251,54 @@ describe("a job on the runner", () => {
     expect(await run(quick)).toBe("done");
     expect(updates.at(-1)).toMatchObject({ status: "done", reply: "Done it" });
     expect(sent).toEqual(["finished"]);
+  });
+
+  it("counts an answer from when its write was sent, so a slow one doesn't stretch the lease", async () => {
+    let first = true;
+    let stoppedAt = 0;
+    const { run, clock } = outage(() => {
+      if (!first) return true;
+      // Answered a minute after it was sent, and nothing after that is.
+      first = false;
+      clock.time += 60_000;
+      return false;
+    });
+    const timed: StreamReply = async function* (messages, signal, tools) {
+      yield* working(messages, signal, tools);
+      stoppedAt = clock.time;
+    };
+    expect(await run(timed)).toBe("stopped");
+    expect(stoppedAt).toBeGreaterThanOrEqual(JOB_LEASE_MS);
+    // Counted from the answer, it would have held until a minute later.
+    expect(stoppedAt).toBeLessThan(60_000 + JOB_LEASE_MS);
+  });
+
+  it("doesn't say it finished when the server had already ended the job", async () => {
+    const lines: string[] = [];
+    const sent: string[] = [];
+    const { db } = fakeDb();
+    // The row was failed there after its progress was written, so the final write is answered with true.
+    db.update = async (_jobId, change) => change.status !== undefined;
+    const notify = async (kind: string) => void sent.push(kind);
+    const ran = await runJob(JOB, {
+      ...options,
+      db,
+      browser: fakeBrowser().browser,
+      streamReply: quick,
+      log: (line) => lines.push(line),
+      notify,
+    });
+    expect(ran).toBe("done");
+    expect(lines).toContain(`Job ${JOB.id}: done here, but the server had already ended it or been asked to stop it.`);
+    expect(sent).toEqual([]);
+  });
+
+  it("writes that a mascot it can't read failed once the server answers again", async () => {
+    let tries = 0;
+    const { run, updates } = outage(() => ++tries <= 2);
+    const job = { ...JOB, mascot: { id: "scout", name: "Scout", instructions: "", sites: [], tools: [] } };
+    expect(await run(quick, job)).toBe("failed");
+    expect(updates).toEqual([expect.objectContaining({ status: "failed" })]);
   });
 
   it("doesn't run as a mascot it can't read", async () => {

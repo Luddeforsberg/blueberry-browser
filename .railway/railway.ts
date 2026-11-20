@@ -25,6 +25,13 @@ const KEPT = [
   "RELAY_PUBLIC_URL",
   "RELAY_SECRET",
   "RELAY_STATE_FILE",
+  "FIRECRAWL_API_KEY",
+  "LLM_TITLE_MODEL",
+  "OPENAI_BASE_URL",
+  "BLUEBERRY_RUNNER_CDP",
+  "BLUEBERRY_RUNNER_CHROME",
+  "BLUEBERRY_RUNNER_POLL_MS",
+  "TZ",
 ];
 
 export default defineRailway((context, project) => {

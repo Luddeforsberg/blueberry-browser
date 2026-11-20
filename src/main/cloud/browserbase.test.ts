@@ -220,7 +220,13 @@ describe("Browserbase", () => {
 
   it("never replaces a session it couldn't look up, or one that hasn't ended, so its id isn't lost", async () => {
     const made = { status: 201, body: { id: "sess-2", status: "RUNNING", connectUrl: "wss://two" } };
-    for (const answer of [{ status: 500, body: {} }, { body: { id: "sess-1", status: "PENDING" } }]) {
+    // A lookup that failed, one that came back with nothing in it, and a session still starting.
+    for (const answer of [
+      { status: 500, body: {} },
+      { body: null },
+      { body: { id: "sess-1" } },
+      { body: { id: "sess-1", status: "PENDING" } },
+    ]) {
       const { calls, send } = stub({ "GET /sessions/sess-1": answer, "POST /sessions": made });
       const kept: BrowserbaseSaved[] = [];
       await expect(provider(send, "sess-1", kept).start()).rejects.toThrow();

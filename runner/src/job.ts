@@ -118,17 +118,27 @@ export interface RunJobOptions {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // How the job ended, tried at least once and again while the lease holds. After that the server ends it as failed on
-// its own. True once the server has it.
-const writeEnd = async (write: () => Promise<unknown>, lease: Lease, pollMs: number): Promise<boolean> => {
+// its own. "saved" only once the server says it wrote it: "over" is an answer that it had already ended the job, or
+// been asked to stop it, and "unanswered" means nothing was heard.
+const writeEnd = async (write: () => Promise<boolean>, lease: Lease, pollMs: number): Promise<"saved" | "over" | "unanswered"> => {
   do {
     try {
-      await write();
-      return true;
+      return (await write()) ? "over" : "saved";
     } catch {
       if (lease.live) await sleep(pollMs);
     }
   } while (lease.live);
-  return false;
+  return "unanswered";
+};
+
+// What the log says about how a job ended, and whether the phone hears it finished: only once the server has it. A Stop
+// the user asked for is answered as one, and that's how it ended, with no notification.
+const howItEnded = (id: string, status: string, ended: Awaited<ReturnType<typeof writeEnd>>, noStopWords: boolean) => {
+  const theirStop = status === "stopped" && noStopWords;
+  if (ended === "unanswered") return { line: `Job ${id}: couldn't write how it ended, so it's left to time out there.`, notify: false };
+  if (ended === "over" && !theirStop)
+    return { line: `Job ${id}: ${status} here, but the server had already ended it or been asked to stop it.`, notify: false };
+  return { line: `Job ${id}: ${status}.`, notify: !theirStop };
 };
 
 // The live view the job's row shows, for the page asked for last. Every step asks again, and a lookup can take a while,
@@ -162,9 +172,11 @@ export const runJob = async (job: ClaimedJob, options: RunJobOptions): Promise<"
     log = console.log,
   } = options;
   const notify = (kind: PushKind) => void options.notify?.(kind).catch(() => {});
+  // Claimed just now, which was the server's answer.
+  const lease = new Lease(leaseMs, now);
   const mascot = mascotFromSnapshot(job.mascot);
   if (!mascot) {
-    await db.update(job.id, { status: "failed", error: BAD_MASCOT }).catch(() => {});
+    await writeEnd(() => db.update(job.id, { status: "failed", error: BAD_MASCOT }), lease, pollMs);
     return "failed";
   }
   const browser = options.browser(job.contextId);
@@ -196,8 +208,6 @@ export const runJob = async (job: ClaimedJob, options: RunJobOptions): Promise<"
   const onShutDown = () => stop(SHUT_DOWN);
   signal?.addEventListener("abort", onShutDown, { once: true });
 
-  // Claimed just now, which was the server's answer.
-  const lease = new Lease(leaseMs, now);
   // One write at a time, in order, with whatever came in meanwhile folded into the next. Every write is a heartbeat too.
   let pending: JobUpdate | null = null;
   let writing: Promise<void> = Promise.resolve();
@@ -207,13 +217,13 @@ export const runJob = async (job: ClaimedJob, options: RunJobOptions): Promise<"
       const next = pending;
       pending = null;
       if (!next) return;
+      const sentAt = now();
       try {
         const stopping = await db.update(job.id, next);
-        lease.renew();
+        lease.renew(sentAt);
         if (stopping) stop(null);
       } catch {
         log(`Job ${job.id}: couldn't write its progress.`);
-        if (!lease.live) stop(LOST_TOUCH);
       }
     });
     return writing;
@@ -264,7 +274,11 @@ export const runJob = async (job: ClaimedJob, options: RunJobOptions): Promise<"
     }
   };
 
-  const heartbeat = setInterval(() => void write({}), heartbeatMs);
+  // Checked here rather than when a write comes back, so one that never does can't keep the job going.
+  const heartbeat = setInterval(() => {
+    if (!lease.live) stop(LOST_TOUCH);
+    void write({});
+  }, heartbeatMs);
   log(`Job ${job.id}: started.`);
   try {
     if (signal?.aborted) stop(SHUT_DOWN);
@@ -276,12 +290,9 @@ export const runJob = async (job: ClaimedJob, options: RunJobOptions): Promise<"
     const status = result.stopped ? "stopped" : result.error ? "failed" : "done";
     const error = result.stopped ? stopWords : result.error;
     const final: JobUpdate = { status, steps: result.steps, reply: result.text, ...(error ? { error } : {}) };
-    if (!(await writeEnd(() => db.update(job.id, final), lease, pollMs))) {
-      log(`Job ${job.id}: couldn't write how it ended, so it's left to time out there.`);
-      return status;
-    }
-    log(`Job ${job.id}: ${status}.`);
-    if (status !== "stopped" || stopWords) notify("finished");
+    const said = howItEnded(job.id, status, await writeEnd(() => db.update(job.id, final), lease, pollMs), !stopWords);
+    log(said.line);
+    if (said.notify) notify("finished");
     return status;
   } finally {
     clearInterval(heartbeat);
