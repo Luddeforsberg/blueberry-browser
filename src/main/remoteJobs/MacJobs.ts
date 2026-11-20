@@ -145,6 +145,8 @@ export class MacJobs {
 
   private async round(): Promise<void> {
     if (this.destroyed) return;
+    // Before anything else is asked, since saying it's there can itself take a while with no answer.
+    if (this.current && !this.current.lease.live) this.stopHere(this.current, LOST_TOUCH);
     const account = this.signedIn;
     const wanted = this.wanted(account);
     if (wanted) {
@@ -166,10 +168,11 @@ export class MacJobs {
   }
 
   private async claim(account: string): Promise<void> {
+    const claimedAt = this.now();
     const row = await this.withToken(account, (token) => this.server!.macClaimJob(token));
     if (!row) return;
     const jobId = String(row.id);
-    // Claimed just now, which was the server's answer.
+    // Claimed, which was the server's answer, and counted from when it was asked.
     const job: Current = {
       account,
       jobId,
@@ -177,7 +180,7 @@ export class MacJobs {
       ended: null,
       stopped: false,
       why: null,
-      lease: new Lease(JOB_LEASE_MS, this.now),
+      lease: new Lease(JOB_LEASE_MS, this.now, claimedAt),
       final: null,
     };
     // Ends there without starting, as any job ends.

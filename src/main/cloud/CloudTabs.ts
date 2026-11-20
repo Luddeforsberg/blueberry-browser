@@ -18,8 +18,9 @@ import { Latest } from "../../shared/lateWork";
 
 const NOT_SAFE = "This computer can't keep the key encrypted, so it wasn't saved.";
 const NOT_SAVED = "The key couldn't be saved.";
-// The session's id is the only way to end it, and it goes with the key.
+// The session's id is the only way to end it, and it goes with the key, unless Browserbase no longer takes that key.
 const STILL_RUNNING = "The cloud session didn't confirm it ended, so the key was kept to end it with. Press End again first.";
+const LEFT_RUNNING = "Browserbase no longer takes that key, so its last session couldn't be ended. It ends on its own within an hour.";
 // What a cloud tab may ask its page's viewport to be, in pixels.
 const FIT = { min: { width: 320, height: 200 }, max: { width: 3840, height: 2160 } };
 
@@ -123,36 +124,39 @@ export class CloudTabs implements ChatCloud {
       this.problem = "Both the API key and the project id are needed.";
     } else if (!safeStorage.isEncryptionAvailable()) {
       this.problem = NOT_SAFE;
-    } else if (await this.stillRunning()) {
+    } else if ((await this.afterEnd()) === "running") {
       this.problem = STILL_RUNNING;
     } else {
-      // A new key may be a new account, where the old context and session don't exist.
-      this.saved = { apiKey: key, projectId: project, contextId: null, sessionId: null };
+      // A new key may be a new account, without the old context. A session the old key couldn't end is kept for this one.
+      const kept = this.sessions?.keyRefused ? this.saved.sessionId : null;
+      this.saved = { apiKey: key, projectId: project, contextId: null, sessionId: kept };
       this.save();
       if (!this.local) this.sessions = this.makeSessions();
+      if (kept) await this.end();
     }
     this.changed();
     return this.state;
   }
 
   async forget(): Promise<CloudState> {
-    if (await this.stillRunning()) {
+    const after = await this.afterEnd();
+    if (after === "running") {
       this.problem = STILL_RUNNING;
       this.changed();
       return this.state;
     }
     this.saved = EMPTY;
-    this.problem = null;
+    this.problem = after === "refused" ? LEFT_RUNNING : null;
     this.save();
     if (!this.local) this.sessions = null;
     this.changed();
     return this.state;
   }
 
-  // Ends the session first. True if Browserbase didn't confirm it, so it may still be running on the key saved now.
-  private async stillRunning(): Promise<boolean> {
+  // Ends the session first: "running" if that wasn't confirmed, and "refused" if Browserbase no longer takes the key.
+  private async afterEnd(): Promise<"ended" | "running" | "refused"> {
     await this.end();
-    return !!this.sessions?.unreleased;
+    return !this.sessions?.unreleased ? "ended" : this.sessions.keyRefused ? "refused" : "running";
   }
 
   // Ends the session at the provider and closes every cloud tab, whatever was working there.

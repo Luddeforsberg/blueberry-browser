@@ -143,6 +143,27 @@ describe("CloudTabs", () => {
     encryption.available = false;
   });
 
+  it("takes a new key, or forgets one, when Browserbase no longer takes the old one, keeping its session for the new key", async () => {
+    encryption.available = true;
+    const file = join(mkdtempSync(join(tmpdir(), "cloud-tabs-")), "cloud.json");
+    const sealed = (text: string) => Buffer.from(text).toString("base64");
+    writeFileSync(file, JSON.stringify({ apiKey: sealed("bb_old"), projectId: sealed("proj"), contextId: "ctx-1", sessionId: "sess-1" }));
+    const saved = () => JSON.parse(readFileSync(file, "utf8")) as Record<string, string | null>;
+    const ended = vi.spyOn(CloudSessions.prototype, "end").mockResolvedValue();
+    vi.spyOn(CloudSessions.prototype, "unreleased", "get").mockReturnValue(true);
+    vi.spyOn(CloudSessions.prototype, "keyRefused", "get").mockReturnValue(true);
+    const tabs = makeTabs(file);
+    tabs.start();
+    await tabs.saveKey("bb_new", "proj");
+    expect(saved()).toEqual({ apiKey: sealed("bb_new"), projectId: sealed("proj"), contextId: null, sessionId: "sess-1" });
+    // Ended once more, with the new key.
+    expect(ended).toHaveBeenCalledTimes(2);
+    expect((await tabs.forget()).problem).toMatch(/ends on its own within an hour/);
+    expect(saved()).toEqual({ apiKey: null, projectId: null, contextId: null, sessionId: null });
+    vi.restoreAllMocks();
+    encryption.available = false;
+  });
+
   it("lets the session wind down only once the last tab the user has there closes", async () => {
     let opened = 0;
     vi.spyOn(CloudSessions.prototype, "openForUser").mockImplementation(async (id) => ({ id, url: "https://example.com/" }) as CdpTab);

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Browser } from "playwright-core";
 import { browserbase, BROWSERBASE_REGION, type BrowserbaseSaved } from "./browserbase";
 import type { CdpTab } from "../tools/CdpTab";
-import { CloudSessions } from "./cloudBrowser";
+import { CloudSessions, KeyRefused } from "./cloudBrowser";
 import { defined } from "../../shared/testing";
 
 // Against a stubbed fetch, shaped from Browserbase's API reference. Nothing here has talked to the real service.
@@ -345,6 +345,13 @@ describe("Browserbase", () => {
     );
     await expect(failing.release()).rejects.toThrow();
     expect(failing.hasSession).toBe(true);
+    // A key Browserbase no longer takes says so, since it can't end anything.
+    const refused = provider(
+      stub({ "POST /sessions/sess-1": { status: 401, body: {} }, "GET /sessions/sess-1": { status: 401, body: {} } }).send,
+      "sess-1",
+    );
+    await expect(refused.release()).rejects.toBeInstanceOf(KeyRefused);
+    expect(refused.hasSession).toBe(true);
 
     const forgotten = provider(stub({ "POST /sessions/sess-1": { status: 404, body: {} } }).send, "sess-1");
     await forgotten.release();

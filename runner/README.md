@@ -15,14 +15,16 @@ You link it to your account in Blueberry, and it accepts the link when it starts
 1. **Run the migrations.** In the Supabase SQL editor, run `supabase/migrations/20261102000000_cloud_jobs.sql`, after the Gallery's, then `supabase/migrations/20261103000000_phone.sql`, for the phone page, then `supabase/migrations/20261104000000_cloud_conversations.sql`, for follow-ups, and then `supabase/migrations/20261105000000_cloud_routines.sql`, for routines that run with the Mac off, and then `supabase/migrations/20261106000000_cloud_relay.sql`, so Settings can show the address for ChatGPT and Claude, and then `supabase/migrations/20261107000000_relay_on_mac.sql`, so their jobs can run on the Mac.
 2. **Create the runner's user.** In the Supabase dashboard, Authentication > Users > Add user > Create new user, with an email of its own and a long random password. Tick Auto Confirm User. Don't use your own account.
 3. **Link it in Blueberry.** Signed in to your Blueberry account, open Settings > Cloud > With your Mac off, type the runner's email and press **Link**. It says it's waiting for the runner.
-4. **Create the service.** From the repo root, with `railway login` done:
+4. **Create the service.** From the repo root, with `railway login` done and Railway's CLI at 5.42.1 or newer:
 
    ```sh
    railway init            # or `railway link` to an existing project
-   railway up
+   railway config plan     # shows what it will change
+   railway config apply
+   railway up --ci -s runner
    ```
 
-   `.railway/railway.ts` builds `runner/Dockerfile` with one replica. Apply it to the service with `railway config plan`, and then `railway config apply` once the plan changes nothing but the build and deploy settings: never accept one that deletes a variable. If it would, add that variable's name to `KEPT` there and plan again.
+   `.railway/railway.ts` describes the `runner` service: it builds `runner/Dockerfile`, with one replica. Railway reads it only through `railway config`, never during a deploy, so apply it before the first `railway up`, and again whenever it changes. Never accept a plan that deletes a variable: add that variable's name to `KEPT` there and plan again. A service set up before this file, from `railway.json`, runs `railway config migrate cutover` once first, so the plan is allowed, and is applied before any deploy of a commit without `railway.json`.
 5. **Set its variables** in the Railway dashboard, or with `railway variables --set NAME=value`:
 
    | Variable | What |

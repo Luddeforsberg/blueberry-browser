@@ -19,9 +19,12 @@ export interface CloudBrowser {
   start(): Promise<CloudSession>;
   // Whether a session may still be running at the provider, connected or not.
   readonly hasSession: boolean;
-  // Ends it there, with or without a connection, so nothing keeps running or costing. Rejects if that wasn't confirmed.
+  // Ends it there, with or without a connection, so nothing keeps running or costing. Rejects if that wasn't confirmed,
+  // with `KeyRefused` when the provider no longer takes the key, which then can't end it at all.
   release(): Promise<void>;
 }
+
+export class KeyRefused extends Error {}
 
 // Playwright loads only when a cloud browser is first used, so startup never waits for it.
 export const connectOverCdp = async (endpoint: string): Promise<Browser> => {
@@ -44,8 +47,9 @@ export class CloudSessions {
   private readonly pages = new Map<string, { tab: CdpTab; jobId: string }>();
   private _status: CloudStatus = "idle";
   private _problem: string | null = null;
-  // The last release wasn't confirmed, so a paid session may still be running.
+  // The last release wasn't confirmed, so a paid session may still be running, and whether that was the key refused.
   private _unreleased = false;
+  private _keyRefused = false;
   // Every page made here. Anything else in the context is a popup a page opened.
   private readonly ours = new WeakSet<Page>();
   private opening: Promise<unknown> = Promise.resolve();
@@ -68,6 +72,10 @@ export class CloudSessions {
 
   get unreleased(): boolean {
     return this._unreleased;
+  }
+
+  get keyRefused(): boolean {
+    return this._unreleased && this._keyRefused;
   }
 
   // Whether End has anything to end, here or at the provider.
@@ -291,10 +299,11 @@ export class CloudSessions {
       this._unreleased = false;
       this._problem = null;
       return true;
-    } catch {
+    } catch (error) {
       // Only that it failed, since this runs on the cloud runner too. Settings > Cloud says what to do.
       console.error("Couldn't release the cloud session.");
       this._unreleased = true;
+      this._keyRefused = error instanceof KeyRefused;
       this._problem = "The cloud session may still be running, and costing, because the provider didn't confirm it ended. Try again.";
       return false;
     }

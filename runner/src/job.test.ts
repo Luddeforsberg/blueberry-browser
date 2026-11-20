@@ -199,8 +199,9 @@ describe("a job on the runner", () => {
       updates,
       lines,
       sent,
-      run: (streamReply: StreamReply, job = JOB) =>
+      run: (streamReply: StreamReply, job = JOB, claimedAt?: number) =>
         runJob(job, {
+          claimedAt,
           ...options,
           heartbeatMs: 5,
           now: () => clock.time,
@@ -271,6 +272,18 @@ describe("a job on the runner", () => {
     expect(stoppedAt).toBeGreaterThanOrEqual(JOB_LEASE_MS);
     // Counted from the answer, it would have held until a minute later.
     expect(stoppedAt).toBeLessThan(60_000 + JOB_LEASE_MS);
+  });
+
+  it("counts the lease from when the claim was sent", async () => {
+    let stoppedAt = 0;
+    const { run, clock } = outage(() => true);
+    const timed: StreamReply = async function* (messages, signal, tools) {
+      yield* working(messages, signal, tools);
+      stoppedAt = clock.time;
+    };
+    // Sent a minute before the job started here.
+    expect(await run(timed, JOB, -60_000)).toBe("stopped");
+    expect(stoppedAt).toBeLessThan(JOB_LEASE_MS - 40_000);
   });
 
   it("doesn't say it finished when the server had already ended the job", async () => {

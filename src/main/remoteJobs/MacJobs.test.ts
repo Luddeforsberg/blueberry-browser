@@ -295,6 +295,21 @@ describe("MacJobs", () => {
     expect(host.stop).toHaveBeenCalledWith("chat-1");
   });
 
+  it("counts the lease from when the claim was sent, not when its answer came", async () => {
+    const { jobs, server, host, later } = setUp();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const claim = vi.mocked(server.macClaimJob).getMockImplementation()!;
+    vi.mocked(server.macClaimJob).mockImplementationOnce(async (token) => {
+      later(10_000);
+      return claim(token);
+    });
+    await jobs.tick();
+    vi.mocked(server.macUpdateJob).mockRejectedValue(new Error("Couldn't reach Supabase."));
+    later(JOB_LEASE_MS - 10_000);
+    await jobs.tick();
+    expect(host.stop).toHaveBeenCalledWith("chat-1");
+  });
+
   it("says when the server had already ended the job it ended here", async () => {
     const { jobs, chats, rows } = setUp();
     const log = vi.spyOn(console, "log").mockImplementation(() => {});

@@ -1,5 +1,5 @@
 import type { CdpTab } from "../tools/CdpTab";
-import { connectOverCdp, type CloudBrowser, type CloudSession } from "./cloudBrowser";
+import { connectOverCdp, KeyRefused, type CloudBrowser, type CloudSession } from "./cloudBrowser";
 
 // Browserbase, from its REST API (docs.browserbase.com/reference/api) and connected to over CDP. One persistent Context
 // keeps the profile between sessions, and a session is kept alive between jobs, ended a few minutes after the last one, by the user, or after an hour.
@@ -74,7 +74,7 @@ export const browserbase = ({
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
     if (response.status === 401 || response.status === 403)
-      throw new Error("Browserbase refused the API key. Check it in Settings > Cloud.");
+      throw new KeyRefused("Browserbase refused the API key. Check it in Settings > Cloud.");
     if (!response.ok) throw new BrowserbaseError(response.status);
     return (await response.json()) as T;
   };

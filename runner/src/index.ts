@@ -139,6 +139,7 @@ const loop = async () => {
     if (!shared && !addressFailing) console.error("Couldn't share the relay's address with Blueberry. Trying again.");
     addressFailing = !shared;
     let job: ClaimedJob | null = null;
+    let claimedAt = 0;
     try {
       // A routine that's due becomes a queued job first, so it's taken in turn like any other. Routines failing, as before
       // their migration has run, never stops jobs from being taken.
@@ -149,6 +150,7 @@ const loop = async () => {
       });
       if (routineJobs) routinesFailing = false;
       routineJobs?.forEach((id) => console.log(`Job ${id}: started from a routine.`));
+      claimedAt = Date.now();
       job = await db.claim();
       if (unreachable) console.log("Reached Supabase again.");
       unreachable = false;
@@ -169,6 +171,7 @@ const loop = async () => {
     const { id } = job;
     working = runJob(job, {
       db,
+      claimedAt,
       browser: (contextId) => sessionBrowser(new CloudSessions(cloudBrowser(contextId))),
       signal: shutdown.signal,
       unreleased,

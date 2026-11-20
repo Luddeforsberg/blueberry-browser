@@ -109,6 +109,8 @@ export interface RunJobOptions {
   heartbeatMs?: number;
   answerTimeoutMs?: number;
   leaseMs?: number;
+  // When the claim that took this job was sent, which the lease counts from.
+  claimedAt?: number;
   now?: () => number;
   log?: (line: string) => void;
   // Tells the owner's phone, with no content: when the job asks them, and when it ends other than by their own Stop.
@@ -173,7 +175,7 @@ export const runJob = async (job: ClaimedJob, options: RunJobOptions): Promise<"
   } = options;
   const notify = (kind: PushKind) => void options.notify?.(kind).catch(() => {});
   // Claimed just now, which was the server's answer.
-  const lease = new Lease(leaseMs, now);
+  const lease = new Lease(leaseMs, now, options.claimedAt ?? now());
   const mascot = mascotFromSnapshot(job.mascot);
   if (!mascot) {
     await writeEnd(() => db.update(job.id, { status: "failed", error: BAD_MASCOT }), lease, pollMs);
