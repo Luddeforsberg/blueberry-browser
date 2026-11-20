@@ -1,3 +1,4 @@
+import { framesPassed } from "./frames";
 import type { ActorApi } from "./install";
 
 export type ActorCommand = Exclude<keyof ActorApi, "key">;
@@ -19,4 +20,11 @@ export const ifThere = ({ name, args }: { name: ActorCommand; args: object }): u
   if (!api) return undefined;
   const command: AnyCommand = api[name];
   return command.call(api, args);
+};
+
+// Before a capture: out of sight, and answered once the frame without it is handed over. That's waited for with no
+// mascot here too, since one taken away just now may still be in the last frame.
+export const beforeCapture = (): Promise<true> => {
+  globalThis.__berryActor?.hide();
+  return framesPassed({ shown: false });
 };

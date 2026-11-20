@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { NativeImage } from "electron";
 import type { Tab } from "./Tab";
 import { TabPage } from "./TabPage";
@@ -54,5 +54,36 @@ describe("a screenshot for the model", () => {
         page.noScreenshotsUntil = Date.now() + 60_000;
       }),
     ).rejects.toThrow();
+  });
+});
+
+describe("a screenshot whose capture never comes back", () => {
+  it("gives up inside the hide, so the mascot shows again", async () => {
+    vi.useFakeTimers();
+    try {
+      let hidden = false;
+      const tab = {
+        trouble: null,
+        actor: {
+          held: () => {},
+          whileHidden: async <T>(capture: () => Promise<T>) => {
+            hidden = true;
+            try {
+              return await capture();
+            } finally {
+              hidden = false;
+            }
+          },
+        },
+        view: { webContents: { capturePage: () => new Promise<NativeImage>(() => {}) } },
+      } as unknown as Tab;
+      const taken = new TabPage(tab, () => {}).screenshot();
+      const failed = expect(taken).rejects.toThrow("stopped answering");
+      await vi.advanceTimersByTimeAsync(10_000);
+      await failed;
+      expect(hidden).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

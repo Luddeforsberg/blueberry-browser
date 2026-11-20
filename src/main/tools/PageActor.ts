@@ -1,6 +1,7 @@
 import type { WebContentsView } from "electron";
-import { actorCommand, ifThere, installActor, type ActorCommand, type ActorLook } from "./pageActorScript";
+import { actorCommand, beforeCapture, ifThere, installActor, type ActorCommand, type ActorLook } from "./pageActorScript";
 import type { MascotLook } from "../../shared/library";
+import { CaptureHide } from "./captureHide";
 import { flightMs, landingFor, MASCOT_SIZE, TYPE_MAX_MS, type Landing, type Place, type Spot } from "./actorMotion";
 
 export { flightMs, landingFor, typingChunks, typingPauseMs, type Landing, type Spot } from "./actorMotion";
@@ -17,6 +18,8 @@ const LIVELY_MS = 760;
 
 // How long a page gets to answer. Being late only means the mascot is out of step, so nothing ever waits on a stuck page.
 const PAGE_ANSWER_MS = 400;
+// A capture waits this long for the page to say the mascot is out of sight, and doesn't happen without that.
+const HIDE_MS = 2000;
 
 const MARKER_MS = 130;
 const CARRY_MS = 240;
@@ -74,6 +77,11 @@ export class PageActor {
   private _saying = "";
   // Waits to end early, because the mascot has gone. What happens next is the tools' to decide.
   private readonly waits = new Set<() => void>();
+  private readonly captures = new CaptureHide({
+    // With no view yet there's no page, and so no mascot.
+    hide: () => (this.tab.existingView ? this.ask(beforeCapture(), HIDE_MS) : Promise.resolve(true)),
+    show: () => void this.ask(ifThere("show")),
+  });
 
   constructor(
     private readonly tab: ActorTab,
@@ -135,12 +143,12 @@ export class PageActor {
     return { ...look, plain, still, dark, zoom: this.drawZoom, size: MASCOT_SIZE, pictured: this.pictured };
   }
 
-  private ask(code: string): Promise<unknown> {
+  private ask(code: string, ms = PAGE_ANSWER_MS): Promise<unknown> {
     const contents = this.tab.existingView?.webContents;
     if (!contents || contents.isDestroyed()) return Promise.resolve(null);
     let timer: NodeJS.Timeout | undefined;
     const late = new Promise<null>((resolve) => {
-      timer = setTimeout(() => resolve(null), PAGE_ANSWER_MS);
+      timer = setTimeout(() => resolve(null), ms);
     });
     // The page's own world is never involved, so a page can't answer for this.
     return Promise.race([contents.executeJavaScriptInIsolatedWorld(1000, [{ code }], true).catch(() => null), late]).finally(() =>
@@ -168,7 +176,7 @@ export class PageActor {
       // The tab may have been held or touched while that was on its way, and nothing comes back after that. Whatever
       // takes the mascot away is sent after anything sent here, so it's only this one that can come too late.
       if (!this.showing) return false;
-      await this.ask(installActor(this.key, this.look, this.position));
+      await this.ask(installActor(this.key, this.look, this.position, this.captures.busy));
       if (!this.showing) return false;
       answer = await this.ask(command);
     }
@@ -312,20 +320,15 @@ export class PageActor {
     const found = await this.ask(actorCommand(this.key, "frameSpot", { origin }));
     if (found === "absent") {
       if (!this.showing) return null;
-      await this.ask(installActor(this.key, this.look, this.position));
+      await this.ask(installActor(this.key, this.look, this.position, this.captures.busy));
       return (await this.ask(actorCommand(this.key, "frameSpot", { origin }))) as Spot | null;
     }
     return found as Spot | null;
   }
 
-  // What a capture sees has no mascot in it. Anything going wrong here mustn't get in the way of the capture.
-  async whileHidden<T>(capture: () => Promise<T>): Promise<T> {
-    const there = (this.tab.isVisible || this.pictured) && (await this.ask(ifThere("hide")));
-    try {
-      return await capture();
-    } finally {
-      if (there) void this.ask(ifThere("show"));
-    }
+  // What a capture sees has no mascot in it.
+  whileHidden<T>(capture: () => Promise<T>): Promise<T> {
+    return this.captures.around(capture);
   }
 
   // The tab has come to the front in the middle of a job.

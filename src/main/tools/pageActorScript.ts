@@ -28,10 +28,13 @@ const posesFor = (accessory: string, palette: string): Record<string, ArtNode> =
 };
 
 // Where the feet were on the last page, so the mascot carries on from there after a navigation.
-export const installActor = (key: string, look: ActorLook, start: { x: number; y: number } | null): string =>
-  inPage(page.installActor, { key, look, start, art: posesFor(look.accessory, look.palette), artSheet: ACTOR_ART_SHEET });
+// `hidden` while a capture is on its way.
+export const installActor = (key: string, look: ActorLook, start: { x: number; y: number } | null, hidden: boolean): string =>
+  inPage(page.installActor, { key, look, start, hidden, art: posesFor(look.accessory, look.palette), artSheet: ACTOR_ART_SHEET });
 
 export const actorCommand = (key: string, name: ActorCommand, args: object = {}): string => inPage(page.actorCommand, { key, name, args });
+
+export const beforeCapture = (): string => inPage(page.beforeCapture, undefined);
 
 // For anything that shouldn't bring the mascot back if it isn't there.
 export const ifThere = (name: ActorCommand, args: object = {}): string => inPage(page.ifThere, { name, args });
