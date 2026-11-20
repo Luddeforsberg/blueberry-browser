@@ -1,5 +1,4 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
-import { dirname, isAbsolute } from "path";
+import { isAbsolute } from "path";
 import type { DesktopBerrySpot, Settings } from "../../shared/ipc";
 import { CHAT_WIDTH, clampWidth, SIDEBAR_WIDTH } from "../window/Layout";
 import { sanitizeSiteZoom } from "./siteZoom";
@@ -7,6 +6,7 @@ import { cleanAccountName } from "../../shared/accountName";
 import { FIRST_JOBS, FIRST_RUN_STEPS, knownOnly } from "../../shared/firstRun";
 import { APP_ICON_GROUNDS } from "../../shared/appIcon";
 import { BERRY_ID } from "../../shared/mascots";
+import { bestEffort, readJsonFile, saveFile } from "../library/savedFile";
 
 export const DEFAULT_SETTINGS: Settings = {
   layoutMode: "vertical",
@@ -129,22 +129,14 @@ export class SettingsStore {
   flush(): void {
     if (this.writeTimer) clearTimeout(this.writeTimer);
     this.writeTimer = null;
-    try {
-      mkdirSync(dirname(this.file), { recursive: true });
-      // Writing beside the file and renaming means a crash never leaves half a file.
-      const temp = `${this.file}.tmp`;
-      writeFileSync(temp, JSON.stringify(this.settings, null, 2));
-      renameSync(temp, this.file);
-    } catch (error) {
-      console.error("Failed to save settings:", error);
-    }
+    bestEffort(
+      saveFile(this.file, JSON.stringify(this.settings, null, 2)),
+      "Settings stay as they are until Blueberry quits, and the next change or quitting tries again.",
+    );
   }
 
   private read(): Settings {
-    try {
-      return sanitizeSettings(JSON.parse(readFileSync(this.file, "utf8")));
-    } catch {
-      return DEFAULT_SETTINGS;
-    }
+    const saved = readJsonFile(this.file);
+    return saved === undefined ? DEFAULT_SETTINGS : sanitizeSettings(saved);
   }
 }

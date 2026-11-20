@@ -1,8 +1,7 @@
 import { safeStorage } from "electron";
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "fs";
-import { dirname } from "path";
 import type { AccountState } from "../../shared/ipc";
 import { Latest } from "../../shared/lateWork";
+import { bestEffort, readTextFile, removeFile, saveFile, type Saved } from "../library/savedFile";
 import { ServerError, type GalleryServer, type ServerSession } from "./galleryServer";
 
 // Who's signed in, for publishing. The session stays in here: main never sends a token to a renderer, no tool can reach
@@ -13,6 +12,11 @@ const REFRESH_BEFORE_MS = 60_000;
 const NO_NETWORK = "Couldn’t reach the sign-in service. Try again in a moment.";
 const SIGN_IN_AGAIN = "Your sign-in has ended. Please sign in again.";
 const NOT_SAVED = "You’re signed in until you quit. This computer has no safe place to keep it, so you’ll sign in again next time.";
+const NOT_WRITTEN = "You’re signed in until you quit. This couldn’t be saved on this computer, so you’ll sign in again next time.";
+const EARLIER_KEPT =
+  "You’re signed in until you quit. This couldn’t be saved on this computer, and an earlier sign-in still is, so that’s the one you’ll have after a restart.";
+const NOT_FORGOTTEN =
+  "You’re signed out for now, but the saved sign-in couldn’t be removed from this computer, so you’ll be signed in again after a restart. Sign in and out again to try once more.";
 const CONFIRM_FIRST = "Check your email to confirm the address, then sign in here.";
 
 const SHORT_PASSWORD = "Use at least 8 characters.";
@@ -116,9 +120,8 @@ export class Account {
     this.signIns.end();
     const token = this.session?.accessToken;
     this.session = null;
-    this.problem = null;
+    this.problem = this.forget() ? null : NOT_FORGOTTEN;
     this.problemAbout = null;
-    this.forget();
     this.onChange();
     if (token) await this.server?.signOut(token).catch(() => console.error("Couldn't end the session on the server."));
     return this.state;
@@ -151,7 +154,8 @@ export class Account {
       if (!isEnded(error)) throw error;
       if (this.session === session) {
         this.session = null;
-        this.forget();
+        // One left on file has ended too, so the next launch only asks again.
+        bestEffort(this.forget(), "The ended sign-in is still on file, and the next launch finds it has ended too.");
         this.say(SIGN_IN_AGAIN);
       }
       return null;
@@ -171,21 +175,17 @@ export class Account {
       this.problem = NOT_SAVED;
       return;
     }
-    try {
-      mkdirSync(dirname(this.file), { recursive: true });
-      const temp = `${this.file}.tmp`;
-      writeFileSync(temp, safeStorage.encryptString(JSON.stringify(session)).toString("base64"), { mode: 0o600 });
-      renameSync(temp, this.file);
-    } catch {
-      this.problem = NOT_SAVED;
-      console.error("Couldn't save the sign-in.");
-    }
+    const sealed = () => safeStorage.encryptString(JSON.stringify(session)).toString("base64");
+    // One left on file from before, perhaps another account's, would be who the next launch signs in as.
+    if (!saveFile(this.file, sealed, { secret: true })) this.problem = this.forget() ? NOT_WRITTEN : EARLIER_KEPT;
   }
 
   private load(): ServerSession | null {
     try {
       if (!safeStorage.isEncryptionAvailable()) return null;
-      const text = safeStorage.decryptString(Buffer.from(readFileSync(this.file, "utf8"), "base64"));
+      const saved = readTextFile(this.file);
+      if (saved === undefined) return null;
+      const text = safeStorage.decryptString(Buffer.from(saved, "base64"));
       const { accessToken, refreshToken, expiresAt, email } = JSON.parse(text) as Record<string, unknown>;
       if (typeof accessToken !== "string" || typeof refreshToken !== "string" || typeof expiresAt !== "number" || typeof email !== "string")
         return null;
@@ -195,11 +195,8 @@ export class Account {
     }
   }
 
-  private forget(): void {
-    try {
-      rmSync(this.file, { force: true });
-    } catch {
-      console.error("Couldn't remove the saved sign-in.");
-    }
+  // False if the saved sign-in is still on file.
+  private forget(): Saved {
+    return removeFile(this.file, { secret: true });
   }
 }

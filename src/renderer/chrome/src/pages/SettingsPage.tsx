@@ -203,7 +203,7 @@ const AiService: React.FC = () => {
   const keyTry = useKeyTry();
   return (
     <div className="mt-4">
-      <AiKeyForm keyTry={keyTry} tryButton onRemove={() => void window.chromeAPI.aiKey.remove()} />
+      <AiKeyForm keyTry={keyTry} tryButton onRemove={() => void keyTry.remove()} />
     </div>
   );
 };

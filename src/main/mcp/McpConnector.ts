@@ -1,6 +1,5 @@
 import { randomBytes, randomUUID, timingSafeEqual } from "crypto";
 import { app, clipboard, safeStorage } from "electron";
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "http";
 import type { AddressInfo } from "net";
 import { dirname, join } from "path";
@@ -8,6 +7,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { McpTool } from "./mcpTools";
 import type { McpActivity, McpSnippet, McpState } from "../../shared/ipc";
+import { fieldsOf } from "../../shared/fields";
+import { readJsonFile, saveFile } from "../library/savedFile";
 
 // Lets Claude Code, Claude Desktop and other apps on this computer use Blueberry, over MCP's Streamable HTTP on
 // 127.0.0.1 only. Off until the user turns it on. Every request needs the token, which is kept encrypted with
@@ -70,7 +71,12 @@ interface Saved {
 }
 
 const NOT_SAFE = "This computer has no safe place to keep the token, so the server can't be turned on.";
-const NOT_SAVED = "On for now, but this couldn't be saved, so it will be off after a restart.";
+// A failed save leaves the file as it was, so each of these says what the next launch will do.
+const NOT_SAVED_ON = "On for now, but this couldn't be saved, so it will be off after a restart.";
+const NOT_SAVED_OFF = "Off for now, but this couldn't be saved, so it will be on again after a restart. Try again.";
+const NOT_REVOKED =
+  "A new token couldn't be saved, so the server is off for now. The old token is still saved, and apps given it will work again after a restart. Turn the server on to save the new one.";
+const NO_BRIDGE = "The bridge for Claude Desktop couldn't be written, so its snippet won't work. Turn the server off and on to try again.";
 
 // The name of the app calling, from what the snippet told it to send, or from what it says it is.
 const clientName = (header: string | string[] | undefined, userAgent: string | undefined): string => {
@@ -118,6 +124,8 @@ const snippets = (url: string, token: string, bridge: string, binary: string): M
 
 export class McpConnector {
   private saved: Saved = { on: false, token: null, port: DEFAULT_PORT };
+  // What the file holds, which is what the next launch starts from: what was read, or the last save that worked.
+  private onDisk: Saved = { ...this.saved };
   private server: Server | null = null;
   // Still finding a port, so switching off can close it before it's ever used.
   private starting: Server | null = null;
@@ -153,6 +161,7 @@ export class McpConnector {
 
   start(): void {
     this.saved = this.load();
+    this.onDisk = { ...this.saved };
     if (this.saved.on) void this.listen();
   }
 
@@ -168,8 +177,11 @@ export class McpConnector {
     }
     this.saved.on = on === true;
     this.save();
+    this.settle();
     if (this.saved.on) await this.listen();
     else this.close();
+    // What a restart does matters more than anything starting it said, so it has the last word.
+    this.settle();
     this.onChange();
     return this.state;
   }
@@ -177,9 +189,11 @@ export class McpConnector {
   // A new token, so every app given the old one is refused from now on.
   revoke(): McpState {
     if (!safeStorage.isEncryptionAvailable()) return this.state;
+    this.problem = null;
     this.saved.token = randomBytes(32).toString("base64url");
-    this.save();
     this.activity = [];
+    this.save();
+    this.settle();
     this.onChange();
     return this.state;
   }
@@ -237,8 +251,9 @@ export class McpConnector {
     this.port = port;
     if (!this.anyPort && port !== this.saved.port) {
       this.saved.port = port;
-      this.save();
-      this.problem = "The usual port was taken, so it moved. Copy the snippets again for any app you'd already set up.";
+      this.problem = this.save()
+        ? "The usual port was taken, so it moved. Copy the snippets again for any app you'd already set up."
+        : "The usual port was taken, so it moved, and the new one couldn't be saved, so it may move again after a restart. Copy the snippets again for any app you'd already set up.";
     }
     this.onChange();
   }
@@ -309,17 +324,12 @@ export class McpConnector {
   }
 
   private writeBridge(): void {
-    try {
-      mkdirSync(dirname(this.bridgeFile), { recursive: true });
-      writeFileSync(this.bridgeFile, BRIDGE, { mode: 0o600 });
-    } catch {
-      console.error("Couldn't write the MCP bridge.");
-    }
+    if (!saveFile(this.bridgeFile, BRIDGE, { secret: true })) this.problem = NO_BRIDGE;
   }
 
   private load(): Saved {
     try {
-      const { on, token, port } = JSON.parse(readFileSync(this.file, "utf8")) as Record<string, unknown>;
+      const { on, token, port } = fieldsOf(readJsonFile(this.file));
       const plain =
         typeof token === "string" && safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(Buffer.from(token, "base64")) : null;
       return {
@@ -332,16 +342,25 @@ export class McpConnector {
     }
   }
 
-  private save(): void {
-    try {
-      mkdirSync(dirname(this.file), { recursive: true });
-      const temp = `${this.file}.tmp`;
-      const token = this.saved.token && safeStorage.encryptString(this.saved.token).toString("base64");
-      writeFileSync(temp, JSON.stringify({ on: this.saved.on, token, port: this.saved.port }), { mode: 0o600 });
-      renameSync(temp, this.file);
-    } catch {
-      this.problem = NOT_SAVED;
-      console.error("Couldn't save the MCP server's settings.");
+  // Only what was really saved becomes what the next launch starts from.
+  private save(): boolean {
+    const { on, token, port } = this.saved;
+    const sealed = () => JSON.stringify({ on, token: token && safeStorage.encryptString(token).toString("base64"), port });
+    if (!saveFile(this.file, sealed, { secret: true })) return false;
+    this.onDisk = { ...this.saved };
+    return true;
+  }
+
+  // While what's on file isn't what's in use, what's true now and after a restart. After a save that worked, nothing.
+  private settle(): void {
+    // A token that was replaced is still on file, and would turn the server on with it at the next launch. Off is the
+    // one thing that's true now and then.
+    if (this.onDisk.on && this.onDisk.token !== this.saved.token) {
+      this.saved.on = false;
+      this.close();
+      this.problem = NOT_REVOKED;
+    } else if (this.onDisk.on !== this.saved.on) {
+      this.problem = this.saved.on ? NOT_SAVED_ON : NOT_SAVED_OFF;
     }
   }
 }

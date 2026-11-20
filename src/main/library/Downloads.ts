@@ -1,9 +1,11 @@
 import { randomUUID } from "crypto";
-import { existsSync, mkdirSync, promises as fs, readFileSync, renameSync, writeFileSync } from "fs";
-import { basename, dirname, extname, isAbsolute, join } from "path";
+import { existsSync, mkdirSync } from "fs";
+import { access } from "fs/promises";
+import { basename, extname, isAbsolute, join } from "path";
 import type { DownloadItem } from "electron";
 import type { DownloadAction, DownloadInfo, DownloadState, Settings } from "../../shared/ipc";
 import { replaceControlCharacters } from "./controlCharacters";
+import { bestEffort, readJsonFile, savedEntries, saveFile } from "./savedFile";
 
 type Item = Pick<
   DownloadItem,
@@ -105,14 +107,8 @@ export class Downloads {
     private readonly file: string,
     private readonly deps: DownloadsDeps,
   ) {
-    try {
-      const raw: unknown = JSON.parse(readFileSync(file, "utf8"));
-      if (Array.isArray(raw)) {
-        this.records = raw.map(readSaved).filter((entry): entry is DownloadInfo => entry !== null);
-      }
-    } catch {
-      // A missing or unreadable file leaves the list empty, like settings.
-    }
+    // A missing or unreadable file leaves the list empty, like settings.
+    this.records = savedEntries(file, readJsonFile(file), readSaved);
   }
 
   get list(): DownloadInfo[] {
@@ -224,7 +220,7 @@ export class Downloads {
   }
 
   private async checkFile(record: DownloadInfo): Promise<boolean> {
-    const exists = await fs.access(record.path).then(
+    const exists = await access(record.path).then(
       () => true,
       () => false,
     );
@@ -286,16 +282,10 @@ export class Downloads {
       .reverse();
   }
 
-  // Only changes of state reach the disk, so progress never writes the file many times a second.
+  // Only changes of state reach the disk, so progress never writes the file many times a second. The list shows the
+  // downloads as they are either way, so nobody is told it was kept.
   private saved(): void {
-    try {
-      mkdirSync(dirname(this.file), { recursive: true });
-      const temp = `${this.file}.tmp`;
-      writeFileSync(temp, JSON.stringify(this.records, null, 2));
-      renameSync(temp, this.file);
-    } catch (error) {
-      console.error("Failed to save the downloads list:", error);
-    }
+    bestEffort(saveFile(this.file, JSON.stringify(this.records, null, 2)), "The next launch lists the downloads as they were kept last.");
     this.notify();
   }
 

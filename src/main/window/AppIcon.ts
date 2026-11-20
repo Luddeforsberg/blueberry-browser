@@ -1,7 +1,8 @@
 import { app, nativeImage, type BaseWindow, type NativeImage } from "electron";
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
-import { dirname, join } from "path";
+import { readFileSync } from "fs";
+import { join } from "path";
 import { APP_ICON_SIZE, type AppIconGround } from "../../shared/appIcon";
+import { removeFile, saveFile } from "../library/savedFile";
 
 // Settings > General > App icon. Main can't draw a mascot, so the chrome draws the chosen icon and hands it over as a PNG.
 // What arrives is untrusted bytes: it's set only if it's for what's chosen and is a PNG of the right size that the system
@@ -58,17 +59,10 @@ export class AppIcon {
     const image = bytes && this.decoded(bytes);
     if (!bytes || !image) return false;
     this.apply(image);
-    try {
-      mkdirSync(dirname(this.picture), { recursive: true });
-
-      // Beside the file, then renamed, so a crash never leaves half of one.
-      writeFileSync(`${this.picture}.tmp`, bytes);
-      renameSync(`${this.picture}.tmp`, this.picture);
-      writeFileSync(`${this.drawnFor}.tmp`, JSON.stringify(chosen));
-      renameSync(`${this.drawnFor}.tmp`, this.drawnFor);
-    } catch (error) {
-      console.error("Failed to keep the app icon:", error);
-    }
+    // What it was drawn for goes first and comes back last, so a picture is never kept as drawn for another choice. Not
+    // kept only means the next launch shows the shipped icon until the chrome draws this one again.
+    const kept = removeFile(this.drawnFor) && saveFile(this.picture, bytes) && saveFile(this.drawnFor, JSON.stringify(chosen));
+    if (!kept) console.error("The app icon is set until Blueberry quits.");
     return true;
   }
 

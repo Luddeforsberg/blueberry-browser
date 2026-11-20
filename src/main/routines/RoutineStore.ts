@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import { dirname } from "path";
 import { DatabaseSync } from "node:sqlite";
 import type { ChatApproval, ChatStep, RoutineDraft, RoutineRun, RoutineRunStatus, RoutineSchedule } from "../../shared/library";
-import { rowOf, rowsOf } from "../library/database";
+import { inTransaction, migrate, rowOf, rowsOf } from "../library/database";
 
 export interface StoredRoutine {
   id: string;
@@ -109,10 +109,7 @@ export class RoutineStore {
     if (file !== ":memory:") mkdirSync(dirname(file), { recursive: true });
     this.db = new DatabaseSync(file);
     this.db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
-    const { user_version: version } = this.db.prepare("PRAGMA user_version").get() as { user_version: number };
-    MIGRATIONS.slice(version).forEach((step, index) => {
-      this.db.exec(`BEGIN; ${step} PRAGMA user_version = ${version + index + 1}; COMMIT;`);
-    });
+    migrate(this.db, MIGRATIONS);
   }
 
   routines(): StoredRoutine[] {
@@ -209,7 +206,21 @@ export class RoutineStore {
     return this.db.prepare("DELETE FROM routines WHERE id = ?").run(id).changes > 0;
   }
 
+  // A run asked for now, which leaves the schedule as it is.
   startRun(routineId: string, startedAt: number, lateFor: number | null): string {
+    return inTransaction(this.db, () => this.insertRun(routineId, startedAt, lateFor));
+  }
+
+  // The run for an occurrence that's due, and the schedule moved on past it, together: an occurrence is never used up
+  // without a run to show for it.
+  startDueRun(routineId: string, nextRunAt: number | null, startedAt: number, lateFor: number | null): string {
+    return inTransaction(this.db, () => {
+      this.setNextRun(routineId, nextRunAt);
+      return this.insertRun(routineId, startedAt, lateFor);
+    });
+  }
+
+  private insertRun(routineId: string, startedAt: number, lateFor: number | null): string {
     const id = randomUUID();
     this.db
       .prepare("INSERT INTO runs (id, routine_id, status, started_at, late_for) VALUES (?, ?, 'running', ?, ?)")

@@ -100,6 +100,33 @@ const fences = [
       "No `as unknown as` in app code: check the value where it enters, or read SQLite rows with rowOf or rowsOf from src/main/library/database.ts (eslint.fences.mjs).",
   },
   {
+    // A store that writes its own file catches the failure itself, and has always ended up logging it and carrying on
+    // as if it worked. savedFile.ts writes beside the file and renames it over, and says whether it happened.
+    name: "writes",
+    in: ["src/main/**/*.ts", "runner/src/**/*.ts"],
+    allowed: {
+      "src/main/library/savedFile.ts": "saveFile, removeFile and moveAside themselves.",
+      "src/main/library/browserHistory.ts": "Copies another browser's history to a folder of its own and always deletes it.",
+      "src/main/cloud/localChrome.ts": "Deletes the throwaway profile of the Chrome it started for tests.",
+    },
+    heldBack: {
+      "src/main/cloud/cloudFile.ts": "The cloud's files are being changed in a task of their own, and move onto savedFile.ts after it.",
+      "src/main/cloud/cloudLogins.ts": "The cloud's files are being changed in a task of their own, and move onto savedFile.ts after it.",
+      "src/main/remoteJobs/runnerJobsFile.ts":
+        "The cloud's files are being changed in a task of their own, and move onto savedFile.ts after it.",
+      "runner/src/relayAuth.ts": "The cloud's files are being changed in a task of their own, and move onto savedFile.ts after it.",
+    },
+    rules: {
+      "no-restricted-syntax": [
+        // `fs` and `fs/promises`, the slash matched by a dot, since esquery reads a regex up to the first slash.
+        "ImportDeclaration[source.value=/^(node:)?fs(.promises)?$/] > ImportSpecifier[imported.name=/^(writeFile|writeFileSync|appendFile|appendFileSync|rename|renameSync|rm|rmSync|unlink|unlinkSync|copyFile|copyFileSync|promises)$/]",
+        "ImportDeclaration[source.value=/^(node:)?fs(.promises)?$/] > :matches(ImportNamespaceSpecifier, ImportDefaultSpecifier)",
+      ],
+    },
+    message:
+      "Save, move and remove a store's files with saveFile, removeFile and moveAside from src/main/library/savedFile.ts, which never leave half a file and say whether it happened (eslint.fences.mjs).",
+  },
+  {
     // Work that finishes later checks a Turn from src/shared/lateWork.ts before it applies anything. A counter of its own,
     // bumped and then compared after a wait, is how each place used to do it, and each guarded only itself.
     name: "late",

@@ -177,6 +177,36 @@ describe("what the user did with a card", () => {
     ]);
   });
 
+  it("keeps the saved cards and feedback that read back, and leaves out the ones that don't", async () => {
+    const { file, write, newTabAt, suggestions } = setup();
+    write.mockResolvedValueOnce(CARD);
+    await newTabAt(0);
+    suggestions.used(defined((await newTabAt(1))[0]).id);
+    write.mockResolvedValueOnce(CARD);
+    suggestions.historyImported();
+    await newTabAt(2);
+    const saved = JSON.parse(readFileSync(file, "utf8")) as { proposals: unknown[]; feedback: unknown[]; dismissed: unknown[] };
+    const [proposal] = saved.proposals;
+    const [feedback] = saved.feedback;
+    writeFileSync(
+      file,
+      JSON.stringify({
+        ...saved,
+        proposals: [null, { ...(proposal as object), card: { kind: "prompt", title: "No prompt" } }, proposal],
+        feedback: [null, 7, { ...(feedback as object), sites: [1] }, feedback],
+        dismissed: [null, "site:news.ycombinator.com"],
+      }),
+    );
+
+    const { suggestions: reloaded, write: model } = setup(file);
+    model.mockResolvedValue(CARD);
+    expect(reloaded.list()).toEqual([expect.objectContaining({ kind: "prompt", title: "Shall I pick five stories for you?" })]);
+    reloaded.historyImported();
+    reloaded.list();
+    await vi.waitFor(() => expect(model).toHaveBeenCalled());
+    expect(defined(model.mock.calls[0])[1]).toContain('"used":true');
+  });
+
   it("drops a card once its history is gone", async () => {
     const { write, newTabAt } = setup();
     write.mockResolvedValueOnce(CARD);

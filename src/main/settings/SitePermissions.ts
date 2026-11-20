@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
-import { dirname } from "path";
+import { fieldsOf } from "../../shared/fields";
+import { readJsonFile, savedEntries, saveFile, type Saved } from "../library/savedFile";
 import type { PermissionPrompt, SavedSitePermission, SiteDecision, SitePermission } from "../../shared/ipc";
 
 // Everything a site can be asked about. Electron's own names go through `ASKED` to reach these.
@@ -111,17 +111,11 @@ export class SitePermissions {
   private readonly listeners = new Set<() => void>();
 
   constructor(private readonly file: string) {
-    try {
-      const raw: unknown = JSON.parse(readFileSync(file, "utf8"));
-      if (Array.isArray(raw)) {
-        raw.forEach((entry: unknown) => {
-          const { origin, permission, decision } = (entry ?? {}) as Record<string, unknown>;
-          this.store(origin, permission, decision);
-        });
-      }
-    } catch {
-      // A missing or unreadable file means every site asks again, which is the safe way to fail.
-    }
+    // A missing or unreadable file means every site asks again, which is the safe way to fail.
+    savedEntries(file, readJsonFile(file), (entry) => {
+      const { origin, permission, decision } = fieldsOf(entry);
+      return this.store(origin, permission, decision) || null;
+    });
   }
 
   get saved(): SavedSitePermission[] {
@@ -198,13 +192,16 @@ export class SitePermissions {
       else if (!ASK_EVERY_TIME.includes(permission)) this.store(entry.origin, permission, "allow");
     });
     entry.answers.forEach((answer) => answer(allow));
-    this.save();
+    // Not kept, the answer holds until Blueberry quits, and the site only asks again after that.
+    if (!this.save()) console.error("This answer holds until Blueberry quits.");
     this.settle();
     return true;
   }
 
-  // From Settings. Null forgets the answer, so the site has to ask again.
+  // From Settings. Null forgets the answer, so the site has to ask again. One that can't be saved isn't made at all,
+  // since Settings would show what the next launch doesn't do.
   set(origin: string, permission: SitePermission, decision: SiteDecision | null): boolean {
+    const before = new Map([...this.decisions].map(([site, decisions]) => [site, new Map(decisions)]));
     if (decision === null) {
       const decisions = this.decisions.get(origin);
       if (!decisions?.delete(permission)) return false;
@@ -212,7 +209,11 @@ export class SitePermissions {
     } else if (!this.store(origin, permission, decision)) {
       return false;
     }
-    this.save();
+    if (!this.save()) {
+      this.decisions.clear();
+      before.forEach((decisions, site) => this.decisions.set(site, decisions));
+      return false;
+    }
     this.settle();
     return true;
   }
@@ -266,15 +267,8 @@ export class SitePermissions {
     contents.once("destroyed", refuse);
   }
 
-  private save(): void {
-    try {
-      mkdirSync(dirname(this.file), { recursive: true });
-      const temp = `${this.file}.tmp`;
-      writeFileSync(temp, JSON.stringify(this.saved, null, 2));
-      renameSync(temp, this.file);
-    } catch (error) {
-      console.error("Failed to save site permissions:", error);
-    }
+  private save(): Saved {
+    return saveFile(this.file, JSON.stringify(this.saved, null, 2));
   }
 
   private notify(): void {

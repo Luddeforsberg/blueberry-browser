@@ -91,13 +91,28 @@ export class Routines {
     if (this.stopped) return;
     if (this.timer) clearTimeout(this.timer);
     const now = Date.now();
+    try {
+      this.startWaiting(now);
+    } catch (error) {
+      // A run that couldn't be saved never started, and its occurrence is still due, so the next look tries again.
+      console.error("Failed to start a routine:", error);
+    }
 
+    const soonest = this.store.soonest();
+    // Anything already due is waiting for a place, and the run that frees one looks again.
+    const wait = soonest === null || soonest <= now ? MAX_WAIT_MS : Math.min(MAX_WAIT_MS, soonest - now);
+    this.timer = setTimeout(() => this.tick(), wait);
+  }
+
+  // What was asked for, then what's due, while there's room.
+  private startWaiting(now: number): void {
     this.requested.forEach((onStart, id) => {
       const routine = this.store.routine(id);
       if (!routine || this.active.has(id)) this.requested.delete(id);
       else if (this.hasFreePlace) {
+        // Still asked for until its run is saved.
+        const runId = this.begin(routine, (startedAt) => this.store.startRun(routine.id, startedAt, null));
         this.requested.delete(id);
-        const runId = this.begin(routine, null);
         onStart?.(runId);
       }
     });
@@ -111,21 +126,17 @@ export class Routines {
         this.events.onChanged();
       } else if (this.hasFreePlace) {
         const dueAt = routine.nextRunAt as number;
-        this.store.setNextRun(routine.id, next);
         // However many times were missed, this one run covers them all.
-        this.begin(routine, now - dueAt > LATE_AFTER_MS ? dueAt : null);
+        const lateFor = now - dueAt > LATE_AFTER_MS ? dueAt : null;
+        this.begin(routine, (startedAt) => this.store.startDueRun(routine.id, next, startedAt, lateFor));
       }
     });
-
-    const soonest = this.store.soonest();
-    // Anything already due is waiting for a place, and the run that frees one looks again.
-    const wait = soonest === null || soonest <= now ? MAX_WAIT_MS : Math.min(MAX_WAIT_MS, soonest - now);
-    this.timer = setTimeout(() => this.tick(), wait);
   }
 
-  private begin(routine: StoredRoutine, lateFor: number | null): string {
+  // `start` saves the run, and only once it's saved does the job begin.
+  private begin(routine: StoredRoutine, start: (startedAt: number) => string): string {
     const now = Date.now();
-    const runId = this.store.startRun(routine.id, now, lateFor);
+    const runId = start(now);
     const run: ActiveRun = { runId, steps: [], approval: null, statusLine: null };
     this.active.set(routine.id, run);
     this.events.onChanged();

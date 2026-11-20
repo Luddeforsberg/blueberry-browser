@@ -1,9 +1,9 @@
 import { randomBytes } from "crypto";
 import { app, safeStorage, shell } from "electron";
-import { rmSync } from "fs";
 import type { PhoneState } from "../../shared/ipc";
 import type { IncomingChoice, IncomingReply, PhoneChannel, PhoneChoice } from "./Phone";
-import { readTelegramFile, writeTelegramFile, type Saved } from "./telegramFile";
+import { readTelegramFile, writeTelegramFile, type SavedBot } from "./telegramFile";
+import { removeFile } from "../library/savedFile";
 
 // The user's own Telegram bot, reached from here with long polling, so no server of ours is involved. The token only
 // ever goes in the address of these requests and, encrypted, into one file. Nothing logs either, and no error from a
@@ -27,6 +27,8 @@ const TOKEN_REJECTED = "Telegram no longer accepts this bot’s token. Disconnec
 const NO_NETWORK = "Can’t reach Telegram right now. Blueberry keeps trying, and everything still waits on Needs you.";
 const OTHER_POLLER = "Something else is reading this bot’s messages, so Blueberry can’t. Stop it, or use a bot of its own.";
 const NOT_SAVED = "Connected for now, but this couldn’t be saved, so you’d have to connect again after a restart.";
+const NOT_REMOVED =
+  "Disconnected for now, but the saved bot couldn’t be removed from this computer, so it will be connected again after a restart. Connect and disconnect again to try once more.";
 const LINK_NOT_CURRENT = "That isn’t the current link. Get a new one in Blueberry, under Settings > Phone.";
 const CANT_MESSAGE = "Telegram says the bot can’t message you. Open its chat and press Start.";
 
@@ -173,14 +175,9 @@ export class TelegramChannel implements PhoneChannel {
     this.token = null;
     this.botName = null;
     this.chatId = null;
-    this.problem = null;
     this.pairing = null;
     this.notSaved = false;
-    try {
-      rmSync(this.file, { force: true });
-    } catch {
-      console.error("Couldn't remove the saved phone connection.");
-    }
+    this.problem = removeFile(this.file, { secret: true }) ? null : NOT_REMOVED;
     this.onChange();
     return this.state;
   }
@@ -369,7 +366,7 @@ export class TelegramChannel implements PhoneChannel {
     return body.result as T;
   }
 
-  private load(): Saved | null {
+  private load(): SavedBot | null {
     return readTelegramFile(this.file);
   }
 

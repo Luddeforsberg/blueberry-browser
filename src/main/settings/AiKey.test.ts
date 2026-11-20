@@ -14,6 +14,19 @@ vi.mock("electron", () => ({
   },
 }));
 
+// A file this says no to can't be removed, as when it's locked or its folder is read-only.
+const refuse = vi.hoisted<{ remove: (file: string) => boolean }>(() => ({ remove: () => false }));
+vi.mock("fs", async (importOriginal) => {
+  const fs = await importOriginal<typeof import("fs")>();
+  return {
+    ...fs,
+    rmSync: (file: string, options?: import("fs").RmOptions) => {
+      if (refuse.remove(file)) throw Object.assign(new Error("EPERM: operation not permitted"), { code: "EPERM" });
+      fs.rmSync(file, options);
+    },
+  };
+});
+
 const { AiKey } = await import("./AiKey");
 
 const KEY = "sk-proj-abcdefghijklmnopqrstuvwxyz0123456789-4f2A";
@@ -84,7 +97,7 @@ describe("AiKey", () => {
   it("forgets the key on Remove, and a try that Remove overtook keeps nothing", async () => {
     const { store, file } = start();
     await store.try("openai", KEY);
-    expect(store.remove()).toEqual({ service: null, last4: null });
+    expect(store.remove()).toEqual({ removed: true, state: { service: null, last4: null } });
     expect(existsSync(file)).toBe(false);
 
     let answer: (outcome: "works") => void = () => {};
@@ -94,6 +107,30 @@ describe("AiKey", () => {
     answer("works");
     expect(await trying).toEqual({ outcome: "overtaken", state: { service: null, last4: null } });
     expect(slow.inUse).toBeNull();
+  });
+
+  it("says a key it couldn't remove is still saved and in use, and a try on its way still loses", async () => {
+    const answers: ((outcome: "works") => void)[] = [];
+    const file = fileIn();
+    const store = new AiKey(file, () => new Promise((resolve) => answers.push(resolve)));
+    const saving = store.try("openai", KEY);
+    answers[0]?.("works");
+    await saving;
+    const changes = vi.fn();
+    store.onChange(changes);
+    refuse.remove = (path) => path === file;
+
+    const trying = store.try("openai", `${KEY.slice(0, -4)}9z9Z`);
+    expect(store.remove()).toEqual({ removed: false, state: { service: "openai", last4: "4f2A" } });
+    answers[1]?.("works");
+    expect((await trying).outcome).toBe("overtaken");
+    expect(store.inUse?.key).toBe(KEY);
+    expect(changes).not.toHaveBeenCalled();
+    expect(new AiKey(file).inUse?.key).toBe(KEY);
+
+    refuse.remove = () => false;
+    expect(store.remove()).toEqual({ removed: true, state: { service: null, last4: null } });
+    expect(new AiKey(file).inUse).toBeNull();
   });
 
   it("keeps the newest try's key when an older one answers last, and says the older one was overtaken", async () => {

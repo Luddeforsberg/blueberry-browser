@@ -1,5 +1,5 @@
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "fs";
-import { dirname } from "path";
+import { fieldsOf } from "../../shared/fields";
+import { bestEffort, readJsonFile, removeFile, saveFile } from "../library/savedFile";
 import type { InternalPage } from "../../shared/ipc";
 
 export interface SavedEntry {
@@ -86,7 +86,7 @@ const sanitizeTab = (raw: unknown): SavedTab | null => {
     url: tab.url,
     title: text(tab.title),
     favicon: typeof tab.favicon === "string" ? tab.favicon : null,
-    ...savedEntries(Array.isArray(tab.entries) ? tab.entries : [], Number(tab.index)),
+    ...savedEntries(Array.isArray(tab.entries) ? tab.entries.map(fieldsOf) : [], Number(tab.index)),
   };
 };
 
@@ -120,11 +120,7 @@ export class SessionStore {
   constructor(private readonly file: string) {}
 
   load(): Session | null {
-    try {
-      return sanitizeSession(JSON.parse(readFileSync(this.file, "utf8")));
-    } catch {
-      return null;
-    }
+    return sanitizeSession(readJsonFile(this.file));
   }
 
   // Null from `read` means there's nothing to keep, so the file goes.
@@ -139,19 +135,16 @@ export class SessionStore {
     const read = this.read;
     this.read = null;
     if (!read) return;
+    let session: Session | null;
     try {
-      const session = read();
-      if (!session) {
-        rmSync(this.file, { force: true });
-        return;
-      }
-      mkdirSync(dirname(this.file), { recursive: true });
-      // Writing beside the file and renaming means a crash never leaves half a file.
-      const temp = `${this.file}.tmp`;
-      writeFileSync(temp, JSON.stringify(session));
-      renameSync(temp, this.file);
+      session = read();
     } catch (error) {
-      console.error("Failed to save the open tabs:", error);
+      console.error("Failed to read the open tabs:", error);
+      return;
     }
+    bestEffort(
+      session ? saveFile(this.file, JSON.stringify(session)) : removeFile(this.file),
+      "The next launch opens the tabs kept before.",
+    );
   }
 }

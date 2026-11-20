@@ -1,9 +1,9 @@
 import { app, safeStorage } from "electron";
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "fs";
-import { dirname } from "path";
 import { isAiService, looksLikeAiKey, type AiKeyState, type AiKeyTried } from "../../shared/aiKey";
 import type { SavedKey } from "../chats/agent";
 import { Latest } from "../../shared/lateWork";
+import { fieldsOf } from "../../shared/fields";
+import { readJsonFile, removeFile, saveFile, type Saved } from "../library/savedFile";
 import { tryAiKey, type TryOutcome } from "./aiKeyTry";
 
 // The user's own AI key, kept as the cloud's key is: encrypted with `safeStorage` in its own file, and never sent back to
@@ -67,35 +67,26 @@ export class AiKey {
     return answer("works");
   }
 
-  remove(): AiKeyState {
+  // A try still on its way loses either way. If the file can't go, the key is still what the next launch uses, so it
+  // stays in use now too, and `removed` says so.
+  remove(): { removed: boolean; state: AiKeyState } {
     this.tries.end();
-    this.saved = null;
-    try {
-      rmSync(this.file, { force: true });
-    } catch {
-      console.error("Couldn't remove the saved AI key.");
+    const removed = removeFile(this.file, { secret: true });
+    if (removed) {
+      this.saved = null;
+      this.changed();
     }
-    this.changed();
-    return this.state;
+    return { removed, state: this.state };
   }
 
-  private save({ service, key }: SavedKey): boolean {
-    try {
-      mkdirSync(dirname(this.file), { recursive: true });
-      const temp = `${this.file}.tmp`;
-      writeFileSync(temp, JSON.stringify({ service, key: safeStorage.encryptString(key).toString("base64") }), { mode: 0o600 });
-      renameSync(temp, this.file);
-      return true;
-    } catch {
-      console.error("Couldn't save the AI key.");
-      return false;
-    }
+  private save({ service, key }: SavedKey): Saved {
+    return saveFile(this.file, () => JSON.stringify({ service, key: safeStorage.encryptString(key).toString("base64") }), { secret: true });
   }
 
   private load(): SavedKey | null {
     try {
       if (!safeStorage.isEncryptionAvailable()) return null;
-      const { service, key } = JSON.parse(readFileSync(this.file, "utf8")) as Record<string, unknown>;
+      const { service, key } = fieldsOf(readJsonFile(this.file));
       if (!isAiService(service) || typeof key !== "string") return null;
       const plain = safeStorage.decryptString(Buffer.from(key, "base64"));
       return looksLikeAiKey(service, plain) ? { service, key: plain } : null;
