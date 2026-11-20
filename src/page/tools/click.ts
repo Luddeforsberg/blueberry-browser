@@ -49,6 +49,17 @@ export const watchPress = ({ ref, x, y, pressOnly }: { ref: string; pressOnly: b
 // somewhere.
 export const inputLanded = (): boolean | "missed" | "cut" | null => state.landed ?? null;
 
+// What became of the press the watch `id` was set for, ending the watch as soon as it's known, so it never stops one of
+// the user's own clicks after Berry's. "ended" if that watch is no longer on, ended by its backstop or by another
+// watch, so the answer here isn't its. A new page has no record, so null means the input took the page somewhere.
+export const pressLanded = ({ id }: { id: string }): boolean | "missed" | "cut" | "ended" | null => {
+  const { landed, watch } = state;
+  if (landed === undefined) return null;
+  if (watch !== id) return "ended";
+  if (landed !== false) state.stopWatching?.();
+  return landed;
+};
+
 // Main is done with the press, however it went. Only the watch it set, so it never ends one set since.
 export const endWatch = ({ id }: { id: string }): void => {
   if (state.watch === id) state.stopWatching?.();

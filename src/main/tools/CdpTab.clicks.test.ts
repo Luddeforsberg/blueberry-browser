@@ -5,7 +5,7 @@ import { createPageTools, type PageTool } from "./browserTools";
 import type { CdpTab } from "./CdpTab";
 import { CloudSessions } from "../cloud/cloudBrowser";
 import { findChrome, localChrome } from "../cloud/localChrome";
-import { inputLanded } from "./pageScripts";
+import { pressLanded } from "./pageScripts";
 import { STOPPED } from "./toolMessages";
 
 // Clicks with real input that's slow to arrive, as on a slow machine or over the network to a cloud browser, on a page
@@ -76,6 +76,9 @@ describe.skipIf(!findChrome())("clicking when real input is slow", () => {
     globalThis.clicks = { ...globalThis.clicks, cover: 0 };
     for (const type of ["pointerdown", "mousedown", "click"]) counted.addEventListener(type, () => globalThis.clicks.cover++, true);
   })()`;
+  // Whether `code` is the script reading what became of a press, for any watch.
+  const landedCode = pressLanded("");
+  const readsLanded = (code: string) => code.startsWith(landedCode.slice(0, landedCode.lastIndexOf('({"id"')));
   // The types of input Berry sent, since the last `holdBack`.
   let sent: string[] = [];
   const pressesSent = () => sent.filter((type) => type === "mouseDown").length;
@@ -192,7 +195,7 @@ describe.skipIf(!findChrome())("clicking when real input is slow", () => {
     const ref = await addButton("Unread");
     const run = tab.runInPage.bind(tab);
     const unreadable = vi.spyOn(tab, "runInPage").mockImplementation(async <R>(code: string): Promise<R> => {
-      if (code === inputLanded) throw new Error("No answer");
+      if (readsLanded(code)) throw new Error("No answer");
       return run<R>(code);
     });
     const hold = holdBack("none", 0);
@@ -206,6 +209,36 @@ describe.skipIf(!findChrome())("clicking when real input is slow", () => {
     }
     expect(pressesSent()).toBe(1);
     expect(await clicksOn("Unread")).toBe(1);
+  }, 10_000);
+
+  it("lets the user's own click through as soon as Berry knows its click landed", async () => {
+    const ref = await addButton("Berry's");
+    await addButton("User's");
+    const at = await tab.runInPage<{ x: number; y: number }>(
+      '(() => { const box = document.getElementById("User\'s").getBoundingClientRect(); return { x: Math.round(box.left + box.width / 2), y: Math.round(box.top + box.height / 2) }; })()',
+    );
+    const run = tab.runInPage.bind(tab);
+    const send = tab.sendAgentInput.bind(tab);
+    let answered = false;
+    // The user clicks just after the first answer that Berry's press landed, before anything else reaches the page.
+    const spy = vi.spyOn(tab, "runInPage").mockImplementation(async <R>(code: string): Promise<R> => {
+      if (answered) {
+        answered = false;
+        await send({ type: "mouseMove", ...at });
+        await send({ type: "mouseDown", button: "left", clickCount: 1, ...at });
+        await send({ type: "mouseUp", button: "left", clickCount: 1, ...at });
+      }
+      const result = await run<R>(code);
+      if (readsLanded(code) && result === true) answered = true;
+      return result;
+    });
+    try {
+      expect(await tool("click").run({ ref })).toMatch(/^Done\./);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(await clicksOn("Berry's")).toBe(1);
+    expect(await clicksOn("User's")).toBe(1);
   }, 10_000);
 
   it("sends no second press after a first whose release was stopped, even with the element back in place", async () => {

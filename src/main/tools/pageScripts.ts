@@ -40,6 +40,9 @@ export const endWatch = (id: string): string => inPage(page.endWatch, { id });
 // element before the rest of the click was stopped. A new page has no record, so null means the input took the page somewhere.
 export const inputLanded = inPage(page.inputLanded, undefined);
 
+// What became of the press the watch `id` was set for, ending that watch once it's known, or "ended" if it ended first.
+export const pressLanded = (id: string): string => inPage(page.pressLanded, { id });
+
 export const scriptedClick = (ref: string, clicks: 1 | 2): string => inPage(page.scriptedClick, { ref, clicks });
 
 export const aimHover = (ref: string, mayScroll: boolean): string => inPage(page.aimHover, { ref, mayScroll });

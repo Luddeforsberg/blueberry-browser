@@ -5,9 +5,9 @@ import {
   chooseOption,
   describeOption,
   endWatch,
-  inputLanded,
   isHovered,
   planDrag,
+  pressLanded,
   scriptedClick,
   scriptedHover,
   selectedOptions,
@@ -90,9 +90,10 @@ export const pointerTools = <T extends PageTarget>(context: ToolContext<T>) => {
       if (!carryOn(tab)) return "stopped";
       if (check === undefined) return "unchecked";
       if (check === null) return "gone";
-      if (check.status !== "aimed") return check.status === "disabled" ? "disabled" : "moved";
+      const { status, watch } = check;
+      if (status !== "aimed" || !watch) return status === "disabled" ? "disabled" : "moved";
       await send();
-      return await landed(() => tab.runInPage<boolean | "missed" | "cut" | null>(inputLanded));
+      return await landed(() => tab.runInPage<boolean | "missed" | "cut" | "ended" | null>(pressLanded(watch)));
     } finally {
       if (check?.watch) await tab.runInPage(endWatch(check.watch)).catch(() => {});
     }
