@@ -47,10 +47,9 @@ const createRoutine = async (chrome: Page) => {
 
   await chrome.getByRole("radio", { name: "Weekly" }).click();
   const days = chrome.getByRole("group", { name: "Days" });
-  await days
-    .getByRole("button", { name: "Saturday", pressed: false })
-    .click()
-    .catch(() => undefined);
+  // The form starts on today, so on a Saturday it's already picked.
+  const saturday = days.getByRole("button", { name: "Saturday" });
+  if ((await saturday.getAttribute("aria-pressed")) !== "true") await saturday.click();
   for (const label of await days
     .getByRole("button", { pressed: true })
     .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label")))) {
