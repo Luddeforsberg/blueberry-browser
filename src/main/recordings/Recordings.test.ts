@@ -6,9 +6,10 @@ import type { Tab } from "../tabs/Tab";
 
 vi.mock("electron", () => ({}));
 
-// A tab whose page never answers the watching, and finishes only when the test says.
+// A tab whose page answers the watching and finishes only when the test says.
 const fakeTab = (url: string) => {
   const finishes: ((notes: unknown[]) => void)[] = [];
+  const answers: ((notes: unknown[]) => void)[] = [];
   const tab = {
     id: url,
     url,
@@ -16,10 +17,9 @@ const fakeTab = (url: string) => {
     berryWorking: false,
     heldForUser: false,
     webContents: { on: () => {}, off: () => {}, isDestroyed: () => false, isLoading: () => false },
-    listenInPage: (code: string) =>
-      code === finishWatching ? new Promise<unknown[]>((resolve) => finishes.push(resolve)) : new Promise<never>(() => {}),
+    listenInPage: (code: string) => new Promise<unknown[]>((resolve) => (code === finishWatching ? finishes : answers).push(resolve)),
   };
-  return { tab: tab as unknown as Tab, finishes };
+  return { tab: tab as unknown as Tab, finishes, answers };
 };
 
 const start = (front: Tab) => {
@@ -45,7 +45,7 @@ describe("Recordings", () => {
     recordings.discard();
     expect(recordings.start()).toBe(true);
     // The page from the first recording finishes now, with something it had left in a field.
-    first.finishes.forEach((finish) => finish([{ kind: "typed", text: "late" }]));
+    first.finishes.forEach((finish) => finish([{ type: "typed", value: "late", label: "Search" }]));
     await stopping;
     expect(openReview).not.toHaveBeenCalled();
     expect(recordings.state.status).toBe("recording");
@@ -56,5 +56,19 @@ describe("Recordings", () => {
     await again;
     expect(recordings.state.status).toBe("review");
     expect(openReview).toHaveBeenCalledOnce();
+  });
+
+  it("puts nothing a page answers for a thrown-away recording into the next one", async () => {
+    const page = fakeTab("https://one.example/");
+    const { recordings } = start(page.tab);
+    recordings.start();
+    const old = page.answers.length;
+    recordings.discard();
+    recordings.start();
+    expect(page.answers.length).toBeGreaterThan(old);
+    // The first recording's read answers now, with what the user did then.
+    page.answers.slice(0, old).forEach((answer) => answer([{ type: "click", label: "Buy" }]));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(recordings.state.steps).toHaveLength(1);
   });
 });

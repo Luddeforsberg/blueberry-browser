@@ -305,7 +305,8 @@ export class Routines {
     const turn = this.naming.next(id);
     try {
       const name = await this.events.writeName(instructions);
-      if (!turn.current) return;
+      // Closed meanwhile: the window that reopens has its own, which this one can't overtake.
+      if (!turn.current || this.stopped) return;
       this.naming.end(id);
       if (name && this.store.setWrittenName(id, name)) this.events.onChanged();
     } catch (error) {

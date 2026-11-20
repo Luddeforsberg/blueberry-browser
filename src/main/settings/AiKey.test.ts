@@ -114,6 +114,13 @@ describe("AiKey", () => {
     stop();
     store.remove();
     expect(changes).toHaveBeenCalledOnce();
+
+    // The newest submission wins even when it isn't a key, so the slow one before it keeps nothing.
+    const slow = store.try("openai", KEY);
+    expect((await store.try("openai", "not a key")).outcome).toBe("not-a-key");
+    answers[2]?.("works");
+    expect((await slow).outcome).toBe("overtaken");
+    expect(store.inUse).toBeNull();
   });
 });
 

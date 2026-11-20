@@ -94,6 +94,22 @@ describe("OneAtATime", () => {
     expect(queue.busy()).toBe(false);
   });
 
+  it("queues work for the same key started from inside work, before it waits", async () => {
+    const queue = new OneAtATime();
+    const order: string[] = [];
+    let inner: Promise<void> = Promise.resolve();
+    const outer = queue.run(async () => {
+      order.push("outer starts");
+      inner = queue.run(async () => void order.push("inner starts"));
+      await Promise.resolve();
+      order.push("outer ends");
+    });
+    await outer;
+    await inner;
+    expect(order).toEqual(["outer starts", "outer ends", "inner starts"]);
+    expect(queue.busy()).toBe(false);
+  });
+
   it("doesn't hold one key up behind another", () => {
     const queue = new OneAtATime<string>();
     const held = later();

@@ -60,7 +60,10 @@ describe("Gallery.publish", () => {
     if (!saved.ok) throw new Error(saved.error);
     const tokens: (() => void)[] = [];
     // The token is slow, as a refresh is, so both publishes are past their checks before either has one.
-    const account = { accessToken: () => new Promise<string>((resolve) => tokens.push(() => resolve("token"))) } as unknown as Account;
+    const account = {
+      state: { email: "ana@example.com" },
+      accessToken: () => new Promise<string>((resolve) => tokens.push(() => resolve("token"))),
+    } as unknown as Account;
     const insertMascot = vi.fn(async () => ID);
     const updateMascot = vi.fn(async () => true);
     const server = { insertMascot, updateMascot } as unknown as GalleryServer;
@@ -76,6 +79,16 @@ describe("Gallery.publish", () => {
     expect(await second).toMatchObject({ ok: true, id: ID });
     expect(insertMascot).toHaveBeenCalledOnce();
     expect(updateMascot).toHaveBeenCalledOnce();
+
+    // One waiting behind another publishes nothing once someone else has signed in.
+    const slow = gallery.publish(saved.id, choices);
+    const queued = gallery.publish(saved.id, choices);
+    await vi.waitFor(() => expect(tokens).toHaveLength(3));
+    account.state.email = "bob@example.com";
+    defined(tokens[2])();
+    await slow;
+    expect(await queued).toMatchObject({ ok: false, error: expect.stringContaining("account changed") });
+    expect(tokens).toHaveLength(3);
   });
 });
 

@@ -24,6 +24,8 @@ interface RecordingsDeps {
 }
 
 interface Watched {
+  // The recording it was watched for. What the page answers after that one is over goes nowhere.
+  recording: Turn;
   // Each new page starts this again, and an answer from an older one is ignored.
   page: number;
   listening: boolean;
@@ -100,18 +102,18 @@ export class Recordings {
   // Any change of tabs comes through here. A tab first seen now gets watched, and going to one that's already there is a
   // step. Going to one of our own pages and back isn't anything.
   sync(): void {
-    if (!this.isRecording || this.stopping) return;
+    if (!this.isRecording || this.stopping || !this.session) return;
     const tab = this.deps.activeTab();
     this.onOurPage = !tab;
     if (!tab || tab === this.current) return;
     this.current = tab;
-    if (!this.watched.has(tab)) this.watch(tab);
+    if (!this.watched.has(tab)) this.watch(tab, this.session);
     // A brand new tab says where it went once it's there.
     if (tab.hasLoaded && this.trail.steps.length > 0) this.trail.switched(tab.url);
     this.publish();
   }
 
-  private watch(tab: Tab): void {
+  private watch(tab: Tab, recording: Turn): void {
     const contents = tab.webContents;
     let opening = !tab.hasLoaded;
     const moved = (_: unknown, url: string, isMainFrame = true) => {
@@ -124,7 +126,7 @@ export class Recordings {
       this.publish();
       this.limitReached();
     };
-    const entry: Watched = { page: 0, listening: false, ended: false, stopListening: () => {} };
+    const entry: Watched = { recording, page: 0, listening: false, ended: false, stopListening: () => {} };
     const newPage = (_: unknown, url: string) => {
       moved(_, url);
       entry.page++;
@@ -166,7 +168,7 @@ export class Recordings {
         if (entry.page === page) entry.listening = false;
         return;
       }
-      if (!Array.isArray(notes)) return;
+      if (!Array.isArray(notes) || !entry.recording.current) return;
       this.take(tab, notes);
       // Asking again is what starts the watching in a page, so it mustn't happen once it's over.
       if (entry.page !== page || entry.ended) return;

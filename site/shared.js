@@ -253,12 +253,16 @@ var OneAtATime = class {
   }
   run(work, key) {
     const before = this.last.get(key);
+    let release = () => {
+    };
+    const after = new Promise((resolve) => release = resolve);
+    this.last.set(key, after);
     const result = before ? before.then(work) : new Promise((resolve) => resolve(work()));
     const settled = () => {
       if (this.last.get(key) === after) this.last.delete(key);
+      release();
     };
-    const after = result.then(settled, settled);
-    this.last.set(key, after);
+    void result.then(settled, settled);
     return result;
   }
 };

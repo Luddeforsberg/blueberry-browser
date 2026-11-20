@@ -52,11 +52,12 @@ export class AiKey {
   }
 
   async try(service: unknown, key: unknown): Promise<{ outcome: AiKeyTried; state: AiKeyState }> {
+    // Taken first, so the newest submission owns the outcome even when it isn't a key at all.
+    const turn = this.tries.next();
     const text = typeof key === "string" ? key.trim() : "";
     const answer = (outcome: AiKeyTried) => ({ outcome, state: this.state });
     if (!isAiService(service) || !looksLikeAiKey(service, text)) return answer("not-a-key");
     if (!safeStorage.isEncryptionAvailable()) return answer("not-safe");
-    const turn = this.tries.next();
     const outcome = await this.tryKey(service, text);
     if (!turn.current) return answer("overtaken");
     if (outcome !== "works") return answer(outcome);

@@ -134,13 +134,16 @@ export class Gallery {
       .catch(() => console.error("Couldn't count an add."));
   }
 
+  // As whoever is signed in when it's pressed. One that waits behind another publishes nothing if they've changed since.
   publish(mascotId: unknown, choices: unknown): Promise<PublishResult> {
     if (typeof mascotId !== "string") return Promise.resolve({ ok: false, error: CANT_PUBLISH });
-    return this.publishing.run(() => this.publishNow(mascotId, choices), mascotId);
+    const { email } = this.account.state;
+    return this.publishing.run(() => this.publishNow(mascotId, choices, email), mascotId);
   }
 
-  private async publishNow(mascotId: string, choices: unknown): Promise<PublishResult> {
+  private async publishNow(mascotId: string, choices: unknown, email: string | null): Promise<PublishResult> {
     if (!this.server) return { ok: false, error: NO_SERVER };
+    if (this.account.state.email !== email) return { ok: false, error: "The account changed meanwhile, so nothing was published." };
     const mascot = this.mascots.find(mascotId);
     if (!mascot || mascot.deletedAt !== null || mascot.id === "berry") return { ok: false, error: CANT_PUBLISH };
     if (mascot.galleryId) return { ok: false, error: "This is a copy from the Gallery, so it’s not yours to publish." };

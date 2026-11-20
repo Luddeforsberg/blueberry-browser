@@ -176,6 +176,7 @@ export interface CloudLoginsHooks {
 }
 
 const NOT_TAKEN = "The cloud browser didn't take that. Try again.";
+const BROWSER_GONE = "Nothing was brought along, because the cloud browser ended or its key changed meanwhile.";
 
 // Bringing a site's sign-in into the cloud browser, one site at a time, and taking it out again. Only main calls this,
 // from Settings, and the list of sites goes to `cloud-logins.json` with names and dates only. A cookie lives only in
@@ -223,11 +224,16 @@ export class CloudLogins {
       const cookies = cookiesForSite(stored, site);
       if (cookies.length === 0)
         return `Blueberry isn't signed in to ${site}, so there's nothing to bring along. Sign in there in a tab first.`;
-      // The user took a while to confirm, and the browser it was for may have gone meanwhile.
-      if (!browser.current || this.hooks.jar() !== jar)
-        return "Nothing was brought along, because the cloud browser ended or its key changed meanwhile.";
+      // The user took a while to confirm, and the browser it was for may have gone meanwhile, even while it was starting.
+      const gone = () => !browser.current || this.hooks.jar() !== jar;
+      if (gone()) return BROWSER_GONE;
       try {
-        await jar.withContext((context) => context.addCookies(cookies));
+        const copied = await jar.withContext(async (context) => {
+          if (gone()) return false;
+          await context.addCookies(cookies);
+          return true;
+        });
+        if (!copied || gone()) return BROWSER_GONE;
       } catch {
         return NOT_TAKEN;
       }

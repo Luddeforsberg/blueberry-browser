@@ -44,12 +44,16 @@ export class OneAtATime<K = void> {
 
   run<T>(work: () => Promise<T>, key: K): Promise<T> {
     const before = this.last.get(key);
+    // Held before the work starts, so work that runs another for the same key before it first waits queues it behind.
+    let release = (): void => {};
+    const after = new Promise<void>((resolve) => (release = resolve));
+    this.last.set(key, after);
     const result = before ? before.then(work) : new Promise<T>((resolve) => resolve(work()));
     const settled = (): void => {
       if (this.last.get(key) === after) this.last.delete(key);
+      release();
     };
-    const after = result.then(settled, settled);
-    this.last.set(key, after);
+    void result.then(settled, settled);
     return result;
   }
 }

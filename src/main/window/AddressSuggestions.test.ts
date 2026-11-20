@@ -33,6 +33,9 @@ describe("AddressSuggestions", () => {
     // A late history answer reaches main before the view has drawn it.
     list.show(request("newer"), window);
     expect(list.pick(drawn, 0)).toBeNull();
+    // And leaves the newer list open.
+    expect(lastShown().rows).toEqual([row("newer")]);
+    expect(sent.at(-1)).not.toBeNull();
 
     const newest = lastShown().listId;
     list.close();

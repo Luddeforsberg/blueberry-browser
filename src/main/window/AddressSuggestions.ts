@@ -56,8 +56,9 @@ export class AddressSuggestions {
   // The row at that place in the list it was pressed in, if that's still the newest and nothing was taken from it yet.
   pick(listId: unknown, index: unknown): AddressSuggestion | null {
     const { shown } = this;
-    const current = shown?.list.current && listId === shown.list.id;
-    const row = current && typeof index === "number" && Number.isInteger(index) ? shown.rows[index] : undefined;
+    // A press on a list that's been replaced does nothing at all, so the newer list stays open.
+    if (!shown?.list.current || listId !== shown.list.id) return null;
+    const row = typeof index === "number" && Number.isInteger(index) ? shown.rows[index] : undefined;
     if (row) this.lists.end();
     this.close();
     return row ?? null;
