@@ -153,8 +153,14 @@ export const setUp = () => {
       release();
     };
   };
-  const holdTokens = () => hold((gate) => (refreshing = gate));
-  const holdAnswers = () => hold((gate) => (answering = gate));
+  const holdTokens = () =>
+    hold((gate) => {
+      refreshing = gate;
+    });
+  const holdAnswers = () =>
+    hold((gate) => {
+      answering = gate;
+    });
   return {
     runner,
     jobs,

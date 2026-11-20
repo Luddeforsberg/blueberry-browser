@@ -141,7 +141,7 @@ export const AddressBar: React.FC = () => {
     e.preventDefault();
     if (suggestions.submit()) return;
     if (!url.trim()) return;
-    navigateToUrl(toUrl(url));
+    void navigateToUrl(toUrl(url));
     setIsFocused(false);
   };
 

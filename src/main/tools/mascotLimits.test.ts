@@ -132,7 +132,7 @@ describe("a mascot's limits", () => {
 
   it("drops what came back if the page took the tab off its sites meanwhile", async () => {
     const tab = web("tab-1", "https://github.com/");
-    (tab.getTextWithFrames as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+    vi.mocked(tab.getTextWithFrames).mockImplementation(async () => {
       (tab as unknown as { url: string }).url = "https://example.com/";
       return "the other site's words";
     });

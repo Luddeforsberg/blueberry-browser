@@ -268,7 +268,7 @@ export class CdpTab implements PageTarget {
   async runInFrame<T = unknown>(frame: PageFrame, code: string): Promise<T> {
     const inner = (frame as PageFrame & { frame?: Frame }).frame;
     if (!inner || inner.isDetached()) throw new Error("That frame has gone");
-    return this.fromPage(() => inner.evaluate(code) as Promise<T>);
+    return this.fromPage(() => inner.evaluate(code));
   }
 
   async getTextWithFrames(allowsFrame: (origin: string) => boolean = () => true): Promise<string> {

@@ -149,7 +149,7 @@ export function attachPageMenu(
       goForward: live(() => tab.goForward()),
       reload: live(() => tab.reload()),
       openLink: app.openTab,
-      copyText: (text) => clipboard.writeText(text),
+      copyText: (text) => void clipboard.writeText(text),
       saveImage: (url) => live(() => contents.downloadURL(url))(),
       copyImage: live(() => contents.copyImageAt(params.x, params.y)),
       undo: live(() => contents.undo()),

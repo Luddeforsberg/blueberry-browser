@@ -38,6 +38,8 @@ const LINK_POLL_MS = 10_000;
 const LINKED_POLL_MS = 5 * 60_000;
 const NO_RUNNER = "Jobs with your Mac off aren't linked any more, so this wasn't sent. Link them again in Settings > Cloud.";
 const SWITCHED = "You signed in to another account while this was being sent, so it wasn't sent. Send it again.";
+// What tokenFor gives when someone else signed in while the token was coming.
+const SWITCHED_ACCOUNT = Symbol("switched account");
 const OTHER_ACCOUNT = (email: string) => `This chat's jobs are on ${email}. Sign in to that account to go on with it.`;
 
 export class RunnerJobs implements ChatRunner {
@@ -230,7 +232,7 @@ export class RunnerJobs implements ChatRunner {
     };
     try {
       const token = await this.tokenFor(account);
-      if (token === "switched") return fail(SWITCHED);
+      if (token === SWITCHED_ACCOUNT) return fail(SWITCHED);
       if (!token) return fail(SIGN_IN);
       // Built on the newest job this chat has, which the server checks is the conversation's newest.
       const server = this.server;
@@ -344,16 +346,17 @@ export class RunnerJobs implements ChatRunner {
 
   // A token for that account only. A refresh can end after someone else signs in and hand back their token, so who is
   // signed in is checked again once it's here, and nothing is sent with it otherwise.
-  private async tokenFor(account: string): Promise<string | null | "switched"> {
+  private async tokenFor(account: string): Promise<string | null | typeof SWITCHED_ACCOUNT> {
     const token = await this.account.accessToken();
-    return this.signedIn === account ? token : "switched";
+    // A token that is the word "switched" counted as a switch when that word was the answer, and still does.
+    return this.signedIn === account && token !== "switched" ? token : SWITCHED_ACCOUNT;
   }
 
   private async withToken<T>(account: string, call: (token: string) => Promise<T>): Promise<T | null> {
     if (!this.server) return null;
     try {
       const token = await this.tokenFor(account);
-      if (!token || token === "switched" || this.destroyed) return null;
+      if (!token || token === SWITCHED_ACCOUNT || this.destroyed) return null;
       const result = await call(token);
       return this.destroyed ? null : result;
     } catch {

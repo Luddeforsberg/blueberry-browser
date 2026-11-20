@@ -33,7 +33,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [draft, setDraft] = useState<string | null>(null);
 
   useEffect(() => {
-    window.chromeAPI.chat.getPageAccess().then(setPageAccessState);
+    void window.chromeAPI.chat.getPageAccess().then(setPageAccessState);
   }, []);
 
   // A panel chat has no tab, so main is told which one the panel has. A reply that ends in the open panel is then seen.
@@ -45,7 +45,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const setPageAccess = useCallback((enabled: boolean) => {
     setPageAccessState(enabled);
-    window.chromeAPI.chat.setPageAccess(enabled).then(setPageAccessState);
+    void window.chromeAPI.chat.setPageAccess(enabled).then(setPageAccessState);
   }, []);
 
   const sendMessage = useCallback(

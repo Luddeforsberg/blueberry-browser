@@ -110,7 +110,7 @@ describe("tryAiKey", () => {
     const [url, init] = defined(fetch.mock.calls[0]);
     expect(url).toBe("https://api.openai.com/v1/chat/completions");
     expect(init?.headers).toMatchObject({ authorization: `Bearer ${KEY}` });
-    expect(JSON.parse(String(init?.body))).toMatchObject({ model: "gpt-6-luna" });
+    expect(JSON.parse(await new Response(init?.body).text())).toMatchObject({ model: "gpt-6-luna" });
 
     const anthropic = answering(200, ANSWERS.anthropic);
     expect(await tryAiKey("anthropic", KEY, { fetch: anthropic, env: { ANTHROPIC_BASE_URL: "http://127.0.0.1:9/" } })).toBe("works");

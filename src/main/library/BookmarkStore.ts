@@ -18,10 +18,10 @@ export class BookmarkStore {
       const raw: unknown = JSON.parse(readFileSync(file, "utf8"));
       if (Array.isArray(raw)) {
         this.bookmarks = raw
-          .filter(
-            (item): item is Bookmark =>
-              item && typeof item.id === "string" && typeof item.title === "string" && typeof item.url === "string" && WEB.test(item.url),
-          )
+          .filter((item: unknown): item is Bookmark => {
+            const { id, title, url } = (item ?? {}) as Record<string, unknown>;
+            return typeof id === "string" && typeof title === "string" && typeof url === "string" && WEB.test(url);
+          })
           .map(({ id, title, url, favicon }) => ({ id, title, url, ...webIcon(favicon) }));
       }
     } catch {

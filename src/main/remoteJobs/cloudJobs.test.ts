@@ -97,13 +97,13 @@ describe("what a job writes to its row", () => {
   ])("keeps a reply of 40,000 %s whole, and cuts one more, saying so", (_, character) => {
     const full = character.repeat(40_000);
     expect(fitJobUpdate({ reply: full }).reply).toBe(full);
-    const cut = fitJobUpdate({ reply: full + character }).reply!;
+    const cut = fitJobUpdate({ reply: full + character }).reply;
     expect(length(cut)).toBe(40_000);
     expect(cut).toBe(character.repeat(39_988) + " (cut short)");
   });
 
   it("never cuts a character in half", () => {
-    const cut = fitJobUpdate({ reply: "a" + "🫐".repeat(40_000) }).reply!;
+    const cut = fitJobUpdate({ reply: "a" + "🫐".repeat(40_000) }).reply;
     expect(length(cut)).toBe(40_000);
     expect(cut.isWellFormed()).toBe(true);
   });
@@ -118,13 +118,13 @@ describe("what a job writes to its row", () => {
     expect(fitJobUpdate({ steps: few }).steps).toEqual(few);
 
     const many = Array.from({ length: 501 }, (_, index) => ({ text: `Step ${index}`, done: true }));
-    const fewer = fitJobUpdate({ steps: many }).steps!;
+    const fewer = fitJobUpdate({ steps: many }).steps;
     expect(fewer).toHaveLength(500);
     expect(fewer[0]).toEqual({ text: "Earlier steps (cut short)", done: true });
     expect(fewer.at(-1)).toEqual({ text: "Step 500", done: true });
 
     const long = Array.from({ length: 500 }, (_, index) => ({ text: `${index} ${"🫐".repeat(400)}`, done: false }));
-    const fitted = fitJobUpdate({ steps: long }).steps!;
+    const fitted = fitJobUpdate({ steps: long }).steps;
     expect(stepsBytes(fitted)).toBeLessThanOrEqual(100_000);
     expect(defined(fitted[0]).text).toBe("Earlier steps (cut short)");
     expect(fitted.at(-1)!.text.startsWith("499 ")).toBe(true);
@@ -167,7 +167,7 @@ describe("what a job writes to its row", () => {
       kind: "search",
     }));
     expect(stepsBytes(steps.map(({ text, done }) => ({ text, done })))).toBeLessThanOrEqual(100_000);
-    const fitted = fitJobUpdate({ steps }).steps!;
+    const fitted = fitJobUpdate({ steps }).steps;
     expect(stepsBytes(fitted)).toBeLessThanOrEqual(100_000);
     expect(defined(fitted[0]).text).toBe("Earlier steps (cut short)");
     expect(fitted.at(-1)).toEqual(steps.at(-1));

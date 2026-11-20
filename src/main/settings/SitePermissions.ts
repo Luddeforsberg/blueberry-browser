@@ -114,7 +114,10 @@ export class SitePermissions {
     try {
       const raw: unknown = JSON.parse(readFileSync(file, "utf8"));
       if (Array.isArray(raw)) {
-        raw.forEach((entry) => this.store(entry?.origin, entry?.permission, entry?.decision));
+        raw.forEach((entry: unknown) => {
+          const { origin, permission, decision } = (entry ?? {}) as Record<string, unknown>;
+          this.store(origin, permission, decision);
+        });
       }
     } catch {
       // A missing or unreadable file means every site asks again, which is the safe way to fail.

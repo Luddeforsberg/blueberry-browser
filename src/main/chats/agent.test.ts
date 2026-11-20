@@ -200,8 +200,8 @@ describe("forProvider", () => {
     await model.invoke([new HumanMessage({ content: content as never })]).catch(() => {});
     return JSON.parse(seen.body);
   };
-  const catching = (seen: { body: string }) => async (_url: unknown, init?: { body?: unknown }) => {
-    seen.body = String(init?.body ?? "");
+  const catching = (seen: { body: string }) => async (_url: unknown, init?: RequestInit) => {
+    seen.body = await new Response(init?.body).text();
     return new Response("{}", { status: 400 });
   };
   const content = [

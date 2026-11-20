@@ -144,7 +144,7 @@ app.on("second-instance", (_event, argv) => {
   else if (!argv.some((arg) => arg.toLowerCase().startsWith(`${LINK_SCHEME}:`))) mainWindow?.bringForward();
 });
 
-app.whenReady().then(() => {
+void app.whenReady().then(() => {
   if (!firstCopy) return;
   electronApp.setAppUserModelId("com.ludwigforsberg.blueberry");
   // A packaged app gets the icon from its bundle. Unpackaged, the Dock would show Electron's.

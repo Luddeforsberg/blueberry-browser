@@ -1,6 +1,6 @@
 import { expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { extname, join } from "node:path";
 import { normalize } from "node:path/posix";
 import type { MascotProfile } from "../src/shared/library";
@@ -37,7 +37,7 @@ export const BROWSER = process.platform === "win32" ? { channel: "msedge" } : { 
 
 // The site as deployed, pointed at the fake server, which is plain http on 127.0.0.1.
 export const serveSite = async (base: string, publicKey: string) => {
-  const site = createServer(async (request, response) => {
+  const respond = async (request: IncomingMessage, response: ServerResponse) => {
     let path = normalize(decodeURIComponent(new URL(request.url ?? "/", "http://site").pathname));
     if (path.endsWith("/")) path += "index.html";
     if (path.includes("..")) {
@@ -67,7 +67,8 @@ export const serveSite = async (base: string, publicKey: string) => {
     } catch {
       response.writeHead(404).end();
     }
-  });
+  };
+  const site = createServer((request, response) => void respond(request, response));
   await new Promise<void>((resolve) => site.listen(0, "127.0.0.1", resolve));
   return site;
 };

@@ -53,7 +53,7 @@ const Favourites: React.FC<{ dragging: SiteDragging }> = ({ dragging: { drag, st
                 onClick={() => {
                   const open = tabs.find((tab) => !tab.page && sameSite(tab.url, site.url));
                   if (open) void switchTab(open.id);
-                  else createTab(site.url);
+                  else void createTab(site.url);
                 }}
                 onContextMenu={(event) => savedSiteMenu(event, site)}
                 className={cn(
@@ -105,7 +105,7 @@ const Bookmarks: React.FC<{ dragging: SiteDragging }> = ({ dragging: { drag, sta
                   <button
                     type="button"
                     onPointerDown={(event) => start(event, site, "bookmarks")}
-                    onClick={() => createTab(site.url)}
+                    onClick={() => void createTab(site.url)}
                     onContextMenu={(event) => savedSiteMenu(event, site)}
                     className={cn(ROW, "hover:bg-hover", drag?.site.id === site.id && "opacity-40")}
                   >
@@ -168,7 +168,7 @@ export const TabsFace: React.FC = () => {
               <span className="tabular-nums" aria-label={`${tabs.length} open`}>
                 {tabs.length}
               </span>
-              <LabelButton label="New tab" shortcut={SHORTCUTS.newTab} onClick={() => createTab()}>
+              <LabelButton label="New tab" shortcut={SHORTCUTS.newTab} onClick={() => void createTab()}>
                 <Plus className="size-4" strokeWidth={1.75} />
               </LabelButton>
             </>

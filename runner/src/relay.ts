@@ -114,7 +114,7 @@ export const relayApp = (config: RelayConfig, supabase: { url: string; key: stri
 
   app.post("/sign-in", express.urlencoded({ extended: false, limit: "10kb" }), async (req, res) => {
     res.setHeader("cache-control", "no-store");
-    const result = await auth.signIn(req.body ?? {}, req.ip ?? "unknown");
+    const result = await auth.signIn((req.body ?? {}) as Record<string, unknown>, req.ip ?? "unknown");
     if ("redirect" in result) return res.redirect(302, result.redirect);
     return res.status(200).type("html").send(result.page);
   });
@@ -126,7 +126,9 @@ export const relayApp = (config: RelayConfig, supabase: { url: string; key: stri
       res.status(405).json({ jsonrpc: "2.0", id: null, error: { code: -32000, message: "Only POST is supported." } });
       return;
     }
-    const grantId = String(req.auth?.extra?.grantId ?? "");
+    // relayAuth.ts's verifier sets it, always to the grant's id.
+    const granted = req.auth?.extra?.grantId;
+    const grantId = typeof granted === "string" ? granted : "";
     const tools = createRelayTools(grantHost(auth, grantId, db));
     const server = new McpServer({ name: NAME, version: "1.0.0" }, { instructions: INSTRUCTIONS });
     for (const tool of tools) {

@@ -180,8 +180,8 @@ export class Account {
   private load(): ServerSession | null {
     try {
       if (!safeStorage.isEncryptionAvailable()) return null;
-      const saved = JSON.parse(safeStorage.decryptString(Buffer.from(readFileSync(this.file, "utf8"), "base64")));
-      const { accessToken, refreshToken, expiresAt, email } = saved;
+      const text = safeStorage.decryptString(Buffer.from(readFileSync(this.file, "utf8"), "base64"));
+      const { accessToken, refreshToken, expiresAt, email } = JSON.parse(text) as Record<string, unknown>;
       if (typeof accessToken !== "string" || typeof refreshToken !== "string" || typeof expiresAt !== "number" || typeof email !== "string")
         return null;
       return { accessToken, refreshToken, expiresAt, email };

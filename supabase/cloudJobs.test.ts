@@ -63,7 +63,7 @@ describe("the cloud jobs' database rules", () => {
   const start = async (uid: string, prompt = "Order the thing") =>
     defined((await as(uid, `select public.start_cloud_job('${prompt}', '[]', ${MASCOT}, 'risky', null) as id`))[0]).id as string;
   const claim = async (runner: string) =>
-    (await as(runner, "select id, status, prompt from public.runner_claim_job()")) as { id: string; status: string; prompt: string }[];
+    await as<{ id: string; status: string; prompt: string }>(runner, "select id, status, prompt from public.runner_claim_job()");
   const job = async (id: string) =>
     (
       await db.query<{ status: string; stop_requested: boolean; steps: unknown; live_view_url: string | null }>(

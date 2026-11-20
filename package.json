@@ -12,7 +12,7 @@
   "scripts": {
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "eslint --cache --max-warnings 0 . && node scripts/oldNames.mjs && node scripts/runnerElectron.mjs",
+    "lint": "eslint --max-warnings 0 . && node scripts/oldNames.mjs && node scripts/runnerElectron.mjs",
     "knip": "knip",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",

@@ -142,7 +142,7 @@ export const readingTools = <T extends PageTarget>(context: ToolContext<T>) => {
                 const name = frameName(frame, tab);
                 const elements = found.elements
                   .slice(0, MAX_FRAME_ELEMENTS)
-                  .map((element) => ({ ...element, ref: `${name}.${element.ref}`, frame: frame.origin }));
+                  .map((element) => ({ ...element, ref: `${name}.${String(element.ref)}`, frame: frame.origin }));
                 return { total: Number.isFinite(found.total) ? Math.max(found.total, elements.length) : elements.length, elements };
               }),
           );

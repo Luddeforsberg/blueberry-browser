@@ -125,9 +125,8 @@ export const createRelayTools = (host: RelayHost): McpTool[] => {
       },
       readOnly: false,
       run: async ({ task, agent, sites, where }) => {
-        const prompt = String(task ?? "")
-          .trim()
-          .slice(0, MAX_TASK_LENGTH);
+        // The SDK has checked it against the shape above, so it's text.
+        const prompt = (typeof task === "string" ? task : "").trim().slice(0, MAX_TASK_LENGTH);
         if (!prompt) return failed("Say what the job is.", "Empty task");
         const mascot = findMascot(await host.mascots(), typeof agent === "string" ? agent : undefined);
         if (!mascot) return failed(`There's no mascot called ${String(agent)}. list_agents names them.`, "No such mascot");

@@ -1,7 +1,7 @@
 import { chromium, type Page } from "@playwright/test";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { extname, join } from "node:path";
 import { normalize } from "node:path/posix";
@@ -53,7 +53,7 @@ export async function drivePhone(
 ): Promise<{ png: Buffer; restless: string | null }> {
   const supabase = await startFakeSupabase({ cloudJobs: true });
   const base = supabase.env.SUPABASE_URL;
-  const site = createServer(async (request, response) => {
+  const respond = async (request: IncomingMessage, response: ServerResponse) => {
     let path = normalize(decodeURIComponent(new URL(request.url ?? "/", "http://site").pathname));
     if (path.endsWith("/")) path += "index.html";
     if (path.includes("..")) {
@@ -75,7 +75,8 @@ export async function drivePhone(
     } catch {
       response.writeHead(404).end();
     }
-  });
+  };
+  const site = createServer((request, response) => void respond(request, response));
   await new Promise<void>((resolve) => site.listen(0, "127.0.0.1", resolve));
   const app = `http://127.0.0.1:${(site.address() as AddressInfo).port}/app/`;
 

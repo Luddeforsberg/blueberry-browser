@@ -28,7 +28,7 @@ export const mascotFromSnapshot = (input: unknown): MascotProfile | null => {
     if (!Array.isArray(sites) || !Array.isArray(tools) || !BERRY.tools.every((tool) => tools.includes(tool))) return null;
     if (sites.length === 0) return BERRY;
     const clean = sites.map((site) => (typeof site === "string" ? normaliseSite(site) : null));
-    return sites.length <= 20 && clean.every((site) => site !== null) ? { ...BERRY, sites: [...new Set(clean as string[])] } : null;
+    return sites.length <= 20 && clean.every((site) => site !== null) ? { ...BERRY, sites: [...new Set(clean)] } : null;
   }
   if (typeof snapshot.id !== "string" || !/^[\w-]{1,100}$/.test(snapshot.id)) return null;
   const parsed = parseMascotDraft({ ...snapshot, look: BERRY.look });
@@ -46,7 +46,8 @@ const kindOf = (kind: unknown): { kind?: StepKind } => (isStepKind(kind) ? { kin
 
 export const stepsFromRow = (input: unknown): ChatStep[] =>
   (Array.isArray(input) ? input : [])
-    .filter((step) => typeof step?.text === "string")
+    .map((step: unknown) => (step ?? {}) as Record<string, unknown>)
+    .filter((step) => typeof step.text === "string")
     .slice(-MAX_STEPS)
     .map((step) => ({ text: String(step.text).slice(0, MAX_STEP_TEXT), done: step.done === true, ...kindOf(step.kind) }));
 

@@ -16,9 +16,9 @@ interface RunnerSaved {
 
 export const loadRunnerJobs = (file: string, { entries, forgotten, routinesThere }: RunnerSaved): void => {
   try {
-    const saved = JSON.parse(readFileSync(file, "utf8"));
+    const { chats, forgotten: gone, routinesInCloud } = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
     const id = (value: unknown): value is string => typeof value === "string" && value.length > 0 && value.length <= 100;
-    Object.entries(saved?.chats ?? {}).forEach(([chatId, value]) => {
+    Object.entries(chats ?? {}).forEach(([chatId, value]) => {
       const { account, jobId, active, conversationId, jobIds } = (value ?? {}) as Record<string, unknown>;
       if (typeof account !== "string" || (jobId !== null && !id(jobId))) return;
       const known = Array.isArray(jobIds) ? jobIds.filter(id) : id(jobId) ? [jobId] : [];
@@ -36,12 +36,12 @@ export const loadRunnerJobs = (file: string, { entries, forgotten, routinesThere
           }),
         );
     });
-    if (Array.isArray(saved?.forgotten)) forgotten.push(...saved.forgotten.filter(id).slice(-MAX_FORGOTTEN));
-    if (Array.isArray(saved?.routinesInCloud))
-      saved.routinesInCloud
+    if (Array.isArray(gone)) forgotten.push(...gone.filter(id).slice(-MAX_FORGOTTEN));
+    if (Array.isArray(routinesInCloud))
+      routinesInCloud
         .filter(id)
         .slice(0, 100)
-        .forEach((key: string) => routinesThere.add(key));
+        .forEach((key) => routinesThere.add(key));
   } catch {
     // Nothing sent there yet.
   }

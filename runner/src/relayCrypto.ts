@@ -26,7 +26,9 @@ export const unsigned = (keys: Keys, text: unknown): Record<string, unknown> | n
   const wanted = mac(keys, body);
   if (given.length !== wanted.length || !timingSafeEqual(given, wanted)) return null;
   try {
-    return JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+    const data: unknown = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+    // Anything but an object is turned away by every caller anyway.
+    return data !== null && typeof data === "object" ? (data as Record<string, unknown>) : null;
   } catch {
     return null;
   }

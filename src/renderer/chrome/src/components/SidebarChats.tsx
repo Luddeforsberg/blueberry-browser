@@ -146,7 +146,7 @@ export const ChatsFace: React.FC<{ onSheet?: boolean }> = ({ onSheet = false }) 
 
   return (
     <>
-      <button type="button" onClick={() => createTab()} className={cn(ROW, "text-ink-2 hover:bg-hover hover:text-ink")}>
+      <button type="button" onClick={() => void createTab()} className={cn(ROW, "text-ink-2 hover:bg-hover hover:text-ink")}>
         <span className={LEAD}>
           <Plus className={ICON} strokeWidth={1.75} />
         </span>

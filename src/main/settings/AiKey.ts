@@ -81,7 +81,7 @@ export class AiKey {
   private load(): SavedKey | null {
     try {
       if (!safeStorage.isEncryptionAvailable()) return null;
-      const { service, key } = JSON.parse(readFileSync(this.file, "utf8"));
+      const { service, key } = JSON.parse(readFileSync(this.file, "utf8")) as Record<string, unknown>;
       if (!isAiService(service) || typeof key !== "string") return null;
       const plain = safeStorage.decryptString(Buffer.from(key, "base64"));
       return looksLikeAiKey(service, plain) ? { service, key: plain } : null;

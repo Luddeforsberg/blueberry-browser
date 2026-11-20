@@ -49,24 +49,24 @@ const VerticalToolbar: React.FC = () => {
             Icon={ChevronLeft}
             label="Back"
             shortcut={SHORTCUTS.back}
-            onClick={goBack}
+            onClick={() => void goBack()}
             active={activeTab?.canGoBack ?? false}
           />
           <ToolBarButton
             Icon={ChevronRight}
             label="Forward"
             shortcut={SHORTCUTS.forward}
-            onClick={goForward}
+            onClick={() => void goForward()}
             active={activeTab?.canGoForward ?? false}
           />
           {activeTab?.isLoading ? (
-            <ToolBarButton Icon={X} label="Stop loading" onClick={stop} />
+            <ToolBarButton Icon={X} label="Stop loading" onClick={() => void stop()} />
           ) : (
             <ToolBarButton
               Icon={RotateCw}
               label="Reload"
               shortcut={SHORTCUTS.reload}
-              onClick={reload}
+              onClick={() => void reload()}
               active={activeTab !== null && !activeTab.page}
             />
           )}

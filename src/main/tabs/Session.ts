@@ -95,7 +95,7 @@ export const sanitizeSession = (raw: unknown): Session | null => {
   const input = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   if (!Array.isArray(input.tabs)) return null;
   // Tabs that are dropped mustn't shift which one was active.
-  const active = input.tabs[Number(input.active)];
+  const active: unknown = input.tabs[Number(input.active)];
   const sanitized = input.tabs.map((tab) => ({ tab: sanitizeTab(tab), wasActive: tab === active }));
   const kept = sanitized.filter(({ tab }) => tab !== null);
   if (kept.length === 0) return null;

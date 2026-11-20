@@ -24,21 +24,22 @@ export const redirectAllowed = (uri: string): boolean => {
 };
 
 export const signedClients = (keys: Keys, now: () => number): OAuthRegisteredClientsStore => {
-  const store: OAuthRegisteredClientsStore = {
-    getClient: (clientId) => {
-      const data = unsigned(keys, clientId);
-      if (!data || data.t !== "client" || !Array.isArray(data.r)) return undefined;
-      const method = data.m === "none" ? "none" : "client_secret_post";
-      return {
-        client_id: clientId,
-        redirect_uris: data.r.map(String),
-        token_endpoint_auth_method: method,
-        grant_types: ["authorization_code", "refresh_token"],
-        response_types: ["code"],
-        ...(typeof data.n === "string" ? { client_name: data.n } : {}),
-        ...(method === "none" ? {} : { client_secret: b64(mac(keys, `secret:${clientId}`)), client_secret_expires_at: 0 }),
-      };
-    },
+  const getClient = (clientId: string): OAuthClientInformationFull | undefined => {
+    const data = unsigned(keys, clientId);
+    if (!data || data.t !== "client" || !Array.isArray(data.r)) return undefined;
+    const method = data.m === "none" ? "none" : "client_secret_post";
+    return {
+      client_id: clientId,
+      redirect_uris: data.r.map(String),
+      token_endpoint_auth_method: method,
+      grant_types: ["authorization_code", "refresh_token"],
+      response_types: ["code"],
+      ...(typeof data.n === "string" ? { client_name: data.n } : {}),
+      ...(method === "none" ? {} : { client_secret: b64(mac(keys, `secret:${clientId}`)), client_secret_expires_at: 0 }),
+    };
+  };
+  return {
+    getClient,
     registerClient: (client) => {
       const uris = client.redirect_uris.map(String);
       if (uris.length === 0 || uris.length > MAX_REDIRECTS || !uris.every((uri) => uri.length <= 500 && redirectAllowed(uri))) {
@@ -55,10 +56,9 @@ export const signedClients = (keys: Keys, now: () => number): OAuthRegisteredCli
         k: randomUUID(),
       });
       return {
-        ...store.getClient(clientId)!,
+        ...getClient(clientId)!,
         client_id_issued_at: Math.floor(now() / 1000),
-      } as OAuthClientInformationFull;
+      };
     },
   };
-  return store;
 };

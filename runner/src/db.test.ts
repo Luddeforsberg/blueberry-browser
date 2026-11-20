@@ -70,7 +70,7 @@ describe("the runner's writes", () => {
   it("cuts a reply, an error and steps to the row's limits, so how a job ended is saved", async () => {
     const bodies: Record<string, unknown>[] = [];
     const send = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
-      bodies.push(JSON.parse(String(init?.body)));
+      bodies.push(JSON.parse(await new Response(init?.body).text()));
       return new Response("false", { status: 200 });
     });
     const db = supabaseDb(CONFIG, runnerSession(CONFIG, fakeAuth() as unknown as GalleryServer), send as unknown as typeof fetch);

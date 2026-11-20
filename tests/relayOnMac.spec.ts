@@ -105,7 +105,7 @@ test("a relay job runs as a chat on this Mac only while the switch is on, and it
     expect(await startJob("mac")).toBeNull();
     const { id: waiting } = defined(
       (
-        await supabase.cloudRows(
+        await supabase.cloudRows<{ id: string }>(
           `insert into public.cloud_jobs (owner, prompt, mascot, target, conversation_id) select id, 'Not now', '{"id":"berry"}'::jsonb, 'mac', gen_random_uuid() from auth.users where email = '${EMAIL}' returning id`,
         )
       )[0],
