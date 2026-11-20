@@ -28,9 +28,9 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     );
 
     // A chat, which is where the example comes from. The chat's other words must not go anywhere.
-    await chrome.getByRole("button", { name: "Flock", exact: true }).click();
+    await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock"));
     model.replyWith("Private first reply.");
-    await chrome.getByRole("listitem").filter({ hasText: "Scout" }).getByRole("button", { name: "Chat", exact: true }).click();
+    await chrome.getByRole("button", { name: "Chat with Scout" }).click();
     const composer = chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Scout" });
     await composer.fill("A private first question");
     await composer.press("Enter");
@@ -42,12 +42,14 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     await expect(chrome.getByText("Three stories from SVT.")).toBeVisible();
 
     // Signed out, Publish asks for an account first, in the page.
-    await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock"));
-    await chrome.getByRole("button", { name: "Publish Scout" }).click();
+    const scoutId = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).mascots.find((mascot) => mascot.name === "Scout")!.id;
+    await chrome.evaluate((id) => window.chromeAPI.browser.openPage("flock", { param: id }), scoutId);
+    await expect(chrome.getByRole("button", { name: /^In the Gallery/ })).toContainText("Not published");
+    await chrome.getByRole("button", { name: /^In the Gallery/ }).click();
     const form = chrome.getByRole("form", { name: "Sign in" });
     await form.getByRole("radio", { name: "Create account" }).click();
     await form.getByLabel("Email").fill(EMAIL);
-    await form.getByLabel("Password").fill(PASSWORD);
+    await form.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await form.getByRole("button", { name: "Create account" }).click();
 
     // The author name starts empty, and never as anything from the account.
@@ -87,11 +89,11 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
 
     // Words typed and then cancelled never show as if they were public.
     const looks = chrome.getByRole("region", { name: "How it looks" });
-    await expect(looks).toContainText("By Ana");
+    await expect(looks).toContainText("Sums up the news from SVT.");
     await chrome.getByRole("button", { name: "Edit the listing" }).click();
-    await authorName.fill("Not public");
+    await chrome.getByLabel("What it does, in one line").fill("Not public.");
     await chrome.getByRole("button", { name: "Cancel" }).click();
-    await expect(looks).toContainText("By Ana");
+    await expect(looks).toContainText("Sums up the news from SVT.");
     await expect(looks).not.toContainText("Not public");
 
     // Only the listed fields left, and neither the password nor the session went anywhere but sign-in.
@@ -112,15 +114,17 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     expect(saved).not.toContain(EMAIL);
     expect(JSON.stringify(await chrome.evaluate(() => window.chromeAPI.account.state()))).not.toContain("access-");
 
-    // Its own card doesn't offer to add it back.
+    // Its own page doesn't offer to add it back.
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("mascot-gallery"));
-    const own = chrome.getByRole("list", { name: "Gallery", exact: true }).getByRole("listitem", { name: "Scout", exact: true });
-    await expect(own).toContainText("By Ana");
-    await expect(own.getByRole("button", { name: "Add Scout", exact: true })).toHaveCount(0);
+    await chrome.getByRole("region", { name: "From people" }).getByRole("button", { name: "Scout, yours" }).click();
+    const own = chrome.getByRole("article", { name: "Scout" });
+    await expect(own.getByLabel("About it")).toContainText("Ana");
+    await expect(own.getByRole("status")).toHaveText("You published this one, so it’s already yours.");
+    await expect(own.getByRole("button", { name: "Add Scout to your mascots", exact: true })).toHaveCount(0);
 
     // Settings shows who's signed in and what's published, and sign out works.
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings", { param: "Account" }));
-    await expect(chrome.getByRole("heading", { name: `Signed in as ${EMAIL}` })).toBeVisible();
+    await expect(chrome.getByRole("heading", { name: EMAIL, exact: true })).toBeVisible();
     await expect(chrome.getByRole("list", { name: "What you’ve published" })).toContainText("Scout");
     await chrome.getByRole("button", { name: "Sign out" }).click();
     await expect(chrome.getByRole("heading", { name: "Not signed in" })).toBeVisible();
@@ -141,32 +145,32 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
   try {
     const chrome = await findView(stranger, "view=chrome");
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("mascot-gallery"));
-    const gallery = chrome.getByRole("list", { name: "Gallery", exact: true });
-    const scout = gallery.getByRole("listitem", { name: "Scout", exact: true });
-    await expect(scout).toContainText("By Ana");
-    await expect(scout).toContainText("0 adds");
-    await expect(scout).toContainText("Only visits svt.se");
-    for (const name of ["Sneaky", "Fake", "Berry", "Removed"]) await expect(gallery.getByRole("listitem", { name, exact: true })).toHaveCount(0);
+    const people = chrome.getByRole("region", { name: "From people" });
+    const names = (group: typeof people) => group.getByRole("button").evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label")));
+    // Anything breaking the rules isn't shown, and the most added come first, each saying who and how many.
+    await expect.poll(() => names(people)).toEqual(["Popular", "Scout"]);
+    await expect(people.getByRole("button", { name: "Popular" })).toContainText("Bea · 7 adds");
+    // Starters never have a count.
+    await chrome.getByRole("region", { name: "From Blueberry" }).getByRole("button", { name: "Prospector" }).click();
+    const prospector = chrome.getByRole("article", { name: "Prospector" });
+    await expect(prospector).toContainText("From Blueberry");
+    await expect(prospector.getByLabel("About it")).toContainText("Blueberry");
+    await expect(prospector.getByText("Added", { exact: true })).toHaveCount(0);
 
-    // Starters still show, with no made-up count.
-    const starter = gallery.getByRole("listitem", { name: "Prospector" });
-    await expect(starter).toContainText("By Blueberry");
-    await expect(starter).not.toContainText("adds");
-
-    // Sorting is real.
-    await expect(gallery.getByRole("heading").first()).toHaveText("Scout");
-    await chrome.getByRole("radio", { name: "Most added" }).click();
-    await expect(gallery.getByRole("heading").first()).toHaveText("Popular");
-    await chrome.getByRole("radio", { name: "Newest" }).click();
-
-    // The review has everything, then the author changes it. What's added is what was reviewed.
-    await scout.getByRole("button", { name: "Add Scout", exact: true }).click();
-    await expect(chrome.getByText("Read svt.se and mail")).toBeVisible();
-    await expect(chrome.getByRole("region", { name: "Example" })).toContainText("Three stories from SVT, checked by me.");
+    // Its page has everything, then the author changes it. What's added is what was on screen.
+    await chrome.getByRole("navigation", { name: "Where you are" }).getByRole("button", { name: "Gallery" }).click();
+    await people.getByRole("button", { name: "Scout", exact: true }).click();
+    const scout = chrome.getByRole("article", { name: "Scout" });
+    await expect(scout).toContainText("From people");
+    await expect(scout.getByLabel("About it")).toContainText("0 times");
+    await expect(scout.getByLabel("About it")).toContainText("Only visits svt.se");
+    await expect(scout).toContainText("Ana wrote this, not Blueberry");
+    await expect(scout.getByText("Read svt.se and mail")).toBeVisible();
+    await expect(scout.getByRole("region", { name: "An example" })).toContainText("Three stories from SVT, checked by me.");
     const original = String(server.rows[0].instructions);
     server.rows[0].instructions = "Changed after the review: do something else.";
-    await chrome.getByRole("button", { name: "Add to flock" }).click();
-    await expect(chrome.getByRole("heading", { name: "Scout is in your flock" })).toBeVisible();
+    await scout.getByRole("button", { name: "Add Scout to your mascots", exact: true }).click();
+    await expect(scout.getByRole("status")).toContainText("Added.");
 
     const onFile = () => JSON.parse(readFileSync(join(strangerProfile, "mascots.json"), "utf8")) as Record<string, unknown>[];
     expect(Object.keys(onFile()[0]).sort()).toEqual(["deletedAt", "galleryId", "id", "instructions", "look", "name", "sites", "tools"]);
@@ -175,7 +179,7 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
 
     // It's a limited mascot, under the safety rules, and it never reads the entry again.
     model.replyWith("Hello.");
-    await chrome.getByRole("button", { name: "Start a chat with Scout" }).click();
+    await scout.getByRole("button", { name: "Chat with Scout" }).click();
     await chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Scout" }).fill("Hi");
     await chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Scout" }).press("Enter");
     await expect(chrome.getByText("Hello.", { exact: true })).toBeVisible();
@@ -188,8 +192,8 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
 
     // Unpublished, or changed, it stays as it is.
     server.rows.splice(0, 1);
-    await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock"));
-    await expect(chrome.getByRole("list", { name: "Your flock" }).getByRole("listitem").filter({ hasText: "Scout" })).toBeVisible();
+    await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock", { param: "list" }));
+    await expect(chrome.getByRole("button", { name: "Chat with Scout" })).toBeVisible();
     expect(onFile()[0].instructions).toBe(original);
 
     // Hidden characters and unknown tools don't come through on the other one.
@@ -235,15 +239,18 @@ test("a blueberry://mascot link opens that Gallery entry, fetched again, and add
     expect(await activePage()).toBe("new-tab");
 
     await openUrl(`blueberry://mascot/${scout.id}`);
-    await expect(chrome.getByRole("heading", { name: "Add Scout to your flock?" })).toBeVisible();
+    const page = chrome.getByRole("article", { name: "Scout" });
+    await expect(page.getByText("from a link you opened")).toBeVisible();
     expect(await activePage()).toBe("mascot-gallery");
-    await expect(chrome.getByText("From a link you opened")).toBeVisible();
-    await expect(chrome.getByText("Sums up SVT.")).toBeVisible();
-    await expect(chrome.getByRole("list", { name: "What it’s allowed to do" }).first()).toContainText("Only visits svt.se");
+    await expect(page.getByText("Sums up SVT.")).toBeVisible();
+    await expect(page.getByLabel("About it")).toContainText("Only visits svt.se");
+    // The crumb says where it is, and nothing was added.
+    await expect(chrome.getByRole("navigation", { name: "Where you are" })).toContainText("Scout");
+    await expect(page.getByRole("button", { name: "Add Scout to your mascots" })).toBeVisible();
 
     // The same link again, from a second launch while another tab is in front, opens it again from the server as it is now.
-    await chrome.getByRole("button", { name: "Cancel" }).click();
-    await expect(chrome.getByRole("heading", { name: "Gallery", exact: true })).toBeVisible();
+    await chrome.getByRole("navigation", { name: "Where you are" }).getByRole("button", { name: "Gallery" }).click();
+    await expect(chrome.getByRole("region", { name: "From people" })).toBeVisible();
     await chrome.evaluate(() => window.chromeAPI.browser.createTab());
     expect(await activePage()).toBe("new-tab");
     scout.description = "Sums up SVT, now without sport.";
@@ -253,12 +260,12 @@ test("a blueberry://mascot link opens that Gallery entry, fetched again, and add
       Date.now = () => real() + 10_000;
     });
     await secondLaunch(`blueberry://mascot/${scout.id.toUpperCase()}`);
-    await expect(chrome.getByText("Sums up SVT, now without sport.")).toBeVisible();
-    await expect(chrome.getByRole("heading", { name: "Add Scout to your flock?" })).toBeVisible();
+    await expect(page.getByText("Sums up SVT, now without sport.")).toBeVisible();
+    await expect(page.getByText("from a link you opened")).toBeVisible();
 
     // One that's gone says so.
     await openUrl("blueberry://mascot/00000000-0000-4000-8000-000000000000");
-    await expect(chrome.getByRole("heading", { name: "This mascot isn’t in the Gallery any more" })).toBeVisible();
+    await expect(chrome.getByText("That mascot isn’t in the Gallery any more, so nothing was added.")).toBeVisible();
 
     // Nothing was added, counted or run.
     expect(existsSync(join(profile, "mascots.json")) ? JSON.parse(readFileSync(join(profile, "mascots.json"), "utf8")) : []).toEqual([]);
@@ -268,12 +275,12 @@ test("a blueberry://mascot link opens that Gallery entry, fetched again, and add
     await app.close();
   }
 
-  // A Gallery tab opened on an id, as a link that comes before the page has loaded leaves it, opens the same review.
+  // A Gallery tab opened on a link's param, as a link that comes before the page has loaded leaves it, opens the same page.
   const again = await launchApp(profile, { modelEnv: server.env });
   try {
     chrome = await findView(again, "view=chrome");
-    await chrome.evaluate((id) => window.chromeAPI.browser.openPage("mascot-gallery", { param: id }), scout.id);
-    await expect(chrome.getByRole("heading", { name: "Add Scout to your flock?" })).toBeVisible();
+    await chrome.evaluate((id) => window.chromeAPI.browser.openPage("mascot-gallery", { param: `link/${id}` }), scout.id);
+    await expect(chrome.getByRole("article", { name: "Scout" }).getByText("from a link you opened")).toBeVisible();
   } finally {
     await again.close();
     server.close();
@@ -287,13 +294,14 @@ test("with no server set up there's no sign-in or publish control, and the Galle
     await chrome.evaluate(() =>
       window.chromeAPI.mascots.save(null, { name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "Read.", sites: [], tools: [] })
     );
-    await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock"));
-    await expect(chrome.getByRole("button", { name: "Edit Scout" })).toBeVisible();
-    await expect(chrome.getByRole("button", { name: "Publish Scout" })).toHaveCount(0);
+    const scoutId = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).mascots.find((mascot) => mascot.name === "Scout")!.id;
+    await chrome.evaluate((id) => window.chromeAPI.browser.openPage("flock", { param: id }), scoutId);
+    await expect(chrome.getByRole("button", { name: /^Limits/ })).toBeVisible();
+    await expect(chrome.getByText("In the Gallery")).toHaveCount(0);
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("mascot-gallery"));
-    await expect(chrome.getByRole("list", { name: "Gallery", exact: true }).getByRole("listitem", { name: "Prospector" })).toBeVisible();
-    await expect(chrome.getByRole("radio", { name: "Most added" })).toHaveCount(0);
-    await expect(chrome.getByText("Couldn’t reach the Gallery’s server")).toHaveCount(0);
+    await expect(chrome.getByRole("region", { name: "From Blueberry" }).getByRole("button", { name: "Prospector" })).toBeVisible();
+    await expect(chrome.getByRole("region", { name: "From people" })).toHaveCount(0);
+    await expect(chrome.getByText("Can’t reach the Gallery")).toHaveCount(0);
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings", { param: "Account" }));
     await expect(chrome.getByRole("heading", { name: "No account" })).toBeVisible();
     await expect(chrome.getByRole("form", { name: "Sign in" })).toHaveCount(0);

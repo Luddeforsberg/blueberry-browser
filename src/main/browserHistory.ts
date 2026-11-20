@@ -28,27 +28,61 @@ const VISITS_QUERY = `
   ORDER BY visits.visit_time DESC
   LIMIT ${MAX_VISITS}`;
 
+// Each with its data folder and its own app, the Mac way and the Windows way.
 const BROWSERS = [
-  { id: "chrome", name: "Chrome", mac: "Google/Chrome", windows: "Google/Chrome/User Data" },
-  { id: "arc", name: "Arc", mac: "Arc/User Data", windows: null },
-  { id: "brave", name: "Brave", mac: "BraveSoftware/Brave-Browser", windows: "BraveSoftware/Brave-Browser/User Data" },
-  { id: "edge", name: "Edge", mac: "Microsoft Edge", windows: "Microsoft/Edge/User Data" },
+  { id: "chrome", name: "Chrome", mac: "Google/Chrome", windows: "Google/Chrome/User Data", app: { mac: "Google Chrome.app", windows: "Google/Chrome/Application/chrome.exe" } },
+  { id: "arc", name: "Arc", mac: "Arc/User Data", windows: null, app: { mac: "Arc.app", windows: null } },
+  {
+    id: "brave",
+    name: "Brave",
+    mac: "BraveSoftware/Brave-Browser",
+    windows: "BraveSoftware/Brave-Browser/User Data",
+    app: { mac: "Brave Browser.app", windows: "BraveSoftware/Brave-Browser/Application/brave.exe" },
+  },
+  { id: "edge", name: "Edge", mac: "Microsoft Edge", windows: "Microsoft/Edge/User Data", app: { mac: "Microsoft Edge.app", windows: "Microsoft/Edge/Application/msedge.exe" } },
 ];
 
-// Where browsers keep their data. Folders under it are laid out the Mac way or the Windows way.
+// Where browsers keep their data, laid out the Mac way or the Windows way, and the folders their apps are installed in.
 export interface BrowserData {
   base: string;
   layout: "mac" | "windows";
+  apps?: string[];
 }
 
-// Other platforms have none. An unpackaged app can be pointed at a folder laid out like the Mac's, for tests and filming.
+// Other platforms have none. An unpackaged app can be pointed at a folder laid out like the Mac's, for tests and filming,
+// and then no app on this computer is looked at.
 export const browserDataFor = (
   platform: NodeJS.Platform,
-  { appData, localAppData, override, packaged }: { appData: string; localAppData?: string; override?: string; packaged: boolean }
+  {
+    appData,
+    localAppData,
+    home,
+    programFiles = [],
+    override,
+    packaged,
+  }: { appData: string; localAppData?: string; home: string; programFiles?: (string | undefined)[]; override?: string; packaged: boolean }
 ): BrowserData | null => {
   if (override && !packaged) return { base: override, layout: "mac" };
-  if (platform === "darwin") return { base: appData, layout: "mac" };
-  if (platform === "win32" && localAppData) return { base: localAppData, layout: "windows" };
+  if (platform === "darwin") return { base: appData, layout: "mac", apps: ["/Applications", join(home, "Applications")] };
+  if (platform === "win32" && localAppData) {
+    return { base: localAppData, layout: "windows", apps: [localAppData, ...programFiles].filter((folder) => folder !== undefined) };
+  }
+  return null;
+};
+
+// The picture of an app, as a data address. Only the picture leaves main, never the app's path.
+export type AppIcon = (file: string) => Promise<string | null>;
+
+// From the first place the browser's own app is installed.
+const iconFor = async ({ layout, apps = [] }: BrowserData, browser: (typeof BROWSERS)[number], iconOf: AppIcon): Promise<string | null> => {
+  const app = browser.app[layout];
+  if (!app) return null;
+  for (const folder of apps) {
+    const file = join(folder, app);
+    // Asked about a file that isn't there, Windows answers with a generic icon, so only an app that's there is asked.
+    const stats = await lstat(file).catch(() => null);
+    if (stats && (layout === "mac" ? stats.isDirectory() : stats.isFile())) return iconOf(file).catch(() => null);
+  }
   return null;
 };
 
@@ -72,11 +106,16 @@ const historyFiles = async ({ base, layout }: BrowserData, browser: (typeof BROW
   }
 };
 
-// Only names, and it opens nothing.
-export const findBrowsers = async (data: BrowserData | null): Promise<ImportSource[]> => {
+// Only names, how many profiles and the app's icon, and it opens nothing.
+export const findBrowsers = async (data: BrowserData | null, iconOf: AppIcon = async () => null): Promise<ImportSource[]> => {
   if (!data) return [];
-  const found = await Promise.all(BROWSERS.map(async (browser) => ((await historyFiles(data, browser)).length > 0 ? [browser] : [])));
-  return found.flat().map(({ id, name }) => ({ id, name }));
+  const found = await Promise.all(
+    BROWSERS.map(async (browser) => {
+      const profiles = (await historyFiles(data, browser)).length;
+      return profiles > 0 ? [{ id: browser.id, name: browser.name, profiles, icon: await iconFor(data, browser, iconOf) }] : [];
+    })
+  );
+  return found.flat();
 };
 
 const copyIfThere = (from: string, to: string): Promise<void> =>

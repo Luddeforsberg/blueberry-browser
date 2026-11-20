@@ -3,8 +3,14 @@ import ReactDOM from 'react-dom/client'
 import { ChromeApp } from './ChromeApp'
 import { OverlayApp } from './OverlayApp'
 import { FindApp } from './FindApp'
+import { SuggestionsApp } from './SuggestionsApp'
+import { TooltipApp } from './TooltipApp'
+import { TabPreviewApp } from './TabPreviewApp'
 import { PromptApp } from './PromptApp'
-import { DesktopApp, DesktopComposerApp } from './DesktopApp'
+import { DesktopApp } from './DesktopApp'
+import { DesktopPanelApp } from './DesktopPanel'
+import { MenuApp } from './MenuApp'
+import { DarkMarkFilter } from './components/Favicon'
 import './index.css'
 
 // A scroll shows the thumb for a moment, as hovering does, since the keyboard can scroll with the pointer elsewhere.
@@ -22,6 +28,7 @@ const view = new URLSearchParams(window.location.search).get('view')
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
-        {view === 'overlay' ? <OverlayApp /> : view === 'find' ? <FindApp /> : view === 'prompt' ? <PromptApp /> : view === 'desktop' ? <DesktopApp /> : view === 'composer' ? <DesktopComposerApp /> : <ChromeApp />}
+        <DarkMarkFilter />
+        {view === 'overlay' ? <OverlayApp /> : view === 'find' ? <FindApp /> : view === 'suggestions' ? <SuggestionsApp /> : view === 'tooltip' ? <TooltipApp /> : view === 'preview' ? <TabPreviewApp /> : view === 'prompt' ? <PromptApp /> : view === 'desktop' ? <DesktopApp /> : view === 'composer' ? <DesktopPanelApp /> : view === 'menu' || view === 'drop-menu' ? <MenuApp /> : <ChromeApp />}
     </React.StrictMode>
 )

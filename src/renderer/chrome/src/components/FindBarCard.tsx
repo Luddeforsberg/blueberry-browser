@@ -10,14 +10,13 @@ const countText = (value: string, result: FindResult | null): string => {
 }
 
 export const FindBarCard: React.FC<{
-    glass: boolean
     value: string
     onChange: (value: string) => void
     result: FindResult | null
     onStep: (forward: boolean) => void
     onClose: () => void
     inputRef?: React.Ref<HTMLInputElement>
-}> = ({ glass, value, onChange, result, onStep, onClose, inputRef }) => {
+}> = ({ value, onChange, result, onStep, onClose, inputRef }) => {
     const hasMatches = !!value && !!result && result.total > 0
 
     return (
@@ -31,8 +30,8 @@ export const FindBarCard: React.FC<{
                 }
             }}
             className={cn(
-                "h-12 flex items-center gap-0.5 pl-2 pr-2 rounded-panel border shadow-selected",
-                glass ? "bg-glass-tint backdrop-blur-xl" : "bg-background"
+                "h-12 flex items-center gap-0.5 pl-2 pr-2 rounded-sheet",
+                "bg-sheet shadow-lift"
             )}
         >
             <input
@@ -48,9 +47,9 @@ export const FindBarCard: React.FC<{
                         onStep(!event.shiftKey)
                     }
                 }}
-                className="flex-1 min-w-0 h-8 px-2 rounded-card bg-transparent text-14 outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex-1 min-w-0 h-8 px-2 rounded-tile bg-transparent text-14 outline-none placeholder:text-ink-2 focus-visible:ring-2 focus-visible:ring-focus"
             />
-            <span aria-live="polite" className="shrink-0 px-1 text-12 tabular-nums text-muted-foreground">
+            <span aria-live="polite" className="shrink-0 px-1 text-13 tabular-nums text-ink-2">
                 {countText(value, result)}
             </span>
             <ToolBarButton Icon={ChevronUp} label="Previous match" active={hasMatches} onClick={() => onStep(false)} />

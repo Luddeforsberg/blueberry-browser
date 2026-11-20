@@ -33,16 +33,28 @@ export class BookmarkStore {
     return this.bookmarks;
   }
 
-  toggle(url: string, title: string, favicon: string | null = null): void {
-    if (!WEB.test(url)) return;
-    const existing = this.bookmarks.find((bookmark) => bookmark.url === url);
-    this.save(existing
-      ? this.bookmarks.filter((bookmark) => bookmark.id !== existing.id)
-      : [...this.bookmarks, { id: randomUUID(), title: title || url, url, ...webIcon(favicon) }]);
+  has(url: string): boolean {
+    return this.bookmarks.some((bookmark) => bookmark.url === url);
   }
 
-  remove(id: string): void {
-    this.save(this.bookmarks.filter((bookmark) => bookmark.id !== id));
+  // Saves a page at the end. One already saved stays as it is.
+  add(url: string, title: string, favicon: string | null = null): void {
+    if (!WEB.test(url) || this.has(url)) return;
+    this.save([...this.bookmarks, { id: randomUUID(), title: title || url, url, ...webIcon(favicon) }]);
+  }
+
+  // Puts a saved site at a place in this list, keeping its id, and moves it there if it's in the list already. The
+  // place counts the others, so it's where it ends up.
+  place(site: Bookmark, index: number): void {
+    if (!WEB.test(site.url)) return;
+    const others = this.bookmarks.filter((bookmark) => bookmark.url !== site.url);
+    const at = Math.max(0, Math.min(Math.trunc(index) || 0, others.length));
+    const placed = { id: site.id, title: site.title, url: site.url, ...webIcon(site.favicon) };
+    this.save([...others.slice(0, at), placed, ...others.slice(at)]);
+  }
+
+  removeUrl(url: string): void {
+    if (this.has(url)) this.save(this.bookmarks.filter((bookmark) => bookmark.url !== url));
   }
 
   private save(bookmarks: Bookmark[]): void {

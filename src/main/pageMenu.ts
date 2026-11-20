@@ -1,5 +1,7 @@
-import { clipboard, Menu, type BaseWindow, type ContextMenuParams, type MenuItemConstructorOptions, type WebContents } from "electron";
+import { clipboard, type ContextMenuParams, type WebContents } from "electron";
+import type { OwnMenuItem } from "./ownMenu";
 import type { Tab } from "./Tab";
+import { SHORTCUTS } from "../shared/shortcuts";
 
 export interface PageMenuActions {
   goBack: () => void;
@@ -44,12 +46,12 @@ export function pageMenuTemplate(
   params: PageMenuParams,
   state: PageMenuState,
   actions: PageMenuActions
-): MenuItemConstructorOptions[] {
+): OwnMenuItem[] {
   const { linkURL, srcURL, editFlags, misspelledWord, dictionarySuggestions } = params;
   const selection = params.selectionText.trim();
   const image = params.mediaType === "image" && srcURL !== "";
   const plainPage = !linkURL && !image && !selection && !params.isEditable;
-  const groups: MenuItemConstructorOptions[][] = [];
+  const groups: OwnMenuItem[][] = [];
 
   if (params.isEditable && misspelledWord) {
     groups.push([
@@ -61,50 +63,50 @@ export function pageMenuTemplate(
 
   if (linkURL) {
     groups.push([
-      ...(OPENABLE_LINK.test(linkURL) ? [{ label: "Open Link in New Tab", click: () => actions.openLink(linkURL) }] : []),
-      { label: "Copy Link", click: () => actions.copyText(linkURL) },
+      ...(OPENABLE_LINK.test(linkURL) ? [{ label: "Open Link in New Tab", icon: "new-tab" as const, click: () => actions.openLink(linkURL) }] : []),
+      { label: "Copy Link", icon: "link", click: () => actions.copyText(linkURL) },
     ]);
   }
 
   if (image) {
     groups.push([
-      ...(SAVEABLE_IMAGE.test(srcURL) ? [{ label: "Save Image", click: () => actions.saveImage(srcURL) }] : []),
-      { label: "Copy Image", click: actions.copyImage },
+      ...(SAVEABLE_IMAGE.test(srcURL) ? [{ label: "Save Image", icon: "save" as const, click: () => actions.saveImage(srcURL) }] : []),
+      { label: "Copy Image", icon: "copy", click: actions.copyImage },
     ]);
   }
 
   if (selection) {
-    groups.push([{ label: `Ask ${state.assistantName} About This`, click: () => actions.askBerry(selection) }]);
+    groups.push([{ label: `Ask ${state.assistantName} About This`, icon: "berry", click: () => actions.askBerry(selection) }]);
   }
 
   if (params.isEditable) {
     groups.push([
-      { label: "Undo", enabled: editFlags.canUndo, click: actions.undo },
-      { label: "Redo", enabled: editFlags.canRedo, click: actions.redo },
+      { label: "Undo", icon: "undo", accelerator: "CmdOrCtrl+Z", enabled: editFlags.canUndo, click: actions.undo },
+      { label: "Redo", icon: "redo", accelerator: "Shift+CmdOrCtrl+Z", enabled: editFlags.canRedo, click: actions.redo },
     ]);
     groups.push([
-      { label: "Cut", enabled: editFlags.canCut, click: actions.cut },
-      { label: "Copy", enabled: editFlags.canCopy, click: actions.copy },
-      { label: "Paste", enabled: editFlags.canPaste, click: actions.paste },
-      { label: "Select All", enabled: editFlags.canSelectAll, click: actions.selectAll },
+      { label: "Cut", icon: "cut", accelerator: "CmdOrCtrl+X", enabled: editFlags.canCut, click: actions.cut },
+      { label: "Copy", icon: "copy", accelerator: "CmdOrCtrl+C", enabled: editFlags.canCopy, click: actions.copy },
+      { label: "Paste", icon: "paste", accelerator: "CmdOrCtrl+V", enabled: editFlags.canPaste, click: actions.paste },
+      { label: "Select All", icon: "select-all", accelerator: "CmdOrCtrl+A", enabled: editFlags.canSelectAll, click: actions.selectAll },
     ]);
   } else if (selection) {
-    groups.push([{ label: "Copy", click: actions.copy }]);
+    groups.push([{ label: "Copy", icon: "copy", accelerator: "CmdOrCtrl+C", click: actions.copy }]);
   }
 
   if (plainPage) {
     groups.push([
-      { label: "Back", enabled: state.canGoBack, click: actions.goBack },
-      { label: "Forward", enabled: state.canGoForward, click: actions.goForward },
-      { label: "Reload", click: actions.reload },
+      { label: "Back", icon: "back", accelerator: SHORTCUTS.back, enabled: state.canGoBack, click: actions.goBack },
+      { label: "Forward", icon: "forward", accelerator: SHORTCUTS.forward, enabled: state.canGoForward, click: actions.goForward },
+      { label: "Reload", icon: "reload", accelerator: SHORTCUTS.reload, click: actions.reload },
     ]);
-    groups.push([{ label: "Select All", click: actions.selectAll }]);
-    groups.push([{ label: state.recording ? `Stop Showing ${state.assistantName}` : `Show ${state.assistantName} How`, click: actions.showHow }]);
+    groups.push([{ label: "Select All", icon: "select-all", accelerator: "CmdOrCtrl+A", click: actions.selectAll }]);
+    groups.push([{ label: state.recording ? `Stop Showing ${state.assistantName}` : `Show ${state.assistantName} How`, icon: "show-how", click: actions.showHow }]);
   }
 
   groups.push([
-    ...(plainPage || (selection && !params.isEditable) ? [{ label: "Print…", click: actions.print }] : []),
-    { label: "Inspect", click: actions.inspect },
+    ...(plainPage || (selection && !params.isEditable) ? [{ label: "Print…", icon: "print" as const, accelerator: "CmdOrCtrl+P", click: actions.print }] : []),
+    { label: "Inspect", icon: "inspect", click: actions.inspect },
   ]);
 
   return groups.flatMap((group, index) => (index === 0 ? group : [{ type: "separator" as const }, ...group]));
@@ -116,11 +118,12 @@ export const printPage = (contents: WebContents): void => {
   });
 };
 
-// The tab can close while its menu is open, and its web contents with it.
+// The tab can close while its menu is open, and its web contents with it. The menu is ours, drawn over the page at the
+// pointer, so nothing the page runs can see or press it.
 export function attachPageMenu(
   tab: Tab,
-  window: BaseWindow,
   app: {
+    openMenu: (items: OwnMenuItem[], at: { x: number; y: number }, page: WebContents) => void;
     openTab: (url: string) => void;
     askBerry: (text: string) => void;
     assistantName: () => string;
@@ -157,6 +160,6 @@ export function attachPageMenu(
       inspect: live(() => contents.inspectElement(params.x, params.y)),
     };
     const state = { canGoBack: tab.canGoBack, canGoForward: tab.canGoForward, assistantName: app.assistantName(), recording: app.recording() };
-    Menu.buildFromTemplate(pageMenuTemplate(params, state, actions)).popup({ window });
+    app.openMenu(pageMenuTemplate(params, state, actions), { x: params.x, y: params.y }, contents);
   });
 }

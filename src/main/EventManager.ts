@@ -1,7 +1,10 @@
-import { ipcMain } from "electron";
+import { clipboard, ipcMain } from "electron";
+import { isAiService, looksLikeAiKey } from "../shared/aiKey";
 import type { Window } from "./Window";
 import type { Tab } from "./Tab";
+import type { MenuView } from "./MenuView";
 import { CHANNEL_REGIONS, chatSendOptions, isTrustedSender, type ChromeEndpoint } from "./ipc";
+import { starterExamplePrompts } from "./mascotCatalog";
 import type { ChromeRegion, InvokeChannel, InvokeChannels } from "../shared/ipc";
 
 type Result<C extends InvokeChannel> =
@@ -33,10 +36,15 @@ export class EventManager {
       chrome: endpoint(this.mainWindow.chromeView),
       overlay: endpoint(this.mainWindow.overlayView),
       find: endpoint(this.mainWindow.findBar.chromeView),
+      suggestions: endpoint(this.mainWindow.addressSuggestions.chromeView),
+      tooltip: endpoint(this.mainWindow.tooltip.chromeView),
+      preview: endpoint(this.mainWindow.previews.chromeView),
       prompt: endpoint(this.mainWindow.permissionPrompt.chrome),
       // There's no such view while the feature is off, so nothing can claim to be it.
       desktop: this.mainWindow.desktopBerry.chromeView && endpoint(this.mainWindow.desktopBerry.chromeView),
       composer: this.mainWindow.desktopBerry.composerView && endpoint(this.mainWindow.desktopBerry.composerView),
+      menu: endpoint(this.mainWindow.menus.chromeView),
+      "drop-menu": this.mainWindow.desktopBerry.menuView && endpoint(this.mainWindow.desktopBerry.menuView.chromeView),
     };
   }
 
@@ -44,18 +52,31 @@ export class EventManager {
     channel: C,
     listener: (...args: InvokeChannels[C]["args"]) => Result<C>
   ): void {
+    this.handleFrom(channel, (_, ...args) => listener(...args));
+  }
+
+  // The same, for a call that needs to know which of its views made it.
+  private handleFrom<C extends InvokeChannel>(
+    channel: C,
+    listener: (region: InvokeChannels[C]["region"], ...args: InvokeChannels[C]["args"]) => Result<C>
+  ): void {
     ipcMain.handle(channel, (event, ...args) => {
       const endpoints = this.endpoints;
-      const trusted = CHANNEL_REGIONS[channel].some((region) => {
-        const endpoint = endpoints[region];
+      const region = CHANNEL_REGIONS[channel].find((candidate) => {
+        const endpoint = endpoints[candidate];
         return endpoint !== null && isTrustedSender(event, endpoint);
       });
-      if (!trusted) {
+      if (!region) {
         throw new Error(`Rejected ${channel} from ${event.senderFrame?.url ?? "an unknown frame"}`);
       }
-      return listener(...(args as InvokeChannels[C]["args"]));
+      return listener(region, ...(args as InvokeChannels[C]["args"]));
     });
     this.handledChannels.push(channel);
+  }
+
+  // The menu view that called: the window's, or the desktop's.
+  private menuView(region: "menu" | "drop-menu"): MenuView | null {
+    return region === "menu" ? this.mainWindow.menus : this.mainWindow.desktopBerry.menuView;
   }
 
   private withTab(tabId: string, action: (tab: Tab) => unknown): boolean {
@@ -86,6 +107,18 @@ export class EventManager {
 
     this.handle("tab:navigate", (tabId, url) => this.mainWindow.navigateTab(tabId, url));
 
+    this.handle("history:suggest", (text) => this.mainWindow.suggestHistory(text));
+
+    this.handle("address:show", (request) => this.mainWindow.showAddressSuggestions(request));
+
+    this.handle("address:close", () => this.mainWindow.addressSuggestions.close());
+
+    this.handle("address:pick", (index) => this.mainWindow.pickAddressSuggestion(index));
+    this.handle("tooltip:show", (request) => this.mainWindow.showTooltip(request));
+    this.handle("tooltip:hide", () => this.mainWindow.tooltip.hide());
+    this.handle("preview:show", (request) => this.mainWindow.previews.show(request));
+    this.handle("preview:hide", () => this.mainWindow.previews.hide());
+
     this.handle("history:recent", () => this.mainWindow.recentVisits);
 
     this.handle("history:search", (options) => this.mainWindow.searchHistory(options));
@@ -98,7 +131,7 @@ export class EventManager {
 
     this.handle("history:import", (sourceId) => this.mainWindow.importHistory(sourceId));
 
-    this.handle("tab:back", (tabId) => this.withTab(tabId, (tab) => tab.goBack()));
+    this.handle("tab:back", (tabId) => this.mainWindow.goBack(tabId));
 
     this.handle("tab:forward", (tabId) => this.withTab(tabId, (tab) => tab.goForward()));
 
@@ -107,6 +140,8 @@ export class EventManager {
     this.handle("tab:stop", (tabId) => this.withTab(tabId, (tab) => tab.stop()));
 
     this.handle("tab:stop-work", (tabId) => this.mainWindow.chats.stopWorkIn(tabId));
+
+    this.handle("tab:take-over", (tabId) => this.mainWindow.chats.releaseTab(tabId));
 
     this.handle("tab:zoom-reset", (tabId) => this.withTab(tabId, (tab) => this.mainWindow.siteZoom.reset(tab)));
 
@@ -130,9 +165,19 @@ export class EventManager {
 
     this.handle("layout:app-menu", () => this.mainWindow.showAppMenu());
 
+    this.handleFrom("menu:current", (region) => this.menuView(region)?.state ?? null);
+    this.handleFrom("menu:place", (region, menuId, sheets) => this.menuView(region)?.place(menuId, sheets) ?? null);
+    this.handleFrom("menu:choose", (region, menuId, rowId) => this.menuView(region)?.choose(menuId, rowId));
+    this.handleFrom("menu:dismiss", (region, menuId) => this.menuView(region)?.dismiss(menuId));
+    this.handle("menu:answer", (askId, yes) => this.mainWindow.menus.answer(askId, yes));
+
     this.handle("overlay:show-sidebar", () => this.mainWindow.showFloatingSidebar());
 
     this.handle("overlay:hide", () => this.mainWindow.hideFloatingSidebar());
+
+    this.handle("overlay:open-popover", (popover) => this.mainWindow.openPopover(popover));
+
+    this.handle("overlay:close-popover", (refocus) => this.mainWindow.closePopover(refocus === true));
   }
 
   private handleThemeEvents(): void {
@@ -142,15 +187,33 @@ export class EventManager {
 
     this.handle("bookmarks:toggle", () => this.mainWindow.toggleBookmark());
 
-    this.handle("bookmarks:toggle-pin", () => this.mainWindow.togglePin());
+    this.handle("bookmarks:place", (id, list, index) => {
+      if (list !== "favourites" && list !== "bookmarks") return;
+      this.mainWindow.placeSavedSite(id, list, index);
+    });
 
-    this.handle("bookmarks:menu", (id) => this.mainWindow.showBookmarkMenu(id));
+    this.handleFrom("bookmarks:menu", (region, id, anchor) => this.mainWindow.showBookmarkMenu(id, anchor, region));
 
     this.handle("library:chat", (chatId) => this.mainWindow.chats.thread(chatId));
 
     this.handle("settings:get", () => this.mainWindow.settings);
 
-    this.handle("settings:update", (patch) => this.mainWindow.updateSettings(patch));
+    // First jobs are done by what main sees happen, so a renderer can't say so.
+    this.handle("settings:app-icon", (png, mascotId, ground) => this.mainWindow.appIcon.set(png, mascotId, ground));
+    this.handle("settings:update", (patch) => this.mainWindow.updateSettings({ ...patch, firstJobsDone: this.mainWindow.settings.firstJobsDone }));
+    this.handle("settings:set-appearance", (appearance) => {
+      if (appearance === "system" || appearance === "light" || appearance === "dark") this.mainWindow.updateSettings({ appearance });
+    });
+
+    this.handle("ai-key:state", () => this.mainWindow.aiKey.state);
+    this.handle("ai-key:try", (service, key) => this.mainWindow.aiKey.try(service, key));
+    this.handle("ai-key:remove", () => this.mainWindow.aiKey.remove());
+    this.handle("ai-key:find", (service) => this.mainWindow.findKey(service));
+    this.handle("ai-key:paste", async (service) => {
+      if (!isAiService(service)) return null;
+      const text = (await clipboard.readText()).trim();
+      return looksLikeAiKey(service, text) ? text : null;
+    });
 
     this.handle("phone:state", () => this.mainWindow.telegram.state);
     this.handle("phone:connect", (token) => this.mainWindow.telegram.connect(token));
@@ -184,8 +247,25 @@ export class EventManager {
 
   private handleChatEvents(): void {
     // Only Blueberry's own composers send this, so the user is there to answer if Berry asks before it starts.
-    this.handle("chat:send", (chatId, text, options) =>
-      typeof text === "string" ? this.mainWindow.chats.send(chatId, text, { ...chatSendOptions(options), userPresent: true }) : null
+    this.handle("chat:send", (chatId, text, raw) => {
+      if (typeof text !== "string") return null;
+      const { files: fileIds = [], tabs = [], ...options } = chatSendOptions(raw);
+      const { attachments, chats } = this.mainWindow;
+      // Only files main read and kept go, and only once the message has gone are they let go of.
+      const files = attachments.peek(fileIds);
+      if (!files) return null;
+      const thread = chats.send(chatId, text, { ...options, files, tabs, userPresent: true });
+      if (thread) {
+        attachments.drop(fileIds);
+        this.mainWindow.sentFromChrome(thread);
+      }
+      return thread;
+    });
+    this.handle("attachments:choose-files", (kept) => this.mainWindow.attachments.chooseFiles(kept));
+    this.handle("attachments:add-files", (files, kept) => this.mainWindow.attachments.addFiles(files, kept));
+    this.handle("attachments:discard", (id) => this.mainWindow.attachments.discard(id));
+    this.handle("attachments:tabs", (chatId, mascotId) =>
+      this.mainWindow.chats.attachableTabs(typeof chatId === "string" ? chatId : null, typeof mascotId === "string" ? mascotId : null)
     );
 
     this.handle("work:watch", (chatId, pictureWidth) => this.mainWindow.workViews.watch(chatId, pictureWidth));
@@ -196,6 +276,7 @@ export class EventManager {
     this.handle("recording:discard", () => this.mainWindow.recordings.discard());
     this.handle("recording:draft", () => this.mainWindow.recordings.draft());
     this.handle("chat:stop", (chatId) => this.mainWindow.chats.stop(chatId));
+    this.handle("chat:panel-shows", (chatId) => this.mainWindow.panelShows(typeof chatId === "string" ? chatId : null));
     this.handle("chat:decide", (chatId, approvalId, allow, answer) =>
       this.mainWindow.chats.decide(chatId, approvalId, allow, answer)
     );
@@ -204,13 +285,13 @@ export class EventManager {
       typeof title === "string" ? this.mainWindow.chats.rename(chatId, title) : false
     );
 
-    this.handle("chat:menu", (chatId) => this.mainWindow.showChatMenu(chatId));
+    this.handleFrom("chat:menu", (region, chatId, anchor) => this.mainWindow.showChatMenu(chatId, anchor, region));
 
     this.handle("chat:page-access", () => this.mainWindow.chats.canSeePage);
 
     this.handle("chat:set-page-access", (enabled) => this.mainWindow.chats.setPageAccess(enabled));
 
-    this.handle("berry:context-menu", () => this.mainWindow.showBerryMenu());
+    this.handle("berry:context-menu", (anchor) => this.mainWindow.showBerryMenu(anchor));
 
     this.handle("page:text", async () => {
       const tab = this.mainWindow.activeTab;
@@ -240,6 +321,10 @@ export class EventManager {
     this.handle("mascots:save", (id, draft) => this.mainWindow.saveMascot(id, draft));
     this.handle("mascots:delete", (id) => this.mainWindow.confirmDeleteMascot(id));
     this.handle("mascots:gallery", () => this.mainWindow.gallery.list());
+    this.handle("mascots:examples", () => starterExamplePrompts());
+    this.handle("mascots:choose", (mascotId) => {
+      if (mascotId === null || typeof mascotId === "string") this.mainWindow.updateSettings({ chosenMascotId: mascotId });
+    });
     this.handle("mascots:gallery-linked", (id) => this.mainWindow.gallery.linked(id));
     this.handle("mascots:add-from-gallery", (galleryId, version, name) => this.mainWindow.addFromGallery(galleryId, version, name));
     this.handle("mascots:publish", (mascotId, choices) => this.mainWindow.gallery.publish(mascotId, choices));
@@ -259,6 +344,7 @@ export class EventManager {
     this.handle("downloads:list", () => this.mainWindow.downloads.refresh());
     this.handle("downloads:act", (id, action) => this.mainWindow.downloads.act(id, action));
     this.handle("downloads:choose-folder", () => this.mainWindow.chooseDownloadFolder());
+    this.handle("downloads:open-folder", () => this.mainWindow.downloads.openFolder());
   }
 
   private handlePermissionEvents(): void {
@@ -274,15 +360,21 @@ export class EventManager {
     const { desktopBerry } = this.mainWindow;
     this.handle("desktop:shortcut-taken", () => desktopBerry.shortcutTaken);
     this.handle("desktop:state", () => desktopBerry.state);
-    this.handle("desktop:line-box", (box) => desktopBerry.setLineBox(box));
-    this.handle("desktop:press", () => desktopBerry.press());
+    this.handle("desktop:drop-box", (box, frame) => desktopBerry.setDropBox(box, frame));
+    this.handle("desktop:press", (part) => desktopBerry.press(part));
     this.handle("desktop:drag-start", () => desktopBerry.dragStart());
     this.handle("desktop:drag-end", () => desktopBerry.dragEnd());
     this.handle("desktop:menu", () => desktopBerry.showMenu());
-    this.handle("desktop:composer-state", () => desktopBerry.composerState);
-    this.handle("desktop:composer-height", (height) => desktopBerry.setComposerHeight(height));
-    this.handle("desktop:send", (text) => desktopBerry.send(text));
-    this.handle("desktop:close-composer", () => desktopBerry.closeComposer());
+    this.handle("desktop:panel-state", () => desktopBerry.panelState);
+    this.handle("desktop:panel-height", (height) => desktopBerry.setPanelHeight(height));
+    this.handle("desktop:send", (text, cloud) => desktopBerry.send(text, cloud));
+    this.handle("desktop:choose", (mascotId) => desktopBerry.choose(mascotId));
+    this.handle("desktop:open-box", () => desktopBerry.openBox());
+    this.handle("desktop:close-panel", () => desktopBerry.closePanel());
+    this.handle("desktop:open-blueberry", () => desktopBerry.openBlueberry());
+    this.handle("desktop:tray-press", (key) => desktopBerry.trayPress(key));
+    this.handle("desktop:decide", (decision) => desktopBerry.decide(decision));
+    this.handle("desktop:see-page", () => desktopBerry.seePage());
   }
 
   public cleanup(): void {

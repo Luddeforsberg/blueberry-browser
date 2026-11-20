@@ -1,7 +1,6 @@
 import {
   ModelConfigError,
   type GenerateTitle,
-  type ReplyContent,
   type ReplyMessage,
   type StreamReply,
 } from "./agent";
@@ -18,15 +17,18 @@ import type { ActionApproval } from "../shared/ipc";
 import type { ChatStore, StoredChat } from "./ChatStore";
 import type { Tab } from "./Tab";
 import type { CdpTab } from "./CdpTab";
-import type { ChatApproval, ChatStep, ChatThread, ChatThreadMessage, HandoffNeed, MascotProfile, MemoryFact, UsedPage, WorkTabState } from "../shared/library";
+import type { ChatApproval, ChatStep, ChatThread, ChatThreadMessage, HandoffNeed, MascotProfile, MemoryFact, SaidOnTheWay, StepKind, UsedPage, WorkTabState } from "../shared/library";
 import type { JobWork } from "./WorkViews";
-import { BERRY, narrowSites, siteAllowed } from "../shared/mascots";
+import { BERRY, narrowSites, permissionsInWords, siteAllowed } from "../shared/mascots";
 import { asHistoryMessage } from "../shared/phone";
 import { addressToKeep, replyPointsTo } from "./jobTabs";
 import type { MemoryToOffer } from "./MemoryStore";
+import { sentAttachment, type PreparedFile } from "./Attachments";
+import { fileBlocks, pageBlocks, withAttached, type PageSnapshot } from "./attachmentPrompt";
+import { MAX_FILES, MAX_TABS, type SentAttachment, type TabChoice } from "../shared/attachments";
+import { whyOnCard, type AskWhy } from "../shared/asking";
 
 const MAX_TITLE_LENGTH = 40;
-const MAX_PAGE_TEXT_LENGTH = 4000;
 const MAX_RENAME_LENGTH = 100;
 // A chat with no topic by then probably won't get one, so stop paying to ask.
 const MAX_TITLE_ATTEMPTS = 5;
@@ -44,7 +46,14 @@ const hostOf = (url: string): string | null => {
   }
 };
 
-const publicApproval = ({ id, text, question, handoff }: ChatApproval): ChatApproval => ({ id, text, ...(question ? { question } : {}), ...(handoff ? { handoff } : {}) });
+const publicApproval = ({ id, text, question, answers, why, handoff }: ChatApproval): ChatApproval => ({
+  id,
+  text,
+  ...(question ? { question } : {}),
+  ...(answers?.length ? { answers } : {}),
+  ...(why ? { why } : {}),
+  ...(handoff ? { handoff } : {}),
+});
 
 const titleFrom = (text: string): string =>
   text.length > MAX_TITLE_LENGTH ? `${text.slice(0, MAX_TITLE_LENGTH - 1).trimEnd()}…` : text;
@@ -70,7 +79,7 @@ const errorMessage = (error: unknown): string => {
   if (error instanceof ModelConfigError || error instanceof CloudBusyError) return error.message;
   const message = error instanceof Error ? error.message.toLowerCase() : "";
   if (message.includes("401") || message.includes("unauthorized")) {
-    return "The API key was rejected. Check it in the .env file and restart.";
+    return "The AI service turned down the key. Check it in Settings, under Connections.";
   }
   if (message.includes("429") || message.includes("rate limit")) {
     return "The model is rate limited right now. Try again in a moment.";
@@ -82,22 +91,11 @@ const errorMessage = (error: unknown): string => {
   return "Something went wrong with this reply. Try again.";
 };
 
-interface Page {
-  url: string;
-  text: string | null;
-  screenshot: string | null;
-  // Said after the page, as ours rather than the page's.
-  note?: string;
-}
-
-const withPage = (message: string, page: Page): ReplyContent => {
-  const text = page.text ? `\n${page.text.slice(0, MAX_PAGE_TEXT_LENGTH)}\n` : "";
-  return [
-    ...(page.screenshot
-      ? [{ type: "image_url" as const, image_url: { url: page.screenshot } }]
-      : []),
-    { type: "text" as const, text: `<page url="${page.url}">${text}</page>\n${page.note ? `${page.note}\n` : ""}\n${message}` },
-  ];
+// A status line grows as its message streams, so it replaces what that message said so far, until a step comes between.
+const keepSaid = (said: SaidOnTheWay[], after: number, text: string): void => {
+  const last = said.at(-1);
+  if (last && last.after === after && text.startsWith(last.text)) last.text = text;
+  else said.push({ after, text });
 };
 
 // The model sees what it did earlier by notes of its steps, not by the pages themselves, which aren't saved.
@@ -109,6 +107,8 @@ interface Run {
   // What it said it's doing, in a message that went on to use tools, until its answer starts. Never saved or sent on.
   statusLine: string | null;
   steps: ChatStep[];
+  // What it wrote on the way, kept where it was said, for the screen only.
+  said: SaidOnTheWay[];
   // Words after a step start a new paragraph, not the end of the sentence before it.
   breakBeforeText: boolean;
   approval: (ChatApproval & { askedAt: number; answer: (allow: boolean, text?: string) => void }) | null;
@@ -223,7 +223,15 @@ interface Job {
   takenOver: Map<string, string>;
   // Where a call that names no tab goes. Fixed by the job, so the user's browsing can't redirect it.
   current: string | null;
+  // Tabs the user attached to a message in this chat, which its tools reach from then on, unless the user has been
+  // handed one or another job has it. The job never closes them.
+  attached: Set<string>;
+  // Their sites as they were attached, which count as ones the job has been on, as a page sent with a message does, and
+  // nothing more: not as named, so a new subdomain there still asks.
+  attachedSites: Set<string>;
 }
+
+const newJob = (): Job => ({ own: new Set(), takenOver: new Map(), current: null, attached: new Set(), attachedSites: new Set() });
 
 // A run that's waiting on the user, for the Needs you page.
 export interface WaitingRun {
@@ -249,7 +257,7 @@ export interface TaskProgress {
 }
 
 // A runner with no window has no saved chats, so only what a task uses has to be there.
-export type ChatStoreLike = Pick<ChatStore, "chat" | "createChat" | "addMessage" | "renameChat" | "deleteChat" | "needsTitle" | "setGeneratedTitle">;
+export type ChatStoreLike = Pick<ChatStore, "chat" | "createChat" | "addMessage" | "filesOf" | "renameChat" | "deleteChat" | "needsTitle" | "setGeneratedTitle" | "setSeen">;
 
 export interface TaskResult {
   text: string;
@@ -305,6 +313,8 @@ export class Chats {
       actionApproval: () => ActionApproval;
       // What Berry goes by right now, since Hide Berry changes it.
       assistantName?: () => string;
+      // Whether the chat's tab is the one in front. With none, as on a runner, every chat counts as seen.
+      chatInFront?: (chatId: string) => boolean;
     },
     private readonly events: ChatEvents,
     // Who a chat runs as, read when each reply starts. It must never answer with more than the mascot was given.
@@ -357,7 +367,7 @@ export class Chats {
       closeTab: (tab) => cloud.close(tab.id),
       heldByUser: (id) => this.handedOver.has(id),
       handOver: (tab, need) => this.handOverInCloud(chatId, run, job, tab, need),
-      ask: (question) => this.askQuestion(chatId, run, question),
+      ask: (question, answers) => this.askQuestion(chatId, run, question, answers),
     });
   }
 
@@ -394,21 +404,27 @@ export class Chats {
 
   // Tabs always open behind the user, so the approval cards, the reply and whatever they're doing stay in front. With
   // `page`, the page sent with this message, the tools also reach every open tab. Without it, only the job's own.
-  // `asked` is what the user typed for this job, which names sites it may go to without asking.
-  private jobTools(chatId: string, run: Run, page: Tab | null, asked: string): PageTool[] {
-    const job = this.jobs.get(chatId) ?? { own: new Set<string>(), takenOver: new Map<string, string>(), current: null };
-    this.jobs.set(chatId, job);
+  // `asked` is what the user typed for this job, which names sites it may go to without asking. `attachedNow` are the tabs
+  // attached to this message, the first place a call that names no tab goes when there's no page.
+  private jobTools(chatId: string, run: Run, page: Tab | null, asked: string, attachedNow: readonly Tab[] = []): PageTool[] {
+    const job = this.jobOf(chatId);
     if (page) {
       job.current = page.id;
       // Sending the page with a message is the user handing it over.
       job.takenOver.delete(page.id);
-    } else if (job.current && !job.own.has(job.current) && !job.takenOver.has(job.current)) {
+    } else if (attachedNow.length > 0) {
+      job.current = attachedNow[attachedNow.length - 1].id;
+    } else if (job.current && !job.own.has(job.current) && !job.takenOver.has(job.current) && !job.attached.has(job.current)) {
       // That was the page from an earlier message. This one came without it, so it's out of reach.
       job.current = [...job.own].at(-1) ?? null;
     }
+    // Its own tabs, and the ones the user attached to this chat while no other job has them.
+    const lent = (tab: Tab) => !page && !job.own.has(tab.id) && job.attached.has(tab.id) && this.inOtherHands(tab.id, chatId);
+    const reaches = (tab: Tab) => !!page || job.own.has(tab.id) || (job.attached.has(tab.id) && !lent(tab));
     const tools = run.cloud ? this.cloudTools(chatId, run, job, asked) : createPageTools<Tab>({
-      allTabs: () => this.browser.allTabs().filter((tab) => page || job.own.has(tab.id)),
-      activeTab: () => this.browser.allTabs().find((tab) => tab.id === job.current) ?? null,
+      allTabs: () => this.browser.allTabs().filter(reaches),
+      // The tools say why a tab the user took or was handed is out of reach, so only one another job has goes unsaid.
+      activeTab: () => this.browser.allTabs().find((tab) => tab.id === job.current && !lent(tab)) ?? null,
       openTab: (url) => {
         const tab = this.browser.openBackgroundTab(url);
         job.own.add(tab.id);
@@ -432,11 +448,12 @@ export class Chats {
       handOver: (tab, need) => this.handOver(chatId, run, job, tab, need),
       limits: unlimited(run.mascot) ? undefined : run.mascot,
       asked,
-      beenTo: run.earlierSites,
+      beenTo: [...run.earlierSites, ...job.attachedSites],
+      attached: (id) => job.attached.has(id),
       search: firecrawlSearch(),
       fetchPage: firecrawlFetch(),
       closeTab: (tab) => this.closeRunTab(run, tab),
-      ask: (question) => this.askQuestion(chatId, run, question),
+      ask: (question, answers) => this.askQuestion(chatId, run, question, answers),
     });
     // A picture can't be gone through, so `Tab` refuses to take one instead. A refusal goes straight to the model too.
     return tools.map((tool) => ({
@@ -562,6 +579,8 @@ export class Chats {
   // Nothing's left to wait for once a handed-over tab has gone.
   tabClosed(tabId: string): void {
     this.handedOver.delete(tabId);
+    // An attached tab that's gone is simply no longer there to reach. Its site stays one the job has been on.
+    this.jobs.forEach((job) => job.attached.delete(tabId));
     this.handedBack.forEach((tab) => {
       if (tab.id === tabId) this.handedBack.delete(tab);
     });
@@ -631,6 +650,60 @@ export class Chats {
     return [...this.jobs.values()].some(({ own }) => own.has(tabId));
   }
 
+  private jobOf(chatId: string): Job {
+    const job = this.jobs.get(chatId) ?? newJob();
+    this.jobs.set(chatId, job);
+    return job;
+  }
+
+  // Another job opened this tab, or another reply is working in it right now.
+  private inOtherHands(tabId: string, chatId: string | null): boolean {
+    return (
+      [...this.jobs].some(([id, job]) => id !== chatId && job.own.has(tabId)) ||
+      [...this.runs].some(([id, run]) => id !== chatId && [...run.tabs].some((tab) => tab.id === tabId))
+    );
+  }
+
+  // Why this tab can't go with a message in this chat, as this mascot, or null if it can. The one judge of it, for the
+  // list the + menu shows and for the message itself. A tab a job opened isn't the user's to give, and isn't listed.
+  tabProblem(tab: Tab, chatId: string | null, mascot: MascotProfile): string | null {
+    if (!/^(https?|file):/.test(tab.url)) return "Nothing here can be read";
+    const held = this.handedOver.get(tab.id);
+    if (held?.asking) {
+      const need = [...this.runs.values()].find((run) => run.approval?.handoff?.tabId === tab.id)?.approval?.handoff?.need;
+      return need === "code" ? "You’re entering a code there, so it stays yours" : need === "captcha" ? "You’re solving a captcha there, so it stays yours" : "You’re signing in there, so it stays yours";
+    }
+    if (this.isOwnTab(tab.id)) return "A job opened it, so it isn’t yours to give";
+    const working = [...this.runs.entries()].find(([id, run]) => id !== chatId && [...run.tabs].some(({ id: used }) => used === tab.id))?.[1];
+    if (working) return `${working.mascot.id === BERRY.id ? (this.browser.assistantName?.() ?? BERRY.name) : working.mascot.name} is working in it`;
+    if (!siteAllowed(tab.url, mascot.sites)) {
+      const [where] = permissionsInWords(mascot);
+      return `${mascot.name} ${where.text.charAt(0).toLowerCase()}${where.text.slice(1)}`;
+    }
+    if (tab.trouble === "crashed") return "This page has crashed";
+    return null;
+  }
+
+  // The user's own web pages, newest first, each with why it can't be added if it can't. Not the one in front, which is
+  // This page, not internal pages, and not a tab a job opened. For a mascot limited to sites, only tabs on them.
+  attachableTabs(chatId: string | null, mascotId: string | null): TabChoice[] {
+    const chat = chatId ? this.store.chat(chatId) : null;
+    if (chatId && !chat) return [];
+    const mascot = this.mascotOf(chat ? chat.mascotId : typeof mascotId === "string" && mascotId !== BERRY.id ? mascotId : null);
+    if (mascot.deletedAt !== null) return [];
+    const front = this.browser.activeTab()?.id;
+    return [...this.browser.allTabs()]
+      .reverse()
+      .filter((tab) => tab.id !== front && !this.isOwnTab(tab.id) && siteAllowed(tab.url, mascot.sites))
+      .map((tab) => ({
+        id: tab.id,
+        title: this.withoutCodes(tab.title || siteOf(tab.url)),
+        site: siteOf(tab.url),
+        favicon: tab.favicon,
+        problem: this.tabProblem(tab, chatId, mascot),
+      }));
+  }
+
   // The chat whose running reply opened this tab and still has it. The sidebar shows it there, not with the user's tabs.
   jobChatOf(tabId: string): string | null {
     for (const [id, job] of this.jobs) {
@@ -677,16 +750,19 @@ export class Chats {
   }
 
   // The user clicked or typed in this tab, or sent it somewhere. Looking at it isn't enough. From here on it may hold
-  // anything, so the job that opened it can't reach it, and the model is told why.
+  // anything, so the job that opened it can't reach it, and the model is told why. A tab the user attached to a chat is
+  // the same: it was shared as it stood, and once they use it again the chat has it only if they attach it again.
   releaseTab(tabId: string): void {
     this.taskPopups.forEach((popups) => popups.delete(tabId));
     const held = this.handedOver.get(tabId);
     if (held) held.touched = true;
     // This runs on every click and key press in every tab, so most of the time it has nothing to do.
-    if (!this.isOwnTab(tabId)) return;
+    if (!this.isOwnTab(tabId) && ![...this.jobs.values()].some(({ attached }) => attached.has(tabId))) return;
     const tab = this.browser.allTabs().find((candidate) => candidate.id === tabId);
     this.jobs.forEach((job, id) => {
-      if (!job.own.delete(tabId)) return;
+      const opened = job.own.delete(tabId);
+      const lent = job.attached.delete(tabId);
+      if (!opened && !lent) return;
       // Said to the model later, when the tab may be somewhere else, so it's cleaned now.
       const url = tab?.url ?? this.cloud?.page(tabId)?.url;
       job.takenOver.set(tabId, url ? this.withoutCodes(url) : "an earlier page");
@@ -727,7 +803,7 @@ export class Chats {
     const open = this.browser.allTabs();
     const state = (tab: Tab): WorkTabState => {
       if (this.handedOver.has(tab.id) || tab.heldForUser) return "held";
-      if (job?.takenOver.has(tab.id) || !(run.withPage || job?.own.has(tab.id))) return "yours";
+      if (job?.takenOver.has(tab.id) || !(run.withPage || job?.own.has(tab.id) || job?.attached.has(tab.id))) return "yours";
       if (!siteAllowed(tab.url, run.mascot.sites)) return "off-limits";
       if (run.withPage && !this.pageAccess) return "no-access";
       return tab.mayShowCode || tab.trouble || tab.loadError ? "none" : "picture";
@@ -763,6 +839,8 @@ export class Chats {
         partial: progress?.reply ?? null,
         statusLine: null,
         steps: progress?.steps ?? [],
+        said: [],
+        startedAt: null,
         approval: progress?.approval ? publicApproval(progress.approval) : null,
         error: this.errors.get(chat.id) ?? null,
         memoryIds: [],
@@ -774,6 +852,8 @@ export class Chats {
       partial: run?.partial ?? null,
       statusLine: run?.statusLine ?? null,
       steps: run?.steps ?? [],
+      said: run ? this.saidOf(run) : [],
+      startedAt: run?.startedAt ?? null,
       approval: run?.approval ? publicApproval(run.approval) : null,
       error: this.errors.get(chat.id) ?? null,
       memoryIds: run?.memoryIds ?? [],
@@ -808,36 +888,74 @@ export class Chats {
       cloud = false,
       runner = false,
       userPresent = false,
-    }: { seePage: boolean; mascotId?: string | null; from?: string | null; sites?: string[]; tools?: string[]; askAtLeast?: ActionApproval; onEnd?: (ended: EndedReply) => void; cloud?: boolean; runner?: boolean; userPresent?: boolean }
+      files = [],
+      tabs: tabIds = [],
+    }: {
+      seePage: boolean;
+      mascotId?: string | null;
+      from?: string | null;
+      sites?: string[];
+      tools?: string[];
+      askAtLeast?: ActionApproval;
+      onEnd?: (ended: EndedReply) => void;
+      cloud?: boolean;
+      runner?: boolean;
+      userPresent?: boolean;
+      // What the user attached in the prompt box: files main read and checked, and the ids of their tabs.
+      files?: readonly PreparedFile[];
+      tabs?: readonly string[];
+    }
   ): ChatThread | null {
     const message = text.trim();
     if (!message) return null;
     if (chatId && (!this.store.chat(chatId) || this.isRunning(chatId))) return null;
-    // Only the user starts one there, from this window, so not an app and never with a page.
+    if (files.length > MAX_FILES || tabIds.length > MAX_TABS || new Set(tabIds).size !== tabIds.length) return null;
+    const attaching = files.length > 0 || tabIds.length > 0;
+    // Only the user starts one there, from this window, so not an app and never with a page. What's attached would go
+    // to our server with the job, so nothing attached goes there.
     const inRunner = (runner === true && from === null) || (chatId !== null && !!this.runner?.has(chatId));
-    if (inRunner) return this.sendToRunner(chatId, message, mascotId ?? null);
+    if (inRunner) return attaching ? null : this.sendToRunner(chatId, message, mascotId ?? null);
     const inCloud = cloud === true || (chatId !== null && this.cloudChats.has(chatId));
     // Asked for the cloud with it off, the job doesn't quietly run in the user's own tabs instead.
     if (inCloud && !this.cloud?.available()) return null;
+    // A job in the cloud works in its own browser there, never in a tab here. Files go to the model from here as ever.
+    if (inCloud && tabIds.length > 0) return null;
 
     // The renderer's choice is checked here, so nothing but a mascot in the flock can start a chat.
     const chosen = typeof mascotId === "string" && mascotId !== BERRY.id ? mascotId : null;
     if (!chatId && chosen && this.mascotOf(chosen).deletedAt !== null) return null;
-    const id = chatId ?? this.store.createChat(titleFrom(message), chosen, from);
-    const profile = this.mascotOf(this.store.chat(id)?.mascotId ?? null);
+    const profile = this.mascotOf(chatId ? (this.store.chat(chatId)?.mascotId ?? null) : chosen);
     const narrowed = sites.length > 0 ? { ...profile, sites: narrowSites(profile.sites, sites) } : profile;
     const mascot = tools ? { ...narrowed, tools: narrowed.tools.filter((tool) => tools.includes(tool)) } : narrowed;
-    this.store.addMessage(id, { role: "user", content: message });
+    // Judged again here, as the message goes, since anything may have changed since the menu showed them.
+    const tabsNow = tabIds.flatMap((tabId) => this.browser.allTabs().filter((tab) => tab.id === tabId));
+    if (tabsNow.length !== tabIds.length || tabsNow.some((tab) => this.tabProblem(tab, chatId, mascot) !== null)) return null;
+    const id = chatId ?? this.store.createChat(titleFrom(message), chosen, from);
+    const attached: SentAttachment[] = [
+      ...tabsNow.map((tab) => ({ kind: "tab" as const, title: this.withoutCodes(tab.title || siteOf(tab.url)), site: siteOf(tab.url) })),
+      ...files.map(sentAttachment),
+    ];
+    this.store.addMessage(id, { role: "user", content: message, ...(attached.length > 0 ? { attached } : {}) }, files);
+    if (tabsNow.length > 0) {
+      const job = this.jobOf(id);
+      tabsNow.forEach((tab) => {
+        job.attached.add(tab.id);
+        if (/^https?:/.test(tab.url)) job.attachedSites.add(siteOf(tab.url));
+        // Attaching a tab is the user sharing it, as sending the page in front is.
+        job.takenOver.delete(tab.id);
+        this.letGo(tab);
+      });
+    }
     this.errors.delete(id);
     const earlier = this.finished.get(id)?.run;
     this.finished.delete(id);
     this.memory?.dropOffers(id);
 
-    const run: Run = { controller: new AbortController(), partial: "", statusLine: null, steps: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot, earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]), memoryIds: [], memoryNote: "", answers: [], handedOver: false, cloud: inCloud, askAtLeast, onEnd, userPresent };
+    const run: Run = { controller: new AbortController(), partial: "", statusLine: null, steps: [], said: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot, earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]), memoryIds: [], memoryNote: "", answers: [], handedOver: false, cloud: inCloud, askAtLeast, onEnd, userPresent };
     if (inCloud) this.cloudChats.add(id);
     this.runs.set(id, run);
     // A page in this window never goes with a job in the cloud.
-    void this.reply(id, run, seePage && !inCloud);
+    void this.reply(id, run, seePage && !inCloud, tabsNow);
 
     this.notify(id);
     return this.thread(id);
@@ -902,6 +1020,11 @@ export class Chats {
     this.events.onListChanged();
   }
 
+  // The chat's tab came to the front.
+  markSeen(chatId: string): void {
+    if (this.store.setSeen(chatId, true)) this.events.onListChanged();
+  }
+
   rename(chatId: string, title: string): boolean {
     const name = title.trim().slice(0, MAX_RENAME_LENGTH);
     if (!name || !this.store.renameChat(chatId, name)) return false;
@@ -942,7 +1065,7 @@ export class Chats {
   }
 
   // Never rejects: whatever goes wrong ends up on the thread.
-  private async reply(chatId: string, run: Run, seePage: boolean): Promise<void> {
+  private async reply(chatId: string, run: Run, seePage: boolean, attachedTabs: readonly Tab[]): Promise<void> {
     const { signal } = run.controller;
     try {
       // Read before anything waits, so it's the page the message was sent from wherever the user has gone since.
@@ -951,9 +1074,10 @@ export class Chats {
       // Sending a page with a message is the user sharing it, so one they kept back is theirs to give.
       if (page) this.letGo(page);
       run.withPage = page !== null;
-      const messages = await this.withNewestPage(chatId, seePage, run.mascot);
+      const messages = await this.requestMessages(chatId, seePage, run.mascot, attachedTabs);
+      // Only what the user typed. Nothing attached is their words, so no address in a file or a page skips a card.
       const said = this.userWords(chatId).join("\n");
-      const tools = this.jobTools(chatId, run, page, said);
+      const tools = this.jobTools(chatId, run, page, said, attachedTabs);
       this.recall(chatId, run, said);
       await this.consume(chatId, run, messages, tools, (content) => {
         if (content) this.events.onChunk(chatId, content);
@@ -974,9 +1098,20 @@ export class Chats {
     this.publishWorkingTabs();
     const steps = endedSteps(run.steps, signal.aborted);
     if (run.partial || steps.length > 0) {
-      this.store.addMessage(chatId, { role: "assistant", content: run.partial, steps, memoryIds: run.memoryIds, ...(pages.length > 0 ? { pages } : {}) });
+      this.store.addMessage(chatId, {
+        role: "assistant",
+        content: run.partial,
+        steps,
+        memoryIds: run.memoryIds,
+        ...(pages.length > 0 ? { pages } : {}),
+        said: this.saidOf(run),
+        startedAt: run.startedAt,
+        took: Date.now() - run.startedAt,
+      });
     }
     const error = this.errors.get(chatId) ?? null;
+    // Finished while the user was somewhere else, so the sidebar shows it as done until they open it.
+    if (!signal.aborted && this.browser.chatInFront && !this.browser.chatInFront(chatId)) this.store.setSeen(chatId, false);
     run.onEnd?.({ reply: run.partial, steps, outcome: run.controller.signal.aborted ? "stopped" : error ? "failed" : "done", error });
     this.notify(chatId);
     if (run.partial && !this.errors.has(chatId)) void this.nameChat(chatId);
@@ -1039,8 +1174,8 @@ export class Chats {
     for await (const part of this.streamReply(messages, run.controller.signal, {
       tools,
       actionApproval: () => stricter(this.browser.actionApproval(), run.askAtLeast),
-      approve: (text) => this.askToAllow(id, run, text),
-      onStep: (text, shown) => this.startStep(id, run, text, shown),
+      approve: (text, why) => this.askToAllow(id, run, text, why),
+      onStep: (text, shown, kind) => this.startStep(id, run, text, shown, kind),
       onUsage,
       mascotNote: (run.mascot.id === BERRY.id ? "" : mascotNote(run.mascot)) + run.memoryNote || undefined,
       userPresent: run.userPresent,
@@ -1051,6 +1186,7 @@ export class Chats {
         run.partial = "";
         run.breakBeforeText = false;
         run.statusLine = part.statusLine;
+        keepSaid(run.said, run.steps.length, part.statusLine);
         this.publish(id, run);
         if (tookBack) onWords("");
         continue;
@@ -1061,6 +1197,8 @@ export class Chats {
       // The answer has started, so the line saying what it's doing goes, and the whole reply goes out with it.
       if (run.statusLine === null) onWords(content);
       else {
+        // Words taken for a status line that turn out to be the answer, as a long job's last call can, are said once.
+        if (run.said.at(-1)?.after === run.steps.length && run.said.at(-1)?.text === part.trim()) run.said.pop();
         run.statusLine = null;
         this.publish(id, run);
         onWords("");
@@ -1087,6 +1225,7 @@ export class Chats {
       partial: "",
       statusLine: null,
       steps: [],
+      said: [],
       breakBeforeText: false,
       approval: null,
       tabs: new Set(),
@@ -1143,6 +1282,11 @@ export class Chats {
     };
   }
 
+  // What it wrote on the way, cleaned as anything a page could have put in it.
+  private saidOf(run: Run): SaidOnTheWay[] {
+    return run.said.map(({ after, text }) => ({ after, text: this.withoutCodes(text) }));
+  }
+
   private publishWorkingTabs(): void {
     const runs = [...this.runs.values()];
     const mascots = new Map(runs.filter((run) => run.mascot.id !== BERRY.id).flatMap((run) => [...run.tabs].map((tab) => [tab, run.mascot.id] as const)));
@@ -1155,8 +1299,8 @@ export class Chats {
     if (thread) this.events.onThread(thread);
   }
 
-  private startStep(chatId: string, run: Run, text: string, shown?: string): () => void {
-    const step: ChatStep = { text, done: false, ...(shown ? { shown } : {}) };
+  private startStep(chatId: string, run: Run, text: string, shown?: string, kind?: StepKind): () => void {
+    const step: ChatStep = { text, done: false, ...(shown ? { shown } : {}), ...(kind ? { kind } : {}) };
     run.steps.push(step);
     run.breakBeforeText = run.partial !== "";
     this.publish(chatId, run);
@@ -1166,7 +1310,7 @@ export class Chats {
     };
   }
 
-  private wait<T>(chatId: string, run: Run, text: string, kind: Pick<ChatApproval, "question" | "handoff">, onAnswer: (allow: boolean, answer?: string) => T): Promise<T> {
+  private wait<T>(chatId: string, run: Run, text: string, kind: Pick<ChatApproval, "question" | "answers" | "why" | "handoff">, onAnswer: (allow: boolean, answer?: string) => T): Promise<T> {
     const { signal } = run.controller;
     return new Promise((resolve, reject) => {
       const stopped = () => reject(new Error("Stopped while waiting for approval"));
@@ -1190,13 +1334,15 @@ export class Chats {
     });
   }
 
-  private askToAllow(chatId: string, run: Run, text: string): Promise<boolean> {
-    return this.wait(chatId, run, text, {}, (allow) => allow);
+  // The card names why it asked only by a known reason, and marks only what's in its words.
+  private askToAllow(chatId: string, run: Run, text: string, because?: AskWhy): Promise<boolean> {
+    const why = whyOnCard(text, because);
+    return this.wait(chatId, run, text, why ? { why } : {}, (allow) => allow);
   }
 
-  // Null if the user would rather not answer.
-  private askQuestion(chatId: string, run: Run, question: string): Promise<string | null> {
-    return this.wait(chatId, run, question, { question: true }, (allow, answer) => {
+  // Null if the user would rather not answer. A pressed answer comes back through `decide` like a typed one.
+  private askQuestion(chatId: string, run: Run, question: string, answers: string[] = []): Promise<string | null> {
+    return this.wait(chatId, run, question, { question: true, ...(answers.length > 0 ? { answers } : {}) }, (allow, answer) => {
       if (!allow || !answer) return null;
       if (!run.answeredElsewhere) run.answers.push({ question, answer });
       return answer;
@@ -1232,19 +1378,35 @@ export class Chats {
     }
   }
 
-  // Only the newest message carries the page, so older screenshots don't go to the model again.
-  private async withNewestPage(chatId: string, seePage: boolean, mascot: MascotProfile): Promise<ReplyMessage[]> {
-    const messages = (this.store.chat(chatId)?.messages ?? []).map(toReplyMessage);
-    const page = seePage ? await this.readPage(mascot) : null;
-    const newest = messages[messages.length - 1];
-    if (!page || !newest || typeof newest.content !== "string") return messages;
-    return [...messages.slice(0, -1), { role: "user", content: withPage(newest.content, page) }];
+  // The chat as the model reads it. Only the newest message carries the page and the tabs attached to it, so older
+  // screenshots don't go again. Files stay with the message they went with, so later questions can be about them.
+  private async requestMessages(chatId: string, seePage: boolean, mascot: MascotProfile, attachedTabs: readonly Tab[]): Promise<ReplyMessage[]> {
+    const files = this.store.filesOf(chatId);
+    const messages = (this.store.chat(chatId)?.messages ?? []).map((message, index): ReplyMessage => {
+      const history = toReplyMessage(message);
+      return { role: history.role, content: withAttached(history.content, (files[index] ?? []).flatMap(fileBlocks)) };
+    });
+    const front = seePage ? await this.readPage(mascot) : null;
+    // The user may take a tab back, or another job take it up, while it's being read. Nothing read goes out then.
+    const job = this.jobs.get(chatId);
+    const shared = (tab: Tab) => () => !!job?.attached.has(tab.id) && !this.inOtherHands(tab.id, chatId);
+    const tabs = await Promise.all(attachedTabs.map((tab) => (shared(tab)() ? this.readTab(tab, mascot, shared(tab)) : null)));
+    const pages = [front, ...tabs].filter((page): page is PageSnapshot => page !== null);
+    const newest = messages.at(-1);
+    if (pages.length === 0 || !newest) return messages;
+    return [...messages.slice(0, -1), { role: "user", content: withAttached(newest.content, pages.flatMap(pageBlocks)) }];
   }
 
-  private async readPage(mascot: MascotProfile): Promise<Page | null> {
+  private readPage(mascot: MascotProfile): Promise<PageSnapshot | null> {
     const tab = this.pageAccess ? this.activeTab : null;
+    return tab ? this.readTab(tab, mascot, () => this.pageAccess) : Promise.resolve(null);
+  }
+
+  // A tab's text and a picture of it, under the mascot's limits: off its sites nothing, and with a frame from a site it
+  // isn't allowed on, no picture. `stillShared` is checked again once it's read, as may the user's say.
+  private async readTab(tab: Tab, mascot: MascotProfile, stillShared: () => boolean = () => true): Promise<PageSnapshot | null> {
     // A mascot's limit covers the page that goes with a message too.
-    if (!tab || !siteAllowed(tab.url, mascot.sites)) return null;
+    if (!siteAllowed(tab.url, mascot.sites)) return null;
     const framedBefore = showsFrameOffLimits(tab, mascot.sites);
 
     const [captured, text] = await Promise.all([
@@ -1265,8 +1427,8 @@ export class Chats {
     // Checked again after the capture, so a frame that came in meanwhile doesn't go out in it.
     const framed = framedBefore || showsFrameOffLimits(tab, mascot.sites);
     const screenshot = framed ? null : captured;
-    // "Can see" may have been switched off while the page was being read, so nothing read goes out.
-    return this.pageAccess && !this.handedOver.has(tab.id) && siteAllowed(tab.url, mascot.sites)
+    // "Can see" may have been switched off while the page was being read, or the tab handed to the user, so nothing read goes out.
+    return stillShared() && !this.handedOver.has(tab.id) && siteAllowed(tab.url, mascot.sites)
       ? {
           url: this.withoutCodes(tab.url),
           text: text === null ? null : this.withoutCodes(text),

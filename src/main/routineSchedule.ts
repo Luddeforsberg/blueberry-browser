@@ -93,12 +93,24 @@ export const parseSchedule = (input: unknown): RoutineSchedule | null => {
   return null;
 };
 
+// A name in code from the first words of what it does, which a routine has until a better one is written, or for good
+// with no model. Its first line, cut at a word.
+const MAX_WORDS_NAME = 40;
+export const nameFromWords = (instructions: string): string => {
+  const line = instructions.trim().split("\n")[0].trim().replace(/[.:;,!?]+$/, "");
+  if (line.length <= MAX_WORDS_NAME) return line;
+  const cut = line.slice(0, MAX_WORDS_NAME);
+  // A word that ends right at the limit is whole.
+  const atWord = line.slice(0, MAX_WORDS_NAME + 1).lastIndexOf(" ");
+  return `${(atWord > MAX_WORDS_NAME / 2 ? cut.slice(0, atWord) : cut).replace(/[\s.:;,!?]+$/, "")}…`;
+};
+
 // What comes from the renderer is checked here, and its errors are worded for the form.
 export const parseDraft = (input: unknown): { draft: RoutineDraft } | { error: string } => {
   const { name, instructions, schedule: rawSchedule, mascotId, sites } = (input ?? {}) as Record<string, unknown>;
   const cleanName = typeof name === "string" ? name.trim() : "";
   const cleanInstructions = typeof instructions === "string" ? instructions.trim() : "";
-  if (!cleanName) return { error: "Give the routine a name." };
+  // No name is asked for: an empty one means name it from what it does, or keep the one it has.
   if (cleanName.length > MAX_NAME_LENGTH) return { error: `Keep the name under ${MAX_NAME_LENGTH} characters.` };
   if (!cleanInstructions) return { error: "Say what the routine should do." };
   if (cleanInstructions.length > MAX_INSTRUCTIONS_LENGTH) {

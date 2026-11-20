@@ -1,7 +1,14 @@
-import React, { createContext, useContext, useId, useRef } from "react";
+import React, { useId, useRef } from "react";
 import { MessageCircle } from "lucide-react";
-import type { MascotAccessory, MascotLook } from "@shared/library";
+import type {
+  MascotAccessory,
+  MascotLook,
+  MascotPalette,
+} from "@shared/library";
 import { cn } from "../lib/utils";
+import { mascotDetail, type MascotDetail } from "./mascotDetail";
+import { useFrame, useStill } from "./motion";
+import { pipFrames } from "./Pips";
 import { useMascotReaction, type Reaction } from "./useMascotReaction";
 
 export type Mood =
@@ -28,457 +35,697 @@ export const MOOD_LABELS: Record<Mood, string> = {
   "off-duty": "asleep",
 };
 
+// DESIGN.md section 9: the six berries. Each is drawn on a 48-unit square, body bottom at 46.
+export type BerryKind =
+  | "blueberry"
+  | "lingon"
+  | "cloudberry"
+  | "gooseberry"
+  | "raspberry"
+  | "currant";
+
+// A look is saved by its old palette id, in files, published rows and the phone's flock, so the ids stay and each
+// draws as the berry nearest the colour its owner chose. Berry is the blueberry.
+export const BERRY_KIND: Record<MascotPalette, BerryKind> = {
+  kingfisher: "blueberry",
+  robin: "lingon",
+  canary: "cloudberry",
+  parakeet: "gooseberry",
+  flamingo: "raspberry",
+  jackdaw: "currant",
+};
+
+const BERRY_LOOK: MascotLook = { palette: "kingfisher", accessory: "none" };
+
+// Colours are the mascots' own tokens, as attributes, so a drawing copied out of the app keeps them without styles.
+const c = (token: string) => `var(--berry-${token})`;
+const EYE = c("eye");
+const ASK = "rgb(var(--ask))";
+const WHITE = "#fff";
+const one = (value: number) => value.toFixed(1);
+
+// The ids of a drawing's gradients, mask and clips. Many drawings share a document, so each has its own.
+interface Ids {
+  shade: string;
+  fade: string;
+  fadeGradient: string;
+  clip: (kind: BerryKind) => string;
+}
+const url = (id: string) => `url(#${id})`;
+
+// The beaded berries, as rows of beads: each row's height, where its beads are along it, and their radius.
+type Bead = [x: number, y: number, r: number];
+const beads = (rows: [y: number, xs: number[], r: number][]): Bead[] =>
+  rows.flatMap(([y, xs, r]) => xs.map((x): Bead => [x, y, r]));
+const CLOUD_BEADS = beads([
+  [17.6, [19.6, 28.4], 5.6],
+  [23.4, [14.2, 24, 33.8], 6.5],
+  [31.4, [11.4, 20, 28, 36.6], 6.3],
+  [39.6, [15.6, 24, 32.4], 6.2],
+]);
+const RASP_BEADS = beads([
+  [17.6, [11.6, 17.8, 24, 30.2, 36.4], 4.4],
+  [24.4, [11.2, 17.6, 24, 30.4, 36.8], 4.4],
+  [31.2, [14.4, 20.8, 27.2, 33.6], 4.3],
+  [37.6, [17.6, 24, 30.4], 4.1],
+  [42.6, [21, 27], 3.5],
+]);
+const beadCircles = (list: Bead[]) =>
+  list.map(([x, y, r]) => <circle key={`${x} ${y}`} cx={x} cy={y} r={r} />);
+
+// Each berry's outline, with no fill of its own: its body, and the clip that keeps its shade inside it. Shapes only,
+// since a clip path takes no groups.
+const SHAPE: Record<BerryKind, React.ReactNode> = {
+  blueberry: <ellipse cx={24} cy={30} rx={19} ry={16} />,
+  lingon: <circle cx={24} cy={29.6} r={16.4} />,
+  cloudberry: (
+    <>
+      {beadCircles(CLOUD_BEADS)}
+      <ellipse cx={24} cy={30} rx={14} ry={12.5} />
+    </>
+  ),
+  gooseberry: <ellipse cx={24} cy={29} rx={15.6} ry={17} />,
+  raspberry: (
+    <>
+      {beadCircles(RASP_BEADS)}
+      <path d="M12 18H36L35 31 28 41H20L13 31z" />
+    </>
+  ),
+  currant: <circle cx={24} cy={30} r={16} />,
+};
+
+// Beads under the face stay plain, so the eyes and mouth read.
+const inFace = (x: number, y: number) => x > 12 && x < 36 && y > 20 && y < 39;
+
+const GOOSE_VEINS = [-0.8, -0.42, 0, 0.42, 0.8];
+
+// What a berry's skin looks like up close, from 48px.
+const TEXTURE: Record<BerryKind, React.ReactNode> = {
+  blueberry: (
+    <ellipse cx={21} cy={21.5} rx={13} ry={6.5} fill={WHITE} opacity={0.12} />
+  ),
+  lingon: null,
+  cloudberry: CLOUD_BEADS.map(([x, y, r]) => {
+    const cx = one(x - r * 0.3);
+    const cy = one(y - r * 0.38);
+    return (
+      <ellipse
+        key={`${x} ${y}`}
+        cx={cx}
+        cy={cy}
+        rx={one(r * 0.32)}
+        ry={one(r * 0.2)}
+        transform={`rotate(-30 ${cx} ${cy})`}
+        fill={WHITE}
+        opacity={0.38}
+      />
+    );
+  }),
+  gooseberry: (
+    <>
+      <ellipse cx={24} cy={29} rx={11} ry={13.4} fill={WHITE} opacity={0.16} />
+      {GOOSE_VEINS.map((k) => (
+        <path
+          key={k}
+          d={`M24 12.4Q${one(24 + k * 19)} 29 24 45.6`}
+          stroke={c("gooseberry-stripe")}
+          strokeWidth={0.9}
+          fill="none"
+          opacity={0.7}
+        />
+      ))}
+    </>
+  ),
+  // A rim under each bead and a glint on it.
+  raspberry: RASP_BEADS.filter(([x, y]) => !inFace(x, y)).map(([x, y, r]) => (
+    <React.Fragment key={`${x} ${y}`}>
+      <path
+        d={`M${one(x - r * 0.8)} ${one(y + r * 0.55)}A${one(r - 0.4)} ${one(r - 0.4)} 0 0 0 ${one(x + r * 0.8)} ${one(y + r * 0.55)}`}
+        fill="none"
+        stroke={c("raspberry-rim")}
+        strokeWidth={0.7}
+        opacity={0.55}
+        strokeLinecap="round"
+      />
+      <circle
+        cx={one(x - r * 0.38)}
+        cy={one(y - r * 0.4)}
+        r={0.95}
+        fill={WHITE}
+        opacity={0.55}
+      />
+    </React.Fragment>
+  )),
+  currant: (
+    <ellipse
+      cx={19}
+      cy={23}
+      rx={11}
+      ry={7.5}
+      fill={c("currant-bloom")}
+      opacity={0.35}
+    />
+  ),
+};
+
+// Under 48px only the gooseberry keeps two of its veins, as they're part of its outline.
+const SMALL_TEXTURE: Partial<Record<BerryKind, React.ReactNode>> = {
+  gooseberry: (
+    <path
+      d="M24 12.4Q12.5 29 24 45.6M24 12.4Q35.5 29 24 45.6"
+      stroke={c("gooseberry-stripe")}
+      strokeWidth={1.5}
+      fill="none"
+    />
+  ),
+};
+
+// A soft shine at the top left. The lingon's is brighter, so it looks glossy.
+const SHINE: Record<"lingon" | "other", React.ReactNode> = {
+  lingon: (
+    <>
+      <ellipse
+        cx={15.6}
+        cy={21.4}
+        rx={4.2}
+        ry={2.5}
+        transform="rotate(-38 15.6 21.4)"
+        fill={WHITE}
+        opacity={0.8}
+      />
+      <circle cx={20.2} cy={18} r={1.1} fill={WHITE} opacity={0.7} />
+    </>
+  ),
+  other: (
+    <ellipse
+      cx={14.6}
+      cy={22.6}
+      rx={3.4}
+      ry={2}
+      transform="rotate(-38 14.6 22.6)"
+      fill={WHITE}
+      opacity={0.5}
+    />
+  ),
+};
+
+// What grows on top, which with the outline says which berry it is, down to 14px.
+const TOP: Record<BerryKind, React.ReactNode> = {
+  blueberry: (
+    <>
+      <path
+        d="M18.2 16.6L18.8 10.8L21.5 13.6L24 9L26.5 13.6L29.2 10.8L29.8 16.6Z"
+        fill={c("blueberry-crown")}
+        stroke={c("blueberry-crown")}
+        strokeWidth={1.3}
+        strokeLinejoin="round"
+      />
+      <ellipse
+        cx={24}
+        cy={15.6}
+        rx={4.2}
+        ry={1.5}
+        fill={c("blueberry-crown-hollow")}
+      />
+    </>
+  ),
+  lingon: (
+    <>
+      <path
+        d="M24 13.6q-.4-4 2.2-6.6"
+        stroke={c("stem")}
+        strokeWidth={1.7}
+        fill="none"
+        strokeLinecap="round"
+      />
+      <ellipse
+        cx={30.2}
+        cy={7.2}
+        rx={4.6}
+        ry={2.3}
+        transform="rotate(-18 30.2 7.2)"
+        fill={c("lingon-leaf")}
+      />
+      <ellipse
+        cx={22.6}
+        cy={10}
+        rx={2.5}
+        ry={1.3}
+        transform="rotate(38 22.6 10)"
+        fill={c("lingon-leaf-small")}
+      />
+    </>
+  ),
+  cloudberry: (
+    <>
+      <ellipse
+        cx={18.6}
+        cy={11.6}
+        rx={4.6}
+        ry={2.1}
+        transform="rotate(-28 18.6 11.6)"
+        fill={c("cloudberry-leaf")}
+      />
+      <ellipse
+        cx={29.4}
+        cy={11.6}
+        rx={4.6}
+        ry={2.1}
+        transform="rotate(28 29.4 11.6)"
+        fill={c("cloudberry-leaf")}
+      />
+      <ellipse cx={24} cy={9.4} rx={2.1} ry={4.2} fill={c("cloudberry-leaf")} />
+    </>
+  ),
+  gooseberry: (
+    <path
+      d="M24 12.8q-.3-3.6 1.8-6.2"
+      stroke={c("gooseberry-tuft")}
+      strokeWidth={1.8}
+      fill="none"
+      strokeLinecap="round"
+    />
+  ),
+  raspberry: (
+    <>
+      <path
+        d="M24 14.2L15.6 11.6L21 10.8L19.6 6.6L24 9.6L28.4 6.6L27 10.8L32.4 11.6Z"
+        fill={c("leaf")}
+        stroke={c("leaf")}
+        strokeWidth={1.1}
+        strokeLinejoin="round"
+      />
+      <path
+        d="M24 10V6.2"
+        stroke={c("leaf")}
+        strokeWidth={1.6}
+        strokeLinecap="round"
+      />
+    </>
+  ),
+  currant: (
+    <>
+      <path
+        d="M24 14.6q.6-4.2 5.4-6.4"
+        stroke={c("currant-stem")}
+        strokeWidth={1.5}
+        fill="none"
+        strokeLinecap="round"
+      />
+      <circle cx={31} cy={7.4} r={2.8} fill={c("currant")} />
+      <circle cx={30.2} cy={6.6} r={0.75} fill={WHITE} opacity={0.6} />
+      <path
+        d="M24 16v-2.6M22.6 14.6l1.4.9 1.4-.9"
+        stroke={c("currant-tuft")}
+        strokeWidth={1.1}
+        fill="none"
+        strokeLinecap="round"
+      />
+    </>
+  ),
+};
+
+// Worn behind what grows on top, so the berry still reads: the cap's crown carries it like a button, and the
+// headphones' band goes behind it.
+const ACCESSORY_BEHIND: Partial<Record<MascotAccessory, React.ReactNode>> = {
+  cap: (
+    <>
+      <path d="M7.6 18.2a16.4 12.4 0 0 1 32.8 0z" fill={c("cap")} />
+      <rect x={30} y={15} width={16} height={3.8} rx={1.9} fill={c("cap")} />
+    </>
+  ),
+  headphones: (
+    <>
+      <path
+        d="M4.4 30C4.4 6 43.6 6 43.6 30"
+        fill="none"
+        stroke={c("headphones")}
+        strokeWidth={2.8}
+      />
+      <rect
+        x={1.2}
+        y={25}
+        width={6.6}
+        height={11.4}
+        rx={3.2}
+        fill={c("headphones")}
+      />
+      <rect
+        x={40.2}
+        y={25}
+        width={6.6}
+        height={11.4}
+        rx={3.2}
+        fill={c("headphones")}
+      />
+    </>
+  ),
+};
+
+// The lingon's and the currant's stems lean right, so what they wear beside the top goes on the left.
+const leansRight = (kind: BerryKind) => kind === "lingon" || kind === "currant";
+
+// Worn in front: the crown and the bow small and at an angle beside the top, and the glasses on the eyes, in ink, or
+// light on the currant (tokens.css).
+const accessoryInFront = (
+  accessory: MascotAccessory,
+  kind: BerryKind,
+  working: boolean,
+): React.ReactNode => {
+  switch (accessory) {
+    case "crown": {
+      const x = leansRight(kind) ? 12.6 : 34;
+      return (
+        <g transform={`rotate(${x < 24 ? -16 : 16} ${x} 11)`}>
+          <path
+            d={`M${one(x - 5.2)} 14.4V7.6l2.9 2.4L${x} 5.6l2.3 4.4 2.9-2.4v6.8z`}
+            fill={c("gold")}
+            stroke={c("gold")}
+            strokeWidth={0.8}
+            strokeLinejoin="round"
+          />
+        </g>
+      );
+    }
+    case "bow": {
+      const x = leansRight(kind) ? 13.6 : 34.6;
+      return (
+        <>
+          <path
+            d={`M${x} 15l-5.6-3.8v7.6zM${x} 15l5.6-3.8v7.6z`}
+            fill={c("bow")}
+            stroke={c("bow")}
+            strokeWidth={1}
+            strokeLinejoin="round"
+          />
+          <circle cx={x} cy={15} r={1.7} fill={c("bow-knot")} />
+        </>
+      );
+    }
+    // They'd sit on the pips, so they come off while it works.
+    case "glasses":
+      return working ? null : (
+        <>
+          <circle
+            cx={18}
+            cy={28}
+            r={5.8}
+            fill="none"
+            stroke={c("glasses")}
+            strokeWidth={1.7}
+          />
+          <circle
+            cx={30}
+            cy={28}
+            r={5.8}
+            fill="none"
+            stroke={c("glasses")}
+            strokeWidth={1.7}
+          />
+          <path
+            d="M23.5 27.4q.5-.6 1 0"
+            stroke={c("glasses")}
+            strokeWidth={1.7}
+            fill="none"
+          />
+        </>
+      );
+    default:
+      return null;
+  }
+};
+
+// Two upright bars, 12 apart, a little heavier under 28px. Shut, they close to a line, as when one mascot gives way to
+// another.
+const Bar: React.FC<{
+  x: number;
+  dx?: number;
+  dy?: number;
+  shut: boolean;
+  small: boolean;
+}> = ({ x, dx = 0, dy = 0, shut, small }) => {
+  const [width, height] = small ? [4.8, 9.6] : [4, 8.4];
+  return (
+    <rect
+      data-eye
+      x={x - width / 2 + dx}
+      y={28 - height / 2 + dy}
+      width={width}
+      height={height}
+      rx={width / 2}
+      fill={EYE}
+      className="[transform-box:fill-box] [transform-origin:center] transition-transform duration-fast"
+      style={shut ? { transform: "scaleY(0.12)" } : undefined}
+    />
+  );
+};
+const Line: React.FC<{ d: string; width?: number }> = ({ d, width = 2.6 }) => (
+  <path
+    d={d}
+    stroke={EYE}
+    strokeWidth={width}
+    fill="none"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  />
+);
+
+// While it works, the two eyes become the pips, one dot chasing round, bigger under 28px. Held still, every dot shows at
+// the same strength.
+const WORKING_STILL = 0.7;
+const WorkingFace: React.FC<{ still: boolean; small: boolean }> = ({
+  still,
+  small,
+}) => {
+  const { frames, ms } = pipFrames("think");
+  const frame = useFrame(frames.length, ms, !still);
+  const off = small ? 0.4 : 0.22;
+  return (
+    <>
+      {[22, 29, 36].flatMap((cy, row) =>
+        [17, 24, 31].map((cx, column) => (
+          <circle
+            key={`${cx}-${cy}`}
+            cx={cx}
+            cy={cy}
+            r={small ? 2.6 : 2.1}
+            fill={EYE}
+            opacity={
+              still
+                ? WORKING_STILL
+                : off + (1 - off) * frames[frame][row * 3 + column]
+            }
+          />
+        )),
+      )}
+    </>
+  );
+};
+
+const Eyes: React.FC<{
+  mood: Mood;
+  still: boolean;
+  shut: boolean;
+  small: boolean;
+}> = ({ mood, still, shut, small }) => {
+  switch (mood) {
+    case "curious":
+      return (
+        <>
+          <Bar x={18} dx={1.8} dy={-1.6} shut={shut} small={small} />
+          <Bar x={30} dx={1.8} dy={-1.6} shut={shut} small={small} />
+        </>
+      );
+    case "thinking":
+    case "fetching":
+      return <WorkingFace still={still} small={small} />;
+    case "asking":
+      return (
+        <>
+          <circle cx={18} cy={28} r={small ? 4.2 : 3.6} fill={EYE} />
+          <circle cx={30} cy={28} r={small ? 4.2 : 3.6} fill={EYE} />
+        </>
+      );
+    case "delivered":
+      return <Line d="M14.6 30q3.4-5.4 6.8 0M26.6 30q3.4-5.4 6.8 0" />;
+    case "oops":
+      return <Line d="M15 30l5-3.6M33 30l-5-3.6" />;
+    case "off-duty":
+      return <Line d="M15 29h6M27 29h6" />;
+    case "rest":
+    case "sitting":
+      return (
+        <>
+          <Bar x={18} shut={shut} small={small} />
+          <Bar x={30} shut={shut} small={small} />
+        </>
+      );
+  }
+};
+
+// From 28px a small mouth carries half the mood. Working has none.
+const Mouth: React.FC<{ mood: Mood }> = ({ mood }) => {
+  switch (mood) {
+    case "rest":
+    case "sitting":
+      return <Line d="M21.8 35q2.2 2.2 4.4 0" width={1.7} />;
+    case "curious":
+      return <circle cx={25.8} cy={35} r={1.35} fill={EYE} />;
+    case "asking":
+      return <Line d="M22.6 36h2.8" width={1.7} />;
+    case "delivered":
+      return (
+        <path
+          d="M20.6 34.2q3.4 4.8 6.8 0z"
+          fill={EYE}
+          stroke={EYE}
+          strokeWidth={1}
+          strokeLinejoin="round"
+        />
+      );
+    case "oops":
+      return <Line d="M20.8 37q1.6-1.6 3.2 0t3.2 0" width={1.6} />;
+    case "off-duty":
+      return <Line d="M22.8 36h2.4" width={1.6} />;
+    case "thinking":
+    case "fetching":
+      return null;
+  }
+};
+
+// The shade, the face fade and each berry's clip, by the ids this drawing was given.
+const Defs: React.FC<{ ids: Ids; kinds: BerryKind[] }> = ({ ids, kinds }) => (
+  <defs>
+    <radialGradient id={ids.shade}>
+      <stop offset={0} stopColor="#000" stopOpacity={0.2} />
+      <stop offset={0.55} stopColor="#000" stopOpacity={0.1} />
+      <stop offset={1} stopColor="#000" stopOpacity={0} />
+    </radialGradient>
+    {/* A mask goes by brightness, so the texture fades to about a third over the face. */}
+    <radialGradient id={ids.fadeGradient}>
+      <stop offset={0} stopColor="#4d4d4d" />
+      <stop offset={0.55} stopColor="#4d4d4d" />
+      <stop offset={1} stopColor={WHITE} />
+    </radialGradient>
+    <mask
+      id={ids.fade}
+      maskUnits="userSpaceOnUse"
+      maskContentUnits="userSpaceOnUse"
+      x={-10}
+      y={-10}
+      width={68}
+      height={68}
+    >
+      <rect x={-10} y={-10} width={68} height={68} fill={WHITE} />
+      <ellipse cx={24} cy={30} rx={15} ry={11.5} fill={url(ids.fadeGradient)} />
+    </mask>
+    {kinds.map((kind) => (
+      <clipPath key={kind} id={ids.clip(kind)}>
+        {SHAPE[kind]}
+      </clipPath>
+    ))}
+  </defs>
+);
+
+// The body in its colour and what's on its skin: a shade underneath, its texture faded over the face, and a shine. A
+// plain body, while it works or on the address field, is the outline alone, so the pips are the one thing on it.
+const Body: React.FC<{
+  kind: BerryKind;
+  fill: string;
+  plain: boolean;
+  detail: MascotDetail;
+  ids: Ids;
+}> = ({ kind, fill, plain, detail, ids }) => {
+  const texture = detail === "full" ? TEXTURE[kind] : SMALL_TEXTURE[kind];
+  return (
+    <>
+      <g fill={fill}>{SHAPE[kind]}</g>
+      {!plain && (
+        <>
+          <g clipPath={url(ids.clip(kind))}>
+            <ellipse cx={30} cy={47} rx={27} ry={15} fill={url(ids.shade)} />
+          </g>
+          {/* Marked, so a page that draws one drawing at many sizes can leave it out below 48px (site/app/app.css). */}
+          {texture && (
+            <g mask={url(ids.fade)} data-texture>
+              {texture}
+            </g>
+          )}
+          {detail !== "small" && SHINE[kind === "lingon" ? "lingon" : "other"]}
+        </>
+      )}
+    </>
+  );
+};
+
+// What grows on top, raised under a cap so it sits on the cap's crown, then what's worn in front.
+const Top: React.FC<{
+  kind: BerryKind;
+  accessory: MascotAccessory;
+  working: boolean;
+}> = ({ kind, accessory, working }) => (
+  <>
+    {accessory === "cap" ? (
+      <g transform="translate(0 -5)">{TOP[kind]}</g>
+    ) : (
+      TOP[kind]
+    )}
+    {accessoryInFront(accessory, kind, working)}
+  </>
+);
+
+const KINDS = Object.values(BERRY_KIND);
+
+// The two reactions that are moods, and only from at rest, so a mood that means something is never covered up.
+const POSE_FOR: Partial<Record<Reaction, Mood>> = {
+  look: "curious",
+  toss: "delivered",
+};
+
 interface MascotProps {
   mood?: Mood;
   size: number;
-  // Colours and an accessory for one of the flock. Left out, this is Berry.
+  // Which berry and what it wears. Left out, this is Berry.
   look?: MascotLook;
   // What it's called to assistive technology.
   name?: string;
   // Hide Berry: a plain icon stands in, and every feature keeps working.
   hidden?: boolean;
-  // Keep Berry still: the pose stays, the motion stops. Reduced motion does the same through CSS.
+  // Keep Berry still: the face stays, the motion stops. Left out, the setting and reduced motion decide.
   still?: boolean;
   // Reacts when clicked. Decoration only: any control it's inside still takes the click as well.
   lively?: boolean;
-  // Leaves out the blink where a bird is always on screen and nothing's happening. A click still gets its reaction.
-  noBlink?: boolean;
+  // On the address field while a mascot works, which is `ink`: the body takes the ground's colour, so it shows there,
+  // and goes plain, as it does while it works.
+  inverted?: boolean;
+  // Eyes shut, as the old one does when another takes its place.
+  shut?: boolean;
+  // Every berry's body, for a drawing made once and shown as any mascot by the `data-mascot` it's given where it's
+  // shown (scripts/buildSite.mjs). The app never needs this.
+  anyLook?: boolean;
   className?: string;
   onContextMenu?: (event: React.MouseEvent) => void;
 }
 
-// Below this, the full drawing turns to mush, so Berry is just its head and the berry it carries.
-const SIMPLIFIED_BELOW = 32;
-
-// Animated parts turn and scale around their own box, not the whole drawing's.
-// How far a walking bird's legs swing either way, in degrees.
-const LEG_SWING = 30;
-
-const ownBox = (origin: string): React.CSSProperties => ({ transformBox: "fill-box", transformOrigin: origin });
-
-// A dusty blueberry, lit from the upper left, with its crown off-centre. Never a star.
-const Fruit: React.FC<{ x: number; y: number; r?: number; className?: string; style?: React.CSSProperties }> = ({
-  x,
-  y,
-  r = 11,
-  className,
-  style,
-}) => {
-  const id = useId().replace(/:/g, "");
-
-  return (
-    <g transform={`translate(${x} ${y}) scale(${r / 10})`}>
-      <g className={className} style={style}>
-        <defs>
-          <radialGradient id={id} cx="36%" cy="30%" r="80%">
-            <stop offset="0%" stopColor="rgb(var(--berry-fruit-bloom))" />
-            <stop offset="42%" stopColor="rgb(var(--berry-fruit-mid))" />
-            <stop offset="100%" stopColor="rgb(var(--berry-fruit-dark))" />
-          </radialGradient>
-        </defs>
-        <ellipse rx={10} ry={9.4} fill={`url(#${id})`} />
-        <path
-          d="M1.6 -5.2 L3.2 -6.2 L4.6 -5.4 L6 -5.3 L5.4 -3.9 L6.2 -2.8 L4.5 -2.7 L3.4 -1.5 L2.6 -2.9 L1.1 -3.5 Z"
-          strokeWidth={1}
-          strokeLinejoin="round"
-          className="fill-berry-fruit-crown stroke-berry-fruit-crown"
-        />
-      </g>
-    </g>
-  );
-};
-
-// The blueberry on its own, marking something as new or in progress. Always beside words.
-export const BerryDot: React.FC<{ size?: number; working?: boolean; className?: string }> = ({
-  size = 10,
-  working = false,
-  className,
-}) => (
-  <svg
-    aria-hidden
-    viewBox="-11 -11 22 22"
-    width={size}
-    height={size}
-    className={cn("shrink-0", working && "motion-safe:animate-pulse", className)}
-  >
-    <Fruit x={0} y={0} r={10} />
-  </svg>
-);
-
-// Where the head turns from, at the base of the neck.
-const NECK = "60 50";
-
-// The parts of Berry in profile. Head and torso share a colour, so together they read as one outline.
-const HEAD = "M86 40 C84 24 68 15 54 19 C43 22 37 32 37 44 C37 56 48 64 62 64 C76 64 88 54 86 40 Z";
-const NAPE = "M54 19 C43 22 37 32 37 44 C42 52 52 52 57 45 C52 37 52 27 60 18 C58 18 56 18 54 19 Z";
-const TORSO = "M40 40 C28 52 23 65 22 78 L5 103 C3 107 6 111 11 109 L35 93 C46 101 65 100 75 87 C85 74 86 60 82 51 C72 38 52 34 40 40 Z";
-const WING = "M43 54 C55 47 68 53 66 66 C64 79 47 90 29 89 C30 75 34 62 43 54 Z";
-const BEAK = "M84 35 C89 36 94 39 98 44 C94 46 89 47 84 47 C86 43 86 39 84 35 Z";
-const BEAK_OPEN = "M84 33 C90 32 96 34 100 38 C95 41 89 42 84 42 C85 39 85 36 84 33 Z M84 43 C88 45 92 47 95 50 C91 51 87 50 83 48 Z";
-
-type Eyes = "open" | "wide" | "smug" | "down" | "up" | "closed";
-
-// A big pupil and one catchlight: calm and friendly, not a stare.
-const PUPIL: Record<Exclude<Eyes, "closed">, { x: number; y: number; r: number }> = {
-  open: { x: 2, y: 0.6, r: 5.6 },
-  wide: { x: 2, y: 0.4, r: 5 },
-  smug: { x: 2.4, y: 0.4, r: 5.4 },
-  down: { x: 1.6, y: 2.2, r: 5.4 },
-  up: { x: 1.8, y: -2.2, r: 5.4 },
-};
-
-const Eye: React.FC<{ x: number; y: number; r?: number; look: Eyes }> = ({ x, y, r = 8.6, look }) => {
-  if (look === "closed") {
-    return (
-      <path
-        d={`M${x - r} ${y} Q${x} ${y + r * 0.8} ${x + r} ${y}`}
-        strokeWidth={2.6}
-        strokeLinecap="round"
-        fill="none"
-        className="stroke-berry-eye"
-      />
-    );
-  }
-
-  const pupil = PUPIL[look];
-  const scale = r / 8.6;
-  const px = x + pupil.x * scale;
-  const pr = pupil.r * scale;
-
-  // Heavy-lidded: only the lower half of the eye shows.
-  if (look === "smug") {
-    return (
-      <g>
-        <path d={`M${x - r} ${y} A${r} ${r} 0 0 0 ${x + r} ${y} Z`} className="fill-berry-eye" />
-        <path d={`M${px - pr} ${y} A${pr} ${pr} 0 0 0 ${px + pr} ${y} Z`} className="fill-berry-pupil" />
-      </g>
-    );
-  }
-
-  return (
-    <g>
-      <circle cx={x} cy={y} r={r} className="fill-berry-eye" />
-      <circle cx={px} cy={y + pupil.y * scale} r={pr} className="fill-berry-pupil" />
-      <circle cx={px - 2.4 * scale} cy={y + (pupil.y - 2.6) * scale} r={1.9 * scale} className="fill-berry-eye" />
-    </g>
-  );
-};
-
-// A dark edge, so an accessory stands off any body colour and any background.
-const GEAR_EDGE = { strokeWidth: 2, strokeLinejoin: "round", strokeLinecap: "round", className: "fill-berry-gear stroke-berry-pupil" } as const;
-
-const GearContext = createContext<MascotAccessory>("none");
-
-// In the head's own coordinates, so it moves with the head in every pose. Big shapes in their own colour, so one can
-// tell mascots apart at icon size. `front` is for the one pose that faces you.
-const Gear: React.FC<{ front?: boolean }> = ({ front = false }) => {
-  const accessory = useContext(GearContext);
-  switch (accessory) {
-    case "none":
-      return null;
-    case "crown":
-      return (
-        <g transform={front ? "translate(-1 -11)" : "rotate(6 61 15)"}>
-          <path d="M46 25 L42 6 L53 14 L61 1 L69 14 L80 6 L76 25 Q61 19 46 25 Z" {...GEAR_EDGE} />
-          <circle cx={61} cy={17} r={3} className="fill-berry-gear-shade" />
-        </g>
-      );
-    case "cap":
-      return front ? (
-        <>
-          <path d="M34 25 C34 2 86 2 86 25 C72 19 48 19 34 25 Z" {...GEAR_EDGE} />
-          <path d="M38 24 C50 18 70 18 82 24 C76 30 44 30 38 24 Z" {...GEAR_EDGE} className="fill-berry-gear-shade stroke-berry-pupil" />
-        </>
-      ) : (
-        <>
-          <path d="M76 25 C88 23 99 26 106 32 C105 35 101 35 97 33 C90 31 84 30 77 30 Z" {...GEAR_EDGE} className="fill-berry-gear-shade stroke-berry-pupil" />
-          <path d="M37 33 C38 12 68 5 84 26 C70 22 52 24 37 33 Z" {...GEAR_EDGE} />
-        </>
-      );
-    case "glasses":
-      return front ? (
-        <g fill="none" strokeLinecap="round">
-          {["M41 30 a9 9 0 1 0 18 0 a9 9 0 1 0 -18 0 M61 30 a9 9 0 1 0 18 0 a9 9 0 1 0 -18 0 M59 28 L61 28"].map((d) => (
-            <React.Fragment key={d}>
-              <path d={d} strokeWidth={5} className="stroke-berry-pupil" />
-              <path d={d} strokeWidth={3} className="stroke-berry-gear" />
-            </React.Fragment>
-          ))}
-        </g>
-      ) : (
-        <g fill="none" strokeLinecap="round">
-          {["M58 35 a11 11 0 1 0 22 0 a11 11 0 1 0 -22 0 M58 33 L43 29"].map((d) => (
-            <React.Fragment key={d}>
-              <path d={d} strokeWidth={5} className="stroke-berry-pupil" />
-              <path d={d} strokeWidth={3} className="stroke-berry-gear" />
-            </React.Fragment>
-          ))}
-        </g>
-      );
-    case "headphones":
-      return front ? (
-        <>
-          <path d="M33 36 C29 -2 91 -2 87 36" fill="none" strokeWidth={7} strokeLinecap="round" className="stroke-berry-pupil" />
-          <path d="M33 36 C29 -2 91 -2 87 36" fill="none" strokeWidth={4} strokeLinecap="round" className="stroke-berry-gear" />
-          <rect x={26} y={30} width={13} height={22} rx={6} {...GEAR_EDGE} />
-          <rect x={81} y={30} width={13} height={22} rx={6} {...GEAR_EDGE} />
-        </>
-      ) : (
-        <>
-          <path d="M49 34 C43 12 68 2 80 22" fill="none" strokeWidth={7} strokeLinecap="round" className="stroke-berry-pupil" />
-          <path d="M49 34 C43 12 68 2 80 22" fill="none" strokeWidth={4} strokeLinecap="round" className="stroke-berry-gear" />
-          <ellipse cx={50} cy={41} rx={9} ry={12} {...GEAR_EDGE} />
-          <ellipse cx={50} cy={41} rx={4} ry={6.5} className="fill-berry-gear-shade" />
-        </>
-      );
-    case "bow":
-      return (
-        <g transform={front ? "translate(8 -7)" : undefined}>
-          <path d="M52 19 L35 8 C31 14 31 24 35 30 Z" {...GEAR_EDGE} />
-          <path d="M52 19 L69 8 C73 14 73 24 69 30 Z" {...GEAR_EDGE} />
-          <circle cx={52} cy={19} r={4.5} {...GEAR_EDGE} className="fill-berry-gear-shade stroke-berry-pupil" />
-        </g>
-      );
-  }
-};
-
-const Head: React.FC<{ turn?: number; eyes?: Eyes; berry?: boolean; open?: boolean; blink?: boolean }> = ({
-  turn = 0,
-  eyes = "open",
-  berry = false,
-  open = false,
-  blink = false,
-}) => (
-  // `data-part` is how the bird drawn on web pages finds the head it pecks with.
-  <g data-part="head" transform={`rotate(${turn} ${NECK})`}>
-    <path d={HEAD} className="fill-berry-ink" />
-    <path d={NAPE} className="fill-berry-nape" />
-    <g className={cn(blink && "motion-safe:animate-berry-blink")} style={blink ? ownBox("center") : undefined}>
-      <Eye x={69} y={35} look={eyes} />
-    </g>
-    {berry && <Fruit x={97} y={53} />}
-    <path d={open ? BEAK_OPEN : BEAK} className="fill-berry-beak" />
-    <Gear />
-  </g>
-);
-
-const Torso: React.FC = () => (
-  <>
-    <path d={TORSO} className="fill-berry-ink" />
-    <path d={WING} className="fill-berry-wing" />
-  </>
-);
-
-const FEATHER = "M16 30 C10 38 10 46 14 54 C20 46 21 38 16 30 Z";
-
-// Short legs with three-toed feet. The hind toe points back along the bird.
-const LEGS = "M52 97 L51 112 M45 114 L51 112 L58 114 M63 95 L63 110 M57 112 L63 110 L70 112";
-const LEG_PROPS = { strokeWidth: 3, strokeLinecap: "round", strokeLinejoin: "round", fill: "none", className: "stroke-berry-ink" } as const;
-const Legs: React.FC = () => <path d={LEGS} {...LEG_PROPS} />;
-
-// The seat is at 86 of 120, so the belly rests on the edge and the legs hang over it.
-const SEAT_LIFT = -11;
-const Sitting: React.FC<{ animate: boolean }> = ({ animate }) => (
-  <g transform={`translate(0 ${SEAT_LIFT})`}>
-    <g {...LEG_PROPS}>
-      <path d="M52 97 L50 117 M46 119 L50 117 L55 119" className={cn("stroke-berry-ink", animate && "motion-safe:animate-berry-swing")} style={ownBox("50% 0%")} />
-      <path d="M63 95 L63 115 M59 117 L63 115 L68 117" className={cn("stroke-berry-ink", animate && "motion-safe:animate-berry-swing-back")} style={ownBox("50% 0%")} />
-    </g>
-    <Torso />
-    <Head berry blink={animate} />
-  </g>
-);
-
-// One drawing per mood, so each is recognisable from its outline alone.
-const Pose: React.FC<{ mood: Mood; animate: boolean; noBlink?: boolean }> = ({ mood, animate, noBlink = false }) => {
-  switch (mood) {
-    case "rest":
-      return (
-        <>
-          <Legs />
-          <Torso />
-          <Head berry blink={animate && !noBlink} />
-        </>
-      );
-
-    case "sitting":
-      return <Sitting animate={animate} />;
-
-    case "curious":
-      // Leans in with the head cocked hard over.
-      return (
-        <>
-          <Legs />
-          <g transform="rotate(9 58 112)">
-            <Torso />
-          </g>
-          <g transform="translate(9 2)">
-            <Head turn={-20} eyes="wide" berry blink={animate} />
-          </g>
-        </>
-      );
-
-    case "thinking":
-      // Head back, eyes up, tossing the berry while working it out.
-      return (
-        <>
-          <Legs />
-          <Torso />
-          <Head turn={-22} eyes="up" open />
-          <Fruit x={102} y={10} r={10} className={cn(animate && "motion-safe:animate-berry-toss")} />
-        </>
-      );
-
-    case "fetching":
-      // Stretched out level, wings beating, feet tucked.
-      return (
-        <g className={cn(animate && "motion-safe:animate-berry-bob")}>
-          <g className={cn(animate && "motion-safe:animate-berry-flap")} style={ownBox("70% 100%")}>
-            <path d="M54 50 C52 34 58 14 74 3 C78 1 80 5 79 8 C82 8 84 12 82 15 C85 17 85 21 83 23 C85 26 84 30 80 32 C78 41 74 50 68 56 Z" className="fill-berry-ink" />
-          </g>
-          <g transform="rotate(24 50 70)">
-            <path d={TORSO} className="fill-berry-ink" />
-            <path d="M52 97 L50 102 M63 95 L61 100" {...LEG_PROPS} />
-          </g>
-          <g className={cn(animate && "motion-safe:animate-berry-flap")} style={ownBox("70% 100%")}>
-            <path d="M64 62 C52 46 40 24 22 6 C18 3 15 7 16 11 C12 11 10 16 13 19 C9 21 9 26 13 27 C11 31 13 35 18 36 C17 39 20 42 24 42 C26 49 34 62 41 69 C49 72 57 70 64 62 Z" className="fill-berry-wing" />
-          </g>
-          <g transform="translate(14 8) rotate(6 60 50)">
-            <Head berry />
-          </g>
-        </g>
-      );
-
-    case "asking":
-      // Square on, looking right at you, berry held out.
-      return (
-        <>
-          <path d="M50 96 L49 112 M43 114 L49 112 L55 114 M70 96 L71 112 M65 114 L71 112 L77 114" {...LEG_PROPS} />
-          <ellipse cx={60} cy={74} rx={29} ry={30} className="fill-berry-ink" />
-          <path d="M34 56 C26 66 25 84 30 94 C37 90 41 76 39 62 Z" className="fill-berry-wing" />
-          <path d="M86 56 C94 66 95 84 90 94 C83 90 79 76 81 62 Z" className="fill-berry-wing" />
-          <g transform="rotate(-5 60 36)">
-            <circle cx={60} cy={36} r={26} className="fill-berry-nape" />
-            <path d="M42 17 C51 8 69 8 78 17 C82 27 80 42 74 52 C69 60 51 60 46 52 C40 42 38 27 42 17 Z" className="fill-berry-ink" />
-            <Fruit x={60} y={66} />
-            <path d="M54 38 C57 36 63 36 66 38 C65.6 43 63 49 61 51 C60.4 52 59.6 52 59 51 C57 49 54.4 43 54 38 Z" className="fill-berry-beak" />
-            <Eye x={50} y={30} r={6.8} look="wide" />
-            <Eye x={70} y={30} r={6.8} look="wide" />
-            <Gear front />
-          </g>
-        </>
-      );
-
-    case "delivered":
-      // Chest out, chin up, the job set down in front of it.
-      return (
-        <>
-          <g transform="translate(-10 0)">
-            <Legs />
-            <Torso />
-            <Head turn={-12} eyes="smug" />
-          </g>
-          <Fruit x={92} y={104} className={cn(animate && "motion-safe:animate-berry-settle")} />
-        </>
-      );
-
-    case "oops":
-      // Slumped, head hanging, berry rolled out of reach.
-      return (
-        <>
-          <g transform="translate(-8 4)">
-            <Legs />
-            <g transform="rotate(8 50 80) translate(0 3)">
-              <Torso />
-            </g>
-            <g transform="translate(-2 12)">
-              <Head turn={22} eyes="down" />
-            </g>
-          </g>
-          <Fruit x={104} y={106} r={9} />
-          <path
-            d={FEATHER}
-            className={cn("fill-berry-wing", animate && "motion-safe:animate-berry-feather")}
-            style={ownBox("center")}
-          />
-        </>
-      );
-
-    case "off-duty":
-      // A fluffed-up ball with the head sunk in and the berry safe beside it.
-      return (
-        <>
-          <path d="M26 88 L8 106 C5 110 9 114 14 112 L38 100 Z" className="fill-berry-ink" />
-          <ellipse cx={52} cy={80} rx={36} ry={32} className="fill-berry-ink" />
-          <path d="M30 66 C42 58 58 64 58 78 C58 92 44 104 26 102 C22 90 22 76 30 66 Z" className="fill-berry-wing" />
-          <g transform="translate(4 22)">
-            <Head turn={16} eyes="closed" />
-          </g>
-          <Fruit x={102} y={104} r={10} />
-        </>
-      );
-  }
-};
-
-// The two reactions that are poses, and only from at rest, so a mood that means something is never covered up.
-const POSE_FOR: Partial<Record<Reaction, Mood>> = { look: "curious", toss: "thinking" };
-
-// Just the head and the berry, so Berry is still Berry at icon sizes. Pose and eye carry the mood.
-const SimplifiedPose: React.FC<{ mood: Mood }> = ({ mood }) => {
-  const eyes: Eyes =
-    mood === "off-duty" ? "closed" : mood === "oops" ? "down" : mood === "thinking" ? "up" : mood === "delivered" ? "smug" : mood === "asking" ? "wide" : "open";
-  const turn = mood === "curious" ? -18 : mood === "thinking" ? -12 : mood === "oops" || mood === "off-duty" ? 12 : 0;
-
-  return (
-    <g transform="translate(-34 0) scale(1.42)">
-      <Head turn={turn} eyes={eyes} berry />
-    </g>
-  );
-};
-
-// One of the small birds that walk behind the new tab page. Purely decoration, so it has no label.
-// Its legs are posed by the walk itself, so they swing exactly in time with its steps.
-export const WalkingBird: React.FC<{ size: number; foot: -1 | 0 | 1; stepMs: number; pecking?: boolean }> = ({
-  size,
-  foot,
-  stepMs,
-  pecking = false,
-}) => {
-  const leg = (turn: number): React.CSSProperties => ({
-    ...ownBox("50% 0%"),
-    transform: `rotate(${turn}deg)`,
-    transition: `transform ${stepMs}ms linear`,
-  });
-
-  return (
-    <svg aria-hidden viewBox="0 0 120 120" width={size} height={size} className="overflow-visible">
-      <g {...LEG_PROPS}>
-        <path d="M52 96 L52 112 L59 112" className="stroke-berry-ink" style={leg(foot * LEG_SWING)} />
-        <path d="M63 94 L63 112 L70 112" className="stroke-berry-ink" style={leg(foot * -LEG_SWING)} />
-      </g>
-      <Torso />
-      <g className={cn(pecking && "motion-safe:animate-berry-peck")} style={{ transformOrigin: "60px 50px" }}>
-        <Head />
-      </g>
-    </svg>
-  );
-};
-
 export const Mascot: React.FC<MascotProps> = ({
   mood = "rest",
   size,
-  look,
+  look = BERRY_LOOK,
   name = "Berry",
   hidden = false,
-  still = false,
+  still,
   lively = false,
-  noBlink = false,
+  inverted = false,
+  shut = false,
+  anyLook = false,
   className,
   onContextMenu,
 }) => {
+  const held = useStill(still);
   const label = `${name}, ${MOOD_LABELS[mood]}`;
   const drawing = useRef<SVGSVGElement>(null);
-  const { reaction, react } = useMascotReaction(drawing, mood, lively && !still);
+  const { reaction, react } = useMascotReaction(drawing, mood, lively && !held);
+  const id = useId();
   const drawn = (mood === "rest" && reaction && POSE_FOR[reaction]) || mood;
 
   if (hidden) {
@@ -487,35 +734,72 @@ export const Mascot: React.FC<MascotProps> = ({
         role="img"
         aria-label="Assistant"
         onContextMenu={onContextMenu}
-        className={cn("text-muted-foreground", className)}
+        className={cn("text-ink-3", className)}
         style={{ width: size, height: size }}
       />
     );
   }
 
+  const kind = BERRY_KIND[look.palette];
+  const kinds = anyLook ? KINDS : [kind];
+  const ids: Ids = {
+    shade: `${id}shade`,
+    fade: `${id}fade`,
+    fadeGradient: `${id}fade-g`,
+    clip: (each) => `${id}clip-${each}`,
+  };
+  const detail = mascotDetail(size);
+  const working = drawn === "thinking" || drawn === "fetching";
+  const plain = working || inverted;
+  // Of every berry's layers, only its own mascot's show where the drawing carries them all.
+  const each = (draw: (kind: BerryKind) => React.ReactNode) =>
+    anyLook
+      ? kinds.map((berry) => (
+          <g key={berry} data-berry={berry}>
+            {draw(berry)}
+          </g>
+        ))
+      : draw(kind);
   return (
     <svg
       ref={drawing}
       role="img"
       aria-label={label}
-      viewBox="0 0 120 120"
+      viewBox="0 0 48 48"
       width={size}
       height={size}
       onClick={lively ? react : undefined}
       onContextMenu={onContextMenu}
       data-reaction={reaction ?? undefined}
-      data-mascot={look?.palette}
-      className={cn("shrink-0 overflow-visible berry-rim", className)}
+      data-mascot={look.palette}
+      data-inverted={inverted || undefined}
+      opacity={drawn === "off-duty" ? 0.5 : undefined}
+      className={cn("shrink-0 overflow-visible", className)}
     >
-      <GearContext.Provider value={look?.accessory ?? "none"}>
-        {/* Remounts on every mood, so poses change with a quick fade rather than a jump. */}
-        <g key={drawn} className={cn(!still && "animate-berry-pose")}>
-          {size < SIMPLIFIED_BELOW ? <SimplifiedPose mood={drawn} /> : <Pose mood={drawn} animate={!still} noBlink={noBlink} />}
-        </g>
-        {reaction === "ruffle" && size >= SIMPLIFIED_BELOW && (
-          <path d={FEATHER} className="fill-berry-wing motion-safe:animate-berry-feather" style={ownBox("center")} />
-        )}
-      </GearContext.Provider>
+      {!plain && <Defs ids={ids} kinds={kinds} />}
+      <g transform={drawn === "curious" ? "rotate(-10 24 29)" : undefined}>
+        {each((berry) => (
+          <Body
+            kind={berry}
+            fill={c(inverted ? "inverted-body" : berry)}
+            plain={plain}
+            detail={detail}
+            ids={ids}
+          />
+        ))}
+        <Eyes
+          mood={drawn}
+          still={held}
+          shut={shut}
+          small={detail === "small"}
+        />
+        {detail !== "small" && <Mouth mood={drawn} />}
+        {ACCESSORY_BEHIND[look.accessory]}
+        {each((berry) => (
+          <Top kind={berry} accessory={look.accessory} working={working} />
+        ))}
+      </g>
+      {drawn === "asking" && <circle cx={41.5} cy={12} r={5} fill={ASK} />}
     </svg>
   );
 };

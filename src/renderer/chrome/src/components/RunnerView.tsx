@@ -29,17 +29,17 @@ export const RunnerView: React.FC<{ chatId: string; steps: ChatStep[]; approval:
 
     return (
         <section aria-label="In the cloud" className="flex flex-col gap-2 animate-fade-in">
-            <p className="flex items-center gap-2 text-13">
-                <Cloud aria-hidden className="size-4 text-muted-foreground" />
-                <span className="font-semibold">In the cloud</span>
+            <p className="flex items-center gap-2 text-14">
+                <Cloud aria-hidden className="size-4 text-ink-2" strokeWidth={1.75} />
+                <span className="font-medium">In the cloud</span>
             </p>
-            <p className="text-13 text-muted-foreground">
+            <p className="text-14 text-ink-2">
                 {handoff ? `Do it in the page below, then press I’m done.` : 'It keeps going with your Mac off. Come back any time.'}
             </p>
-            <div className="relative aspect-[4/3] overflow-hidden rounded-card border bg-tray">
+            <div className="relative aspect-[4/3] overflow-hidden rounded-tile border bg-tray">
                 {url ? (
                     <iframe
-                        title="Live view of the page in the cloud"
+                        aria-label="Live view of the page in the cloud"
                         src={url}
                         sandbox="allow-same-origin allow-scripts"
                         inert={lock.inert}
@@ -47,12 +47,12 @@ export const RunnerView: React.FC<{ chatId: string; steps: ChatStep[]; approval:
                         className={cn('absolute inset-0 size-full border-0', lock.className)}
                     />
                 ) : (
-                    <p className="absolute inset-0 flex items-center justify-center p-4 text-center text-13 text-muted-foreground">
+                    <p className="absolute inset-0 flex items-center justify-center p-4 text-center text-14 text-ink-2">
                         No live view yet. A test browser in the cloud never has one.
                     </p>
                 )}
             </div>
-            <p role="status" className="text-13 line-clamp-2">{doing}</p>
+            <p role="status" className="text-14 line-clamp-2">{doing}</p>
         </section>
     )
 }

@@ -3,7 +3,7 @@ import { cn } from "./utils";
 
 describe("cn", () => {
   it("keeps a type size next to a text colour", () => {
-    expect(cn("text-13", "text-foreground")).toBe("text-13 text-foreground");
+    expect(cn("text-13", "text-ink")).toBe("text-13 text-ink");
   });
 
   it("lets a later type size replace an earlier one", () => {

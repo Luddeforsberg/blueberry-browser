@@ -1,0 +1,2 @@
+# Every text file is LF in the repo and in every checkout, Windows too, so tools like Prettier see what CI sees.
+* text=auto eol=lf

@@ -1,58 +1,232 @@
-import React, { useEffect, useState } from 'react'
-import { Bird, Hand, RefreshCw, SlidersHorizontal } from 'lucide-react'
+import React, { useEffect, useRef, useState } from 'react'
+import { Search } from 'lucide-react'
 import type { TabInfo, Visit } from '@shared/ipc'
-import type { Suggestion } from '@shared/library'
-import { BerryDot } from '@common/components/Mascot'
+import type { MascotProfile, NeedsYouItem, Suggestion } from '@shared/library'
+import { BERRY_ID, permissionsInWords } from '@shared/mascots'
+import { firstJobRows, PLAIN_WORDS, type FirstJob } from '@shared/firstRun'
+import { greetingName } from '@shared/accountName'
+import { Button } from '@common/components/Button'
+import { cn } from '@common/lib/utils'
+import { LABEL } from '@common/components/StatusPill'
+import { looksLikeUrl, toUrl } from '@common/lib/url'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
-import { Favicon } from '../components/Favicon'
-import { useAssistantName } from '../components/Berry'
-import { Composer } from '../components/Composer'
+import { Berry, useAssistantName } from '../components/Berry'
+import { Composer, type PillFace } from '../components/Composer'
 import { useCloud } from '../useCloud'
 import { useRunner } from '../useRunner'
-import { ArtBlueberry } from '../components/ArtBlueberry'
-import { Backdrop } from '../components/Backdrop'
-import { BirdSuggestions, BirdsOnFruit, type FruitIdea } from '../components/BirdsOnFruit'
-import { setFlockView, suggestedMascot } from '../flockView'
-import { setRoutinesView, suggestedForm } from '../routinesView'
-import { looksLikeUrl, toUrl } from '@common/lib/url'
-import { cn } from '@common/lib/utils'
+import { startMascot, suggestedMascot } from '../flockView'
+import { openRoutines, startRoutine, suggestedForm } from '../routinesView'
+import { asContinuation, withSiteNames } from '../siteNames'
+import { SuggestionItem } from '../components/SuggestionItem'
+import { suggestionRows, type SuggestionRow } from '../newTabSuggestions'
+import { useAttachments } from '../useAttachments'
+import { BoxChips, useAddMenu } from '../components/BoxAttachments'
+import { useRecording } from '../components/ShowBerry'
+import { Favicon } from '../components/Favicon'
+import { startingSites } from '../startingSites'
+import { FIRST_JOB_PROMPT, FirstJobs } from '../components/FirstJobs'
+import { setGalleryView } from '../galleryView'
+import { galleryParam } from '@shared/galleryPlaces'
+import { openSettings } from '../openSettings'
 
-const TRAY_BUTTON = cn(
-    "flex items-center gap-2 h-8 px-2.5 rounded-control text-14 text-muted-foreground outline-none transition-colors",
-    "hover:text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+// DESIGN.md section 10, New tab: no page yet, so no sheet. The well, the greeting, the prompt box, and what's real under it.
+
+// The well's dot grid, which never sits behind text: it fades out in a round towards the middle, wide enough to clear the
+// box and the lists, so it shows in the corners and softly along the edges.
+const WELL_DOTS = (
+    <div
+        aria-hidden
+        className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle,var(--dot)_1px,transparent_1.3px)] bg-[length:14px_14px] [mask-image:radial-gradient(ellipse_66%_84%_at_50%_54%,transparent_0,transparent_48%,#000_86%)]"
+    />
 )
 
-const WORK_CARDS = 3
+// DESIGN.md section 10, Show Berry how: started from one of our own pages, which aren't watched, a new tab says what to
+// do while watching is on, in place of the greeting, the box and the lists, so nothing on it offers to ask anything.
+// Going somewhere from it is going there from the address field, and this tab becomes the page the job starts on.
+const ShowMeHow: React.FC<{ tab: TabInfo }> = ({ tab }) => {
+    const [text, setText] = useState('')
+    const [visits, setVisits] = useState<Visit[]>([])
+    const { pinned } = useLibrary()
+    const isBerry = useAssistantName() !== 'Assistant'
+    useEffect(() => {
+        void window.chromeAPI.browser.searchHistory({}).then(({ entries }) => setVisits(entries))
+    }, [])
+    const go = (url: string) => void window.chromeAPI.browser.navigateTab(tab.id, url)
+    const sites = startingSites(pinned, visits)
 
-const timeOf = (visitedAt: number) =>
-    new Date(visitedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+    return (
+        <div className="relative h-full">
+            {WELL_DOTS}
+            <div className="absolute inset-0 overflow-y-auto [container-type:size]">
+                <div className="min-h-full flex flex-col items-center px-6 pt-[max(48px,calc(43cqh-150px))] pb-12 text-center">
+                    <Berry mood="curious" size={56} />
+                    <h1 className="mt-3 text-20 font-semibold text-ink">{isBerry ? 'Show me how.' : 'Record a routine.'}</h1>
+                    <p className="mt-2 max-w-[400px] text-14 text-ink-2">
+                        {isBerry
+                            ? 'Go to where the job starts and do it once. I note what you click and type as steps, and never a password.'
+                            : 'Go to where the job starts and do it once. What you click and type is noted as steps, never a password.'}
+                    </p>
+                    <form
+                        onSubmit={(event) => {
+                            event.preventDefault()
+                            if (text.trim()) go(toUrl(text))
+                        }}
+                        className="mt-4 w-full max-w-[420px] h-11 px-3.5 flex items-center gap-2.5 rounded-[14px] bg-sheet shadow-chip text-left focus-within:ring-2 focus-within:ring-focus"
+                    >
+                        <Search aria-hidden className="size-[15px] shrink-0 text-ink-3" strokeWidth={1.75} />
+                        <input
+                            aria-label="Where does it start?"
+                            placeholder="Where does it start?"
+                            value={text}
+                            onChange={(event) => setText(event.target.value)}
+                            spellCheck={false}
+                            autoFocus
+                            className="flex-1 min-w-0 h-full bg-transparent text-15 text-ink caret-ink outline-none placeholder:text-faint"
+                        />
+                    </form>
+                    {sites.length > 0 && (
+                        <ul aria-label="Places to start" className="mt-3 flex flex-wrap justify-center gap-2">
+                            {sites.map(({ site, url, favicon }) => (
+                                <li key={site}>
+                                    <Button variant="raised" size="sm" className="text-13" onClick={() => go(url)}>
+                                        <Favicon src={favicon} site={site} />
+                                        {site}
+                                    </Button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                    <p className="mt-3 text-13 text-ink-3">Or go to a tab you already have open.</p>
+                </div>
+            </div>
+        </div>
+    )
+}
 
-// A heading, one smart input and recent work. Recent only lists pages really visited.
+// DESIGN.md section 10, Choosing a mascot: the old one's eyes shut, the new one pops in at 120ms with the pips for a
+// face, and its eyes open at 420ms. Held still, it's a short fade. Choosing again partway starts over from there.
+const ARRIVES_MS = 120
+const SETTLED_MS = 420
+const useMascotSwitch = (chosen: MascotProfile) => {
+    const { keepBerryStill } = useShell().settings
+    const [shown, setShown] = useState(chosen)
+    const [phase, setPhase] = useState<'rest' | 'shut' | 'arriving'>('rest')
+    const [arrival, setArrival] = useState(0)
+    // Who's showing, and the latest of who's chosen, so a library update partway doesn't start the switch again.
+    const showing = useRef(chosen.id)
+    const latest = useRef(chosen)
+    latest.current = chosen
+
+    // The same mascot, saved again: show what it is now.
+    useEffect(() => {
+        if (chosen.id === showing.current) setShown(chosen)
+    }, [chosen])
+
+    useEffect(() => {
+        if (chosen.id === showing.current) return
+        const arrive = () => {
+            showing.current = latest.current.id
+            setShown(latest.current)
+            setArrival((count) => count + 1)
+        }
+        if (keepBerryStill) {
+            arrive()
+            return
+        }
+        setPhase('shut')
+        const arriving = window.setTimeout(() => {
+            arrive()
+            setPhase('arriving')
+        }, ARRIVES_MS)
+        const settle = window.setTimeout(() => setPhase('rest'), SETTLED_MS)
+        return () => {
+            window.clearTimeout(arriving)
+            window.clearTimeout(settle)
+        }
+    }, [chosen.id, keepBerryStill])
+
+    const face: PillFace = { mood: phase === 'arriving' ? 'fetching' : 'rest', shut: phase === 'shut', arrival }
+    return { shown, face, switching: phase !== 'rest', still: keepBerryStill }
+}
+
+// What a mascot may not do, in words, or nothing for one with no limits, as Berry has none.
+const limitsOf = (mascot: MascotProfile): string | null => {
+    const lines = permissionsInWords(mascot)
+    return lines.every((line) => line.open) ? null : lines.map((line) => `${line.text}.`).join(' ')
+}
+
+const openJob = (item: Pick<NeedsYouItem, 'id' | 'job' | 'routineId'>) => {
+    if (item.routineId) {
+        openRoutines({ page: 'routine', id: item.routineId })
+    } else {
+        void window.chromeAPI.browser.openPage('chat', { param: item.id, title: item.job })
+    }
+}
+
+const Label: React.FC<{ ask?: boolean; id: string; children: React.ReactNode }> = ({ ask, id, children }) => (
+    <h2 id={id} className={cn('mx-3 mb-1.5', LABEL, ask && 'text-ask')}>{children}</h2>
+)
+
+const WaitingRow: React.FC<{ item: NeedsYouItem }> = ({ item }) => {
+    const mascot = useFlock().find(item.mascotId)
+    const name = useAssistantName(mascot)
+    const { approval } = item
+    // An approval says what it would do, so it reads on from the mascot's name. A question or a handoff is already a sentence.
+    const words = withSiteNames(approval.text)
+    return (
+        <li className="min-h-12 py-2 pl-3 pr-2.5 flex items-center gap-[13px] rounded-[14px] bg-sheet text-14 text-ink shadow-chip">
+            <Berry mood="asking" size={26} mascot={mascot} />
+            <span className="flex-1 min-w-0 truncate">
+                {approval.question || approval.handoff ? words : <><span className="font-medium">{name}</span> wants to {asContinuation(words)}</>}
+                <span className="text-ink-2">, on {item.job}</span>
+            </span>
+            {/* A row in a list never carries a filled button. */}
+            <Button size="sm" variant="raised" onClick={() => openJob(item)} aria-label={`Review ${item.job}`}>Review</Button>
+        </li>
+    )
+}
+
 export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const [text, setText] = useState('')
-    const [recent, setRecent] = useState<Visit[]>([])
     const [suggestions, setSuggestions] = useState<Suggestion[]>([])
-    // A prompt put in the composer: moves the keyboard there, and goes away once it's been sent.
-    const [filled, setFilled] = useState<{ id: string; times: number } | null>(null)
+    // What a row put in the box, and which row: moves the keyboard there, and the row looks used while the box still says it.
+    // A suggestion's id is told when it's sent.
+    const [filled, setFilled] = useState<{ key: string; suggestionId: string | null; prompt: string; times: number } | null>(null)
+    const fill = (key: string, suggestionId: string | null, prompt: string) => {
+        setText(prompt)
+        setFilled({ key, suggestionId, prompt, times: (filled?.times ?? 0) + 1 })
+    }
     const browser = window.chromeAPI.browser
     const library = useLibrary()
-    const { layout, theme } = useShell()
-    const { chosen, choose, find } = useFlock()
+    const { settings } = useShell()
+    const { chosen, choose, flock } = useFlock()
+    // Who was chosen as the page opened, so choosing one from a row doesn't reorder the rows.
+    const [chosenAtOpen] = useState(chosen.id)
+    const { shown, face, switching, still } = useMascotSwitch(chosen)
     const [cloudState] = useCloud()
     // Only with a runner linked in Settings > Cloud, which has accepted, so nothing waits in a queue nobody takes from.
     const [runnerState] = useRunner()
     const canUseRunner = runnerState.status === 'linked'
     const canUseCloud = cloudState.status !== 'off'
-    // Null follows the bird, which may work in the cloud. Another bird, chosen here or in the chat panel, goes back to
-    // following it.
+    // Null follows the mascot, which may work in the cloud. Choosing another goes back to following it.
     const [cloudChoice, setCloudChoice] = useState<boolean | null>(null)
     useEffect(() => setCloudChoice(null), [chosen.id])
-    const inCloud = (canUseRunner || canUseCloud) && (cloudChoice ?? chosen.worksInCloud === true)
-
-    useEffect(() => {
-        browser.getRecent().then(setRecent).catch(() => setRecent([]))
-    }, [browser])
+    // One that only reads the page in front has no use for the cloud, where that page isn't.
+    const cloudFits = (canUseRunner || canUseCloud) && chosen.tools.includes('visit')
+    const inCloud = cloudFits && (cloudChoice ?? chosen.worksInCloud === true)
+    // The runner keeps going with this computer off, so it's used whenever there is one. The user never picks.
+    const toRunner = inCloud && canUseRunner
+    const box = useAttachments(toRunner ? 'runner' : inCloud ? 'cloud' : 'here')
+    const recording = useRecording().status === 'recording'
+    const assistant = useAssistantName()
+    const add = useAddMenu(box, {
+        chatId: null,
+        mascot: chosen,
+        place: toRunner ? 'runner' : inCloud ? 'cloud' : 'here',
+        // Show Berry how starts here too, for a routine shown rather than written.
+        showHow: { label: assistant === 'Assistant' ? 'Record a routine' : `Show ${assistant} how`, note: assistant === 'Assistant' ? null : 'makes a routine', problem: recording ? 'It’s already watching' : null, onStart: () => void window.chromeAPI.recording.start() },
+    })
 
     // Saved cards, at once. New ones arrive when they're written, and the page never waits for them.
     useEffect(() => {
@@ -61,209 +235,160 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         return onUpdated(setSuggestions)
     }, [])
 
+    // Examples from the starters' real runs, for the mascots to try.
+    const [examples, setExamples] = useState<Record<string, string>>({})
+    useEffect(() => {
+        void window.chromeAPI.mascots.examples().then(setExamples)
+    }, [])
+
     const takeUp = (suggestion: Suggestion) => {
         if (suggestion.kind === 'prompt') {
-            setText(suggestion.prompt)
-            setFilled({ id: suggestion.id, times: (filled?.times ?? 0) + 1 })
+            fill(`suggestion-${suggestion.id}`, suggestion.id, suggestion.prompt)
         } else if (suggestion.kind === 'routine') {
-            setRoutinesView({ page: 'form', values: suggestedForm(suggestion.draft, suggestion.id) })
-            void browser.openPage('routines')
+            startRoutine(suggestedForm(suggestion.draft, suggestion.id))
         } else {
-            setFlockView({ page: 'form', values: suggestedMascot(suggestion.draft, suggestion.id) })
-            void browser.openPage('flock')
+            startMascot(suggestedMascot(suggestion.draft, suggestion.id))
         }
     }
 
     const dismiss = (id: string) => void window.chromeAPI.suggestions.dismiss(id).then(setSuggestions)
 
-    const askBerry = async (message: string) => {
-        if (filled) void window.chromeAPI.suggestions.used(filled.id)
+    const press = (row: SuggestionRow) => {
+        if (row.kind === 'pick-up') openJob({ id: row.chat.id, job: row.chat.title, routineId: null })
+        else if (row.kind === 'suggestion') takeUp(row.suggestion)
+        else {
+            choose(row.mascot.id)
+            fill(row.key, null, row.prompt)
+        }
+    }
+
+    // First jobs, after the first run, in place of suggestions until every row is done or it's hidden.
+    const firstJobsShown = firstJobRows(settings.firstJobs, settings.firstJobsDone).length > 0
+    const greeting = greetingName(settings.accountName)
+    const pressFirstJob = (job: FirstJob) => {
+        if (job === 'key') openSettings('ai-service')
+        else if (job === 'history') openSettings('bring-in-history')
+        else if (job === 'try') {
+            // Its words are Berry's to act on. Nothing is sent until the user sends it.
+            choose(BERRY_ID)
+            fill('first-job-try', null, FIRST_JOB_PROMPT)
+        } else {
+            setGalleryView({ query: '', category: null })
+            void browser.openPage('mascot-gallery', { param: galleryParam({ page: 'mascot', id: PLAIN_WORDS }) })
+        }
+    }
+
+    const ask = async (message: string) => {
+        if (filled?.suggestionId) void window.chromeAPI.suggestions.used(filled.suggestionId)
         const chat = await window.chromeAPI.chat.send(null, message, {
             seePage: false,
             mascotId: chosen.id,
-            // The runner keeps going with this computer off, so it's used whenever there is one. The user never picks.
-            runner: inCloud && canUseRunner,
-            cloud: inCloud && !canUseRunner && canUseCloud
+            runner: toRunner,
+            cloud: inCloud && !canUseRunner && canUseCloud,
+            ...box.sendable()
         })
         if (!chat) return
+        box.clear()
         await browser.openPage('chat', { param: chat.id, title: chat.title })
         await browser.closeTab(tab.id)
     }
 
-    const ask = () => {
-        if (text.trim()) void askBerry(text.trim())
-    }
-
-    // Plain Enter opens an address and asks Berry anything else. ⌘Enter always asks.
+    // Enter opens anything that looks like an address and asks the mascot about everything else. ⌘Enter always asks, and
+    // so does anything with something attached, which is for the mascot.
     const submit = (alwaysAsk: boolean) => {
-        if (!text.trim()) return
-        if (alwaysAsk || !looksLikeUrl(text)) ask()
-        else void browser.navigateTab(tab.id, toUrl(text))
+        const message = text.trim()
+        if (!message) return
+        if (alwaysAsk || !box.empty || !looksLikeUrl(message)) void ask(message)
+        else void browser.navigateTab(tab.id, toUrl(message))
     }
 
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (e.key !== 'Enter') return
-        e.preventDefault()
-        submit(e.metaKey || e.ctrlKey)
-    }
+    const name = useAssistantName(shown)
+    const asking = new Set(library.needsYou.map(({ id }) => id))
+    const rows = suggestionRows({ chats: library.chats, asking, suggestions, flock, examples, chosenAtOpen })
 
-    const name = useAssistantName(chosen)
-    const isBerry = name !== 'Assistant'
+    if (recording) return <ShowMeHow tab={tab} />
 
-    const TRAY = [
-        { label: 'Needs you', Icon: Hand, onClick: () => browser.openPage('needs-you') },
-        { label: 'Routines', Icon: RefreshCw, onClick: () => browser.openPage('routines') },
-        { label: 'Flock', Icon: Bird, onClick: () => browser.openPage('flock') }
-    ]
-
-    // Real work only: chats and routines from the library. With none, the birds offer what there is to try.
-    const work: FruitIdea[] = [
-        ...library.chats.map((chat) => ({
-            id: chat.id,
-            mascot: find(chat.mascotId),
-            mood: 'rest' as const,
-            words: <p className="font-semibold">{chat.title}</p>,
-            action: 'Open the chat',
-            actionLabel: `Open the chat: ${chat.title}`,
-            onUse: () => void browser.openPage('chat', { param: chat.id, title: chat.title })
-        })),
-        ...library.routines.map((routine) => ({
-            id: routine.id,
-            mascot: find(routine.mascotId),
-            mood: routine.status === 'running' ? 'fetching' as const : 'rest' as const,
-            words: (
-                <>
-                    <p className="flex items-center gap-2 font-semibold">
-                        {routine.name}
-                        {routine.status === 'running' && <BerryDot working />}
-                        {routine.status === 'running' && <span className="sr-only">Running now</span>}
-                    </p>
-                    <p className="opacity-90">{routine.schedule}</p>
-                    {routine.lastResult && <p className="opacity-90 line-clamp-2">{routine.lastResult}</p>}
-                </>
-            ),
-            action: 'See the routine',
-            actionLabel: `See the routine: ${routine.name}`,
-            onUse: () => void browser.openPage('routines')
-        }))
-    ].slice(0, WORK_CARDS)
-
-    const IDEAS: FruitIdea[] = [
-        {
-            id: 'idea-routines',
-            mascot: find(null),
-            mood: 'rest',
-            words: <p><span className="font-semibold">Put something on a schedule.</span> <span className="opacity-90">{isBerry ? 'Hand me a task that repeats, and I’ll report back when it’s done.' : 'Set up a task that repeats, with results waiting for you.'}</span></p>,
-            action: 'See routines',
-            onUse: () => void browser.openPage('routines')
-        },
-        {
-            id: 'idea-settings',
-            mascot: find(null),
-            mood: 'rest',
-            words: <p><span className="font-semibold">Make the browser yours.</span> <span className="opacity-90">Choose your tab layout and theme, and what stays on this computer.</span></p>,
-            action: 'Open settings',
-            onUse: () => void browser.openPage('settings')
-        }
-    ]
-
-    const glass = theme.glass ? "bg-surface/90 backdrop-blur-xl" : "bg-surface"
     return (
-        <div className="relative h-full overflow-y-auto">
-            <div className="relative min-h-full overflow-hidden">
-                <Backdrop quiet={suggestions.length > 0} />
-                {/* The space above is 22vh, less on a shorter window, so five recent pages still fit at 900px tall. */}
-                <div className="relative max-w-[800px] mx-auto px-6 pt-[clamp(104px,calc(100vh-796px),22vh)] pb-6">
-                    <h1 className="sr-only">Where shall we start today?</h1>
-                    {/* Room for Berry, who stands on the composer's top edge. */}
-                    {isBerry && <div className="h-[84px]" />}
+        <div className="relative h-full">
+            {WELL_DOTS}
+            {/* Placed by the page area's own height, not the window's: the box's middle at 43% of it, and the greeting
+                never nearer the top than 48px. 127px is from the greeting's top to the middle of the empty box. The lists
+                flow on under it. */}
+            <div className="absolute inset-0 overflow-y-auto [container-type:size]">
+                <div className="min-h-full flex flex-col items-center px-6 pt-[max(48px,calc(43cqh-127px))] pb-12">
+                    {/* A mark, not a control. */}
+                    <h1 className="max-w-[640px] mb-[26px] flex items-center gap-3 text-30 font-medium text-ink">
+                        <span data-berry-perched className="-mt-1.5 shrink-0 flex">
+                            <span key={face.arrival} className={cn('flex origin-[50%_70%]', face.arrival > 0 && (still ? 'animate-[mascot-fade_150ms_ease-out]' : 'animate-mascot-pop'))}>
+                                <Berry size={40} mascot={shown} mood={face.mood} shut={face.shut} />
+                            </span>
+                        </span>
+                        {/* A long name is cut, never wrapped, at the box's width. Cutting clips at the line box, which is
+                            shorter than a g or a comma hangs, so the box is given room it doesn't take up. */}
+                        <span className="min-w-0 truncate py-1.5 -my-1.5">{greeting ? `Where to, ${greeting}?` : 'Where to?'}</span>
+                    </h1>
 
-                    <div data-berry-home className="relative z-10 rounded-composer">
+                    <div className="w-full max-w-[640px]">
                         <Composer
-                            label={`Search, enter a URL, or ask ${isBerry ? name : 'a question'}`}
-                            placeholder={isBerry ? `Ask ${name} anything, or enter a URL…` : 'Ask anything, or enter a URL…'}
+                            size="hero"
+                            label={`Search, enter a URL, or ask ${name === 'Assistant' ? 'a question' : name}`}
+                            placeholder={`Ask ${name}, or type an address`}
+                            quietPlaceholder={switching && face.shut}
                             value={text}
                             onChange={(next) => {
                                 setText(next)
                                 // Emptied, it's no longer that prompt being sent.
                                 if (!next.trim()) setFilled(null)
                             }}
-                            onKeyDown={handleKeyDown}
+                            onKeyDown={(event) => {
+                                if (event.key !== 'Enter' || event.shiftKey) return
+                                event.preventDefault()
+                                submit(event.metaKey || event.ctrlKey)
+                            }}
                             spellCheck={false}
                             autoFocus
                             focusKey={filled?.times}
                             canSend={text.trim().length > 0}
                             onSend={() => submit(false)}
-                            mascot={chosen}
+                            mascot={shown}
+                            chosenId={chosen.id}
+                            face={face}
                             onChooseMascot={choose}
-                            cloud={canUseRunner || canUseCloud ? { on: inCloud, onToggle: () => setCloudChoice(!inCloud) } : undefined}
+                            limits={limitsOf(shown)}
+                            cloud={cloudFits ? { on: inCloud, onToggle: () => setCloudChoice(!inCloud) } : undefined}
+                            attachment={box.empty ? undefined : <BoxChips box={box} />}
+                            add={add}
+                            onFiles={toRunner ? undefined : (files) => void box.addFiles(files)}
                         />
                     </div>
-                    {/* The sidebar holds these when it's open. Frosted, so a bird walking behind the page can't cross a label. */}
-                    {!layout.sidebarOpen && (
-                        <div className={cn("relative z-10 flex items-center gap-1 h-11 px-2 mt-1 rounded-card", theme.glass ? "bg-canvas/70 backdrop-blur-xl" : "bg-canvas")}>
-                            {TRAY.map(({ label, Icon, onClick }) => (
-                                <button key={label} type="button" onClick={() => void onClick()} className={TRAY_BUTTON}>
-                                    <Icon className="size-4" />
-                                    {label}
-                                </button>
-                            ))}
-                            <div className="flex-1" />
-                            <button type="button" onClick={() => void browser.openPage('settings')} className={TRAY_BUTTON}>
-                                <SlidersHorizontal className="size-4" />
-                                Settings
-                            </button>
-                        </div>
-                    )}
 
-                    {/* Suggestions sit nearer the composer, so they're in view on an ordinary window. It stays where it is. */}
-                    <div className="relative mt-14">
-                        <ArtBlueberry dark={theme.isDark} className="absolute left-1/2 top-0 max-w-none -translate-x-1/2 pointer-events-none" />
-
-                        {suggestions.length > 0 ? (
-                            <section aria-labelledby="suggestions-heading" className="relative">
-                                <h2 id="suggestions-heading" className="sr-only">Things you repeat</h2>
-                                <BirdSuggestions suggestions={suggestions} onUse={takeUp} onDismiss={dismiss} />
-                            </section>
-                        ) : work.length > 0 ? (
-                            <section aria-labelledby="work-heading" className="relative">
-                                <h2 id="work-heading" className="sr-only">Your work</h2>
-                                <BirdsOnFruit ideas={work} />
-                            </section>
-                        ) : (
-                            <section aria-labelledby="ideas-heading" className="relative">
-                                <h2 id="ideas-heading" className="sr-only">Some ideas</h2>
-                                <BirdsOnFruit ideas={IDEAS} />
+                    <div className="w-full max-w-[640px] mt-[26px] flex flex-col gap-4">
+                        {library.needsYou.length > 0 && (
+                            <section aria-labelledby="new-tab-waiting">
+                                <Label ask id="new-tab-waiting">Waiting for you</Label>
+                                <ul className="flex flex-col gap-1.5">
+                                    {library.needsYou.map((item) => <WaitingRow key={item.id} item={item} />)}
+                                </ul>
                             </section>
                         )}
-
-                {recent.length > 0 && (
-                    <section aria-labelledby="recent-heading" className={cn("relative mt-8 p-2 rounded-panel shadow-card", glass)}>
-                        <h2 id="recent-heading" className="px-2 py-1 text-14 text-muted-foreground">
-                            Recent
-                        </h2>
-                        <ul>
-                            {recent.slice(0, 5).map((visit) => (
-                                <li key={visit.url}>
-                                    <button
-                                        type="button"
-                                        onClick={() => void browser.navigateTab(tab.id, visit.url)}
-                                        className={cn(
-                                            "w-full h-9 px-2 flex items-center gap-3 rounded-control text-14 text-left",
-                                            "hover:bg-muted outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
-                                        )}
-                                    >
-                                        <Favicon src={visit.favicon} site={visit.url} />
-                                        <span className="flex-1 truncate">{visit.title}</span>
-                                        <span className="text-12 text-muted-foreground tabular-nums">
-                                            {timeOf(visit.visitedAt)}
-                                        </span>
-                                    </button>
-                                </li>
-                            ))}
-                        </ul>
-                    </section>
-                )}
+                        {firstJobsShown ? (
+                            <FirstJobs onPress={pressFirstJob} />
+                        ) : rows.length > 0 && (
+                            <section aria-labelledby="new-tab-suggestions">
+                                <Label id="new-tab-suggestions">Suggestions</Label>
+                                <ul className="flex flex-col gap-0.5">
+                                    {rows.map((row) => (
+                                        <SuggestionItem
+                                            key={row.key}
+                                            row={row}
+                                            used={filled?.key === row.key && text === filled.prompt}
+                                            onPress={() => press(row)}
+                                            onDismiss={row.kind === 'suggestion' ? () => dismiss(row.suggestion.id) : undefined}
+                                        />
+                                    ))}
+                                </ul>
+                            </section>
+                        )}
                     </div>
                 </div>
             </div>

@@ -1,5 +1,6 @@
 import type { ChatThread, MascotAccessory, MascotDraft, MascotPalette, MascotProfile, MascotTool } from '@shared/library'
-import { ACCESSORIES, MASCOT_TOOLS, PALETTES } from '@shared/mascots'
+import { ACCESSORIES, BERRY, MASCOT_TOOLS, PALETTES } from '@shared/mascots'
+import { flockParam, type FlockPlace, type MascotPart } from '@shared/flockPlaces'
 
 export interface MascotFormValues {
     // Null for a new mascot.
@@ -9,7 +10,8 @@ export interface MascotFormValues {
     accessory: MascotAccessory
     instructions: string
     onlySomeSites: boolean
-    sitesText: string
+    // Each as the user added it. Main checks them again when it's saved.
+    sites: string[]
     tools: MascotTool[]
     worksInCloud: boolean
     // The suggestion that filled this in, which goes away once it's saved.
@@ -39,20 +41,13 @@ export const lastExchange = ({ messages }: Pick<ChatThread, 'messages'>): { prom
     return prompt ? { prompt: prompt.content, answer: messages[answerAt].content } : null
 }
 
-export type FlockView =
-    | { page: 'list'; landed?: string }
-    | { page: 'form'; values: MascotFormValues }
-    | { page: 'publish'; mascotId: string; values: PublishValues }
-    // `returnTo` is a form left to look at this, with whatever had been changed in it.
-    | { page: 'memory'; mascotId: string; returnTo?: MascotFormValues }
-
 const NAMES = ['Pip', 'Scout', 'Juno', 'Wren', 'Otis', 'Margot', 'Figaro', 'Mabel', 'Ziggy', 'Clementine', 'Rook', 'Nimbus']
 
 const oneOf = <T,>(list: readonly T[]): T => list[Math.floor(Math.random() * list.length)]
 
 const randomLook = () => ({
-    // Not the jackdaw, which is Berry's, so a new one starts out as itself.
-    palette: oneOf(PALETTES.filter(({ id }) => id !== 'jackdaw')).id,
+    // Not Berry's, so a new one starts out as itself.
+    palette: oneOf(PALETTES.filter(({ id }) => id !== BERRY.look.palette)).id,
     accessory: oneOf(ACCESSORIES.filter(({ id }) => id !== 'none')).id
 })
 
@@ -62,7 +57,7 @@ export const blankMascot = (): MascotFormValues => ({
     ...randomLook(),
     instructions: '',
     onlySomeSites: false,
-    sitesText: '',
+    sites: [],
     tools: MASCOT_TOOLS.map(({ id }) => id),
     worksInCloud: false
 })
@@ -80,7 +75,7 @@ export const mascotForm = ({ id, name, look, instructions, sites, tools, worksIn
     ...look,
     instructions,
     onlySomeSites: sites.length > 0,
-    sitesText: sites.join(', '),
+    sites,
     tools,
     worksInCloud
 })
@@ -91,8 +86,7 @@ export const suggestedMascot = (draft: MascotDraft, suggestionId: string): Masco
     suggestionId
 })
 
-export const sitesFrom = ({ onlySomeSites, sitesText }: Pick<MascotFormValues, 'onlySomeSites' | 'sitesText'>): string[] =>
-    onlySomeSites ? sitesText.split(/[\s,]+/).filter(Boolean) : []
+export const sitesFrom = ({ onlySomeSites, sites }: Pick<MascotFormValues, 'onlySomeSites' | 'sites'>): string[] => (onlySomeSites ? sites : [])
 
 export const toMascotDraft = (values: MascotFormValues): MascotDraft => ({
     name: values.name,
@@ -102,31 +96,69 @@ export const toMascotDraft = (values: MascotFormValues): MascotDraft => ({
     tools: values.tools
 })
 
-export const FLOCK_VIEW_EVENT = 'blueberry:flock-view'
+// What each part of a mascot is, among the form's values.
+const PART_FIELDS = {
+    look: ['palette', 'accessory'],
+    name: ['name'],
+    purpose: ['instructions'],
+    limits: ['onlySomeSites', 'sites', 'tools']
+} as const satisfies Record<MascotPart, readonly (keyof MascotFormValues)[]>
 
-// Lasts while the page isn't showing, so going to another tab doesn't lose what's been typed.
-let current: FlockView = { page: 'list' }
-// The Flock tab it belongs to, so a Flock tab opened again starts on the list. Null when it was set from elsewhere with
-// no Flock page showing, which is for the Flock tab about to show.
-let owner: string | null = null
-let showing = false
+// The mascot as it is now with one part as it was changed, so a part changed on its own never puts back anything else
+// from when it was opened.
+export const withPart = (current: MascotFormValues, changed: MascotFormValues, part: MascotPart): MascotFormValues => ({
+    ...current,
+    ...Object.fromEntries(PART_FIELDS[part].map((field) => [field, changed[field]]))
+})
 
-export const flockView = () => current
-
-// What the Flock page in `tabId` shows: the list, unless it's that tab's own view or one just set for it.
-export const flockViewFor = (tabId: string): FlockView => {
-    if (owner !== null && owner !== tabId) current = { page: 'list' }
-    owner = tabId
-    return current
+// Who the dock shows when the flock doesn't fit in `room` faces: as many as fit beside a count of the rest. One that's
+// asking or working is never among the hidden, so it takes the place of the last one at rest, after the first.
+export const dockFaces = <T,>(flock: T[], room: number, busy: (mascot: T) => boolean): { shown: T[]; more: number } => {
+    if (flock.length <= room) return { shown: flock, more: 0 }
+    const shown = flock.slice(0, Math.max(1, room - 1))
+    for (const mascot of flock.slice(shown.length)) {
+        if (!busy(mascot)) continue
+        let at = shown.length - 1
+        while (at > 0 && busy(shown[at])) at--
+        if (at > 0) shown[at] = mascot
+    }
+    return { shown, more: flock.length - shown.length }
 }
 
-// Whether a Flock page is on screen, so a view set meanwhile is its own.
-export const setFlockShowing = (on: boolean) => {
-    showing = on
+// The mascots' page at a place. It moves around itself this way too, so where it is lives in its tab's param, which is
+// how Back and a restored session find it.
+export const openMascots = (place: FlockPlace) => void window.chromeAPI.browser.openPage('flock', { param: flockParam(place) })
+
+// What's being typed on the mascots' page, by tab, for the one place it was typed in. It lasts while the tab is away, so
+// going to another tab and back loses nothing, and goes once the page has moved anywhere else, so leaving keeps nothing.
+const drafts = new Map<string, { param: string; value: unknown }>()
+
+export const tabDraft = <T,>(tabId: string, param: string, fresh: () => T): T => {
+    const kept = drafts.get(tabId)
+    return kept?.param === param ? (kept.value as T) : fresh()
 }
 
-export const setFlockView = (view: FlockView) => {
-    current = view
-    if (!showing) owner = null
-    window.dispatchEvent(new Event(FLOCK_VIEW_EVENT))
+export const keepTabDraft = (tabId: string, param: string, value: unknown) => {
+    drafts.set(tabId, { param, value })
+}
+
+export const forgetTabDraftElsewhere = (tabId: string, param: string) => {
+    if (drafts.get(tabId)?.param !== param) drafts.delete(tabId)
+}
+
+// A new mascot started from elsewhere, such as New mascot in the chooser or a suggestion, with its answers filled in.
+// The steps take it when they show, whichever tab they're in.
+export const NEW_MASCOT_EVENT = 'blueberry:new-mascot'
+let started: MascotFormValues | null = null
+
+export const startMascot = (values: MascotFormValues = blankMascot()) => {
+    started = values
+    window.dispatchEvent(new Event(NEW_MASCOT_EVENT))
+    openMascots({ page: 'new' })
+}
+
+export const takeStartedMascot = (): MascotFormValues | null => {
+    const values = started
+    started = null
+    return values
 }

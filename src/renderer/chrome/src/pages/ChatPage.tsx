@@ -1,24 +1,27 @@
 import React, { useEffect, useRef, useState } from 'react'
 import type { TabInfo } from '@shared/ipc'
 import { useChatThread } from '../contexts/ChatContext'
-import { AssistantMessage, ChatApprovalCard, ChatError, UserMessage, useFollowReply } from '../components/ChatMessage'
+import { AssistantMessage, ChatApprovalCard, UserMessage, WentWrong, didWork, useFollowReply, type ReplyActions, type ReplyOrigin } from '../components/ChatMessage'
+import { chatRoutine } from '../routinesView'
 import { useAssistantName } from '../components/Berry'
 import { MemoryOffers } from '../components/MemoryInChat'
 import { ChatComposer } from '../components/Composer'
-import { useFlock } from '../contexts/LibraryContext'
-import { Button } from '@common/components/Button'
-import { cn } from '@common/lib/utils'
-import { blankForm, setRoutinesView } from '../routinesView'
+import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useWorkView, WorkingStrip, WorkingView } from '../components/WorkingView'
 import { RunnerView } from '../components/RunnerView'
+import { answerInBox } from '../components/Composer'
 
-// The chat keeps its width, so the working view only goes beside it when it can have this much of the page.
-const ROOM_FOR_WORK = 960
-const PICTURE_WIDTH = { min: 300, share: 0.38, max: 600 }
-const WORK_GUTTER = 48
-const COLUMN_WITH_BIRD = 888
+// DESIGN.md section 2: the working view is 420px, with 18px either side of the picture, and goes beside the conversation
+// only while that keeps room to read.
+const WORK_VIEW = 420
+const PICTURE_WIDTH = WORK_VIEW - 2 * 18
+const ROOM_FOR_WORK = WORK_VIEW + 480
 
-// A full page for talking to Berry about anything, not about a web page.
+// The conversation and the prompt box share one column, so they line up however wide the page is. A reply's face hangs
+// 36px out from it: 28px either side, or 36px where the page is too narrow for the face to go past the column's edge.
+const COLUMN = 'w-full max-w-[720px] mx-auto px-[clamp(28px,calc(396px_-_50%),36px)]'
+
+// A full page for talking to a mascot about anything, not about a web page.
 export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const chatId = tab.pageParam
     const thread = useChatThread(chatId)
@@ -30,6 +33,9 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const pageRef = useRef<HTMLDivElement>(null)
     const askingRef = useRef<HTMLDivElement>(null)
     const [pageSize, setPageSize] = useState({ width: 0, height: 0 })
+    // Hide work holds for this chat, until Show work in the Working block.
+    const [workHidden, setWorkHidden] = useState(false)
+    useEffect(() => setWorkHidden(false), [chatId])
     const hasThread = !!chatId && !!thread
     useEffect(() => {
         const page = pageRef.current
@@ -38,116 +44,125 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         observer.observe(page)
         return () => observer.disconnect()
     }, [hasThread])
-    const pageWidth = pageSize.width
-    const roomBeside = pageWidth >= ROOM_FOR_WORK
-    const pictureWidth = roomBeside ? Math.round(Math.max(PICTURE_WIDTH.min, Math.min(pageWidth * PICTURE_WIDTH.share, PICTURE_WIDTH.max))) : 0
-    const { view: work, frames } = useWorkView(chatId, pictureWidth)
+    const roomBeside = pageSize.width >= ROOM_FOR_WORK
+    // Nothing is captured while the view is hidden or has no room.
+    const { view: work, frames } = useWorkView(chatId, roomBeside && !workHidden ? PICTURE_WIDTH : 0)
     const running = partial != null
+    const library = useLibrary()
+    // An offer to remember arrives after the reply has ended, and has to be followed down like a step.
+    const offers = library.memory.offers.filter((offer) => offer.sourceId === chatId).length
+    // Only the library's list says whether a chat's jobs go to a cloud tab, not the thread.
+    const inCloud = library.chats.some((chat) => chat.id === chatId && chat.cloud)
     const scrollerRef = useFollowReply(
         thread?.messages.filter((message) => message.role === 'user').length ?? 0,
         partial,
-        (thread?.steps.length ?? 0) + (thread?.approval ? 1 : 0)
+        (thread?.steps.length ?? 0) + (thread?.approval ? 1 : 0) + offers
     )
-
-    // Only what the user asked for, which they can change before saving it.
-    const saveAsRoutine = () => {
-        if (!thread) return
-        const asked = thread.messages.filter((message) => message.role === 'user').map((message) => message.content)
-        setRoutinesView({ page: 'form', values: blankForm(thread.title, asked.join('\n\n'), thread.mascotId) })
-        void window.chromeAPI.browser.openPage('routines')
-    }
 
     // Chats begin on the new tab page, so this is only ever a moment while the chat loads, or one just deleted.
     if (!chatId || !thread) return <div ref={pageRef} className="h-full" />
 
-    // Its bird hangs outside the column, so a column without room beside it moves over to make some.
+    const actions: ReplyActions = {
+        onSay: (words) => void window.chromeAPI.chat.send(chatId, words, { seePage: false, mascotId: mascot.id }),
+        routineFromChat: didWork(thread.messages) ? () => chatRoutine(thread.title, thread.messages, thread.mascotId) : undefined,
+    }
+
+    // While a question waits, the prompt box is where it's answered.
+    const question = thread.approval?.question ? thread.approval : null
     const onRunner = !!thread.runner && running && roomBeside
-    const gutter = pageWidth < COLUMN_WITH_BIRD || ((work || onRunner) && roomBeside) ? "pl-14" : "pl-6"
+    const workBeside = !!work && roomBeside && !workHidden
+    // There's no line on top: where it runs is said only when that's not here, and who started it only when it wasn't the
+    // user, over the first reply.
+    const origin: ReplyOrigin | undefined = thread.runner || inCloud ? { words: 'in the cloud', cloud: true } : thread.from ? { words: `from ${thread.from}`, cloud: false } : undefined
 
     // The reply being written holds the place it's saved in, so it stays the same element when it ends.
-    const messages = running ? [...thread.messages, { role: 'assistant' as const, content: partial, steps: thread.steps, memoryIds: thread.memoryIds }] : thread.messages
+    const messages = running
+        ? [...thread.messages, { role: 'assistant' as const, content: partial, steps: thread.steps, said: thread.said, startedAt: thread.startedAt ?? undefined, memoryIds: thread.memoryIds }]
+        : thread.messages
+    const last = messages.at(-1)
+    const failedReply = thread.error && last?.role === 'assistant' ? last : null
+    const firstReply = messages.findIndex((message) => message.role === 'assistant')
 
     return (
         <div ref={pageRef} className="h-full flex">
             <div className="flex-1 min-w-0 h-full flex flex-col">
                 <div ref={scrollerRef} className="flex-1 min-h-0 overflow-y-auto">
-                    <div className={cn("max-w-[800px] mx-auto pr-6 pt-8 pb-4 flex flex-col gap-6", gutter)}>
+                    <div className={`${COLUMN} pt-6 pb-4 flex flex-col gap-6`}>
                         {messages.map((message, index) =>
                             message.role === 'user' ? (
-                                <div key={index} className="flex flex-col">
-                                    {/* Another app wrote the first message, so it says whose words they are. */}
-                                    {index === 0 && thread.from && <p className="mb-1.5 text-12 text-muted-foreground text-right">From {thread.from}</p>}
-                                    {index === 0 && thread.runner && <p className="mb-1.5 text-12 text-muted-foreground text-right">In the cloud</p>}
-                                    <UserMessage content={message.content} />
-                                </div>
+                                <UserMessage key={index} content={message.content} attached={message.attached} />
                             ) : (
                                 <AssistantMessage
                                     key={index}
                                     content={message.content}
                                     steps={message.steps}
-                                    statusLine={thread.statusLine}
+                                    said={message.said}
                                     isStreaming={running && index === messages.length - 1}
-                                    avatar
                                     waiting={thread.approval !== null}
                                     mascot={mascot}
-                                    failed={!!thread.error && index === messages.length - 1}
+                                    error={message === failedReply && thread.error ? thread.error : undefined}
                                     memoryIds={message.memoryIds}
                                     pages={message.pages}
+                                    startedAt={message.startedAt}
+                                    took={message.took}
+                                    actions={!running && index === messages.length - 1 ? actions : undefined}
+                                    origin={index === firstReply ? origin : undefined}
+                                    onShowWork={running && index === messages.length - 1 && work && roomBeside && workHidden ? () => setWorkHidden(false) : undefined}
+                                    gutter
                                 />
                             )
                         )}
                         {thread.approval && (
-                            <div ref={askingRef}>
-                                <ChatApprovalCard chatId={chatId} approval={thread.approval} mascot={mascot} avatarOutside />
+                            <div ref={askingRef} className="-mt-2">
+                                <ChatApprovalCard chatId={chatId} approval={thread.approval} mascot={mascot} />
                             </div>
                         )}
                         {/* With no room beside the chat, a page handed to the user still has to be somewhere to do it in. */}
                         {thread.runner && running && !roomBeside && thread.approval?.handoff && (
                             <RunnerView chatId={chatId} steps={thread.steps} approval={thread.approval} />
                         )}
-                        {thread.error && <ChatError message={thread.error} />}
-                        {/* Only once Berry has done something in this chat: a reply that's just a question has nothing to repeat. */}
-                        {!running &&
-                            thread.messages.at(-1)?.role === 'assistant' &&
-                            thread.messages.some((message) => message.role === 'assistant' && (message.steps?.length ?? 0) > 0) && (
-                            <div>
-                                <Button size="sm" variant="ghost" className="-ml-3 text-muted-foreground" onClick={saveAsRoutine}>
-                                    Save as routine
-                                </Button>
-                            </div>
-                        )}
+                        {thread.error && !running && !failedReply && <WentWrong message={thread.error} mascot={mascot} actions={actions} gutter />}
                         {!running && <MemoryOffers key={chatId} sourceId={chatId} mascot={mascot} />}
                     </div>
                 </div>
 
-                <div className={cn("max-w-[800px] w-full mx-auto pr-6 pb-5", gutter)}>
+                <div className={`${COLUMN} shrink-0 pb-4`}>
                     {work && !roomBeside && work.outcome === null && <WorkingStrip view={work} mascot={mascot} approval={thread.approval} />}
                     <ChatComposer
-                        onSend={(message) => void window.chromeAPI.chat.send(chatId, message, { seePage: false, mascotId: mascot.id })}
-                        disabled={running}
+                        onSend={(message, attached) =>
+                            question ? answerInBox(chatId, question.id, message, attached) : window.chromeAPI.chat.send(chatId, message, { seePage: false, mascotId: mascot.id, ...attached }).then((sent) => sent !== null, () => false)
+                        }
+                        answering={!!question}
+                        // A runner chat goes on with this computer off, and a cloud chat works in its own browser there.
+                        attach={{ chatId, mascot, place: thread.runner ? 'runner' : inCloud ? 'cloud' : 'here' }}
+                        disabled={running && !question}
                         onStop={running ? () => void window.chromeAPI.chat.stop(chatId) : undefined}
-                        placeholder={name === 'Assistant' ? 'Ask a question' : `Ask ${name}`}
+                        placeholder={question ? (question.answers?.length ? `Answer ${name}, or pick one above` : `Answer ${name}`) : name === 'Assistant' ? 'Write a message' : running ? `Tell ${name} something while it works` : `Tell ${name} something`}
                         autoFocus
                         mascot={mascot}
                     />
                 </div>
             </div>
             {onRunner && (
-                <aside aria-label="What it’s working on" className="shrink-0 h-full overflow-y-auto overflow-x-hidden pl-6 pr-6 pt-16 pb-5" style={{ width: pictureWidth + WORK_GUTTER }}>
+                <aside aria-label="What it’s working on" className="shrink-0 h-full overflow-y-auto overflow-x-hidden bg-well shadow-[inset_1px_0_0_var(--line)] px-[18px] pt-16 pb-5" style={{ width: WORK_VIEW }}>
                     <RunnerView chatId={chatId} steps={thread.steps} approval={thread.approval} />
                 </aside>
             )}
-            {work && roomBeside && (
-                <aside aria-label="What it’s working on" className="shrink-0 h-full overflow-y-auto overflow-x-hidden pl-6 pr-6 pt-16 pb-5" style={{ width: pictureWidth + WORK_GUTTER }}>
-                    <WorkingView
-                        view={work}
-                        frames={frames}
-                        mascot={mascot}
-                        approval={thread.approval}
-                        aspect={pageSize.height > 0 ? pageSize.width / pageSize.height : 1}
-                        onStop={() => void window.chromeAPI.chat.stop(chatId)}
-                        onShowAsking={() => askingRef.current?.scrollIntoView({ block: 'nearest' })}
-                    />
+            {workBeside && (
+                <aside aria-label="What it’s working on" className="relative shrink-0 h-full overflow-y-auto overflow-x-hidden bg-well shadow-[inset_1px_0_0_var(--line)]" style={{ width: WORK_VIEW }}>
+                    {/* The well's dot grid, coming in towards the bottom, under everything else. */}
+                    <div aria-hidden className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle,var(--dot)_1px,transparent_1.3px)] bg-[length:14px_14px] [mask-image:linear-gradient(transparent_40%,#000)]" />
+                    <div className="relative min-h-full flex flex-col">
+                        <WorkingView
+                            view={work}
+                            frames={frames}
+                            mascot={mascot}
+                            approval={thread.approval}
+                            aspect={pageSize.height > 0 ? pageSize.width / pageSize.height : 1}
+                            onHide={() => setWorkHidden(true)}
+                            onShowAsking={() => askingRef.current?.scrollIntoView({ block: 'nearest' })}
+                        />
+                    </div>
                 </aside>
             )}
         </div>

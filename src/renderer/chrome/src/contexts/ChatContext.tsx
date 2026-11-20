@@ -1,13 +1,19 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import type { ChatApproval, ChatStep, ChatThread, UsedPage } from '@shared/library'
+import type { ChatApproval, ChatStep, ChatThread, SaidOnTheWay, UsedPage } from '@shared/library'
+import type { SentAttachment } from '@shared/attachments'
+import type { Attached } from '../useAttachments'
 
 export interface Message {
     id: string
     role: 'user' | 'assistant'
     content: string
     steps?: ChatStep[]
+    said?: SaidOnTheWay[]
+    startedAt?: number
+    took?: number
     memoryIds?: string[]
     pages?: UsedPage[]
+    attached?: SentAttachment[]
     isStreaming?: boolean
     statusLine?: string | null
 }
@@ -17,6 +23,8 @@ interface ChatContextType {
     isLoading: boolean
     error: string | null
     chatId: string | null
+    // The open chat's name, once it has one.
+    title: string | null
     approval: ChatApproval | null
     // Who the open chat runs as. Null is Berry, and it's also what a chat not started yet has.
     mascotId: string | null
@@ -26,7 +34,8 @@ interface ChatContextType {
 
     // Chat actions
     // A new chat runs as `mascotId`. An open one keeps its own.
-    sendMessage: (content: string, mascotId: string) => Promise<void>
+    // Whether main took the message.
+    sendMessage: (content: string, mascotId: string, attached?: Attached) => Promise<boolean>
     stop: () => void
     clearChat: () => void
 
@@ -63,7 +72,7 @@ const toMessages = (thread: ChatThread | null): Message[] => {
     const saved: Message[] = thread.messages.map((message, index) => ({ id: `msg-${index}`, ...message }))
     // Before the first words arrive, the thinking state stands in for the reply.
     return thread.partial || thread.statusLine || thread.steps.length > 0 || thread.approval
-        ? [...saved, { id: 'partial', role: 'assistant', content: thread.partial ?? '', statusLine: thread.statusLine, steps: thread.steps, memoryIds: thread.memoryIds, isStreaming: true }]
+        ? [...saved, { id: 'partial', role: 'assistant', content: thread.partial ?? '', statusLine: thread.statusLine, steps: thread.steps, said: thread.said, startedAt: thread.startedAt ?? undefined, memoryIds: thread.memoryIds, isStreaming: true }]
         : saved
 }
 
@@ -88,6 +97,11 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         window.chromeAPI.chat.getPageAccess().then(setPageAccessState)
     }, [])
 
+    // A panel chat has no tab, so main is told which one the panel has. A reply that ends in the open panel is then seen.
+    useEffect(() => {
+        void window.chromeAPI.chat.panelShows(chatId)
+    }, [chatId])
+
     useEffect(() => window.chromeAPI.chat.onDraft(setDraft), [])
 
     const setPageAccess = useCallback((enabled: boolean) => {
@@ -95,12 +109,14 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         window.chromeAPI.chat.setPageAccess(enabled).then(setPageAccessState)
     }, [])
 
-    const sendMessage = useCallback(async (content: string, mascotId: string) => {
+    const sendMessage = useCallback(async (content: string, mascotId: string, attached?: Attached) => {
         try {
-            const sent = await window.chromeAPI.chat.send(chatId, content, { seePage: true, mascotId })
+            const sent = await window.chromeAPI.chat.send(chatId, content, { seePage: true, mascotId, ...attached })
             if (sent) setChatId(sent.id)
+            return sent !== null
         } catch (error) {
             console.error('Failed to send message:', error)
+            return false
         }
     }, [chatId])
 
@@ -122,6 +138,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading: thread?.partial != null,
         error: thread?.error ?? null,
         chatId,
+        title: thread?.title ?? null,
         approval: thread?.approval ?? null,
         mascotId: thread?.mascotId ?? null,
         pageAccess,

@@ -7,7 +7,7 @@ import type { AddressInfo } from "node:net";
 import { mkdtempSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findView, launchApp } from "./app";
+import { answerAsk, findView, launchApp } from "./app";
 import { startFakeModel, type FakeModel } from "./fakeModel";
 
 let server: Server;
@@ -96,23 +96,26 @@ test("a restart brings tabs back without loading them all, and history is kept",
     const go = Menu.getApplicationMenu()!.items.find((item) => item.label === "Go")!;
     go.submenu!.items.find((item) => item.accelerator === "CmdOrCtrl+Y")!.click();
   });
-  const list = chrome.getByRole("region", { name: "Today" }).getByRole("listitem");
+  // Visits in a row to one site fold into one row, which opens in place.
+  const today = chrome.getByRole("region", { name: "Today" });
+  await today.getByRole("button", { name: /127\.0\.0\.1\s*5 pages/ }).click();
+  const list = today.getByRole("list", { name: "Visits to 127.0.0.1" }).getByRole("listitem");
   await expect(list).toHaveCount(5);
   await expect(list.first()).toContainText("Title of page-one");
 
+  // A search shows every match, unfolded.
   await chrome.getByRole("searchbox", { name: "Search history" }).fill("page-tw");
-  await expect(list).toHaveCount(1);
-  await list.first().hover();
-  await chrome.getByRole("button", { name: "Delete Title of page-two from history" }).click();
+  const found = today.getByRole("listitem");
+  await expect(found).toHaveCount(1);
+  await found.first().hover();
+  await chrome.getByRole("button", { name: "Remove Title of page-two from history" }).click();
   await expect(chrome.getByText("No pages match “page-tw”.")).toBeVisible();
 
   await chrome.getByRole("searchbox", { name: "Search history" }).fill("");
-  await expect(list).toHaveCount(4);
-  await app.evaluate(({ dialog }) => {
-    dialog.showMessageBox = (async () => ({ response: 0, checkboxChecked: false })) as never;
-  });
-  await chrome.getByRole("button", { name: "Clear history" }).click();
-  await expect(chrome.getByText("Nothing here yet. I looked under everything.")).toBeVisible();
+  await expect(today.getByRole("button", { name: /4 pages/ })).toBeVisible();
+  await chrome.getByRole("button", { name: "Clear…" }).click();
+  await answerAsk(app, "Clear history");
+  await expect(chrome.getByText(/^Nothing here yet\./)).toBeVisible();
   expect(await chrome.evaluate(() => window.chromeAPI.browser.getRecent())).toEqual([]);
   await app.close();
 
@@ -196,6 +199,8 @@ test("a crashed page stays in its tab, tells Berry so, and reloads; damaged data
       )
     )
     .toBe(false);
+  // A crash while the reload is still loading is only a load that goes on in a new process, so it has to have finished.
+  await expect.poll(async () => (await tabs(chrome)).find((tab) => tab.id === doomed.id)?.isLoading).toBe(false);
 
   // A crashed tab still closes like any other.
   await crash();

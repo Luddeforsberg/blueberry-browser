@@ -1,53 +1,68 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// The view lives in the module, so each test gets a fresh one.
+// The drafts live in the module, so each test gets a fresh one.
 const load = async () => {
   vi.resetModules();
   vi.stubGlobal("window", new EventTarget());
   return import("./flockView");
 };
 
-describe("which view a Flock tab opens on", () => {
+describe("what's typed on the mascots' page", () => {
   let view: Awaited<ReturnType<typeof load>>;
   beforeEach(async () => {
     view = await load();
   });
 
-  const intoForm = () => {
-    view.setFlockShowing(true);
-    view.setFlockView({ page: "form", values: view.blankMascot() });
-    view.setFlockShowing(false);
-  };
-
-  it("opens on the list the first time", () => {
-    expect(view.flockViewFor("tab-1")).toEqual({ page: "list" });
+  it("is still there when the same tab comes back to the same place", () => {
+    view.keepTabDraft("tab-1", "new", "half a name");
+    view.forgetTabDraftElsewhere("tab-1", "new");
+    expect(view.tabDraft("tab-1", "new", () => "blank")).toBe("half a name");
   });
 
-  it("keeps a form going while the same Flock tab is away and back", () => {
-    view.flockViewFor("tab-1");
-    intoForm();
-    expect(view.flockViewFor("tab-1").page).toBe("form");
+  it("is gone once the page has moved somewhere else, even if it comes back", () => {
+    view.keepTabDraft("tab-1", "new", "half a name");
+    view.forgetTabDraftElsewhere("tab-1", "list");
+    expect(view.tabDraft("tab-1", "new", () => "blank")).toBe("blank");
   });
 
-  it("opens a new Flock tab on the list, not where the last one was", () => {
-    view.flockViewFor("tab-1");
-    intoForm();
-    expect(view.flockViewFor("tab-2")).toEqual({ page: "list" });
+  it("belongs to its tab and its place only", () => {
+    view.keepTabDraft("tab-1", "new", "half a name");
+    expect(view.tabDraft("tab-2", "new", () => "blank")).toBe("blank");
+    expect(view.tabDraft("tab-1", "m1/name", () => "blank")).toBe("blank");
+  });
+});
+
+describe("changing one part of a mascot", () => {
+  it("takes only that part from what was changed, and the rest from the mascot as it is now", async () => {
+    const { blankMascot, withPart } = await load();
+    const now = { ...blankMascot(), id: "m1", name: "Scout", instructions: "Changed since.", worksInCloud: true };
+    const opened = { ...now, name: "Scout", instructions: "As it was when opened.", worksInCloud: false };
+    const changed = { ...opened, onlySomeSites: true, sites: ["svt.se"], tools: [] };
+    expect(withPart(now, changed, "limits")).toEqual({ ...now, onlySomeSites: true, sites: ["svt.se"], tools: [] });
+    expect(withPart(now, { ...opened, name: "Pip" }, "name")).toEqual({ ...now, name: "Pip" });
+    expect(withPart(now, { ...opened, palette: "robin", accessory: "bow" }, "look")).toEqual({ ...now, palette: "robin", accessory: "bow" });
+  });
+});
+
+describe("who the dock shows", () => {
+  const busy = (name: string) => name.endsWith("!");
+  const faces = async (flock: string[], room: number) => (await load()).dockFaces(flock, room, busy);
+
+  it("shows everyone while they fit, and at exactly the room there is", async () => {
+    expect(await faces([], 5)).toEqual({ shown: [], more: 0 });
+    expect(await faces(["a", "b", "c"], 3)).toEqual({ shown: ["a", "b", "c"], more: 0 });
   });
 
-  it("shows what was set from elsewhere in whichever Flock tab opens for it", () => {
-    view.flockViewFor("tab-1");
-    intoForm();
-    view.setFlockView({ page: "memory", mascotId: "m1" });
-    expect(view.flockViewFor("tab-2")).toEqual({ page: "memory", mascotId: "m1" });
-    // And it's that tab's own from then on.
-    expect(view.flockViewFor("tab-2")).toEqual({ page: "memory", mascotId: "m1" });
+  it("gives one place to the count when there's one too many", async () => {
+    expect(await faces(["a", "b", "c", "d"], 3)).toEqual({ shown: ["a", "b"], more: 2 });
   });
 
-  it("keeps a view set from elsewhere while a Flock page is showing in that tab", () => {
-    view.flockViewFor("tab-1");
-    view.setFlockShowing(true);
-    view.setFlockView({ page: "memory", mascotId: "m1" });
-    expect(view.flockViewFor("tab-1")).toEqual({ page: "memory", mascotId: "m1" });
+  it("never hides one that's asking or working, and never moves the first", async () => {
+    expect(await faces(["a", "b", "c", "d!"], 3)).toEqual({ shown: ["a", "d!"], more: 2 });
+    expect(await faces(["a", "b", "c!"], 2)).toEqual({ shown: ["a"], more: 2 });
+  });
+
+  it("always shows the first, however little room there is", async () => {
+    expect(await faces(["a", "b"], 0)).toEqual({ shown: ["a"], more: 1 });
   });
 });

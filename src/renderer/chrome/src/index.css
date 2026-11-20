@@ -1,3 +1,5 @@
+@import "@fontsource-variable/geist/wght.css";
+@import "@fontsource-variable/geist-mono/wght.css";
 @import "../../common/tokens.css";
 
 @tailwind base;
@@ -11,7 +13,6 @@
 }
 
 @layer base {
-  /* Transparent, so the window material shows wherever the app draws glass. */
   html,
   body {
     background: transparent;
@@ -20,9 +21,16 @@
   body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    @apply font-sans text-13 text-foreground;
+    @apply font-sans text-14 text-ink;
+    letter-spacing: -0.003em;
+    font-variant-numeric: tabular-nums;
     height: 100vh;
     overflow: hidden;
+  }
+
+  /* Geist Mono is the machine's words, and reads without the tightening. */
+  .font-mono {
+    letter-spacing: 0;
   }
 }
 
@@ -36,15 +44,79 @@
     -webkit-app-region: no-drag;
   }
 
-  /* The frame: the dusty skin of a blueberry, with the fine grain of its bloom. */
-  .bg-frame {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='260' height='260' filter='url(%23n)'/%3E%3C/svg%3E"), var(--frame);
-    background-blend-mode: soft-light;
+  /* A button, chip or tile shrinks to 96% while it's pressed (DESIGN.md section 8). Its own colours change with it. */
+  .press {
+    @apply transition-[color,background-color,box-shadow,opacity,transform] duration-fast ease-crisp active:scale-[.96] disabled:active:scale-100 aria-disabled:active:scale-100;
+  }
+
+  /* A row in a list the pointer runs down reaches over the gap under it, so its highlight never drops out on the way to
+     the next one (DESIGN.md section 7). The next row is drawn over it, so it never takes that row's own space. */
+  .bridged {
+    @apply relative after:absolute after:inset-x-0 after:top-full after:h-1.5;
+  }
+
+  /* In the Gallery a berry's colour is only in the mascot, and in its name on the stage of a mascot's page, mixed 62% into
+     ink (DESIGN.md section 10, Gallery). `data-tint` names the berry, on the element or above it. */
+  [data-tint="blueberry"] {
+    --berry: var(--berry-blueberry);
+  }
+
+  [data-tint="lingon"] {
+    --berry: var(--berry-lingon);
+  }
+
+  [data-tint="cloudberry"] {
+    --berry: var(--berry-cloudberry);
+  }
+
+  [data-tint="gooseberry"] {
+    --berry: var(--berry-gooseberry);
+  }
+
+  [data-tint="raspberry"] {
+    --berry: var(--berry-raspberry);
+  }
+
+  [data-tint="currant"] {
+    --berry: var(--berry-currant);
+  }
+
+  .berry-ink {
+    color: color-mix(in srgb, var(--berry) 62%, rgb(var(--ink)));
+  }
+
+  /* A row's arrow leans towards where it goes while the row is pointed at. */
+  .leans {
+    @apply transition-transform duration-fast ease-crisp;
+  }
+
+  :hover > .leans,
+  :focus-visible > .leans,
+  .row-on:is(:hover, :has(:focus-visible)) .leans {
+    transform: translateX(3px);
   }
 }
 
 #root {
   height: 100vh;
+}
+
+/* The tab row's hairline between two neighbours, unless either is in front or hovered (DESIGN.md section 10). */
+.tab-row > li + li::before {
+  content: "";
+  position: absolute;
+  left: -1.5px;
+  top: 9px;
+  width: 1px;
+  height: 14px;
+  background: var(--line);
+}
+
+.tab-row > li[data-active]::before,
+.tab-row > li[data-active] + li::before,
+.tab-row > li:hover::before,
+.tab-row > li:hover + li::before {
+  display: none;
 }
 
 ::-webkit-scrollbar {
@@ -63,9 +135,9 @@
 
 :hover::-webkit-scrollbar-thumb,
 [data-scrolling]::-webkit-scrollbar-thumb {
-  background: rgb(var(--border));
+  background: var(--dot);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgb(var(--muted-foreground));
+  background: rgb(var(--ink-3));
 }

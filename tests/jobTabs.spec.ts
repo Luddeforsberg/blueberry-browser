@@ -61,7 +61,7 @@ test.describe("a job's tabs", () => {
     await chrome.screenshot({ path: join(SHOTS, "1-while-it-runs.png") });
 
     finish();
-    await expect(chrome.getByRole("button", { name: "Pages it used (3)" })).toBeVisible();
+    await expect(chrome.getByRole("list", { name: "Pages it used" }).getByRole("button")).toHaveCount(3);
     // The last page it worked in is where the reply sends you, so it's yours now. The others have gone.
     await expect.poll(async () => (await tabs()).filter(({ url }) => url.startsWith(site.origin)).map(({ url, jobChatId }) => [url, jobChatId])).toEqual([[`${site.origin}/c`, null]]);
     await expect(underChat()).toHaveCount(0);
@@ -74,7 +74,6 @@ test.describe("a job's tabs", () => {
     await expect.poll(async () => (await recent()).map(({ title }) => title)).toContain("Page /c");
     await chrome.evaluate((id) => window.chromeAPI.browser.switchTab(id), chat.id);
 
-    await chrome.getByRole("button", { name: "Pages it used (3)" }).click();
     const used = chrome.getByRole("list", { name: "Pages it used" }).getByRole("button");
     await expect(used).toHaveText(["/a", "/b", "/c"].map((path) => new RegExp(`^Page ${path}`)));
     await chrome.screenshot({ path: join(SHOTS, "2-pages-it-used.png") });
@@ -96,7 +95,7 @@ test.describe("a job's tabs", () => {
     await expect(userTabs().getByText("Page /a")).toBeVisible();
 
     finish();
-    await expect(chrome.getByRole("button", { name: "Pages it used (1)" })).toBeVisible();
+    await expect(chrome.getByRole("list", { name: "Pages it used" }).getByRole("button")).toHaveCount(1);
     await expect.poll(async () => (await tabs()).filter(({ url }) => url.startsWith(site.origin)).map(({ url }) => url)).toEqual([`${site.origin}/a`]);
     await chrome.screenshot({ path: join(SHOTS, "3-taken-over.png") });
   });

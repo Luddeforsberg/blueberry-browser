@@ -33,5 +33,24 @@ export default tseslint.config(
       'react-refresh/only-export-components': 'warn'
     }
   },
+  {
+    // The chrome never uses the system's tooltip (DESIGN.md section 8): a control gets `Tooltip` instead.
+    files: ['src/renderer/**/*.tsx'],
+    rules: {
+      'react/forbid-dom-props': [
+        'error',
+        { forbid: [{ propName: 'title', message: 'Use <Tooltip words="…"> from @common/components/Tooltip, not the system tooltip (DESIGN.md section 8). An iframe takes aria-label.' }] }
+      ]
+    }
+  },
+  {
+    // Plain JavaScript can't write a return type, and a CommonJS file loads with `require`.
+    files: ['**/*.{js,cjs,mjs}'],
+    rules: { '@typescript-eslint/explicit-function-return-type': 'off' }
+  },
+  {
+    files: ['**/*.cjs'],
+    rules: { '@typescript-eslint/no-require-imports': 'off' }
+  },
   eslintConfigPrettier
 )

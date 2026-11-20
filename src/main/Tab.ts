@@ -1,12 +1,12 @@
 import { NativeImage, WebContentsView, type WebContents, type WebFrameMain } from "electron";
 import type { Layout, TabLoadError, TabTrouble } from "../shared/ipc";
+import { TabIcons } from "./tabIcons";
 import { PageActor, type ActorOptions } from "./PageActor";
 import { savedEntries, type SavedWebTab } from "./Session";
 import type { PageTarget } from "./pageTarget";
 
-// The page card radius from DESIGN.md.
-// Matches the card the page sits in, `rounded-panel` in the chrome.
-const PAGE_RADIUS = 22;
+// The page sheet's radius from DESIGN.md section 2, `rounded-sheet` in the chrome.
+const PAGE_RADIUS = 16;
 
 // An id of our own, away from the page's world (0) and Electron's low numbers.
 const AGENT_WORLD = 1000;
@@ -91,6 +91,7 @@ export class Tab implements PageTarget {
   private _title: string;
   private _url: string;
   private _favicon: string | null = null;
+  private readonly icons = new TabIcons();
   private _isVisible: boolean = false;
   private _berryWorking = false;
   private workingStyle: Promise<string | null> | null = null;
@@ -188,8 +189,9 @@ export class Tab implements PageTarget {
 
     contents.on("did-navigate", (_, url) => {
       this._hasLoaded = true;
+      // Back, Forward and Reload report no icon, so the tab gives the page the one it had (`tabIcons.ts`).
+      this._favicon = this.icons.after(this._url, url, this._favicon);
       this._url = url;
-      this._favicon = null;
       // A restored page in the back list already has its title, so the page doesn't report it again.
       const { navigationHistory } = contents;
       this._title = navigationHistory.getEntryAtIndex(navigationHistory.getActiveIndex())?.title || this._title;
@@ -204,6 +206,7 @@ export class Tab implements PageTarget {
 
     contents.on("page-favicon-updated", (_, favicons) => {
       this._favicon = favicons[0] ?? null;
+      this.icons.remember(this._url, this._favicon);
       this.events.onDetails();
       this.events.onChange();
     });
@@ -502,16 +505,21 @@ export class Tab implements PageTarget {
     else this.actor.shown();
   }
 
-  // A small picture of the page, with the bird in it, for the working view in the chrome and for nothing else. Tools use
-  // `screenshot`, which is separate and keeps the bird out. It's asked again after the capture, because the user may have
-  // been handed the tab while that was on its way, and may even have finished and given it back, so that counts too.
-  async picture(width: number): Promise<Buffer | null> {
+  // A small picture of the page, with the bird in it, for the working view in the chrome and the tab's preview card, and
+  // for nothing else. Tools use `screenshot`, which is separate and keeps the bird out. It's asked again after the
+  // capture, because the user may have been handed the tab while that was on its way, and may even have finished and
+  // given it back, so that counts too. `cut` keeps only the top left of the page, in that shape, as a height to width.
+  async picture(width: number, cut?: number): Promise<Buffer | null> {
     const view = this.webContentsView;
     if (!view || !this.canBePictured) return null;
     const { holdsStarted } = this;
     const image = await this.fromPage(() => view.webContents.capturePage()).catch(() => null);
     if (!image || image.isEmpty() || !this.canBePictured || holdsStarted !== this.holdsStarted) return null;
-    return image.resize({ width, quality: "good" }).toJPEG(PICTURE_QUALITY);
+    const size = image.getSize();
+    const top = cut
+      ? image.crop({ x: 0, y: 0, width: Math.min(size.width, Math.round(size.height / cut)), height: Math.min(size.height, Math.round(size.width * cut)) })
+      : image;
+    return top.resize({ width, quality: "good" }).toJPEG(PICTURE_QUALITY);
   }
 
   private get canBePictured(): boolean {

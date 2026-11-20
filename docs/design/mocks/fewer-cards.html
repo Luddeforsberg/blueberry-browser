@@ -1,0 +1,144 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Blueberry design: fewer cards</title><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"><style>
+*{box-sizing:border-box}
+body{margin:32px auto;max-width:640px;padding:0 16px;background:#F6F5F2}
+.cap{margin:34px 2px 12px}
+.cap:first-child{margin-top:0}
+.cap b{display:block;font:600 17px/1.4 var(--font-sans),system-ui,sans-serif;color:var(--foreground,#111)}
+.cap span{display:block;font:400 14px/21px var(--font-sans),system-ui,sans-serif;color:var(--muted-foreground,#777);margin-top:3px;max-width:980px}
+.pair{display:grid;grid-template-columns:640px 640px;gap:20px;align-items:start}
+.tag{font:500 11px/1 var(--font-mono),monospace;color:var(--muted-foreground,#777);margin:0 2px 7px;letter-spacing:.06em}
+.pair img{display:block;width:640px;border-radius:14px;box-shadow:0 0 0 1px rgba(128,128,128,.28)}
+.pg{width:640px;border-radius:14px;box-shadow:0 0 0 1px rgba(128,128,128,.28);background:#fff;color:var(--ink);padding:26px 22px 28px;
+ font-family:Geist,system-ui,sans-serif;font-size:14px;line-height:20px;letter-spacing:-.005em;-webkit-font-smoothing:antialiased;
+ --ink:#151514;--ink2:#5F5E5A;--ink3:#6C6A65;--faint:#8C8A84;--line:rgba(21,21,20,.09);--hover:rgba(21,21,20,.05);--tray:#E1E0DB;--sheet2:#F3F2EF;--ask:#C62B31;--askbg:#FBE4E3;--focus:#3F51DC;
+ --chip:0 0 0 1px rgba(21,21,20,.09),0 1px 2px rgba(21,21,20,.07)}
+.pg.ground{background:#E6E5E0}
+svg.i{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex:none}
+svg.go{width:14px;height:14px;color:var(--faint)}
+.b{flex:none;display:block}
+.fv{width:16px;height:16px;border-radius:4px;flex:none;display:grid;place-items:center;color:#fff;font:600 9px/1 Geist,sans-serif}
+.t{font:400 11.5px/1 "Geist Mono",monospace;color:var(--faint);flex:none;letter-spacing:0}
+.mono{font-family:"Geist Mono",monospace;font-size:11.5px;letter-spacing:0}
+.grow{flex:1}
+h3{margin:0;font-size:20px;line-height:26px;font-weight:600;letter-spacing:-.015em}
+.ph{display:flex;align-items:center;gap:8px;min-height:34px}
+.psub{margin:4px 0 0;color:var(--ink2);font-size:14px}
+.btn{height:32px;padding:0 12px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;flex:none;white-space:nowrap}
+.btn.sm{height:28px;padding:0 10px}
+.btn.fill{background:#151514;color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 1px 2px rgba(21,21,20,.25)}
+.btn.raised{background:#fff;box-shadow:var(--chip)}
+.btn.quiet{color:var(--ink2);padding:0 8px}
+.btn.quiet svg{width:14px;height:14px}
+.recdot{width:7px;height:7px;border-radius:50%;background:var(--ask);display:block}
+.iconbtn{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:var(--ink3);flex:none}
+.find{height:32px;width:190px;border-radius:999px;background:var(--sheet2);display:flex;align-items:center;gap:7px;padding:0 12px;color:var(--faint);font-size:13px}
+.find svg{width:14px;height:14px}
+.day{display:flex;align-items:baseline;gap:8px;margin:22px 0 4px;padding:0 8px}
+.day b{font-size:13px;font-weight:500}
+.day span{font-size:13px;color:var(--faint)}
+.hrow{height:36px;display:flex;align-items:center;gap:10px;padding:0 8px;border-radius:9px}
+.hrow b{font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hrow small{font-size:13px;color:var(--ink3);flex:1;white-space:nowrap}
+.hrow.hov,.drow.hov,.rrow.hov,.step.hov{background:var(--hover)}
+.hrow .iconbtn{margin-right:-4px}
+.drow{display:flex;align-items:center;gap:10px;padding:10px 8px;border-radius:11px;position:relative}
+.drow+.drow::before,.rrow+.rrow::before{content:"";position:absolute;left:56px;right:8px;top:0;height:1px;background:var(--line)}
+.drow.hov::before,.drow.hov+.drow::before,.rrow.hov::before,.rrow.hov+.rrow::before{display:none}
+.ftile{width:36px;height:36px;border-radius:9px;background:var(--sheet2);box-shadow:inset 0 0 0 1px var(--line);display:grid;place-items:center;font:500 10.5px/1 "Geist Mono",monospace;color:var(--ink2);flex:none}
+.w{flex:1;min-width:0;display:flex;flex-direction:column}
+.w>b{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.w>small{font-size:13px;line-height:19px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.w>small em{font-style:normal;color:var(--ink3)}
+.bar{height:2px;border-radius:2px;background:var(--line);margin-top:7px;display:block}
+.bar u{display:block;height:2px;border-radius:2px;background:var(--ink)}
+.drow.gone b{color:var(--ink3);text-decoration:line-through;text-decoration-color:var(--faint);font-weight:400}
+.grp{display:flex;align-items:baseline;gap:7px;margin:22px 0 2px;padding:0 8px;font-size:13px}
+.grp b{font-weight:500}
+.grp span{color:var(--faint);font:400 11.5px/1 "Geist Mono",monospace}
+.grp.ask b{color:var(--ask)}
+.rrow{display:flex;align-items:center;gap:12px;padding:9px 8px;border-radius:11px;position:relative;min-height:56px}
+.rrow.big{min-height:62px}
+.rrow+.rrow::before{left:48px}
+.rrow.big+.rrow.big::before{left:56px}
+.lim{font-size:13px;color:var(--ink3);flex:none}
+.back{display:flex;align-items:center;gap:4px;color:var(--ink2);font-size:13px;margin-bottom:18px}
+.back svg{width:14px;height:14px}
+.rhead{display:flex;align-items:center;gap:14px}
+.rhead small{font-size:14px;color:var(--ink2);margin-top:2px}
+.lab{display:flex;align-items:center;justify-content:space-between;margin:26px 0 6px;min-height:28px}
+.lab.first{margin-top:20px}
+.lab b{font-size:13px;font-weight:500;color:var(--ink2)}
+.does{margin:0;font-size:15px;line-height:23px;max-width:540px}
+.facts{display:grid;grid-template-columns:1.25fr 1fr 1fr;margin-top:18px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.fact{padding:11px 14px 12px;display:flex;flex-direction:column;gap:2px;border-left:1px solid var(--line)}
+.fact:first-child{border-left:0;padding-left:0}
+.fact small{font-size:12px;color:var(--ink3)}
+.fact b{font-weight:500;display:flex;align-items:center;gap:6px}
+.runs{position:relative;padding-left:2px}
+.run{display:flex;gap:14px;position:relative;padding-bottom:14px}
+.run>i{width:9px;height:9px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--faint);background:#fff;margin-top:6px;flex:none;position:relative;z-index:1}
+.run.open>i{background:var(--ink);box-shadow:none}
+.run.bad>i{background:var(--ask);box-shadow:none}
+.run::before{content:"";position:absolute;left:4px;top:10px;bottom:-6px;width:1px;background:var(--line)}
+.run:last-child::before{display:none}
+.rh{display:flex;align-items:baseline;gap:9px}
+.rh b{font-weight:500}
+.rh em{font-style:normal;color:var(--ink2);font-size:13px;flex:1}
+.run.bad .rh em{color:var(--ask)}
+.run p{margin:7px 0 0;font-size:15px;line-height:22px}
+.run p.dim{font-size:14px;color:var(--ink2);margin-bottom:9px}
+.run .btn{align-self:flex-start}
+.fold{display:flex;align-items:center;gap:5px;margin-top:6px;font:400 11.5px/1 "Geist Mono",monospace;color:var(--ink3)}
+.del{margin-top:14px;color:var(--ask);font-size:13px;font-weight:500}
+.pips{display:grid;grid-template-columns:repeat(3,3px);gap:2px;flex:none}
+.pips u{width:3px;height:3px;border-radius:50%;background:rgba(21,21,20,.16)}
+.pips u.on{background:var(--ink)}
+.pips.red u.on{background:var(--ask)}
+.recbar{display:flex;align-items:center;gap:10px;height:40px;padding:0 6px 0 14px;border-radius:999px;background:#fff;box-shadow:var(--chip);width:max-content;min-width:330px}
+.recbar b{font-weight:500}
+.site{display:flex;align-items:center;gap:8px;margin:24px 0 6px;padding:0 8px;font-size:13px}
+.site b{font-weight:500}
+.trail{position:relative}
+.trail::before{content:"";position:absolute;left:15px;top:20px;bottom:24px;width:1px;background:var(--line)}
+.step{display:flex;align-items:flex-start;gap:12px;padding:8px 8px;border-radius:10px;position:relative}
+.mk{width:15px;height:20px;display:grid;place-items:center;background:#fff;flex:none;position:relative;z-index:1}
+.step.hov .mk{background:#F2F2F1}
+.lockic{width:14px;height:14px;color:var(--ink3)}
+.step .w>b{font-weight:400;white-space:normal}
+.step .w>small{color:var(--ink3)}
+.tok{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 3px 0 7px;border-radius:7px;background:#EEF0FD;color:#2A39B0;font-weight:500;vertical-align:1px}
+.tok u{text-decoration:none;font:400 10.5px/16px "Geist Mono",monospace;color:#2A39B0;background:#fff;border-radius:5px;padding:0 5px;box-shadow:0 0 0 1px rgba(42,57,176,.18)}
+.stage{display:flex;flex-direction:column;align-items:center;padding:8px 0 4px}
+.stage>.b{margin-bottom:-6px;position:relative;z-index:1}
+.shell{width:520px;background:var(--tray);border-radius:24px;padding:4px}
+.card{background:#fff;border-radius:20px;padding:20px 22px 22px;box-shadow:0 0 0 1px rgba(21,21,20,.07),0 1px 2px rgba(21,21,20,.06),0 10px 24px -12px rgba(21,21,20,.2)}
+.q{text-align:center;margin-top:8px}
+.qs{margin:6px auto 16px;text-align:center;color:var(--ink2);max-width:380px}
+.say{margin:0;padding:0 0 0 22px;font-size:15px;line-height:30px}
+.under{display:flex;align-items:center;justify-content:space-between;padding:6px 4px 4px 10px}
+.dots{display:flex;gap:5px;align-items:center}
+.dots u{width:5px;height:5px;border-radius:50%;background:rgba(21,21,20,.25)}
+.dots u.on{width:18px;border-radius:3px;background:var(--ink)}
+.seg{display:grid;grid-template-columns:repeat(5,1fr);height:32px;background:var(--tray);border-radius:10px;padding:2px;margin-top:14px;font-size:13px;color:var(--ink2)}
+.seg span{display:grid;place-items:center;border-radius:8px}
+.seg .on{background:#fff;color:var(--ink);font-weight:500;box-shadow:var(--chip)}
+.srow{display:flex;align-items:center;gap:16px;padding:13px 0;border-top:1px solid var(--line);min-height:52px}
+.lab+.srow{border-top:0}
+.srow.tall{align-items:flex-start}
+.srow>b{flex:1;font-weight:500}
+.srow .w>small{white-space:normal}
+.pics{display:flex;gap:10px}
+.pic{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:13px;color:var(--ink2)}
+.pic i{width:72px;height:46px;border-radius:9px;background:#ECEBE7;box-shadow:inset 0 0 0 1px var(--line);display:block;position:relative;overflow:hidden}
+.pic i::after{content:"";position:absolute;left:22px;top:5px;right:5px;bottom:5px;border-radius:5px;background:#fff;box-shadow:0 0 0 1px var(--line)}
+.pic.dark i{background:#131312}.pic.dark i::after{background:#272725}
+.pic.sys i{background:linear-gradient(90deg,#ECEBE7 50%,#131312 50%)}.pic.sys i::after{background:linear-gradient(90deg,#fff 38%,#272725 38%)}
+.pic.top i::after{left:5px;top:13px}
+.pic.on{color:var(--ink);font-weight:500}
+.pic.on i{outline:1.5px solid var(--ink);outline-offset:2px}
+.seg2{display:flex;height:30px;background:var(--tray);border-radius:999px;padding:2px;font-size:13px;color:var(--ink2);flex:none}
+.seg2 span{padding:0 11px;display:grid;place-items:center;border-radius:999px}
+.seg2 .on{background:#fff;color:var(--ink);font-weight:500;box-shadow:var(--chip)}
+.sw{width:34px;height:20px;border-radius:999px;background:var(--sheet2);box-shadow:inset 0 0 0 1px var(--line);position:relative;flex:none}
+.sw::after{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:var(--chip)}
+</style></head><body><div class="cap"><b>A page in a tab</b><span>Lists sit straight on the sheet. A card is only for what you type into or have to answer.</span></div><div class="pg "><div class="ph"><h3>History</h3><span class="grow"></span><span class="find"><svg class="i " viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search</span><span class="btn quiet">Clear…</span></div><div class="day"><b>Today</b><span>Tuesday 17 November</span></div><div class="hrow "><span class="fv" style="background:#0B8A5F">S</span><b>SVT Nyheter</b><small>svt.se</small><span class="t">23:19</span></div><div class="hrow hov"><span class="fv" style="background:#1A73E8">K</span><b>Stockholm to Lisbon, 12 May</b><small>kayak.se</small><span class="iconbtn"><svg class="i " viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></span></div><div class="hrow"><span class="fv" style="background:#FF6600">P</span><b>prisjakt.nu</b><small>3 pages</small><svg class="i go" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg><span class="t">22:40</span></div><div class="hrow "><span class="fv" style="background:#3A3F47">G</span><b>blueberry-browser · Pull requests</b><small>github.com</small><span class="t">21:57</span></div><div class="hrow "><span class="fv" style="background:#D9483B">W</span><b>Blueberry – Wikipedia</b><small>en.wikipedia.org</small><span class="t">21:12</span></div><div class="day"><b>Yesterday</b><span>Monday 16 November</span></div><div class="hrow "><span class="fv" style="background:#5E6AD2">L</span><b>Changelog – Linear</b><small>linear.app</small><span class="t">18:44</span></div><div class="hrow "><span class="fv" style="background:#3A3F47">N</span><b>Pricing – Notion</b><small>notion.com</small><span class="t">18:41</span></div><div class="hrow "><span class="fv" style="background:#7A5AF8">D</span><b>Dagens Nyheter</b><small>dn.se</small><span class="t">08:05</span></div></div><div class="cap"><b>Downloads</b><span>A hairline between rows that hides under the pointer, and what can be done on the row you’re on.</span></div><div class="pg "><div class="ph"><h3>Downloads</h3><span class="grow"></span><span class="btn quiet"><svg class="i " viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9l-.8-1.2A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>Open folder</span></div><div class="day"><b>Today</b></div><div class="drow"><span class="ftile">dmg</span><span class="w"><b>blueberry-setup.dmg</b><small>24.0 MB of 64.0 MB · 20 s left · blueberry.app</small><span class="bar"><u style="width:38%"></u></span></span><span class="t">38%</span><span class="iconbtn"><svg class="i " viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></svg></span><span class="iconbtn"><svg class="i " viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></span></div><div class="drow hov"><span class="ftile">pdf</span><span class="w"><b>q4-report.pdf</b><small>1.2 MB · svt.se</small></span><span class="btn raised sm">Open</span><span class="iconbtn"><svg class="i " viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9l-.8-1.2A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span><span class="iconbtn"><svg class="i " viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></span></div><div class="drow gone"><span class="ftile">jpg</span><span class="w"><b>lisbon-rooftops.jpg</b><small>Moved or deleted · unsplash.com</small></span><span class="t">21:30</span></div><div class="day"><b>Yesterday</b></div><div class="drow"><span class="ftile">zip</span><span class="w"><b>brand-assets.zip</b><small>48.6 MB · linear.app</small></span><span class="t">16:12</span></div><div class="drow"><span class="ftile">csv</span><span class="w"><b>leads-november.csv</b><small>212 KB · docs.google.com</small></span><span class="t">09:48</span></div></div><div class="cap"><b>Routines</b><span>Grouped by what matters, with when it’s next as plain mono at the end.</span></div><div class="pg "><div class="ph"><h3>Routines</h3><span class="grow"></span><span class="btn raised"><i class="recdot"></i>Show Berry how</span><span class="btn fill"><svg class="i " viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New routine</span></div><p class="psub">Work done for you on a schedule, in tabs of its own.</p><div class="grp ask"><b>Needs you</b></div><div class="rrow "><svg class="b" style="width:28px;height:28px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#2A39B0"/><circle cx="12" cy="13.6" r="9.2" fill="#3F51DC"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><circle cx="20" cy="4.5" r="3" fill="#C62B31" stroke="#fff" stroke-width="1.5"/></svg><span class="w"><b>Check my order</b><small>Wants to open the order page on klm.com</small></span><span class="btn raised sm">Answer</span></div><div class="grp"><b>Scheduled</b><span>3</span></div><div class="rrow "><svg class="b" style="width:28px;height:28px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#3F51DC"/><circle cx="12" cy="13.6" r="9.2" fill="#F2AE35"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#3A2A10"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#3A2A10"/></svg><span class="w"><b>SVT news summary</b><small>Every weekday at 09:00</small></span><span class="t">tomorrow 09:00</span></div><div class="rrow hov"><svg class="b" style="width:28px;height:28px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#2A39B0"/><circle cx="12" cy="13.6" r="9.2" fill="#3F51DC"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/></svg><span class="w"><b>Flight watch</b><small>Every Saturday at 07:30 · <em>The cheapest is TAP at 06:10, 1 640 kr return.</em></small></span><span class="btn raised sm">Run now</span><svg class="i go" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></div><div class="rrow "><svg class="b" style="width:28px;height:28px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#2A39B0"/><circle cx="12" cy="13.6" r="9.2" fill="#3F51DC"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/></svg><span class="w"><b>Rent reminder</b><small>On the 25th of every month at 08:00</small></span><span class="t">25 Nov 08:00</span></div><div class="grp"><b>Only when you ask</b><span>1</span></div><div class="rrow "><svg class="b" style="width:28px;height:28px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#9A7A52"/><circle cx="12" cy="13.6" r="9.2" fill="#262433"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/></svg><span class="w"><b>Competitor sweep</b><small>Last run Friday · <em>Linear shipped two changes, Notion none.</em></small></span></div></div><div class="cap"><b>A routine’s page</b><span>What it does in full, three facts, and its runs on a thread.</span></div><div class="pg "><div class="back"><svg class="i " viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>Routines</div><div class="rhead"><svg class="b" style="width:44px;height:44px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#2A39B0"/><circle cx="12" cy="13.6" r="9.2" fill="#3F51DC"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/></svg><span class="w"><h3>Flight watch</h3><small>Every Saturday at 07:30 · next on Saturday</small></span><span class="btn raised">Pause</span><span class="btn fill">Run now</span></div><div class="lab"><b>What it does</b><span class="btn quiet sm"><svg class="i " viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Edit</span></div><p class="does">Check fares from Stockholm to Lisbon in May and tell me the cheapest direct return, with the airline and the departure time.</p><div class="facts"><span class="fact"><small>When</small><b>Every Saturday at 07:30</b></span><span class="fact"><small>Who does it</small><b><svg class="b" style="width:16px;height:16px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#2A39B0"/><circle cx="12" cy="13.6" r="9.2" fill="#3F51DC"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/></svg>Berry</b></span><span class="fact"><small>Where it may go</small><b>Anywhere</b></span></div><div class="lab"><b>Runs</b></div><div class="runs"><div class="run open"><i></i><span class="w"><span class="rh"><b>Mon 16 Nov, 23:19</b><em>Finished</em><span class="t">2 s</span></span><p>The cheapest is <strong>TAP at 06:10</strong>, 1 640 kr return.</p><span class="fold"><svg class="i go" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>2 steps on tap.pt</span></span></div><div class="run "><i></i><span class="w"><span class="rh"><b>Sat 8 Nov, 07:30</b><em>Finished</em><span class="t">41 s</span></span></span></div><div class="run bad"><i></i><span class="w"><span class="rh"><b>Sat 1 Nov, 07:30</b><em>Went wrong</em><span class="t">1 m 12 s</span></span><p class="dim">tap.pt didn’t load, so there was nothing to compare.</p><span class="btn raised sm">Run again</span></span></div></div><div class="del">Delete Flight watch</div></div><div class="cap"><b>Show Berry how, while it watches</b><span>A small recorder, and the steps on a thread for each site.</span></div><div class="pg "><div class="recbar"><span class="pips red"><u class="on"></u><u class="on"></u><u class="on"></u><u class="on"></u><u class="on"></u><u class="on"></u><u class="on"></u><u class="on"></u><u class="on"></u></span><b>Watching</b><span class="t">0:41</span><span class="t">4 steps</span><span class="grow"></span><span class="btn fill sm">Done</span></div><div class="site"><span class="fv" style="background:#0B8A5F">E</span><b>example.com</b></div><div class="trail"><div class="step "><span class="mk"><span class="pips "><u class="on"></u><u class=""></u><u class=""></u><u class=""></u><u class="on"></u><u class=""></u><u class=""></u><u class=""></u><u class="on"></u></span></span><span class="w"><b>Went to the shop</b><small>example.com/shop</small></span></div><div class="step hov"><span class="mk"><span class="pips "><u class=""></u><u class="on"></u><u class=""></u><u class="on"></u><u class="on"></u><u class="on"></u><u class=""></u><u class="on"></u><u class=""></u></span></span><span class="w"><b>Searched for <span class="tok">usb-c cable<u>ask me each run</u></span></b><small>example.com/search</small></span><span class="btn quiet sm">Leave out</span></div><div class="step "><span class="mk"><span class="pips "><u class=""></u><u class=""></u><u class=""></u><u class=""></u><u class="on"></u><u class=""></u><u class=""></u><u class=""></u><u class=""></u></span></span><span class="w"><b>Clicked Add to cart</b></span></div><div class="step "><span class="mk"><svg class="i lockic" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span><span class="w"><b>Typed in the password field</b><small>Never saved. I’ll hand the page to you here.</small></span></div></div></div><div class="cap"><b>Show Berry how, what it wrote</b><span>The value that might change is marked where it stands.</span></div><div class="pg ground"><div class="stage"><svg class="b" style="width:56px;height:56px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#2A39B0"/><circle cx="12" cy="13.6" r="9.2" fill="#3F51DC"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/></svg><div class="shell"><div class="card"><span class="t">1 / 4</span><h3 class="q">What should I do?</h3><p class="qs">In your own words, as in a chat. Press a marked word to choose whether I ask for it each run.</p><ol class="say"><li>Go to example.com/shop</li><li>Search for <span class="tok">usb-c cable<u>ask me each run</u></span></li><li>Tell me the cheapest one</li></ol></div><div class="under"><span></span><span class="dots"><u class="on"></u><u></u><u></u><u></u></span><span class="btn fill">Continue</span></div></div></div></div><div class="cap"><b>Settings</b><span>A label and its rows, with no sheet around them.</span></div><div class="pg "><div class="ph"><h3>Settings</h3></div><div class="seg"><span class="on">General</span><span>Mascots</span><span>Privacy</span><span>Connections</span><span>Account</span></div><div class="lab first"><b>Look</b></div><div class="srow tall"><b>Theme</b><span class="pics"><span class="pic light on"><i></i><small>Light</small></span><span class="pic dark "><i></i><small>Dark</small></span><span class="pic sys "><i></i><small>System</small></span></span></div><div class="srow tall"><b>Tabs</b><span class="pics"><span class="pic side on"><i></i><small>On the side</small></span><span class="pic top "><i></i><small>On top</small></span></span></div><div class="lab"><b>Browsing</b></div><div class="srow"><span class="w"><b>When Blueberry opens</b><small>Opens the tabs you had, each loading when you first go to it.</small></span><span class="seg2"><span class="on">Your tabs</span><span>A new tab</span></span></div><div class="srow"><span class="w"><b>Save files to</b><small class="mono">~/Downloads</small></span><span class="btn raised sm">Change…</span></div><div class="srow"><span class="w"><b>Ask where to save each file</b><small>Off saves straight to the folder above.</small></span><span class="sw"></span></div></div><div class="cap"><b>Your mascots</b><span>Limits as plain words, and Chat on the row you’re on.</span></div><div class="pg "><div class="ph"><h3>Your mascots</h3><span class="grow"></span><span class="btn raised">Gallery</span><span class="btn fill"><svg class="i " viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New mascot</span></div><p class="psub">Each has its own job and its own limits. They all ask before anything risky.</p><div class="rrow big "><svg class="b" style="width:36px;height:36px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#2A39B0"/><circle cx="12" cy="13.6" r="9.2" fill="#3F51DC"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/></svg><span class="w"><b>Berry</b><small>Does whatever you ask, wherever you let it.</small></span><span class="lim">No limits</span></div><div class="rrow big hov"><svg class="b" style="width:36px;height:36px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#3F51DC"/><circle cx="12" cy="13.6" r="9.2" fill="#F2AE35"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#3A2A10"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#3A2A10"/></svg><span class="w"><b>Plain Words</b><small>Explains the page you’re on in plain English.</small></span><span class="btn raised sm">Chat</span><svg class="i go" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></div><div class="rrow big "><svg class="b" style="width:36px;height:36px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#9A7A52"/><circle cx="12" cy="13.6" r="9.2" fill="#262433"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/></svg><span class="w"><b>Competitor Watch</b><small>Checks the competitors you name for what’s new.</small></span><span class="lim">Reads only</span></div><div class="rrow big "><svg class="b" style="width:36px;height:36px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#4E9A4A"/><circle cx="12" cy="13.6" r="9.2" fill="#DF4B3B"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/></svg><span class="w"><b>Meeting Prep</b><small>Reads up on a company before a call and writes a brief.</small></span><span class="lim">Reads only</span></div><div class="rrow big "><svg class="b" style="width:36px;height:36px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#4E9A4A"/><circle cx="12" cy="13.6" r="9.2" fill="#E86A9B"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/></svg><span class="w"><b>Newsletter Builder</b><small>Collects the week’s best links and drafts a newsletter.</small></span><span class="lim">Reads only</span></div></div></body></html>

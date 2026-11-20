@@ -1,5 +1,5 @@
 import { EventEmitter } from "events";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { describe, expect, it, vi } from "vitest";
@@ -192,6 +192,14 @@ describe("Downloads", () => {
 
     writeFileSync(path, "back");
     expect((await downloads.refresh())[0].missing).toBe(false);
+  });
+
+  it("opens the folder files are saved to, even when it's gone", async () => {
+    const { downloads, deps, folder } = setup();
+    rmSync(folder, { recursive: true, force: true });
+    expect(await downloads.openFolder()).toBe(true);
+    expect(deps.openPath).toHaveBeenCalledWith(folder);
+    expect(existsSync(folder)).toBe(true);
   });
 
   it("keeps the list across restarts, keeps no full address, and stops what was running", async () => {

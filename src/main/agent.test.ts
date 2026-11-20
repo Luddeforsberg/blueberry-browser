@@ -4,7 +4,8 @@ import { AIMessage, fakeModel, ToolMessage } from "langchain";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type { PageTool } from "./browserTools";
-import { generateTitle, ModelConfigError, modelConfig, NO_KEY, ReplySorter, shortenOldResults, streamReply, systemPrompt, type ReplyPart } from "./agent";
+import { forProvider, generateTitle, ModelConfigError, modelConfig, ReplySorter, shortenOldResults, streamReply, systemPrompt, type ReplyPart } from "./agent";
+import { NO_KEY } from "../shared/aiKey";
 
 const NO_TOOLS = {
   tools: [],
@@ -39,6 +40,7 @@ describe("modelConfig", () => {
       apiKey: "key",
       model: "custom",
       titleModel: "claude-haiku-5-5",
+      ownAddressOnly: false,
     });
     expect(() => modelConfig({ LLM_PROVIDER: "anthropic", OPENAI_API_KEY: "key" })).toThrow(NO_KEY);
   });
@@ -50,6 +52,15 @@ describe("modelConfig", () => {
 
   it("rejects an unknown provider instead of picking another", () => {
     expect(() => modelConfig({ LLM_PROVIDER: "gemini", OPENAI_API_KEY: "key" })).toThrow(/gemini/);
+  });
+
+  it("uses a key saved in Settings before the .env one, with the .env models only for their own provider", () => {
+    const env = { OPENAI_API_KEY: "env-key", LLM_MODEL: "custom", LLM_TITLE_MODEL: "custom-title" };
+    expect(modelConfig(env, { service: "openai", key: "saved-key" })).toEqual({ provider: "openai", apiKey: "saved-key", model: "custom", titleModel: "custom-title", ownAddressOnly: false });
+    expect(modelConfig(env, { service: "anthropic", key: "saved-key" }, true)).toEqual({ provider: "anthropic", apiKey: "saved-key", model: "claude-sonnet-5-5", titleModel: "claude-haiku-5-5", ownAddressOnly: true });
+    // A key from the .env file is the developer's, and goes where their environment says.
+    expect(modelConfig(env, null, true).ownAddressOnly).toBe(false);
+    expect(modelConfig({ LLM_PROVIDER: "gemini" }, { service: "openai", key: "saved-key" }).apiKey).toBe("saved-key");
   });
 });
 
@@ -173,7 +184,7 @@ describe("a mascot's limits and approvals", () => {
     schema: z.object({}),
     label: () => "Clicked",
     describe: async () => "Click Delete",
-    isRisky: async () => true,
+    whyRisky: async () => ({ reason: "risky-word", mark: "Delete" }),
     run,
     ...extra,
   });
@@ -188,7 +199,7 @@ describe("a mascot's limits and approvals", () => {
     const run = vi.fn(async () => "clicked");
     const approve = vi.fn(async () => false);
     await reply(click({ refuses: async () => null }, run), approve);
-    expect(approve).toHaveBeenCalledWith("Click Delete");
+    expect(approve).toHaveBeenCalledWith("Click Delete", { reason: "risky-word", mark: "Delete" });
     expect(run).not.toHaveBeenCalled();
   });
 
@@ -211,7 +222,7 @@ describe("a mascot's limits and approvals", () => {
           new AbortController().signal,
           {
             ...NO_TOOLS,
-            tools: [click({ isRisky: async () => isRisky, allowedLabel: () => "Clicked “Delete” on example.com" })],
+            tools: [click({ whyRisky: async () => (isRisky ? { reason: "risky-word" } : null), allowedLabel: () => "Clicked “Delete” on example.com" })],
             approve: async () => true,
             actionApproval: () => mode,
             onStep: (text, shown) => {
@@ -450,20 +461,20 @@ describe("streamReply with an action that needs approval", () => {
       );
 
     it("runs a safe action without asking, and asks about a risky one", async () => {
-      const safe = click({ isRisky: async () => false });
+      const safe = click({ whyRisky: async () => null });
       const asked: string[] = [];
       await ask(safe, callsTool("1"), () => "risky", asked);
       expect(asked).toEqual([]);
       expect(safe.run).toHaveBeenCalledTimes(1);
 
-      const risky = click({ isRisky: async () => true });
+      const risky = click({ whyRisky: async () => ({ reason: "risky-word" }) });
       await ask(risky, callsTool("1"), () => "risky", asked);
       expect(asked).toEqual(["Click e-1"]);
       expect(risky.run).toHaveBeenCalledTimes(1);
     });
 
     it("asks about nothing in never mode", async () => {
-      const risky = click({ isRisky: async () => true });
+      const risky = click({ whyRisky: async () => ({ reason: "risky-word" }) });
       const asked: string[] = [];
       await ask(risky, callsTool("1"), () => "never", asked);
       expect(asked).toEqual([]);
@@ -472,11 +483,22 @@ describe("streamReply with an action that needs approval", () => {
 
     it("does nothing if a safe action turned risky before it ran", async () => {
       let checks = 0;
-      const tool = click({ isRisky: async () => ++checks > 1 });
+      const tool = click({ whyRisky: async () => (++checks > 1 ? { reason: "risky-word" } : null) });
       const model = callsTool("1");
       await ask(tool, model, () => "risky", []);
       expect(tool.run).not.toHaveBeenCalled();
       expect(model.calls.at(-1)?.messages.at(-1)?.text).toContain("page changed");
+    });
+
+    it("says which rule made each call ask", async () => {
+      const because = async (tool: PageTool, mode: "risky" | "always") => {
+        const approve = vi.fn(async () => true);
+        await collect(streamReply([{ role: "user", content: "hi" }], new AbortController().signal, { ...NO_TOOLS, tools: [tool], approve, actionApproval: () => mode }, callsTool("1")));
+        return approve.mock.calls.map((call) => (call as unknown[])[1]);
+      };
+      expect(await because(click({ whyRisky: async () => ({ reason: "new-site", mark: "e-1" }) }), "risky")).toEqual([{ reason: "new-site", mark: "e-1" }]);
+      expect(await because(click(), "risky")).toEqual([{ reason: "tool-always-asks" }]);
+      expect(await because(click({ whyRisky: async () => null }), "always")).toEqual([{ reason: "always-ask" }]);
     });
   });
 
@@ -549,5 +571,51 @@ describe("generateTitle", () => {
   it("keeps a title to 60 characters", async () => {
     expect(await titled("x".repeat(60))).toBe("x".repeat(60));
     expect(await titled("x".repeat(61))).toBe(`${"x".repeat(59)}…`);
+  });
+});
+
+describe("forProvider", () => {
+  // The request each provider's own client would send, caught before it leaves.
+  const requestBody = async (model: BaseChatModel, content: unknown, seen: { body: string }) => {
+    const { HumanMessage } = await import("@langchain/core/messages");
+    await model.invoke([new HumanMessage({ content: content as never })]).catch(() => {});
+    return JSON.parse(seen.body);
+  };
+  const catching = (seen: { body: string }) => async (_url: unknown, init?: { body?: unknown }) => {
+    seen.body = String(init?.body ?? "");
+    return new Response("{}", { status: 400 });
+  };
+  const content = [
+    { type: "text" as const, text: '<file name="itinerary.pdf" kind="pdf">' },
+    { type: "pdf" as const, name: "itinerary.pdf", data: "JVBERi0=" },
+    { type: "text" as const, text: "</file>" },
+  ];
+
+  it("leaves content without a PDF as it was", () => {
+    expect(forProvider("Hi", "anthropic")).toBe("Hi");
+    const picture = [{ type: "image_url" as const, image_url: { url: "data:image/png;base64,AA" } }];
+    expect(forProvider(picture, "openai")).toBe(picture);
+  });
+
+  it("sends a PDF to Anthropic once, as a document", async () => {
+    const { ChatAnthropic } = await import("@langchain/anthropic");
+    const seen = { body: "" };
+    const model = new ChatAnthropic({ apiKey: "key", model: "claude-sonnet-5-5", maxRetries: 0, clientOptions: { fetch: catching(seen) as never } });
+    const { messages } = await requestBody(model, forProvider(content, "anthropic"), seen);
+    const documents = messages[0].content.filter((block: { type: string }) => block.type === "document");
+    expect(documents).toEqual([{ type: "document", title: "itinerary.pdf", source: { type: "base64", media_type: "application/pdf", data: "JVBERi0=" } }]);
+  });
+
+  it("sends a PDF to OpenAI as a named file, through either API", async () => {
+    const { ChatOpenAI } = await import("@langchain/openai");
+    for (const useResponsesApi of [true, false]) {
+      const seen = { body: "" };
+      const model = new ChatOpenAI({ apiKey: "key", model: "gpt-6.1-terra", maxRetries: 0, useResponsesApi, configuration: { fetch: catching(seen) as never } });
+      const body = await requestBody(model, forProvider(content, "openai"), seen);
+      const sent = JSON.stringify(useResponsesApi ? body.input : body.messages);
+      expect(sent).toContain(useResponsesApi ? '"type":"input_file"' : '"type":"file"');
+      expect(sent).toContain('"file_data":"data:application/pdf;base64,JVBERi0="');
+      expect(sent).toContain('"filename":"itinerary.pdf"');
+    }
   });
 });

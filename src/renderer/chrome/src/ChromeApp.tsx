@@ -1,74 +1,63 @@
-import React, { useRef } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Menu } from 'lucide-react'
 import type { Rect } from '@shared/ipc'
 import { BrowserProvider, useBrowser } from './contexts/BrowserContext'
-import { LibraryProvider, useFlock } from './contexts/LibraryContext'
+import { LibraryProvider } from './contexts/LibraryContext'
 import { InternalPageView } from './pages/InternalPageView'
-import { ChatProvider, useChat } from './contexts/ChatContext'
+import { ChatProvider } from './contexts/ChatContext'
 import { ShellProvider, useShell } from './contexts/ShellContext'
 import { Sidebar } from './components/Sidebar'
 import { TabStrip } from './components/TabStrip'
 import { Toolbar } from './components/Toolbar'
 import { ChatPanel } from './components/ChatPanel'
 import { ResizeHandle } from './components/ResizeHandle'
-import { Onboarding } from './components/Onboarding'
-import { BerryCompanion } from './components/BerryCompanion'
+import { FirstRun } from './components/FirstRun'
 import { PageTrouble } from './components/PageTrouble'
 import { ToolBarButton } from './components/ToolBarButton'
 import { useRecording } from './components/ShowBerry'
+import { AppIconSender } from './components/AppIconSender'
 import { cn } from '@common/lib/utils'
-import { siteAllowed } from '@shared/mascots'
+import { TooltipProvider, type TipElsewhere } from '@common/components/Tooltip'
 
-// Regions sit exactly where main's layout puts them, so the tab view lines up with the page card.
+// Regions sit exactly where main's layout puts them, so the tab view lines up with the page's sheet.
 const Region: React.FC<{
     rect: Rect
     className?: string
     children?: React.ReactNode
     onMouseEnter?: () => void
-    reading?: boolean
-}> = ({ rect, className, children, onMouseEnter, reading }) => (
+}> = ({ rect, className, children, onMouseEnter }) => (
     <div
         className={cn("absolute", className)}
         style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }}
         onMouseEnter={onMouseEnter}
-        data-berry-reading={reading || undefined}
     >
         {children}
     </div>
 )
 
 const Shell: React.FC = () => {
-    const { layout, theme, settings } = useShell()
+    const { layout, settings } = useShell()
     const { activeTab, reload } = useBrowser()
-    const recordingState = useRecording()
-    const { isLoading, pageAccess, mascotId } = useChat()
-    const { find } = useFlock()
-    // Follows the user until a reply starts, and then stays on the page that reply was sent from.
-    const sentFrom = useRef<string | null>(null)
-    if (!isLoading) sentFrom.current = activeTab?.id ?? null
+    const recording = useRecording().status === 'recording'
 
-    if (!settings.onboarded) return <Onboarding />
+    if (!settings.onboarded) return <FirstRun />
     const { page, floatingSidebar } = layout
     const trouble = activeTab?.trouble ?? activeTab?.loadError
-    // Sending a message is what lets Berry read the open page, so the ring only shows while it does.
-    // It also shows on any tab Berry is using in the reply it's working on.
-    const recording = recordingState.status === 'recording'
-    const reading = !!activeTab && !activeTab.page && (activeTab.berryWorking || (isLoading && pageAccess && activeTab.id === sentFrom.current && siteAllowed(activeTab.url, find(mascotId).sites)))
+    // The new tab has no page yet, so no sheet: it's the well, where a page will go (DESIGN.md section 3). Every other
+    // page is a sheet, as a web page is, the ones on `PageFrame` included (A page in a tab).
+    const well = activeTab?.page === 'new-tab' && !trouble
 
     return (
-        <div className={cn("relative h-full", theme.glass ? "bg-frame" : "bg-background")}>
-            {/* One card holds the toolbar, bookmarks bar and page, so they read as one surface. */}
-            <Region
-                rect={{ ...layout.toolbar, height: page.y + page.height - layout.toolbar.y }}
-                reading={reading}
-                className={cn(
-                    "rounded-panel transition-shadow duration-layout",
-                    theme.glass ? "bg-canvas/85 backdrop-blur-2xl" : "bg-canvas",
-                    recording ? "shadow-recording" : reading ? "shadow-reading" : "shadow-page"
-                )}
-            />
+        <div className="relative h-full bg-ground">
             {/* Internal pages draw here. For web pages it shows until the tab view paints, or when a page has crashed. */}
-            <Region rect={page} className="overflow-hidden rounded-b-panel">
+            <Region
+                rect={page}
+                className={cn(
+                    "overflow-hidden rounded-sheet transition-shadow duration-panel",
+                    well ? "bg-well shadow-[inset_0_0_0_1px_var(--line)]" : "bg-sheet",
+                    recording ? "shadow-recording" : !well && "shadow-rim"
+                )}
+            >
                 {activeTab?.page && <InternalPageView tab={activeTab} />}
                 {trouble && <PageTrouble trouble={trouble} onReload={() => void reload()} />}
             </Region>
@@ -105,8 +94,33 @@ const Shell: React.FC = () => {
                     <ToolBarButton Icon={Menu} label="Menu" onClick={() => void window.chromeAPI.layout.showAppMenu()} />
                 </Region>
             )}
-            <BerryCompanion />
         </div>
+    )
+}
+
+const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+
+// A tooltip that would hang over a web page, or over what the horizontal toolbar opened, can't be drawn here, since
+// those views cover the chrome. It goes to the tooltip view over them instead (DESIGN.md section 2, View stack).
+const ChromeTips: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { layout, theme } = useShell()
+    const { activeTab } = useBrowser()
+    const [popover, setPopover] = useState(false)
+    useEffect(() => window.chromeAPI.layout.onPopover(({ shown }) => setPopover(!!shown)), [])
+    const page = !!activeTab && !activeTab.page && !activeTab.trouble && !activeTab.loadError
+    const covered = popover ? layout.popover : page ? layout.page : null
+    const elsewhere = useMemo<TipElsewhere>(
+        () => ({
+            takes: (box) => !!covered && overlaps(box, covered),
+            show: (tip) => void window.chromeAPI.tooltip.show(tip),
+            hide: () => void window.chromeAPI.tooltip.hide()
+        }),
+        [covered]
+    )
+    return (
+        <TooltipProvider mac={theme.platform === 'mac'} elsewhere={elsewhere}>
+            {children}
+        </TooltipProvider>
     )
 }
 
@@ -115,7 +129,10 @@ export const ChromeApp: React.FC = () => (
         <BrowserProvider>
             <LibraryProvider>
                 <ChatProvider>
-                    <Shell />
+                    <ChromeTips>
+                        <Shell />
+                    </ChromeTips>
+                    <AppIconSender />
                 </ChatProvider>
             </LibraryProvider>
         </BrowserProvider>

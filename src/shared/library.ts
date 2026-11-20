@@ -1,6 +1,9 @@
 // What the sidebar and internal pages show. Types only, like the IPC contract.
 // All of it is saved locally.
 
+import type { SentAttachment } from "./attachments";
+import type { AskWhy } from "./asking";
+
 export interface Bookmark {
   id: string;
   title: string;
@@ -9,8 +12,10 @@ export interface Bookmark {
   favicon?: string;
 }
 
-// Pins are kept the same way as bookmarks, in a file of their own.
+// Pins are kept the same way as bookmarks, in a file of their own. A site is in one or the other: a favourite is a
+// bookmark kept on top, as a tile.
 export type PinnedSite = Bookmark;
+export type SavedSiteList = "favourites" | "bookmarks";
 
 // Something Berry did on the way to a reply.
 export interface ChatStep {
@@ -19,6 +24,19 @@ export interface ChatStep {
   // What the chat shows in its place, naming what the user allowed, such as a button. It has page text in it, so it's
   // only ever drawn here: history, the cloud and other apps get `text`.
   shown?: string;
+  // What kind of thing it did, which picks its pips (DESIGN.md section 6). Only for the screen: with none, it's plain.
+  kind?: StepKind;
+}
+
+// Every kind there is, so a step read back from somewhere else keeps only one of these.
+export const STEP_KINDS = ["open", "read", "scan", "search", "click", "type", "ask", "wait"] as const;
+export type StepKind = (typeof STEP_KINDS)[number];
+
+// Words a mascot wrote on the way to its answer, in a message that went on to use tools, after `after` of its steps.
+// Only for the screen, like a step's `shown`: the model, history, the cloud and other apps never get them.
+export interface SaidOnTheWay {
+  after: number;
+  text: string;
 }
 
 // An action waiting for the user to allow it.
@@ -27,6 +45,10 @@ export interface ChatApproval {
   text: string;
   // Berry is asking for an answer in words, not for leave to do something.
   question?: boolean;
+  // For a question: answers the user can press, each sent back as if typed. They can still type their own.
+  answers?: string[];
+  // For an action: the rule that made it ask, and the piece of `text` it's about. None from the cloud runner.
+  why?: AskWhy;
   // Berry has handed a tab to the user, and is waiting for them to say they're done with it.
   handoff?: ChatHandoff;
 }
@@ -67,6 +89,12 @@ export interface ChatThreadMessage {
   memoryIds?: string[];
   // The pages its job opened, which close when it ends, so the user can open any of them again.
   pages?: UsedPage[];
+  // What the user sent with it from the prompt box's +, by name only.
+  attached?: SentAttachment[];
+  // A reply's words between its steps, when it began and how long it took, in milliseconds. None from before these.
+  said?: SaidOnTheWay[];
+  startedAt?: number;
+  took?: number;
 }
 
 export interface UsedPage {
@@ -86,6 +114,8 @@ export interface ChatThreadSummary {
   running?: boolean;
   // Its jobs are done in the cloud.
   cloud?: boolean;
+  // Its last reply ended, not stopped, while its tab wasn't in front, and the user hasn't opened it since.
+  unseen?: boolean;
 }
 
 export interface ChatThread extends ChatThreadSummary {
@@ -94,8 +124,10 @@ export interface ChatThread extends ChatThreadSummary {
   partial: string | null;
   // What the running reply said it's doing, until its answer starts. Only for the screen, and never saved.
   statusLine: string | null;
-  // What the running reply has done so far. Empty when no reply is running.
+  // What the running reply has done so far, what it said between, and when it began. Empty and null when none is running.
   steps: ChatStep[];
+  said: SaidOnTheWay[];
+  startedAt: number | null;
   approval: ChatApproval | null;
   // Why the last reply failed, until the next message.
   error: string | null;

@@ -5,7 +5,7 @@ import { createServer, type ServerResponse } from "node:http";
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findView, launchApp } from "./app";
+import { chooseFromMenu, findView, launchApp } from "./app";
 
 const SIZE = 64 * 1024;
 let slow: ServerResponse | null = null;
@@ -47,7 +47,7 @@ test.afterAll(() => {
 const startProfile = () => {
   const profile = mkdtempSync(join(tmpdir(), "blueberry-downloads-"));
   const folder = join(profile, "saved");
-  writeFileSync(join(profile, "settings.json"), JSON.stringify({ onboarded: true, downloadFolder: folder }));
+  writeFileSync(join(profile, "settings.json"), JSON.stringify({ onboarded: true, startersAdded: true, downloadFolder: folder }));
   return { profile, folder };
 };
 
@@ -86,6 +86,8 @@ test("a download saves without a dialog and can be followed, paused, cancelled a
   await expect(large.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "50");
   await expect(large.getByText("32.0 KB of 64.0 KB")).toBeVisible();
 
+  // What can be done shows on the row you're on.
+  await large.hover();
   await large.getByRole("button", { name: "Pause large.bin" }).click();
   await expect(large.getByText(/^Paused/)).toBeVisible();
   await large.getByRole("button", { name: "Resume large.bin" }).click();
@@ -109,29 +111,33 @@ test("a download saves without a dialog and can be followed, paused, cancelled a
   expect(readFileSync(join(folder, "report.txt"), "utf8")).toBe("finished");
 
   // Save Image in the page's right-click menu arrives through the same handler.
-  await app.evaluate(({ Menu }) => {
-    Menu.prototype.popup = function () { this.items.find((item) => item.label.startsWith("Save Image"))?.click(); };
-  });
   await switchToFiles();
   await page.click("#pixel", { button: "right" });
+  await chooseFromMenu(app, "Save Image");
   await expect.poll(() => existsSync(join(folder, "pixel.gif"))).toBe(true);
 
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("downloads"));
   const report = chrome.getByRole("listitem", { name: "report (1).txt" });
+  await report.hover();
   await report.getByRole("button", { name: "Open", exact: true }).click();
   await report.getByRole("button", { name: "Show report (1).txt in folder" }).click();
   const saved = join(folder, "report (1).txt");
   await expect.poll(shellCalls).toEqual([`open ${saved}`, `show ${saved}`]);
+  // The folder is main's to name: the page only asks for it.
+  await chrome.getByRole("button", { name: "Open folder" }).click();
+  await expect.poll(shellCalls).toEqual([`open ${saved}`, `show ${saved}`, `open ${folder}`]);
 
   // Cancelling leaves nothing behind.
   await switchToFiles();
   await page.click("#slow");
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("downloads"));
   const copy = chrome.getByRole("listitem", { name: "large (1).bin" });
+  await copy.hover();
   await copy.getByRole("button", { name: "Cancel large (1).bin" }).click();
   await expect(copy.getByText("Cancelled")).toBeVisible();
   slow!.destroy();
-  await expect(chrome.locator('button[title="Downloads"]')).toBeVisible();
+  // The toolbar button says only Downloads again: nothing is running.
+  await expect(chrome.locator('button[aria-label="Downloads"]')).toBeVisible();
   await expect.poll(() => readdirSync(folder).sort()).toEqual(["large.bin", "pixel.gif", "report (1).txt", "report.txt"]);
 
   // The list survives a restart, and a file that's gone says so and can't be opened.
@@ -141,11 +147,12 @@ test("a download saves without a dialog and can be followed, paused, cancelled a
   chrome = await findView(app, "view=chrome");
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("downloads"));
   const gone = chrome.getByRole("listitem", { name: "report.txt" });
-  await expect(gone.getByText("File is missing")).toBeVisible();
+  await expect(gone.getByText("Moved or deleted")).toBeVisible();
   await expect(gone.getByRole("button", { name: "Open", exact: true })).toHaveCount(0);
   await expect(chrome.getByRole("listitem", { name: "large.bin" }).getByRole("button", { name: "Open", exact: true })).toBeVisible();
   await expect(chrome.getByRole("listitem", { name: "large (1).bin" }).getByText("Cancelled")).toBeVisible();
 
+  await gone.hover();
   await gone.getByRole("button", { name: "Remove report.txt from the list" }).click();
   await expect(gone).toHaveCount(0);
   await app.close();
@@ -208,8 +215,8 @@ test("a site can't use anything until the user answers, and the answer can be ch
   page = await openFiles(app, chrome);
   expect(await notifications()).toBe("granted");
 
-  await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings"));
-  await chrome.getByRole("button", { name: "Site permissions" }).click();
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings", { param: "privacy" }));
+  await chrome.getByRole("button", { name: /^Site permissions/ }).click();
   await chrome.getByRole("radiogroup", { name: `Notifications for ${origin}` }).getByRole("radio", { name: "Block" }).click();
   await expect.poll(notifications).toBe("denied");
   await chrome.getByRole("button", { name: `Forget Location for ${origin}` }).click();

@@ -3,8 +3,7 @@
 // the same checks on a row, and src/main/pageActorArt.ts, for the bird on web pages. Run with `pnpm run site:build` after
 // changing any of them.
 import { build } from "esbuild";
-import { copyFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -24,6 +23,8 @@ await build({
       // How it calls the server: a deadline on every call, one poll at a time, and how often to ask about the link.
       `export { fetchWithin, oneAtATime, runnerLinkDue } from "./src/shared/phoneCalls";`,
       `export { asContinuation, withSiteNames } from "./src/renderer/chrome/src/siteNames";`,
+      // Times written the one way the app writes them.
+      `export { finishedWhen, rowTime } from "./src/renderer/chrome/src/shortWords";`,
       `export { plausibleCode } from "./src/main/phoneReplies";`,
     ].join("\n"),
     resolveDir: root,
@@ -36,7 +37,8 @@ await build({
   outfile: join(site, "shared.js"),
 });
 
-// Every accessory in the resting pose, still. The palette is an attribute on the drawing, so colours come from tokens.css.
+// Every accessory in the resting pose, still. Each drawing carries every berry's body, and the `data-mascot` it's given
+// where it's shown picks one, so colours and shapes come from tokens.css and the rules written to birds.css below.
 const temp = mkdtempSync(join(tmpdir(), "blueberry-site-"));
 const script = join(temp, "birds.mjs");
 await build({
@@ -44,9 +46,11 @@ await build({
     contents: `
       import { createElement } from "react";
       import { renderToStaticMarkup } from "react-dom/server";
-      import { Mascot } from "./src/renderer/common/components/Mascot";
+      import { BERRY_KIND, Mascot } from "./src/renderer/common/components/Mascot";
       import { ACCESSORIES } from "./src/shared/mascots";
-      const pose = (mood, accessory, size = 120) => renderToStaticMarkup(createElement(Mascot, { mood, size, look: { palette: "jackdaw", accessory } }));
+      export { BERRY_KIND };
+      export { PIP_MARKS, PIP_PATTERNS, pipOpacities, STEP_PIPS } from "./src/renderer/common/components/Pips";
+      const pose = (mood, accessory, size = 120) => renderToStaticMarkup(createElement(Mascot, { mood, size, still: true, anyLook: true, look: { palette: "jackdaw", accessory } }));
       // What the bird on a web page is drawn from, by \`src/main/pageActorScript.ts\`.
       export const actorArt = Object.fromEntries(ACCESSORIES.map(({ id }) => [id, {
         flying: pose("fetching", id),
@@ -55,14 +59,15 @@ await build({
         sitting: pose("sitting", id),
         thinking: pose("thinking", id),
         asking: pose("asking", id),
-        marker: pose("rest", id, 24),
+        // Drawn at 28px, so with the detail of that size.
+        marker: pose("rest", id, 28),
       }]));
       // The phone page's poses, still and whole, even where it draws them small. Colours again come from the palette
-      // attribute. Still, so the transform origins the app animates with are left out: the page's CSP refuses inline styles.
-      const still = (mood, accessory) => renderToStaticMarkup(createElement(Mascot, { mood, size: 120, still: true, look: { palette: "jackdaw", accessory } })).replace(/ style="[^"]*"/g, "");
+      // attribute. The page's CSP refuses inline styles, so there are none.
+      const still = (mood, accessory) => pose(mood, accessory).replace(/ style="[^"]*"/g, "");
       const PHONE_MOODS = ["rest", "fetching", "asking", "delivered", "oops"];
       export const poses = Object.fromEntries(ACCESSORIES.map(({ id }) => [id, Object.fromEntries(PHONE_MOODS.map((mood) => [mood, still(mood, id)]))]));
-      export const birds = Object.fromEntries(ACCESSORIES.map(({ id }) => [id, renderToStaticMarkup(createElement(Mascot, { mood: "rest", size: 160, still: true, look: { palette: "jackdaw", accessory: id } }))]));
+      export const birds = Object.fromEntries(ACCESSORIES.map(({ id }) => [id, pose("rest", id, 160)]));
     `,
     resolveDir: root,
     loader: "ts",
@@ -76,14 +81,43 @@ await build({
   banner: { js: `import { createRequire } from "node:module"; const require = createRequire(${JSON.stringify(join(root, "package.json"))});` },
   outfile: script,
 });
-const { birds, actorArt, poses } = await import(pathToFileURL(script).href);
+const { birds, actorArt, poses, BERRY_KIND, PIP_MARKS, PIP_PATTERNS, pipOpacities, STEP_PIPS } = await import(pathToFileURL(script).href);
 rmSync(temp, { recursive: true, force: true });
 
-const classes = new Set([...Object.values(birds), JSON.stringify(poses)].join(" ").match(/(?:fill|stroke)-berry-[a-z-]+/g));
-const rules = [...classes].map((name) => {
-  const [, kind, token] = /^(fill|stroke)-(berry-[a-z-]+)$/.exec(name);
-  return `.${name} { ${kind}: rgb(var(--${token})); }`;
-});
+// The pips (DESIGN.md section 6) for the phone page, as CSS from the app's own frames: a grid of nine dots, each
+// pattern's dots stepping through its frames, and each still mark. With less motion asked for, tokens.css cuts every
+// animation short, which leaves each dot at its first frame. Which pips a step's kind has comes with them.
+const pipRules = [
+  ".pips { display: inline-grid; flex: none; grid-template-columns: repeat(3, 3px); gap: 2px; }",
+  ".pips i { display: block; width: 3px; height: 3px; border-radius: 50%; background: currentColor; }",
+];
+const round = (value) => Number(value.toFixed(3));
+for (const pattern of [...PIP_PATTERNS, ...PIP_MARKS]) {
+  const { frames, ms } = pipOpacities(pattern);
+  for (let dot = 0; dot < 9; dot++) {
+    const values = frames.map((frame) => round(frame[dot]));
+    const name = `pips-${pattern}-${dot + 1}`;
+    const moves = values.some((value) => value !== values[0]);
+    pipRules.push(`.pips[data-pips="${pattern}"] i:nth-child(${dot + 1}) { opacity: ${values[0]};${moves ? ` animation: ${name} ${ms * frames.length}ms step-end infinite;` : ""} }`);
+    if (moves) pipRules.push(`@keyframes ${name} { ${values.map((value, at) => `${round((at / values.length) * 100)}% { opacity: ${value}; }`).join(" ")} }`);
+  }
+}
+writeFileSync(join(site, "app", "pips.css"), `/* Generated by scripts/buildSite.mjs from Pips.tsx. Don't edit this. */\n${pipRules.join("\n")}\n`);
+writeFileSync(join(site, "app", "pips.js"), `${NOTE}export const STEP_PIPS = ${JSON.stringify(STEP_PIPS, null, 2)};\n`);
+
+// Geist and Geist Mono, served by the site itself (DESIGN.md section 5), with their licence.
+mkdirSync(join(site, "fonts"), { recursive: true });
+for (const [family, file] of [["geist", "geist-latin-wght-normal.woff2"], ["geist-mono", "geist-mono-latin-wght-normal.woff2"]]) {
+  const from = join(root, "node_modules", "@fontsource-variable", family);
+  copyFileSync(join(from, "files", file), join(site, "fonts", file));
+  copyFileSync(join(from, "LICENSE"), join(site, "fonts", `${family}-LICENSE.txt`));
+}
+
+// Of the bodies every drawing carries, only its own mascot's shows.
+const rules = [
+  "[data-berry] { display: none; }",
+  ...Object.entries(BERRY_KIND).map(([palette, kind]) => `[data-mascot="${palette}"] [data-berry="${kind}"] { display: inline; }`),
+];
 writeFileSync(join(site, "birds.js"), `${NOTE}export const BIRDS = ${JSON.stringify(birds, null, 2)};\n`);
 writeFileSync(join(site, "app", "poses.js"), `${NOTE}export const POSES = ${JSON.stringify(poses)};\n`);
 writeFileSync(join(site, "birds.css"), `/* Generated by scripts/buildSite.mjs. Don't edit this. */\n${rules.join("\n")}\n`);
@@ -122,56 +156,32 @@ const tree = Object.fromEntries(
   Object.entries(actorArt).map(([accessory, poses]) => [accessory, Object.fromEntries(Object.entries(poses).map(([pose, markup]) => [pose, toTree(markup, pose)]))])
 );
 
-const tokens = readFileSync(join(root, "src/renderer/common/tokens.css"), "utf8");
+const tokens = readFileSync(join(root, "src/renderer/common/tokens.css"), "utf8").replace(/\r\n/g, "\n");
+// The tokens the bird and its line use, from one block of tokens.css.
 const block = (selector) => {
   const at = tokens.indexOf(`${selector} {`);
-  return tokens.slice(at, tokens.indexOf("}", at)).match(/--(?:berry-[a-z-]+|surface|foreground|muted-foreground): [^;]+;/g).join(" ");
+  return tokens.slice(at, tokens.indexOf("}", at)).match(/--(?:berry-[a-z-]+|sheet|ink|ask): [^;]+;/g).join(" ");
 };
-const animations = createRequire(import.meta.url)(join(root, "tailwind.config.js")).theme.extend;
-const keyframes = ["berry-flap", "berry-bob", "berry-blink", "berry-toss", "berry-swing"].map((name) => {
-  const steps = Object.entries(animations.keyframes[name]).map(([at, style]) => `${at} { ${Object.entries(style).map(([key, value]) => `${key}: ${value}`).join("; ")}; }`);
-  return `@keyframes ${name} { ${steps.join(" ")} }`;
-});
-const moving = Object.entries(animations.animation)
-  .filter(([name]) => name.startsWith("berry-"))
-  .map(([name, value]) => `.animate-${name} { animation: ${value}; }`);
-const palettes = [...tokens.matchAll(/\[data-mascot="([a-z]+)"\] \{/g)].map(([, palette]) => palette);
-const sheet = [
-  `.sky { ${block(":root")} ${block(":root,\n  .dark")} }`,
-  `.sky.dark { ${block(".dark")} }`,
-  ...[...new Set(palettes)].flatMap((palette) => [
-    `.sky[data-mascot="${palette}"] { ${block(`[data-mascot="${palette}"]`)} }`,
-    `.sky.dark[data-mascot="${palette}"] { ${block(`.dark [data-mascot="${palette}"]`)} }`,
-  ]),
-  ...[...new Set(JSON.stringify(tree).match(/(?:fill|stroke)-berry-[a-z-]+/g))].map((name) => {
-    const [, kind, token] = /^(fill|stroke)-(berry-[a-z-]+)$/.exec(name);
-    return `.${name} { ${kind}: rgb(var(--${token})); }`;
-  }),
-  ".berry-rim { filter: var(--berry-rim); }",
-  ...keyframes,
-  "@media (prefers-reduced-motion: no-preference) {",
-  ...moving,
-  "}",
-].join("\n");
+// The rules that give a mascot its eyes, as tokens.css writes them.
+const eyes = tokens.match(/(?:\[data-mascot="[a-z]+"\],?\s*)+\{[^}]*\}/g).map((rule) => rule.replace(/\s+/g, " "));
+const sheet = [`.sky { ${block(":root")} }`, `.sky.dark { ${block(".dark")} }`, ...eyes, ...rules].join("\n");
 writeFileSync(
   join(root, "src/main/pageActorArt.ts"),
-  `${NOTE}export type ArtNode = [tag: string, attributes: Record<string, string>, ...children: ArtNode[]];\n\nexport const ACTOR_ART = ${JSON.stringify(tree)} as unknown as Record<string, Record<string, ArtNode>>;\n\nexport const ACTOR_ART_SHEET = ${JSON.stringify(sheet)};\n`
+  `${NOTE}export type ArtNode = [tag: string, attributes: Record<string, string>, ...children: ArtNode[]];\n\nexport const ACTOR_ART = ${JSON.stringify(tree)} as unknown as Record<string, Record<string, ArtNode>>;\n\nexport const ACTOR_ART_SHEET = ${JSON.stringify(sheet)};\n\n// Which berry each saved palette draws as, so a page gets only that one's parts.\nexport const ACTOR_BERRY: Record<string, string> = ${JSON.stringify(BERRY_KIND)};\n`
 );
 
-// The picture a shared link shows, since a link preview can't run the page: the flock on a wire, on `canvas` in light mode. It's
+// The picture a shared link shows, since a link preview can't run the page: the mascots in a row, on `ground` in light mode. It's
 // drawn by the Chrome on this computer, so without one it says so and leaves the old picture.
-const SHARE_FLOCK = [["none", "jackdaw"], ["cap", "kingfisher"], ["glasses", "robin"], ["headphones", "flamingo"], ["cap", "parakeet"], ["headphones", "canary"]];
+const SHARE_FLOCK = [["none", "kingfisher"], ["cap", "robin"], ["glasses", "canary"], ["headphones", "flamingo"], ["bow", "parakeet"], ["crown", "jackdaw"]];
 const shareCard = `<!doctype html><html><head><meta charset="utf-8"><style>${readFileSync(join(site, "tokens.css"), "utf8")}
 ${readFileSync(join(site, "birds.css"), "utf8")}
 * { box-sizing: border-box; margin: 0; }
-body { width: 1200px; height: 630px; background: rgb(var(--canvas)); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; }
+body { width: 1200px; height: 630px; background: rgb(var(--ground)); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 .card { height: 100%; padding: 100px 108px 36px; display: flex; flex-direction: column; }
-h1 { font-size: 72px; font-weight: 600; letter-spacing: -0.02em; color: rgb(var(--foreground)); }
-p { margin-top: 12px; font-size: 30px; color: rgb(var(--muted-foreground)); }
-.wire { margin-top: auto; display: flex; justify-content: space-between; border-bottom: 2px solid rgb(var(--muted-foreground) / 0.45); margin-bottom: 64px; }
-.wire div { width: 150px; height: ${Math.round((150 * 113) / 120)}px; }
+h1 { font-size: 72px; font-weight: 500; letter-spacing: -0.025em; color: rgb(var(--ink)); }
+p { margin-top: 12px; font-size: 30px; color: rgb(var(--ink-2)); }
+.wire { margin-top: auto; display: flex; justify-content: space-between; margin-bottom: 72px; }
 .wire svg { width: 150px; height: 150px; overflow: visible; }
-.wire div:nth-child(3n) svg { transform: scaleX(-1); }
 </style></head><body><div class="card"><h1>Blueberry</h1><p>An AI browser that works on your behalf.</p><div class="wire">${SHARE_FLOCK.map(([accessory, palette]) => `<div>${birds[accessory].replace('data-mascot="jackdaw"', `data-mascot="${palette}"`)}</div>`).join("")}</div></div></body></html>`;
 try {
   const { chromium } = await import("playwright-core");

@@ -11,7 +11,7 @@ import { chromeHistoryFile, writeChromiumHistory } from "./chromiumHistory";
 import { startFakeModel } from "./fakeModel";
 import { DEMO_LINES, demoProposals } from "./suggestionReplies";
 
-test("onboarding brings in another browser's history, and the birds speak about it on the new tab", async () => {
+test("the first run brings in another browser's history, and the birds speak about it on the new tab", async () => {
   test.setTimeout(60_000);
   const browsers = mkdtempSync(join(tmpdir(), "blueberry-browsers-"));
   writeChromiumHistory(chromeHistoryFile(browsers), demoVisits()).close();
@@ -21,21 +21,26 @@ test("onboarding brings in another browser's history, and the birds speak about 
   const app = await launchApp(undefined, { firstLaunch: true, modelEnv: { ...model.env, BLUEBERRY_BROWSER_DATA: browsers } });
   try {
     const chrome = await findView(app, "view=chrome");
-    await expect(chrome.getByLabel("Step 1 of 4")).toBeVisible();
-    await chrome.getByRole("button", { name: "Nice to meet you" }).click();
+    await chrome.getByRole("button", { name: "Get started" }).click();
     await chrome.getByRole("button", { name: "Continue" }).click();
+    // The .env key works, so the key can wait.
+    await chrome.getByRole("button", { name: "I’ll do this later" }).click();
 
-    await expect(chrome.getByRole("heading", { name: "Bring your history along?" })).toBeVisible();
-    await expect(chrome.getByLabel("Step 3 of 4")).toBeVisible();
-    await expect(chrome.getByText("I can read your history from Chrome")).toBeVisible();
+    await expect(chrome.getByRole("heading", { name: "Shall I bring your history over?" })).toBeVisible();
+    await expect(chrome.getByText("3 / 4")).toBeVisible();
+    await expect(chrome.getByRole("radio", { name: /^Chrome/ })).toBeChecked();
     expect(model.suggestionRequests).toHaveLength(0);
 
     await chrome.getByRole("button", { name: "Bring it in" }).click();
-    await expect(chrome.getByRole("status")).toHaveText(/^Brought in [\d,  ]+ visits from Chrome\.$/);
+    await expect(chrome.getByRole("status")).toHaveText(/^[\d,  ]+ visits came across from Chrome\.$/);
+    await expect(chrome.getByRole("radio", { name: /^Chrome[\d,  ]+ visits came acrossDone$/ })).toBeChecked();
     await chrome.getByRole("button", { name: "Continue" }).click();
     await chrome.getByRole("button", { name: "Start browsing" }).click();
 
-    const cards = chrome.getByRole("region", { name: "Things you repeat" }).getByRole("listitem");
+    // First jobs stands where suggestions go, with history already done, until it's hidden.
+    await expect(chrome.getByRole("region", { name: "First jobs" })).toContainText("1 of 4");
+    await chrome.getByRole("button", { name: "Hide" }).click();
+    const cards = chrome.getByRole("region", { name: "Suggestions" }).getByRole("listitem");
     await expect(cards).toHaveCount(3, { timeout: 20_000 });
     await expect(chrome.getByText(DEMO_LINES.routine)).toBeVisible();
 

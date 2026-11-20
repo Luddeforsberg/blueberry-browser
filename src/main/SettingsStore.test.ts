@@ -3,6 +3,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, sanitizeSettings, SettingsStore } from "./SettingsStore";
+import { ACCOUNT_NAME_MAX } from "../shared/accountName";
 
 const tempFile = () => join(mkdtempSync(join(tmpdir(), "blueberry-settings-")), "settings.json");
 
@@ -33,6 +34,34 @@ describe("sanitizeSettings", () => {
   });
 });
 
+describe("accountName", () => {
+  const named = { ...DEFAULT_SETTINGS, accountName: "Alex" };
+
+  it("starts with none, and keeps a name trimmed", () => {
+    expect(DEFAULT_SETTINGS.accountName).toBeNull();
+    expect(sanitizeSettings({ accountName: "  Alex Lind " }).accountName).toBe("Alex Lind");
+  });
+
+  it("clears it for nothing, or only spaces", () => {
+    expect(sanitizeSettings({ accountName: null }, named).accountName).toBeNull();
+    expect(sanitizeSettings({ accountName: "" }, named).accountName).toBeNull();
+    expect(sanitizeSettings({ accountName: "   " }, named).accountName).toBeNull();
+  });
+
+  it("takes one character up to the limit, counting what's drawn rather than code units, and keeps the old name past it", () => {
+    expect(sanitizeSettings({ accountName: "A" }).accountName).toBe("A");
+    expect(sanitizeSettings({ accountName: "a".repeat(ACCOUNT_NAME_MAX) }).accountName).toBe("a".repeat(ACCOUNT_NAME_MAX));
+    expect(sanitizeSettings({ accountName: "🫐".repeat(ACCOUNT_NAME_MAX) }).accountName).toBe("🫐".repeat(ACCOUNT_NAME_MAX));
+    expect(sanitizeSettings({ accountName: "a".repeat(ACCOUNT_NAME_MAX + 1) }, named).accountName).toBe("Alex");
+  });
+
+  it("refuses control characters and line breaks, and anything not a string", () => {
+    for (const accountName of ["Al\nex", "Al\u0000ex", "Al\u001bex", "Al\u2028ex", "Al\u0085ex", 42, {}]) {
+      expect(sanitizeSettings({ accountName }, named).accountName).toBe("Alex");
+    }
+  });
+});
+
 describe("downloadFolder", () => {
   it("keeps null and absolute paths, and refuses anything else", () => {
     const base = { ...DEFAULT_SETTINGS, downloadFolder: "/kept" };
@@ -41,6 +70,31 @@ describe("downloadFolder", () => {
     expect(sanitizeSettings({}, base).downloadFolder).toBe("/kept");
     for (const bad of ["", "relative/path", "/nul\0byte", 3, {}]) {
       expect(sanitizeSettings({ downloadFolder: bad }, base).downloadFolder).toBe("/kept");
+    }
+  });
+});
+
+describe("the app icon", () => {
+  const chosen = { ...DEFAULT_SETTINGS, appIconMascotId: "4b0c6a5e-1f2d-4c3b-9a8e-7d6c5b4a3f21", appIconGround: "glow" as const };
+
+  it("starts as Berry on Paper, and keeps a mascot's id and any of the four grounds", () => {
+    expect(DEFAULT_SETTINGS).toMatchObject({ appIconMascotId: null, appIconGround: "paper" });
+    expect(sanitizeSettings({ appIconMascotId: chosen.appIconMascotId, appIconGround: "night" })).toMatchObject({ appIconMascotId: chosen.appIconMascotId, appIconGround: "night" });
+    for (const ground of ["paper", "night", "colour", "glow"]) expect(sanitizeSettings({ appIconGround: ground }).appIconGround).toBe(ground);
+  });
+
+  it("takes Berry's own id, or null, as Berry", () => {
+    expect(sanitizeSettings({ appIconMascotId: "berry" }, chosen).appIconMascotId).toBeNull();
+    expect(sanitizeSettings({ appIconMascotId: null }, chosen).appIconMascotId).toBeNull();
+  });
+
+  it("keeps what it had for anything that isn't an id or a ground", () => {
+    for (const appIconMascotId of ["", "a".repeat(65), "../mascots.json", "id with spaces", 7, {}]) {
+      expect(sanitizeSettings({ appIconMascotId }, chosen).appIconMascotId).toBe(chosen.appIconMascotId);
+    }
+    expect(sanitizeSettings({ appIconMascotId: "a".repeat(64) }, chosen).appIconMascotId).toBe("a".repeat(64));
+    for (const appIconGround of ["", "Paper", "colour ", "plum", null]) {
+      expect(sanitizeSettings({ appIconGround }, chosen).appIconGround).toBe("glow");
     }
   });
 });

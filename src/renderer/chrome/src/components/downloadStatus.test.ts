@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DownloadInfo } from '@shared/ipc'
-import { downloadStatus, formatBytes, fractionDone } from './downloadStatus'
+import { downloadStatus, fileEnding, formatBytes, fractionDone, timeLeft } from './downloadStatus'
 
 const download = (patch: Partial<DownloadInfo>): DownloadInfo => ({
     id: '1',
@@ -37,7 +37,7 @@ describe('fractionDone', () => {
 
 describe('downloadStatus', () => {
     it('says so when a finished file is missing, whatever else is true', () => {
-        expect(downloadStatus(download({ missing: true })).text).toBe('File is missing')
+        expect(downloadStatus(download({ missing: true })).text).toBe('Moved or deleted')
     })
 
     it('tells an unknown size apart from a known one', () => {
@@ -48,5 +48,26 @@ describe('downloadStatus', () => {
     it('tells a stop that can carry on apart from one that can not', () => {
         expect(downloadStatus(download({ state: 'interrupted', canResume: true })).text).toContain('Stopped')
         expect(downloadStatus(download({ state: 'interrupted' })).text).toBe('Didn’t finish')
+    })
+})
+
+describe('timeLeft', () => {
+    it('works it out from how fast it has come, only while it arrives with a size', () => {
+        const running = download({ state: 'progressing', receivedBytes: 1000, totalBytes: 4000, startedAt: 0 })
+        expect(timeLeft(running, 10_000)).toBe('30 s left')
+        expect(timeLeft({ ...running, receivedBytes: 100 }, 10_000)).toBe('7 min left')
+        expect(timeLeft({ ...running, receivedBytes: 1, totalBytes: 1000 }, 10_000)).toBe('3 h left')
+        expect(timeLeft({ ...running, totalBytes: 0 }, 10_000)).toBeNull()
+        expect(timeLeft({ ...running, receivedBytes: 0 }, 10_000)).toBeNull()
+        expect(timeLeft({ ...running, state: 'paused' }, 10_000)).toBeNull()
+    })
+})
+
+describe('fileEnding', () => {
+    it('is the ending in lower case, or nothing', () => {
+        expect(fileEnding('Report.PDF')).toBe('pdf')
+        expect(fileEnding('backup.tar.gz')).toBe('gz')
+        expect(fileEnding('README')).toBeNull()
+        expect(fileEnding('notes.markdown')).toBeNull()
     })
 })

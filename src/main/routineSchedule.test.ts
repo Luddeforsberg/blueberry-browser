@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { nextRun, parseDraft, scheduleLabel } from "./routineSchedule";
+import { nameFromWords, nextRun, parseDraft, scheduleLabel } from "./routineSchedule";
 
 const local = (...parts: [number, number, number, number, number]) => new Date(...parts).getTime();
 // Months count from 0 here, as they do in Date.
@@ -90,7 +90,8 @@ describe("parseDraft", () => {
   });
 
   it("holds the name and instructions to their limits", () => {
-    expect(parseDraft({ ...valid, name: "   " })).toHaveProperty("error");
+    // None is asked for, so none is fine.
+    expect(parseDraft({ ...valid, name: "   " })).toEqual({ draft: expect.objectContaining({ name: "" }) });
     expect(parseDraft({ ...valid, instructions: "" })).toHaveProperty("error");
     expect(parseDraft({ ...valid, name: "a".repeat(100) })).toHaveProperty("draft");
     expect(parseDraft({ ...valid, name: "a".repeat(101) })).toHaveProperty("error");
@@ -113,5 +114,14 @@ describe("parseDraft", () => {
     expect(scheduled({ kind: "once", at: NaN })).toHaveProperty("error");
     expect(scheduled({ kind: "hourly", time: "07:30" })).toHaveProperty("error");
     expect(scheduled(undefined)).toHaveProperty("error");
+  });
+});
+
+describe("nameFromWords", () => {
+  it("is the first line, cut at a word", () => {
+    expect(nameFromWords("  Read SVT.\nThen sum up the five biggest stories")).toBe("Read SVT");
+    expect(nameFromWords("a".repeat(40))).toBe("a".repeat(40));
+    expect(nameFromWords("a".repeat(41))).toBe(`${"a".repeat(40)}…`);
+    expect(nameFromWords("Check the fares from Stockholm to Lisbon for the first week of May")).toBe("Check the fares from Stockholm to Lisbon…");
   });
 });

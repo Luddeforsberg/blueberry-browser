@@ -8,15 +8,6 @@ const LibraryContext = createContext<LibrarySnapshot>(EMPTY)
 
 export const useLibrary = () => useContext(LibraryContext)
 
-// What the bookmark cluster and bar show when there's nothing saved yet.
-export const NO_SAVED_SITES = 'Pin or bookmark a page to keep it here.'
-
-// Pinned sites first, then bookmarks. A site saved both ways shows once, as a pin.
-export const useSavedSites = () => {
-    const { pinned, bookmarks } = useLibrary()
-    return [...pinned, ...bookmarks.filter((bookmark) => !pinned.some((pin) => pin.url === bookmark.url))]
-}
-
 const ChosenContext = createContext<{ chosenId: string; choose: (id: string) => void }>({ chosenId: BERRY_ID, choose: () => undefined })
 
 // The flock, and who the next new chat runs as. Chosen on any composer, and shown on all of them.
@@ -34,10 +25,10 @@ export const useFlock = () => {
 export const LibraryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [library, setLibrary] = useState<LibrarySnapshot>(EMPTY)
     const [chosenId, setChosenId] = useState(BERRY_ID)
-    // Saved, because the bird on the desktop goes by it too.
+    // Saved, because the bird on the desktop goes by it too, and a mascot's card over the page chooses from another view.
     const choose = useCallback((id: string) => {
         setChosenId(id)
-        void window.chromeAPI.settings.updateSettings({ chosenMascotId: id === BERRY_ID ? null : id })
+        void window.chromeAPI.mascots.choose(id === BERRY_ID ? null : id)
     }, [])
     const chosen = useMemo(() => ({ chosenId, choose }), [chosenId, choose])
 
@@ -45,7 +36,13 @@ export const LibraryProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const api = window.chromeAPI.library
         api.getLibrary().then(setLibrary).catch((error) => console.error('Failed to load library:', error))
         void window.chromeAPI.settings.getSettings().then(({ chosenMascotId }) => setChosenId(chosenMascotId ?? BERRY_ID))
-        return api.onLibraryUpdated(setLibrary)
+        // Chosen in another view, it's chosen here too.
+        const unfollow = window.chromeAPI.settings.onSettingsUpdated(({ chosenMascotId }) => setChosenId(chosenMascotId ?? BERRY_ID))
+        const unsubscribe = api.onLibraryUpdated(setLibrary)
+        return () => {
+            unfollow()
+            unsubscribe()
+        }
     }, [])
 
     return (

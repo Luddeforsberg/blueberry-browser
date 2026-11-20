@@ -4,12 +4,12 @@
 // src/shared/mascots.ts
 var BERRY_ID = "berry";
 var PALETTES = [
-  { id: "jackdaw", label: "Jackdaw" },
-  { id: "robin", label: "Robin" },
-  { id: "canary", label: "Canary" },
-  { id: "parakeet", label: "Parakeet" },
-  { id: "flamingo", label: "Flamingo" },
-  { id: "kingfisher", label: "Kingfisher" }
+  { id: "kingfisher", label: "Blueberry" },
+  { id: "robin", label: "Lingon" },
+  { id: "canary", label: "Cloudberry" },
+  { id: "parakeet", label: "Gooseberry" },
+  { id: "flamingo", label: "Raspberry" },
+  { id: "jackdaw", label: "Currant" }
 ];
 var ACCESSORIES = [
   { id: "none", label: "Nothing" },
@@ -27,7 +27,8 @@ var MASCOT_TOOLS = [
 var BERRY = {
   id: BERRY_ID,
   name: "Berry",
-  look: { palette: "jackdaw", accessory: "none" },
+  // The blueberry, with nothing on.
+  look: { palette: "kingfisher", accessory: "none" },
   instructions: "",
   sites: [],
   tools: MASCOT_TOOLS.map(({ id }) => id),
@@ -266,6 +267,43 @@ var siteParts = (text) => {
 var withSiteNames = (text) => siteParts(text).map((part) => part.text).join("");
 var asContinuation = (text) => /^[A-Z][a-z]/.test(text) ? text[0].toLowerCase() + text.slice(1) : text;
 
+// src/renderer/chrome/src/shortWords.ts
+var DAY_MS = 864e5;
+var weekday = (time) => new Date(time).toLocaleDateString("en-GB", { weekday: "short" });
+var dayAndMonth = (time) => new Date(time).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+var twoDigits = (n) => String(n).padStart(2, "0");
+var dayOf = (time) => {
+  const date = new Date(time);
+  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS;
+};
+var shortWhen = (time, now = Date.now()) => {
+  const days = dayOf(time) - dayOf(now);
+  if (days === 0) return new Date(time).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  if (days === -1) return "yesterday";
+  if (days === 1) return "tomorrow";
+  if (Math.abs(days) < 7) return weekday(time);
+  return dayAndMonth(time);
+};
+var finishedWhen = (time, now = Date.now()) => {
+  const when = shortWhen(time, now);
+  if (/^\d\d:\d\d$/.test(when)) return `at ${when}`;
+  return when === "yesterday" ? when : `on ${when}`;
+};
+var rowTime = (time, { now = Date.now(), going = false } = {}) => {
+  if (going) {
+    const seconds = Math.max(0, Math.floor((now - time) / 1e3));
+    const hours = Math.floor(seconds / 3600);
+    const minutes2 = Math.floor(seconds / 60) % 60;
+    return hours > 0 ? `${hours}:${twoDigits(minutes2)}:${twoDigits(seconds % 60)}` : `${minutes2}:${twoDigits(seconds % 60)}`;
+  }
+  if (time > now) return shortWhen(time, now);
+  const minutes = Math.floor((now - time) / 6e4);
+  if (minutes < 1) return "now";
+  if (minutes < 60) return `${minutes}m`;
+  if (minutes < 1440) return `${Math.floor(minutes / 60)}h`;
+  return dayOf(now) - dayOf(time) < 7 ? weekday(time) : dayAndMonth(time);
+};
+
 // src/main/phoneReplies.ts
 var MIN_CODE_LENGTH = 4;
 var MAX_CODE_LENGTH = 12;
@@ -282,6 +320,7 @@ export {
   conversationIdOf,
   conversationsOf,
   fetchWithin,
+  finishedWhen,
   flockFromRows,
   followUpHistory,
   isUuid,
@@ -291,6 +330,7 @@ export {
   permissionsInWords,
   plainFromMarkdown,
   plausibleCode,
+  rowTime,
   runnerLinkDue,
   withSiteNames
 };

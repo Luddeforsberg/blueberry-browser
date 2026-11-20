@@ -1,53 +1,71 @@
-import { BaseWindow, globalShortcut, Menu, screen, type Display } from "electron";
+import { BaseWindow, globalShortcut, screen, type Display, type WebContents } from "electron";
 import { createChromeView, type ChromeView } from "./chromeView";
+import { MenuView } from "./MenuView";
+import type { OwnMenuItem } from "./ownMenu";
 import { sendToRenderer } from "./ipc";
 import {
-  DESKTOP_BIRD_SIZE,
   DESKTOP_DEFAULT_SPOT,
-  DESKTOP_PEEK,
-  DESKTOP_PEEK_WAITING,
-  desktopComposerBounds,
-  desktopFlightPoint,
+  desktopBoxPlace,
   desktopHit,
-  desktopPeekHit,
   desktopPlace,
+  desktopRestingDrop,
+  desktopSheetsPlace,
   desktopSpotAt,
-  desktopTucked,
   type DesktopPlace,
   type Rect,
 } from "./Layout";
-import { desktopFace, firstLine, readingTime, type DesktopResult, type DesktopTarget } from "./desktopBerryState";
-import type { DesktopBerrySpot, DesktopBerryState, DesktopComposerState, Point, Settings, ThemeState } from "../shared/ipc";
-import type { LibrarySnapshot, MascotProfile } from "../shared/library";
+import {
+  anythingGoing,
+  checkDecision,
+  desktopAsk,
+  desktopCloud,
+  desktopDrop,
+  desktopTray,
+  desktopWhere,
+  firstLine,
+  readingTime,
+  saidWords,
+  sameAsk,
+  sameDay,
+  type DesktopEnded,
+  type DesktopFacts,
+  type DesktopResult,
+  type DesktopRunning,
+  type DesktopTarget,
+  type ShownAsk,
+  type TrayTarget,
+} from "./desktopBerryState";
+import type { DesktopBerrySpot, DesktopBox, DesktopDecided, DesktopDropPart, DesktopDropState, DesktopPanelState, Settings, ThemeState } from "../shared/ipc";
+import type { LibrarySnapshot, MascotProfile, NeedsYouItem } from "../shared/library";
+import { DESKTOP_SHADOW, DESKTOP_SHEET } from "../shared/desktopSizes";
 import { BERRY } from "../shared/mascots";
+import { SHORTCUTS } from "../shared/shortcuts";
 
-export const DESKTOP_SHORTCUT = "Alt+Space";
+const DESKTOP_SHORTCUT = SHORTCUTS.desktop;
 
 // How often the pointer is checked against what can be clicked. Nothing else tells a window that lets clicks through.
 const POINTER_POLL_MS = 50;
-// Two checks in a row, so a pointer passing along the edge doesn't bring it out.
+// Two checks in a row, so a pointer passing along the edge doesn't make it grow.
 const HOVER_AFTER_CHECKS = 2;
-const TUCK_AFTER_LEAVING_MS = 700;
-// About what the view takes to slide it, and then the window can go back to its small size.
-const TUCK_MS = 260;
-const FADE_MS = 170;
-// Long enough to see where it landed, and to see the job was taken.
-const STAYS_AFTER_LANDING_MS = 1400;
-const STAYS_AFTER_SEND_MS = 1200;
-const STAYS_AFTER_CLOSING_MS = 500;
-const FLIGHT_MIN_MS = 700;
-const FLIGHT_MAX_MS = 1200;
-const FLIGHT_POINTS = 30;
-const MAX_RESULTS = 5;
-// A result can still be read by hovering for this long, and then there's nothing left to say about it.
-const RESULT_LASTS_MS = 10 * 60 * 1000;
+const SHRINK_AFTER_LEAVING_MS = 700;
+// What the view takes to grow or shrink the drop, after which a window can hide.
+const SIZE_MS = 200;
 // A window being minimised only says so when it's finished, so leaving waits a moment to see which this is.
 const LEAVING_SETTLES_MS = 800;
-const COMPOSER_WIDTH = 400;
-const COMPOSER_MIN_HEIGHT = 50;
-// In the composer these go to the text box, for selecting, copying and moving around in it. Anything else would reach the
+// How long the ask says what happened before it goes.
+const SAID_MS = 1500;
+// How long opening the tray waits for the view to say how tall it is, so the window shows at its size.
+const HEIGHT_WAIT_MS = 150;
+const MAX_RESULTS = 5;
+// A result can still be seen in the stack of faces this long, and then there's nothing left to say about it.
+const RESULT_LASTS_MS = 10 * 60 * 1000;
+const MAX_FINISHED = 30;
+// The first sentence of a reply, in two lines.
+const RESULT_LENGTH = 64;
+// In the panel these go to the text box, for selecting, copying and moving around in it. Anything else would reach the
 // browser's menu, behind the user's back.
-const COMPOSER_MENU_KEYS = new Set(["a", "c", "v", "x", "z", "arrowleft", "arrowright", "arrowup", "arrowdown", "backspace", "delete", "home", "end"]);
+const PANEL_MENU_KEYS = new Set(["a", "c", "v", "x", "z", "arrowleft", "arrowright", "arrowup", "arrowdown", "backspace", "delete", "home", "end"]);
+const DROP_PARTS: readonly DesktopDropPart[] = ["drop", "answer", "open", "dismiss"];
 
 export interface DesktopBerryHost {
   settings: () => Settings;
@@ -55,70 +73,89 @@ export interface DesktopBerryHost {
   library: () => LibrarySnapshot;
   mascot: (id: string | null) => MascotProfile;
   nameOf: (mascotId: string) => string;
-  // Blueberry's window is what the user is using, so the bird belongs in there.
+  // Blueberry's window is what the user is using, so the drop isn't needed.
   inFront: () => boolean;
   stillMotion: () => boolean;
   theme: () => ThemeState;
-  // Where the chrome's own bird is on the screen right now, for taking off from.
-  takeOffPoint: () => Promise<Point>;
-  setAway: (away: boolean) => void;
   // A chat that has just ended. Null if the user stopped it or it's gone.
-  ended: (chatId: string) => { mascotId: string; text: string; error: string | null } | null;
+  ended: (chatId: string) => { mascotId: string; title: string; text: string; error: string | null } | null;
   chatOnScreen: (chatId: string) => boolean;
-  send: (text: string, mascotId: string) => boolean;
-  open: (target: Exclude<DesktopTarget, null>) => void;
+  // A working chat's latest step and when its reply began, for the tray and the drop pointed at.
+  progress: (chatId: string) => { step: string | null; since: number | null };
+  // Jobs the user sent before, newest first, as chips over the box.
+  recentJobs: () => Array<{ label: string; prompt: string }>;
+  // Whether the cloud runner or a cloud browser can take a job.
+  cloud: () => { runner: boolean; cloud: boolean };
+  send: (text: string, mascotId: string, where: { runner: boolean; cloud: boolean }) => boolean;
+  // The same as Needs you's `chat:decide`.
+  decide: (chatId: string, approvalId: string, allow: boolean, answer?: string) => boolean;
+  open: (target: DesktopTarget) => void;
+  // The tab an ask is about, or its chat or routine when it has none here.
+  seePage: (item: NeedsYouItem) => void;
   showBlueberry: () => void;
 }
 
-const offsetBy = ({ x, y }: Point, by: Point): Point => ({ x: x + by.x, y: y + by.y });
-
-// The bird that stands at the edge of the screen while the user is in other apps, with the shortcut that gives it a job.
-// All it can do is start a chat with no page and open Blueberry, so it can't do anything a chat can't, or anything
-// without asking. It never reads the screen, other apps or the clipboard, and there's no route from a tool to here.
+// The mascot on the edge of the screen while the user is in other apps: a drop that says what the mascots are doing, a
+// prompt box that's the drop grown, the tray and the ask. All it can do is start a chat with no page, answer what Needs
+// you answers, the same way, and open Blueberry. It never reads the screen, other apps or the clipboard, and there's no
+// route from a tool to here.
 //
-// Its window keeps one size wherever it stands, so nothing resizes while it moves or speaks, and all its movement is
-// transforms in the view, which keep going whatever the main process is doing. The window only covers the work area for
-// a flight or a drag, and goes back to its small size once the bird has tucked away.
+// Two windows make it. The drop's own lets clicks through everywhere but the drop, never takes the keyboard, and keeps
+// one size wherever it stands, so the drop grows and shrinks inside it and nothing native moves. The panel is the window
+// that can take the keyboard without bringing Blueberry forward: it draws the prompt box, starting from the drop's own
+// size at the drop's own place and growing from there, over the drop, so the two read as one shape, or the tray and the
+// ask beside it. It changes size only before it shows and between one thing and the next, never while anything moves.
 export class DesktopBerry {
   private window: BaseWindow | null = null;
   private view: ChromeView | null = null;
-  private composerWindow: BaseWindow | null = null;
-  private composer: ChromeView | null = null;
-  private composerGlass = false;
-  private composerHeight = COMPOSER_MIN_HEIGHT;
-  private composing = false;
+  private panelWindow: BaseWindow | null = null;
+  private panel: ChromeView | null = null;
+  // Right-clicking the drop: our menu, in a panel of its own, so it can take the keyboard without bringing Blueberry
+  // forward, and stays inside the screen it opened on.
+  private menuWindow: BaseWindow | null = null;
+  private menus: MenuView | null = null;
+  private menuArea: Rect | null = null;
   private outside = false;
-  // "wide" means the window covers the work area: for a flight, a drag, or the bird settling after one.
-  private motion: "none" | "flying" | "dragging" | "wide" = "none";
-  private flight: DesktopBerryState["flight"] = null;
-  private flightId = 0;
-  private flightTimer: NodeJS.Timeout | null = null;
-  private fadeTimer: NodeJS.Timeout | null = null;
-  private leavingTimer: NodeJS.Timeout | null = null;
-  private pointerTimer: NodeJS.Timeout | null = null;
-  private stayTimer: NodeJS.Timeout | null = null;
-  private shrinkTimer: NodeJS.Timeout | null = null;
-  private expiryTimer: NodeJS.Timeout | null = null;
-  // Out for a moment by itself, because it has something to say or has just done something.
-  private staying = false;
-  // Says it's out and the words are showing, rather than only being out.
-  private announcing = false;
-  private announced: string | null = null;
+  private dragging = false;
+  private frame = 0;
+  private bounds: Rect = { x: 0, y: 0, width: 1, height: 1 };
+  private dropBox: Rect | null = null;
   private hovering = false;
   private hoverChecks = 0;
   private leftAt: number | null = null;
   private passingClicks = true;
-  private frame = 0;
-  private bounds: Rect = { x: 0, y: 0, width: DESKTOP_BIRD_SIZE, height: DESKTOP_BIRD_SIZE };
-  private lineBox: Rect | null = null;
   private results: Array<DesktopResult & { endedAt: number }> = [];
+  private finished: DesktopEnded[] = [];
   private wasRunning = new Set<string>();
+  // The result that has come out by itself, by its chat, and whether it waits for the pointer to leave to go back in.
+  private announcing: string | null = null;
+  private endsOnLeaving = false;
   private spot: DesktopBerrySpot | null = null;
   // With no saved display, the one it came out on, so it doesn't follow the pointer around.
   private pinnedDisplayId: number | null = null;
-  private waiting = false;
   private registered = false;
   private _shortcutTaken = false;
+  // The panel: what it shows, and the ask main holds so the view never names it.
+  private panelOpen: "box" | "sheets" | null = null;
+  private trayOpen = false;
+  private asking: ShownAsk | null = null;
+  private asksShown = 0;
+  private said: string | null = null;
+  private opened = 0;
+  private closing = false;
+  private panelBounds: DesktopPlace | null = null;
+  private boxThick = 0;
+  private sheetsHeight = 0;
+  private heightWaiters: Array<() => void> = [];
+  private trayKeys = new Map<string, TrayTarget>();
+  private keyCount = 0;
+  private hideTimer: NodeJS.Timeout | null = null;
+  private panelHideTimer: NodeJS.Timeout | null = null;
+  private leavingTimer: NodeJS.Timeout | null = null;
+  private pointerTimer: NodeJS.Timeout | null = null;
+  private announceTimer: NodeJS.Timeout | null = null;
+  private expiryTimer: NodeJS.Timeout | null = null;
+  private saidTimer: NodeJS.Timeout | null = null;
 
   constructor(private readonly host: DesktopBerryHost) {}
 
@@ -127,7 +164,11 @@ export class DesktopBerry {
   }
 
   get composerView(): ChromeView | null {
-    return this.composer;
+    return this.panel;
+  }
+
+  get menuView(): MenuView | null {
+    return this.menus;
   }
 
   get shortcutTaken(): boolean {
@@ -139,25 +180,29 @@ export class DesktopBerry {
     return desktopBerry && onboarded;
   }
 
-  // Goes by the settings, so it's called whenever one may have changed. `turnedOn` is the user pressing the switch: it
-  // flies out to show where it lives. With Blueberry in front it then comes back in, once it has tucked away, because
-  // that's where it belongs while they're here. Launching with it on doesn't fly anywhere.
-  sync(turnedOn = false): void {
+  private get still(): boolean {
+    return this.host.settings().keepBerryStill || this.host.stillMotion();
+  }
+
+  // Goes by the settings, so it's called whenever one may have changed. Turned on with Blueberry in front, it waits
+  // until the user goes to another app.
+  sync(): void {
     if (!this.on) return this.turnOff();
     if (!this.window) {
       this.turnOn();
-      if (turnedOn) void this.comeOut(true);
-      else if (!this.host.inFront()) void this.comeOut(false);
+      if (!this.host.inFront()) void this.comeOut();
     }
     // Opened on the chat that finished, in front of the user, so there's nothing left to say about it.
     this.results = this.results.filter(({ chatId }) => !this.host.chatOnScreen(chatId));
+    if (this.announcing && !this.results.some(({ chatId }) => chatId === this.announcing)) this.stopAnnouncing();
     this.publish();
   }
 
   private turnOn(): void {
     this.spot = this.host.settings().desktopBerrySpot;
     this.createWindow();
-    this.createComposer();
+    this.createPanel();
+    this.createMenu();
     this.registerShortcut();
     screen.on("display-metrics-changed", this.onDisplays);
     screen.on("display-added", this.onDisplays);
@@ -174,20 +219,24 @@ export class DesktopBerry {
     screen.off("display-metrics-changed", this.onDisplays);
     screen.off("display-added", this.onDisplays);
     screen.off("display-removed", this.onDisplays);
-    this.outside = false;
-    this.composing = false;
-    this.motion = "none";
-    this.flight = null;
-    this.staying = this.announcing = this.hovering = false;
-    this.announced = null;
+    this.outside = this.dragging = this.hovering = this.trayOpen = this.closing = false;
+    this.panelOpen = null;
+    this.asking = null;
+    this.said = null;
+    this.announcing = null;
     this.results = [];
-    this.host.setAway(false);
-    const { window, view } = this;
-    this.window = null;
-    this.view = null;
+    this.finished = [];
+    this.heightWaiters.splice(0).forEach((resolve) => resolve());
+    const { window, view, panelWindow, panel, menuWindow, menus } = this;
+    this.window = this.panelWindow = this.menuWindow = null;
+    this.view = this.panel = null;
+    this.menus = null;
     view?.view.webContents.close();
-    if (!window?.isDestroyed()) window?.destroy();
-    this.destroyComposer();
+    panel?.view.webContents.close();
+    menus?.destroy();
+    if (window && !window.isDestroyed()) window.destroy();
+    if (panelWindow && !panelWindow.isDestroyed()) panelWindow.destroy();
+    if (menuWindow && !menuWindow.isDestroyed()) menuWindow.destroy();
   }
 
   destroy(): void {
@@ -195,9 +244,9 @@ export class DesktopBerry {
   }
 
   private stopTimers(): void {
-    [this.fadeTimer, this.leavingTimer, this.stayTimer, this.shrinkTimer, this.flightTimer, this.expiryTimer].forEach((timer) => timer && clearTimeout(timer));
+    [this.hideTimer, this.panelHideTimer, this.leavingTimer, this.announceTimer, this.expiryTimer, this.saidTimer].forEach((timer) => timer && clearTimeout(timer));
     if (this.pointerTimer) clearInterval(this.pointerTimer);
-    this.fadeTimer = this.leavingTimer = this.stayTimer = this.shrinkTimer = this.flightTimer = this.expiryTimer = this.pointerTimer = null;
+    this.hideTimer = this.panelHideTimer = this.leavingTimer = this.announceTimer = this.expiryTimer = this.saidTimer = this.pointerTimer = null;
   }
 
   // A panel never brings its app forward, and floats over full-screen apps.
@@ -212,6 +261,9 @@ export class DesktopBerry {
       fullscreenable: false,
       skipTaskbar: true,
       alwaysOnTop: true,
+      transparent: true,
+      hasShadow: false,
+      roundedCorners: false,
       ...(process.platform === "darwin" ? { type: "panel" as const, hiddenInMissionControl: true } : { type: "toolbar" as const }),
     };
   }
@@ -223,14 +275,13 @@ export class DesktopBerry {
   }
 
   private createWindow(): void {
-    this.bounds = { x: 0, y: 0, width: DESKTOP_BIRD_SIZE, height: DESKTOP_BIRD_SIZE };
+    // Placed when it first comes out.
+    const { width, height } = this.here.window;
+    this.bounds = { x: 0, y: 0, width, height };
     const window = new BaseWindow({
       ...this.panelOptions,
-      width: this.bounds.width,
-      height: this.bounds.height,
-      transparent: true,
-      hasShadow: false,
-      roundedCorners: false,
+      width,
+      height,
       // It never takes the keyboard, so the app the user is in is never interrupted.
       focusable: false,
       acceptFirstMouse: true,
@@ -238,7 +289,6 @@ export class DesktopBerry {
     this.floatEverywhere(window);
     window.setIgnoreMouseEvents(true);
     this.passingClicks = true;
-
     const chrome = createChromeView("desktop");
     chrome.view.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     window.contentView.addChildView(chrome.view);
@@ -248,52 +298,62 @@ export class DesktopBerry {
     window.hide();
   }
 
-  // Made up front, so the first keys after the shortcut aren't lost to it loading. With glass, the system's own material
-  // fills the window, as CSS can't blur what's behind a window. It takes the window's shape, so the corners are the
-  // system's. Otherwise it's a solid box in a clear window.
-  private createComposer(): void {
-    const { glass } = this.host.theme();
-    this.composerGlass = glass && process.platform === "darwin";
-    const window = new BaseWindow({
-      ...this.panelOptions,
-      width: COMPOSER_WIDTH,
-      height: this.composerHeight,
-      ...(this.composerGlass ? { vibrancy: "popover" as const, visualEffectState: "active" as const, hasShadow: true } : { transparent: true, hasShadow: false, roundedCorners: false }),
-    });
+  // Made up front, so the first keys after the shortcut aren't lost to it loading. A clear window: everything in it is
+  // drawn by the view.
+  private createPanel(): void {
+    const window = new BaseWindow({ ...this.panelOptions, width: 1, height: 1 });
     this.floatEverywhere(window);
     const chrome = createChromeView("composer");
     chrome.view.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     chrome.view.webContents.on("before-input-event", (event, input) => {
-      if (input.type === "keyDown" && (input.meta || input.control) && !COMPOSER_MENU_KEYS.has(input.key.toLowerCase())) event.preventDefault();
+      if (input.type === "keyDown" && (input.meta || input.control) && !PANEL_MENU_KEYS.has(input.key.toLowerCase())) event.preventDefault();
     });
     window.contentView.addChildView(chrome.view);
-    chrome.view.setBounds({ x: 0, y: 0, width: COMPOSER_WIDTH, height: this.composerHeight });
-    window.on("blur", () => this.closeComposer());
-    this.composerWindow = window;
-    this.composer = chrome;
+    window.on("blur", () => this.closePanel());
+    this.panelWindow = window;
+    this.panel = chrome;
     window.hide();
   }
 
-  private destroyComposer(): void {
-    const { composerWindow, composer } = this;
-    this.composerWindow = null;
-    this.composer = null;
-    composer?.view.webContents.close();
-    if (composerWindow && !composerWindow.isDestroyed()) composerWindow.destroy();
+  // A clear window as big as the menu, which closes when anything else takes the keyboard.
+  private createMenu(): void {
+    const window = new BaseWindow({ ...this.panelOptions, width: 1, height: 1 });
+    this.floatEverywhere(window);
+    this.menus = new MenuView(
+      "drop-menu",
+      (view) => {
+        window.contentView.addChildView(view);
+        return {
+          area: () => this.menuArea ?? screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea,
+          show: (rect) => {
+            window.setBounds(rect);
+            view.setBounds({ x: 0, y: 0, width: rect.width, height: rect.height });
+            window.showInactive();
+            window.focus();
+          },
+          // Hiding it gives the keyboard back to the app in front, which never stopped being the one in front.
+          hide: () => window.hide(),
+        };
+      },
+      { mascotsHidden: () => !this.host.settings().showBerry, refocus: false }
+    );
+    window.on("blur", () => this.menus?.closeMenu());
+    this.menuWindow = window;
   }
 
   private registerShortcut(): void {
-    this.registered = globalShortcut.register(DESKTOP_SHORTCUT, () => this.toggleComposer());
+    this.registered = globalShortcut.register(DESKTOP_SHORTCUT, () => this.toggleBox());
     this._shortcutTaken = !this.registered;
   }
 
   private readonly onDisplays = (): void => {
-    if (this.motion !== "none") return;
+    if (this.dragging) return;
     this.place();
+    this.placePanel();
     this.publish();
   };
 
-  // Where it stands. A saved display that has gone means the same place on the edge of one that's there, and being a
+  // Where it is. A saved display that has gone means the same place on the edge of one that's there, and being a
   // fraction along an edge, that's always on screen.
   private get standing(): { display: Display; spot: Pick<DesktopBerrySpot, "edge" | "fraction"> } {
     const displays = screen.getAllDisplays();
@@ -310,21 +370,12 @@ export class DesktopBerry {
     return desktopPlace(display.workArea, spot);
   }
 
-  private get peek(): number {
-    return this.waiting ? DESKTOP_PEEK_WAITING : DESKTOP_PEEK;
-  }
-
-  // Everything's worked out for where the small window goes, and this is how far that is from where the window is now.
-  private get offset(): Point {
-    const { window } = this.here;
-    return { x: window.x - this.bounds.x, y: window.y - this.bounds.y };
-  }
-
   private setBounds(bounds: Rect): void {
     const before = this.bounds;
     if (before.x === bounds.x && before.y === bounds.y && before.width === bounds.width && before.height === bounds.height) return;
     this.bounds = bounds;
     this.frame++;
+    this.dropBox = null;
     this.window?.setBounds(bounds);
     if (before.width !== bounds.width || before.height !== bounds.height) {
       this.view?.view.setBounds({ x: 0, y: 0, width: bounds.width, height: bounds.height });
@@ -334,158 +385,64 @@ export class DesktopBerry {
   private place(): void {
     if (!this.window || this.window.isDestroyed()) return;
     this.setBounds(this.here.window);
-    this.placeComposer();
-  }
-
-  private widen(area: Rect): void {
-    if (this.shrinkTimer) clearTimeout(this.shrinkTimer);
-    this.shrinkTimer = null;
-    this.setBounds(area);
   }
 
   // --- Coming and going ---
 
-  private get flightAllowed(): boolean {
-    const { keepBerryStill, showBerry } = this.host.settings();
-    return showBerry && !keepBerryStill && !this.host.stillMotion();
-  }
-
-  private whenLoaded(): Promise<void> {
-    const contents = this.view?.view.webContents;
+  private whenLoaded(contents: WebContents | undefined): Promise<void> {
     if (!contents || !contents.isLoading()) return Promise.resolve();
     return new Promise((resolve) => contents.once("did-finish-load", () => resolve()));
   }
 
-  private async comeOut(fly: boolean): Promise<void> {
+  // It pours out of the edge: the view grows it from nothing once it's shown.
+  private async comeOut(): Promise<void> {
     if (!this.window || this.outside) return;
     this.outside = true;
     this.pinnedDisplayId = null;
-    if (this.fadeTimer) clearTimeout(this.fadeTimer);
-    this.fadeTimer = null;
-    const from = fly && this.flightAllowed ? await this.host.takeOffPoint() : null;
-    await this.whenLoaded();
+    if (this.hideTimer) clearTimeout(this.hideTimer);
+    this.hideTimer = null;
+    await this.whenLoaded(this.view?.view.webContents);
     if (!this.window || !this.outside) return;
-    this.host.setAway(true);
-    if (from) this.fly(from);
-    else {
-      this.place();
-      if (fly) this.stayFor(STAYS_AFTER_LANDING_MS);
-    }
+    this.place();
     this.publish();
     this.window.showInactive();
     this.watchPointer();
   }
 
   private goInside(): void {
-    if (!this.outside) return;
-    this.cancelFlight();
-    if (this.shrinkTimer) clearTimeout(this.shrinkTimer);
-    this.shrinkTimer = null;
-    this.motion = "none";
+    if (!this.outside || this.panelOpen) return;
     this.outside = false;
+    this.dragging = false;
     this.publish();
-    this.host.setAway(false);
     this.stopWatchingPointer();
-    this.fadeTimer = setTimeout(() => {
-      this.fadeTimer = null;
+    this.hideTimer = setTimeout(() => {
+      this.hideTimer = null;
       if (this.outside || !this.window || this.window.isDestroyed()) return;
       this.window.hide();
-      this.place();
-    }, FADE_MS);
+    }, this.still ? 0 : SIZE_MS);
   }
 
-  // Blueberry's window has gone away, so the bird comes out of it.
+  // Blueberry's window has gone away, so the drop comes out.
   mainWindowGone(): void {
     if (this.leavingTimer) clearTimeout(this.leavingTimer);
     this.leavingTimer = null;
-    void this.comeOut(true);
+    void this.comeOut();
   }
 
-  // The user has gone to another app. If it's still there a moment later, the bird comes out quietly.
+  // The user has gone to another app. If it's still there a moment later, the drop comes out.
   mainWindowBlurred(): void {
     if (this.leavingTimer || !this.window) return;
     this.leavingTimer = setTimeout(() => {
       this.leavingTimer = null;
-      if (!this.host.inFront()) void this.comeOut(false);
+      if (!this.host.inFront()) void this.comeOut();
     }, LEAVING_SETTLES_MS);
   }
 
   mainWindowFocused(): void {
     if (this.leavingTimer) clearTimeout(this.leavingTimer);
     this.leavingTimer = null;
-    if (!this.composing) this.goInside();
+    this.goInside();
     this.sync();
-  }
-
-  // Drawn by the view along a path, so the window keeps still for all of it. It lands standing, and tucks after a moment.
-  private fly(from: Point): void {
-    const { display } = this.standing;
-    const area = display.workArea;
-    this.motion = "flying";
-    this.widen(area);
-    const here = this.here;
-    const land = offsetBy(here.out, this.offset);
-    // In the window, which is on one display. It takes off from the edge of that if the browser is on another.
-    const start = {
-      x: Math.min(Math.max(from.x - DESKTOP_BIRD_SIZE / 2 - area.x, 0), area.width - DESKTOP_BIRD_SIZE),
-      y: Math.min(Math.max(from.y - DESKTOP_BIRD_SIZE / 2 - area.y, 0), area.height - DESKTOP_BIRD_SIZE),
-    };
-    const ms = Math.round(Math.min(Math.max(Math.hypot(land.x - start.x, land.y - start.y) * 0.9, FLIGHT_MIN_MS), FLIGHT_MAX_MS));
-    this.flight = {
-      id: ++this.flightId,
-      ms,
-      left: land.x < start.x,
-      path: Array.from({ length: FLIGHT_POINTS + 1 }, (_, index) => desktopFlightPoint(start, land, index / FLIGHT_POINTS)),
-    };
-    if (this.flightTimer) clearTimeout(this.flightTimer);
-    this.flightTimer = setTimeout(() => this.landed(), ms);
-  }
-
-  private landed(): void {
-    this.flightTimer = null;
-    this.flight = null;
-    this.motion = "wide";
-    this.stayFor(STAYS_AFTER_LANDING_MS);
-    this.publish();
-  }
-
-  private cancelFlight(): void {
-    if (this.flightTimer) clearTimeout(this.flightTimer);
-    this.flightTimer = null;
-    this.flight = null;
-    if (this.motion === "flying") this.motion = "wide";
-  }
-
-  // --- Out or tucked ---
-
-  private get tucked(): boolean {
-    return !this.composing && !this.hovering && !this.staying && this.motion !== "flying" && this.motion !== "dragging";
-  }
-
-  private stayFor(ms: number, announcing = false): void {
-    this.staying = true;
-    this.announcing = announcing;
-    if (this.stayTimer) clearTimeout(this.stayTimer);
-    this.stayTimer = setTimeout(() => {
-      this.stayTimer = null;
-      this.staying = this.announcing = false;
-      this.afterChange();
-    }, ms);
-  }
-
-  // Once it's tucked, the window can go back to its small size, with only its head to blink if that takes a frame.
-  // Turned on with Blueberry in front, this is also when it comes back in.
-  private afterChange(): void {
-    this.publish();
-    if (!this.tucked || this.shrinkTimer) return;
-    this.shrinkTimer = setTimeout(() => {
-      this.shrinkTimer = null;
-      if (!this.tucked || !this.window) return;
-      this.motion = "none";
-      this.place();
-      this.publish();
-      if (this.host.inFront() && !this.composing) this.goInside();
-    }, TUCK_MS);
   }
 
   // --- The pointer ---
@@ -504,24 +461,23 @@ export class DesktopBerry {
     this.setPassingClicks(true);
   }
 
-  private get hits(): Rect[] {
+  // What's drawn takes the pointer, and nothing else in the window does.
+  private get hit(): Rect {
+    return this.dropBox ?? desktopRestingDrop(this.anchored, this.standing.spot.edge);
+  }
+
+  // The drop's place in the window as it is now, which covers the work area during a drag.
+  private get anchored(): DesktopPlace {
     const here = this.here;
-    const { edge } = this.standing.spot;
-    const by = this.offset;
-    const bird = this.tucked
-      ? (() => {
-          const peek = desktopPeekHit(here, edge, this.peek);
-          return { ...peek, ...offsetBy(peek, by) };
-        })()
-      : { ...offsetBy(here.out, by), width: DESKTOP_BIRD_SIZE, height: DESKTOP_BIRD_SIZE };
-    return this.lineShowing && this.lineBox ? [bird, this.lineBox] : [bird];
+    return { window: this.bounds, anchor: { x: here.anchor.x + here.window.x - this.bounds.x, y: here.anchor.y + here.window.y - this.bounds.y } };
   }
 
   private checkPointer(): void {
-    if (this.motion === "dragging") return;
-    if (this.motion === "flying") return this.setPassingClicks(true);
-    const over = desktopHit(screen.getCursorScreenPoint(), this.bounds, this.hits);
+    if (this.dragging) return;
+    const over = desktopHit(screen.getCursorScreenPoint(), this.bounds, [this.hit]);
     this.setPassingClicks(!over);
+    // While the panel is open, the drop stays as it is beside it, and only takes a press.
+    if (this.panelOpen) return;
     if (over) {
       this.leftAt = null;
       if (this.hovering || ++this.hoverChecks < HOVER_AFTER_CHECKS) return;
@@ -532,10 +488,11 @@ export class DesktopBerry {
     this.hoverChecks = 0;
     if (!this.hovering) return;
     this.leftAt ??= Date.now();
-    if (Date.now() - this.leftAt < TUCK_AFTER_LEAVING_MS) return;
+    if (Date.now() - this.leftAt < SHRINK_AFTER_LEAVING_MS) return;
     this.leftAt = null;
     this.hovering = false;
-    this.afterChange();
+    if (this.endsOnLeaving) this.stopAnnouncing();
+    this.publish();
   }
 
   private setPassingClicks(passing: boolean): void {
@@ -544,41 +501,218 @@ export class DesktopBerry {
     this.window.setIgnoreMouseEvents(passing);
   }
 
-  // --- From the views ---
+  // --- From the drop ---
 
-  setLineBox(box: Rect | null): void {
+  setDropBox(box: Rect, frame: number): void {
     const valid = (value: unknown): boolean => typeof value === "number" && Number.isFinite(value);
-    this.lineBox = box && [box.x, box.y, box.width, box.height].every(valid) ? box : null;
+    if (frame !== this.frame || !box || ![box.x, box.y, box.width, box.height].every(valid)) return;
+    this.dropBox = { x: box.x, y: box.y, width: box.width, height: box.height };
   }
 
-  setComposerHeight(height: number): void {
-    if (typeof height !== "number" || !Number.isFinite(height)) return;
-    this.composerHeight = Math.max(Math.round(height), COMPOSER_MIN_HEIGHT);
-    this.placeComposer();
+  press(part: DesktopDropPart): void {
+    if (!this.window || !DROP_PARTS.includes(part)) return;
+    const facts = this.facts;
+    if (part === "answer") {
+      const [first] = facts.needsYou;
+      if (first) this.openAsk(first, false);
+      return;
+    }
+    if (part === "open" || part === "dismiss") {
+      const chatId = this.announcing;
+      if (!chatId) return;
+      this.forgetResult(chatId);
+      if (part === "open") {
+        this.closePanel();
+        this.host.open({ page: "chat", chatId });
+      }
+      return this.publish();
+    }
+    if (this.panelOpen) return this.closePanel();
+    if (anythingGoing(facts)) this.openTray();
+    else this.openBox();
   }
 
-  private placeComposer(): void {
-    const window = this.composerWindow;
-    if (!window || window.isDestroyed() || !this.composing) return;
+  // Free for as long as the pointer has it, over the whole work area, and the view moves it.
+  dragStart(): void {
+    if (!this.window || !this.outside) return;
+    this.closePanel();
+    this.dragging = true;
+    this.setBounds(this.standing.display.workArea);
+    this.setPassingClicks(false);
+    this.publish();
+  }
+
+  // It goes to the nearest edge, where it was let go.
+  dragEnd(): void {
+    if (!this.dragging || !this.window) return;
+    const point = screen.getCursorScreenPoint();
+    const display = screen.getDisplayNearestPoint(point);
+    this.spot = desktopSpotAt(display.workArea, display.id, point);
+    this.pinnedDisplayId = display.id;
+    this.dragging = false;
+    this.place();
+    this.publish();
+    this.host.update({ desktopBerrySpot: this.spot });
+  }
+
+  // At the pointer, on the screen it's on.
+  showMenu(): void {
+    if (!this.window || !this.menus) return;
+    const { keepBerryStill, showBerry } = this.host.settings();
+    const result = this.announcing ?? this.results.at(-1)?.chatId ?? null;
+    const items: OwnMenuItem[] = [
+      ...(result
+        ? [
+            {
+              label: "Not Now",
+              click: () => {
+                this.forgetResult(result);
+                this.publish();
+              },
+            },
+            { type: "separator" as const },
+          ]
+        : []),
+      { label: "Open Blueberry", icon: "open", click: () => this.host.showBlueberry() },
+      { type: "separator" },
+      { label: "Keep Mascots Still", type: "checkbox", checked: keepBerryStill, click: () => this.host.update({ keepBerryStill: !keepBerryStill }) },
+      { label: "Hide Mascots", type: "checkbox", checked: !showBerry, click: () => this.host.update({ showBerry: !showBerry }) },
+      { label: "Take Off the Desktop", click: () => this.host.update({ desktopBerry: false }) },
+    ];
+    const point = screen.getCursorScreenPoint();
+    this.menuArea = screen.getDisplayNearestPoint(point).workArea;
+    this.menus.open(items, { ...point, width: 0, height: 0 }, { label: "Mascots", mac: process.platform === "darwin" });
+  }
+
+  // --- The panel: the prompt box, the tray and the ask ---
+
+  private toggleBox(): void {
+    if (this.panelOpen === "box" && !this.closing) this.closePanel();
+    else this.openBox();
+  }
+
+  openBox(): void {
+    if (this.panelOpen !== "box" || this.closing) this.opened++;
+    this.panelOpen = "box";
+    this.trayOpen = false;
+    this.asking = null;
+    this.said = null;
+    void this.showPanel();
+  }
+
+  private openTray(): void {
+    if (this.panelOpen !== "sheets" || this.closing) this.opened++;
+    this.panelOpen = "sheets";
+    this.trayOpen = true;
+    this.asking = null;
+    this.said = null;
+    void this.showPanel();
+  }
+
+  // The exact words only ever reach the view from here, after Answer was pressed.
+  private openAsk(item: NeedsYouItem, withTray: boolean): void {
+    if (this.saidTimer) clearTimeout(this.saidTimer);
+    this.saidTimer = null;
+    if (this.panelOpen !== "sheets" || this.closing) this.opened++;
+    this.panelOpen = "sheets";
+    this.trayOpen = withTray;
+    this.asking = { key: `a${++this.asksShown}`, item: structuredClone(item), decided: false };
+    this.said = null;
+    void this.showPanel();
+  }
+
+  private async showPanel(): Promise<void> {
+    const window = this.panelWindow;
+    if (!window) return;
+    if (this.panelHideTimer) clearTimeout(this.panelHideTimer);
+    this.panelHideTimer = null;
+    this.closing = false;
+    this.hovering = false;
+    void this.comeOut();
+    await this.whenLoaded(this.panel?.view.webContents);
+    // Closed while it waited, so it stays closed, and the keyboard stays where it is.
+    if (!this.panelOpen || this.closing || this.panelWindow !== window) return;
+    // The tray and the ask are as tall as what's in them, so the window waits to hear that before it shows.
+    const sized = this.panelOpen === "sheets" ? this.nextHeight() : Promise.resolve();
+    this.placePanel();
+    this.publishPanel();
+    this.publish();
+    await sized;
+    if (!this.panelOpen || this.closing || this.panelWindow !== window || window.isDestroyed()) return;
+    this.placePanel();
+    this.publishPanel();
+    window.showInactive();
+    window.focus();
+    this.panel?.view.webContents.focus();
+  }
+
+  private nextHeight(): Promise<void> {
+    return new Promise((resolve) => {
+      const timer = setTimeout(resolve, HEIGHT_WAIT_MS);
+      this.heightWaiters.push(() => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+  }
+
+  setPanelHeight(height: number): void {
+    if (typeof height !== "number" || !Number.isFinite(height) || height <= 0 || !this.panelOpen) return;
+    const rounded = Math.round(height);
+    if (this.panelOpen === "box") {
+      if (rounded === this.boxThick) return;
+      this.boxThick = rounded;
+    } else {
+      this.heightWaiters.splice(0).forEach((resolve) => resolve());
+      if (rounded === this.sheetsHeight) return;
+      this.sheetsHeight = rounded;
+    }
+    if (this.panelWindow?.isVisible()) {
+      this.placePanel();
+      this.publishPanel();
+    }
+  }
+
+  private get sheetsWidth(): number {
+    const sheets = this.trayOpen && this.asking ? 2 * DESKTOP_SHEET.width + DESKTOP_SHEET.gap : DESKTOP_SHEET.width;
+    return sheets + 2 * DESKTOP_SHADOW;
+  }
+
+  private placePanel(): void {
+    const window = this.panelWindow;
+    if (!window || window.isDestroyed() || !this.panelOpen) return;
     const { display, spot } = this.standing;
-    const bounds = desktopComposerBounds(display.workArea, spot, { width: COMPOSER_WIDTH, height: this.composerHeight });
-    window.setBounds(bounds);
-    this.composer?.view.setBounds({ x: 0, y: 0, width: bounds.width, height: bounds.height });
+    const place =
+      this.panelOpen === "box"
+        ? desktopBoxPlace(display.workArea, spot, this.boxThick)
+        : desktopSheetsPlace(display.workArea, spot, { width: this.sheetsWidth, height: this.sheetsHeight || 200 });
+    this.panelBounds = place;
+    window.setBounds(place.window);
+    this.panel?.view.setBounds({ x: 0, y: 0, width: place.window.width, height: place.window.height });
   }
 
-  get composerState(): DesktopComposerState {
-    return { open: this.composing, name: this.host.nameOf(this.chosen.id) };
-  }
-
-  private publishComposer(): void {
-    if (this.composer) sendToRenderer(this.composer.view.webContents, "desktop:composer-state", this.composerState);
-  }
-
-  send(text: string): boolean {
-    if (typeof text !== "string" || !this.composing) return false;
-    if (!this.host.send(text, this.chosen.id)) return false;
-    this.closeComposer(STAYS_AFTER_SEND_MS);
-    return true;
+  // The view shrinks what it shows back into the drop, and then the window hides, which gives the keyboard back to the
+  // app in front, which never stopped being the one in front.
+  closePanel(): void {
+    if (!this.panelOpen || this.closing) return;
+    this.closing = true;
+    this.publishPanel();
+    const finish = () => {
+      this.panelHideTimer = null;
+      if (!this.closing) return;
+      this.closing = false;
+      this.panelOpen = null;
+      this.trayOpen = false;
+      this.asking = null;
+      this.said = null;
+      this.trayKeys.clear();
+      this.panelWindow?.hide();
+      this.publishPanel();
+      this.publish();
+      if (this.host.inFront()) this.goInside();
+    };
+    if (this.still) return finish();
+    this.panelHideTimer = setTimeout(finish, SIZE_MS);
   }
 
   private get chosen(): MascotProfile {
@@ -586,94 +720,82 @@ export class DesktopBerry {
     return mascot.deletedAt === null ? mascot : BERRY;
   }
 
-  private toggleComposer(): void {
-    if (this.composing) this.closeComposer();
-    else void this.openComposer();
+  send(text: string, cloud: boolean): boolean {
+    if (this.panelOpen !== "box" || this.closing || typeof text !== "string" || typeof cloud !== "boolean") return false;
+    const chosen = this.chosen;
+    if (!this.host.send(text, chosen.id, desktopWhere(chosen, this.host.cloud(), cloud))) return false;
+    this.closePanel();
+    return true;
   }
 
-  private async openComposer(): Promise<void> {
-    if (!this.window || !this.composerWindow) return;
-    this.cancelFlight();
-    this.composing = true;
-    await this.comeOut(false);
-    if (!this.window || !this.composerWindow || !this.composing) return;
-    this.publish();
-    this.publishComposer();
-    this.placeComposer();
-    this.composerWindow.showInactive();
-    this.composerWindow.focus();
-    this.composer?.view.webContents.focus();
+  choose(mascotId: string): void {
+    if (typeof mascotId !== "string") return;
+    const mascot = this.host.library().mascots.find(({ id }) => id === mascotId);
+    if (!mascot || mascot.deletedAt !== null) return;
+    this.host.update({ chosenMascotId: mascot.id === BERRY.id ? null : mascot.id });
   }
 
-  // Hiding it gives the keyboard back to the app in front, which never stopped being the one in front.
-  closeComposer(staysFor = STAYS_AFTER_CLOSING_MS): void {
-    if (!this.composing || !this.composerWindow) return;
-    this.composing = false;
-    this.composerWindow.hide();
-    this.publishComposer();
-    this.stayFor(staysFor);
-    this.publish();
-    if (this.host.inFront()) this.goInside();
+  openBlueberry(): void {
+    this.closePanel();
+    this.host.showBlueberry();
   }
 
-  press(): void {
-    const { target } = this.face;
-    if (!target) return this.toggleComposer();
-    this.closeComposer();
-    if (target.page === "chat") this.results = this.results.filter(({ chatId }) => chatId !== target.chatId);
-    this.host.open(target);
+  trayPress(key: string): void {
+    // Not while it's going away: what was pressed is no longer there to press.
+    const target = typeof key === "string" && this.trayOpen && !this.closing ? this.trayKeys.get(key) : undefined;
+    if (!target) return;
+    if (target.kind === "ask") {
+      const item = this.facts.needsYou.find(({ id, approval }) => id === target.chatId && approval.id === target.approvalId);
+      if (item) this.openAsk(item, true);
+      return;
+    }
+    this.closePanel();
+    if (target.target.page === "chat") this.forgetResult(target.target.chatId);
+    this.host.open(target.target);
     this.publish();
   }
 
-  // Free for as long as the pointer has it, over the whole work area, and the view moves it.
-  dragStart(): void {
-    if (!this.window || this.motion === "flying") return;
-    this.closeComposer();
-    this.motion = "dragging";
-    this.widen(this.standing.display.workArea);
-    this.setPassingClicks(false);
-    this.publish();
+  // Applied to the ask main showed, through the same path as Needs you, once. Nothing goes if that ask isn't the one
+  // waiting any more or has changed since it was shown, if the press was on an earlier showing, or once the sheet is
+  // going away, and a handoff or a code never goes from here.
+  decide(decision: unknown): DesktopDecided {
+    if (this.panelOpen !== "sheets" || this.closing) return "gone";
+    const shown = this.asking;
+    const check = checkDecision(shown, this.facts.needsYou, decision);
+    if (!check.ok || !shown) {
+      if (check.ok === false && check.why === "code") return "code";
+      if (check.ok === false && check.why === "gone" && shown && !shown.decided) this.askGone();
+      return "gone";
+    }
+    shown.decided = true;
+    if (!this.host.decide(check.chatId, check.approvalId, check.allow, check.answer)) {
+      this.askGone();
+      return "gone";
+    }
+    this.said = saidWords(this.host.nameOf(shown.item.mascotId), !!shown.item.approval.question, check.allow);
+    this.publishPanel();
+    if (this.saidTimer) clearTimeout(this.saidTimer);
+    this.saidTimer = setTimeout(() => {
+      this.saidTimer = null;
+      if (this.asking === shown) this.askGone();
+    }, SAID_MS);
+    return "done";
   }
 
-  // Goes to the nearest edge. It glides there if that's on the same display, and it stays out while the pointer is on it.
-  dragEnd(): void {
-    if (this.motion !== "dragging" || !this.window) return;
-    const point = screen.getCursorScreenPoint();
-    const display = screen.getDisplayNearestPoint(point);
-    const sameDisplay = display.id === this.standing.display.id;
-    this.spot = desktopSpotAt(display.workArea, display.id, point);
-    this.motion = "wide";
-    if (!sameDisplay) this.widen(display.workArea);
-    this.hovering = true;
-    this.leftAt = Date.now();
-    this.publish();
-    this.host.update({ desktopBerrySpot: this.spot });
+  // The ask goes, and with the tray beside it the tray stays.
+  private askGone(): void {
+    this.asking = null;
+    this.said = null;
+    if (!this.trayOpen) return this.closePanel();
+    this.placePanel();
+    this.publishPanel();
   }
 
-  showMenu(): void {
-    if (!this.window) return;
-    const { keepBerryStill, showBerry } = this.host.settings();
-    const { target } = this.face;
-    const result = target?.page === "chat" && this.results.some(({ chatId }) => chatId === target.chatId) ? target.chatId : null;
-    Menu.buildFromTemplate([
-      ...(result
-        ? [
-            {
-              label: "Not Now",
-              click: () => {
-                this.results = this.results.filter(({ chatId }) => chatId !== result);
-                this.publish();
-              },
-            },
-            { type: "separator" as const },
-          ]
-        : []),
-      { label: "Open Blueberry", click: () => this.host.showBlueberry() },
-      { type: "separator" },
-      { label: "Keep Berry Still", type: "checkbox", checked: keepBerryStill, click: () => this.host.update({ keepBerryStill: !keepBerryStill }) },
-      { label: "Hide Berry", type: "checkbox", checked: !showBerry, click: () => this.host.update({ showBerry: !showBerry }) },
-      { label: "Take Off the Desktop", click: () => this.host.update({ desktopBerry: false }) },
-    ]).popup({ window: this.window });
+  seePage(): void {
+    const shown = this.asking;
+    if (!shown) return;
+    this.closePanel();
+    this.host.seePage(shown.item);
   }
 
   // --- What it says ---
@@ -682,110 +804,176 @@ export class DesktopBerry {
     return new Set(library.chats.filter(({ running }) => running).map(({ id }) => id));
   }
 
-  // Anything ending while the user is in Blueberry, they can see for themselves.
+  private forgetResult(chatId: string): void {
+    this.results = this.results.filter((result) => result.chatId !== chatId);
+    if (this.announcing === chatId) this.stopAnnouncing();
+  }
+
+  private stopAnnouncing(): void {
+    if (this.announceTimer) clearTimeout(this.announceTimer);
+    this.announceTimer = null;
+    this.announcing = null;
+    this.endsOnLeaving = false;
+  }
+
+  // A result comes out for as long as it takes to read, and stays while the pointer is on it.
+  private announce(chatId: string, text: string): void {
+    this.stopAnnouncing();
+    this.announcing = chatId;
+    this.announceTimer = setTimeout(() => {
+      this.announceTimer = null;
+      if (this.hovering) this.endsOnLeaving = true;
+      else this.stopAnnouncing();
+      this.publish();
+    }, readingTime(text));
+  }
+
+  // Anything ending while the user is in Blueberry, they can see for themselves. It's still in the tray.
   libraryChanged(library: LibrarySnapshot): void {
     if (!this.window) return;
     const running = this.runningChats(library);
     const ended = [...this.wasRunning].filter((id) => !running.has(id));
     this.wasRunning = running;
-    if (!this.host.inFront()) {
-      ended.forEach((chatId) => {
-        const chat = this.host.ended(chatId);
-        if (!chat) return;
-        this.results = [
-          ...this.results.filter((result) => result.chatId !== chatId),
-          { chatId, mascotId: chat.mascotId, failed: chat.error !== null, text: chat.error ?? (firstLine(chat.text) || "Done."), endedAt: Date.now() },
-        ].slice(-MAX_RESULTS);
-        if (this.expiryTimer) clearTimeout(this.expiryTimer);
-        this.expiryTimer = setTimeout(() => {
-          this.expiryTimer = null;
-          this.results = this.results.filter(({ endedAt }) => Date.now() - endedAt < RESULT_LASTS_MS);
-          this.publish();
-        }, RESULT_LASTS_MS);
-      });
+    const away = !this.host.inFront();
+    ended.forEach((chatId) => {
+      const chat = this.host.ended(chatId);
+      if (!chat) return;
+      const endedAt = Date.now();
+      this.finished = [...this.finished.filter((each) => each.chatId !== chatId), { chatId, mascotId: chat.mascotId, title: chat.title, problem: chat.error, endedAt }].slice(-MAX_FINISHED);
+      if (!away) return;
+      const text = chat.error ?? (firstLine(chat.text, RESULT_LENGTH) || "Done.");
+      this.results = [...this.results.filter((result) => result.chatId !== chatId), { chatId, mascotId: chat.mascotId, failed: chat.error !== null, text, endedAt }].slice(-MAX_RESULTS);
+      this.announce(chatId, text);
+      if (this.expiryTimer) clearTimeout(this.expiryTimer);
+      this.expiryTimer = setTimeout(() => {
+        this.expiryTimer = null;
+        this.results = this.results.filter(({ endedAt: at }) => Date.now() - at < RESULT_LASTS_MS);
+        this.publish();
+      }, RESULT_LASTS_MS);
+    });
+    // Answered somewhere else, or changed, while it was showing here.
+    const shown = this.asking;
+    if (shown && !shown.decided) {
+      const live = library.needsYou.find(({ id }) => id === shown.item.id);
+      if (!live || !sameAsk(shown.item.approval, live.approval)) this.askGone();
     }
     this.publish();
   }
 
-  private get face(): ReturnType<typeof desktopFace> {
+  private get facts(): DesktopFacts {
     const library = this.host.library();
-    return desktopFace({
+    const now = Date.now();
+    const running: DesktopRunning[] = [
+      ...library.chats.filter(({ running }) => running).map(({ id, mascotId, title }) => ({ chatId: id, routineId: null, mascotId: mascotId ?? BERRY.id, title })),
+      ...library.routines
+        .filter(({ latestRun }) => latestRun?.status === "running")
+        .map(({ id, mascotId, name, latestRun }) => ({
+          chatId: null,
+          routineId: id,
+          mascotId: mascotId ?? BERRY.id,
+          title: name,
+          step: latestRun?.steps.at(-1)?.text ?? null,
+          since: latestRun?.startedAt ?? null,
+        })),
+    ];
+    return {
       needsYou: library.needsYou,
       results: this.results,
-      running: [
-        ...library.chats.filter(({ running }) => running).map(({ id, mascotId, title }) => ({ chatId: id, mascotId: mascotId ?? BERRY.id, title })),
-        ...library.routines.filter(({ latestRun }) => latestRun?.status === "running").map(({ mascotId, name }) => ({ chatId: null, mascotId: mascotId ?? BERRY.id, title: name })),
-      ],
+      running,
+      finishedToday: this.finished.filter(({ endedAt }) => sameDay(endedAt, now)),
       chosen: this.chosen,
       mascot: (id) => this.host.mascot(id),
       nameOf: ({ id }) => this.host.nameOf(id),
-    });
+    };
   }
 
-  // Something new to say brings it out, once, for as long as it takes to read.
-  private announce({ announce, line }: ReturnType<typeof desktopFace>): void {
-    if (!this.outside || announce === this.announced) return;
-    this.announced = announce;
-    if (!announce || !line) return;
-    this.stayFor(readingTime(line), true);
+  // A chat's step and when it began, filled in only where they're shown.
+  private withProgress(job: DesktopRunning): DesktopRunning {
+    return job.chatId ? { ...job, ...this.host.progress(job.chatId) } : job;
   }
 
-  private get lineShowing(): boolean {
-    return !this.composing && this.motion !== "flying" && this.motion !== "dragging" && (this.announcing || this.hovering);
-  }
-
-  get state(): DesktopBerryState {
-    const { showBerry, keepBerryStill } = this.host.settings();
-    const { mood, name, look, line, sign } = this.face;
-    const here = this.here;
-    const { edge } = this.standing.spot;
-    const by = this.offset;
-    const { tucked } = this;
+  get state(): DesktopDropState {
+    const { showBerry } = this.host.settings();
+    const facts = this.facts;
+    const pointed = this.hovering && !this.panelOpen;
+    if (pointed && facts.running.length === 1) facts.running = facts.running.map((job) => this.withProgress(job));
+    const { faces, working, says } = desktopDrop(facts, { pointed, announcing: this.announcing, shortcut: this.registered });
+    const { anchor } = this.anchored;
     return {
-      mood,
-      name,
-      look,
-      line,
-      sign: tucked ? sign : null,
-      lineShowing: this.lineShowing && line !== null,
-      lineAnchor: {
-        ...here.line,
-        // The window may be wider than the small one for now, and everything is measured from the small one.
-        fromSide: here.line.side === "left" ? here.line.fromSide + by.x : here.line.fromSide + (this.bounds.width - by.x - here.window.width),
-        middle: here.line.middle + by.y,
-      },
       shown: this.outside,
       frame: this.frame,
       origin: { x: this.bounds.x, y: this.bounds.y },
-      at: offsetBy(tucked ? desktopTucked(here, edge, this.peek) : here.out, by),
-      edge,
-      flip: here.flip,
-      tucked,
-      dragging: this.motion === "dragging",
-      flight: this.flight,
+      edge: this.standing.spot.edge,
+      anchor,
+      dragging: this.dragging,
+      faces,
+      working,
+      // While the tray or the ask is open beside it, the drop stays small: they say it all.
+      says: this.panelOpen ? { kind: "rest" } : says,
       showBerry,
-      still: keepBerryStill || this.host.stillMotion(),
+      still: this.still,
+    };
+  }
+
+  private get box(): DesktopBox {
+    const chosen = this.chosen;
+    const library = this.host.library();
+    const face = (mascot: MascotProfile) => ({ id: mascot.id, name: this.host.nameOf(mascot.id), look: mascot.look });
+    return {
+      chosen: face(chosen),
+      flock: library.mascots.filter(({ deletedAt }) => deletedAt === null).map(face),
+      cloud: desktopCloud(chosen, this.host.cloud()),
+      recent: this.panelOpen === "box" ? this.host.recentJobs() : [],
+      shortcut: this.registered,
+    };
+  }
+
+  get panelState(): DesktopPanelState {
+    const { showBerry } = this.host.settings();
+    const facts = this.facts;
+    const library = this.host.library();
+    let tray: DesktopPanelState["tray"] = null;
+    if (this.trayOpen && this.panelOpen === "sheets") {
+      // A row keeps its key while it's showing, so a press made just as the tray changes still reaches it.
+      const before = new Map([...this.trayKeys].map(([key, target]) => [JSON.stringify(target), key]));
+      this.trayKeys.clear();
+      const flock = library.mascots.filter(({ deletedAt }) => deletedAt === null);
+      tray = desktopTray({ ...facts, running: facts.running.map((job) => this.withProgress(job)) }, flock, (target) => {
+        const key = before.get(JSON.stringify(target)) ?? `k${++this.keyCount}`;
+        this.trayKeys.set(key, target);
+        return key;
+      });
+    }
+    const shown = this.asking;
+    const askFace = shown && { name: this.host.nameOf(shown.item.mascotId), look: this.host.mascot(shown.item.mascotId).look, mood: "asking" as const };
+    const place = this.panelBounds;
+    return {
+      open: this.panelOpen,
+      opened: this.opened,
+      closing: this.closing,
+      edge: this.standing.spot.edge,
+      anchor: place?.anchor ?? { x: 0, y: 0 },
+      box: this.box,
+      tray,
+      ask: shown && askFace ? { ...desktopAsk(shown.item, askFace), key: shown.key, said: this.said } : null,
+      showBerry,
+      still: this.still,
     };
   }
 
   private publish(): void {
-    if (!this.view) return;
-    const face = this.face;
-    this.waiting = face.sign === "waiting";
-    this.announce(face);
-    sendToRenderer(this.view.view.webContents, "desktop:state", this.state);
-    if (this.composing) this.publishComposer();
+    if (this.view) sendToRenderer(this.view.view.webContents, "desktop:state", this.state);
+    if (this.panelOpen && !this.closing) this.publishPanel();
+  }
+
+  private publishPanel(): void {
+    if (this.panel) sendToRenderer(this.panel.view.webContents, "desktop:panel-state", this.panelState);
   }
 
   notifyTheme(): void {
     const theme = this.host.theme();
     if (this.view) sendToRenderer(this.view.view.webContents, "theme:updated", theme);
-    if (this.composer) sendToRenderer(this.composer.view.webContents, "theme:updated", theme);
-    // Reduce Transparency changed, and a window can't change from having a material to being clear.
-    const wantsGlass = theme.glass && process.platform === "darwin";
-    if (this.window && wantsGlass !== this.composerGlass && !this.composing) {
-      this.destroyComposer();
-      this.createComposer();
-    }
+    if (this.panel) sendToRenderer(this.panel.view.webContents, "theme:updated", theme);
+    this.menus?.notifyTheme(theme);
   }
 }

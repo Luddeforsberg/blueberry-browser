@@ -1,10 +1,12 @@
 import { HANDOFF_WORDS } from "./browserTools";
-import type { DesktopBerryState } from "../shared/ipc";
-import type { MascotProfile, NeedsYouItem } from "../shared/library";
+import { plausibleCode } from "./phoneReplies";
+import type { DesktopAsk, DesktopDropSays, DesktopFace, DesktopTray } from "../shared/ipc";
+import type { ChatApproval, MascotProfile, NeedsYouItem } from "../shared/library";
 
 const MAX_LINE_LENGTH = 90;
 const MIN_READING_MS = 5000;
 const MAX_READING_MS = 12000;
+const MAX_FACES = 3;
 
 // A job that ended while the user was elsewhere, until they've seen it.
 export interface DesktopResult {
@@ -14,8 +16,27 @@ export interface DesktopResult {
   failed: boolean;
 }
 
-// What the bird can be pressed for, kept in main so the view never names a chat or an approval.
-export type DesktopTarget = { page: "needs-you"; approvalId: string } | { page: "chat"; chatId: string } | null;
+// A job that ended today, for the tray. Stopped ones aren't kept.
+export interface DesktopEnded {
+  chatId: string;
+  mascotId: string;
+  title: string;
+  problem: string | null;
+  endedAt: number;
+}
+
+// A job that's working. A routine's run has no chat. `step` and `since` are only filled in where they're shown.
+export interface DesktopRunning {
+  chatId: string | null;
+  routineId: string | null;
+  mascotId: string;
+  title: string;
+  step?: string | null;
+  since?: number | null;
+}
+
+// What the drop or a row in the tray can open in Blueberry, kept in main so the view never names a chat.
+export type DesktopTarget = { page: "chat"; chatId: string } | { page: "routine"; routineId: string };
 
 // A line in a reply, as plain words: no markup, links as their words, and a bare address as just its site.
 const plainWords = (line: string): string =>
@@ -30,8 +51,8 @@ const plainWords = (line: string): string =>
     .replace(/\s+/g, " ")
     .trim();
 
-// The first sentence of a reply, short enough for two lines beside a bird. A line only leading in to a list isn't
-// saying anything yet, so it's the first thing after it.
+// The first sentence of a reply, short enough for two lines in the drop. A line only leading in to a list isn't saying
+// anything yet, so it's the first thing after it.
 export const firstLine = (reply: string, max = MAX_LINE_LENGTH): string => {
   const lines = reply
     .replace(/```[\s\S]*?```/g, "\n")
@@ -53,68 +74,184 @@ export const firstLine = (reply: string, max = MAX_LINE_LENGTH): string => {
 // Long enough to read, however little it says.
 export const readingTime = (line: string): number => Math.min(Math.max(3000 + line.length * 70, MIN_READING_MS), MAX_READING_MS);
 
-// Who, and what kind of thing it's waiting for, as a notification says it. The buttons are only in Blueberry.
-const askingWords = (who: string, { approval }: NeedsYouItem): string =>
-  approval.handoff
-    ? `${who} needs you to ${HANDOFF_WORDS[approval.handoff.need]}`
-    : approval.question
-      ? `${who} has a question for you`
-      : `${who} needs your OK`;
-
-const andMore = (text: string, others: number, what: string): string => {
-  if (others === 0) return text;
-  const more = ` And ${others} more ${what}.`;
-  return `${firstLine(text, MAX_LINE_LENGTH - more.length)}${more}`;
-};
+// Who, and what kind of thing it's waiting for, as a notification says it: never the question, the site or the words.
+export const askingWords = (who: string, { approval }: Pick<NeedsYouItem, "approval">): string =>
+  approval.handoff ? `${who} needs you to ${HANDOFF_WORDS[approval.handoff.need]}` : approval.question ? `${who} has a question for you` : `${who} needs your OK`;
 
 export interface DesktopFacts {
+  // Oldest first.
   needsYou: NeedsYouItem[];
   // Newest last.
   results: DesktopResult[];
-  // What's working, oldest first. A routine has no chat.
-  running: Array<{ chatId: string | null; mascotId: string; title: string }>;
+  // Oldest first.
+  running: DesktopRunning[];
+  // Newest last.
+  finishedToday: DesktopEnded[];
   chosen: MascotProfile;
   mascot: (id: string) => MascotProfile;
   nameOf: (mascot: MascotProfile) => string;
 }
 
-// What the bird shows, and whose bird it is. There's one on the desktop, so it's whoever has the most to say:
-// someone asking, then someone finished, then someone working, and otherwise whoever the next job goes to.
-export const desktopFace = ({ needsYou, results, running, chosen, mascot, nameOf }: DesktopFacts): Pick<DesktopBerryState, "mood" | "name" | "look" | "line" | "sign"> & { target: DesktopTarget; announce: string | null } => {
-  const face = (who: MascotProfile) => ({ name: nameOf(who), look: who.look });
-  const [first] = needsYou;
-  if (first) {
-    const who = mascot(first.mascotId);
-    return {
-      ...face(who),
-      mood: "asking",
-      sign: "waiting",
-      line: andMore(`${askingWords(nameOf(who), first)}.`, needsYou.length - 1, needsYou.length === 2 ? "is waiting" : "are waiting"),
-      target: { page: "needs-you", approvalId: first.approval.id },
-      announce: `asking:${first.approval.id}`,
-    };
-  }
-  const [working] = running;
-  const latest = results.at(-1);
-  if (latest) {
-    return {
-      ...face(mascot(latest.mascotId)),
-      mood: latest.failed ? "oops" : "delivered",
-      sign: working ? "working" : null,
-      line: andMore(latest.text, results.length - 1, "finished"),
-      target: { page: "chat", chatId: latest.chatId },
-      announce: `result:${latest.chatId}:${latest.text}`,
-    };
-  }
-  if (working) {
-    return {
-      ...face(mascot(working.mascotId)),
-      mood: "fetching",
-      sign: "working",
-      line: `Working on “${working.title}”`,
-      target: working.chatId ? { page: "chat", chatId: working.chatId } : null,
-      announce: null,
-    };
-  }
-  return { ...face(chosen), mood: "rest", sign: null, line: null, target: null, announce: null };
+const faceOf = (facts: DesktopFacts, mascotId: string, mood: DesktopFace["mood"]): DesktopFace => {
+  const who = facts.mascot(mascotId);
+  return { name: facts.nameOf(who), look: who.look, mood };
 };
+
+// Whether a press on the drop has anything to show besides the prompt box.
+export const anythingGoing = ({ needsYou, results, running, finishedToday }: DesktopFacts): boolean =>
+  needsYou.length + results.length + running.length + finishedToday.length > 0;
+
+const count = (n: number, what: string): string | null => (n > 0 ? `${n} ${what}` : null);
+
+// A job waiting for the user is still running, but it's said once, as asking.
+const notWaiting = ({ needsYou, running }: Pick<DesktopFacts, "needsYou" | "running">): DesktopRunning[] =>
+  running.filter((job) => !needsYou.some((item) => (job.chatId !== null && item.id === job.chatId) || (job.routineId !== null && item.routineId === job.routineId)));
+
+// What the drop shows. The faces are whoever has the most to say, in the order asking, finished, working, and with
+// nothing going on, whoever the next job goes to. What comes out by itself is only an ask, which stays until it's
+// answered, and a result that has just come in (`announcing`, by its chat), and neither says more than who and what kind
+// of thing, and the reply's own first sentence. Pointed at, it says what a press does, or what's going.
+export const desktopDrop = (
+  facts: DesktopFacts,
+  { pointed, announcing, shortcut }: { pointed: boolean; announcing: string | null; shortcut: boolean }
+): { faces: DesktopFace[]; working: boolean; says: DesktopDropSays } => {
+  const { needsYou, results } = facts;
+  const running = notWaiting(facts);
+  const newestFirst = [...results].reverse();
+  const things = [
+    ...needsYou.map((item) => faceOf(facts, item.mascotId, "asking")),
+    ...newestFirst.map((result) => faceOf(facts, result.mascotId, result.failed ? "oops" : "delivered")),
+    ...running.map((job) => faceOf(facts, job.mascotId, "fetching")),
+  ];
+  const faces = things.length > 0 ? things.slice(0, MAX_FACES) : [faceOf(facts, facts.chosen.id, "rest")];
+  const working = running.length > 0;
+  const [asking] = needsYou;
+  if (asking) return { faces, working, says: { kind: "asking", words: askingWords(facts.nameOf(facts.mascot(asking.mascotId)), asking) } };
+  const announced = announcing === null ? undefined : results.find(({ chatId }) => chatId === announcing);
+  // The newest result is the one that comes out, so its face is already in front.
+  if (announced) return { faces, working, says: { kind: "finished", text: announced.text } };
+  if (!pointed) return { faces, working, says: { kind: "rest" } };
+  if (things.length === 0) return { faces, working, says: { kind: "job", shortcut } };
+  const [job] = running;
+  if (things.length === 1 && job) return { faces, working, says: { kind: "working", title: job.title, since: job.since ?? null } };
+  const counts = [count(results.length, "finished"), count(running.length, "working")].filter((each): each is string => each !== null);
+  return { faces, working, says: { kind: "counts", counts } };
+};
+
+// Main gives each row a key for this one showing, so the view never names a chat or an approval.
+export type TrayTarget = { kind: "ask"; chatId: string; approvalId: string } | { kind: "open"; target: DesktopTarget };
+
+const targetOf = ({ chatId, routineId }: { chatId: string | null; routineId?: string | null }): DesktopTarget | null =>
+  chatId ? { page: "chat", chatId } : routineId ? { page: "routine", routineId } : null;
+
+// The tray: the flock in their moods, then what needs you, what's working and what finished today, newest first.
+export const desktopTray = (facts: DesktopFacts, flock: MascotProfile[], keyFor: (target: TrayTarget) => string): DesktopTray => {
+  const { needsYou, results, finishedToday, chosen } = facts;
+  const running = notWaiting(facts);
+  const moodOf = (id: string): DesktopFace["mood"] =>
+    needsYou.some((item) => item.mascotId === id)
+      ? "asking"
+      : running.some((job) => job.mascotId === id)
+        ? "fetching"
+        : results.some((result) => result.mascotId === id)
+          ? "delivered"
+          : "rest";
+  return {
+    flock: flock.map((mascot) => ({ name: facts.nameOf(mascot), look: mascot.look, mood: moodOf(mascot.id), chosen: mascot.id === chosen.id })),
+    asks: needsYou.map((item) => ({
+      ...faceOf(facts, item.mascotId, "asking"),
+      key: keyFor({ kind: "ask", chatId: item.id, approvalId: item.approval.id }),
+      words: askingWords(facts.nameOf(facts.mascot(item.mascotId)), item),
+      since: item.askedAt,
+    })),
+    working: running.flatMap((job) => {
+      const target = targetOf(job);
+      return target
+        ? [{ ...faceOf(facts, job.mascotId, "fetching"), key: keyFor({ kind: "open", target }), title: job.title, step: job.step ?? null, since: job.since ?? null }]
+        : [];
+    }),
+    finished: [...finishedToday].reverse().map((ended) => ({
+      ...faceOf(facts, ended.mascotId, ended.problem ? "oops" : "delivered"),
+      key: keyFor({ kind: "open", target: { page: "chat", chatId: ended.chatId } }),
+      title: ended.title,
+      problem: ended.problem,
+      at: ended.endedAt,
+    })),
+  };
+};
+
+// The ask, as the sheet shows it after Answer: the tool's exact words, never cut.
+export const desktopAsk = (item: NeedsYouItem, face: DesktopFace): Omit<DesktopAsk, "key" | "said"> => {
+  const { approval } = item;
+  return {
+    face,
+    kind: approval.handoff ? "handoff" : approval.question ? "question" : "approval",
+    text: approval.text,
+    answers: approval.question ? (approval.answers ?? []) : [],
+    handoff: approval.handoff ? { need: approval.handoff.need, site: approval.handoff.site } : null,
+    job: item.job,
+  };
+};
+
+// The ask that's showing, as it was when it was shown, under a key made for this one showing. Main holds it, and the
+// view only ever sends a decision with that key, so a press on a sheet that has since been replaced answers nothing.
+export interface ShownAsk {
+  key: string;
+  item: NeedsYouItem;
+  decided: boolean;
+}
+
+// The same ask, with nothing about it changed since it was shown.
+export const sameAsk = (shown: ChatApproval, live: ChatApproval): boolean =>
+  shown.id === live.id &&
+  shown.text === live.text &&
+  !!shown.question === !!live.question &&
+  JSON.stringify(shown.answers ?? []) === JSON.stringify(live.answers ?? []) &&
+  JSON.stringify(shown.why ?? null) === JSON.stringify(live.why ?? null) &&
+  JSON.stringify(shown.handoff ?? null) === JSON.stringify(live.handoff ?? null);
+
+export type DecisionCheck =
+  | { ok: true; chatId: string; approvalId: string; allow: boolean; answer?: string }
+  | { ok: false; why: "gone" | "stale" | "code" | "not-here" | "invalid" };
+
+// Whether a decision from the ask may go, and to which approval: only the one that was shown, only from a press on that
+// showing (`stale` otherwise, which leaves the one showing now alone), only while it's still the one waiting and
+// unchanged, and only once. A handoff isn't answered here, and an answer shaped like a code isn't sent.
+export const checkDecision = (shown: ShownAsk | null, waiting: readonly NeedsYouItem[], decision: unknown): DecisionCheck => {
+  if (!shown || shown.decided) return { ok: false, why: "gone" };
+  if (typeof decision !== "object" || decision === null) return { ok: false, why: "invalid" };
+  const { key, allow, answer } = decision as { key?: unknown; allow?: unknown; answer?: unknown };
+  if (typeof key !== "string" || typeof allow !== "boolean" || (answer !== undefined && typeof answer !== "string")) return { ok: false, why: "invalid" };
+  if (key !== shown.key) return { ok: false, why: "stale" };
+  const live = waiting.find((item) => item.id === shown.item.id);
+  if (!live || !sameAsk(shown.item.approval, live.approval)) return { ok: false, why: "gone" };
+  const { approval } = live;
+  if (approval.handoff) return { ok: false, why: "not-here" };
+  if (answer !== undefined) {
+    if (!approval.question || !allow || !answer.trim()) return { ok: false, why: "invalid" };
+    if (plausibleCode(answer) !== null) return { ok: false, why: "code" };
+  } else if (approval.question && allow) {
+    return { ok: false, why: "invalid" };
+  }
+  return { ok: true, chatId: live.id, approvalId: approval.id, allow, ...(answer !== undefined ? { answer } : {}) };
+};
+
+// What the sheet says for a moment after an answer, as Needs you says it.
+export const saidWords = (name: string, question: boolean, allow: boolean): string =>
+  question ? (allow ? `Answered. ${name} carries on.` : `Skipped. ${name} carries on without it.`) : allow ? `Allowed. ${name} carries on.` : `Not allowed, and ${name} knows.`;
+
+// This computer or the cloud, by the new tab's rule: there while the cloud can be used, unless the mascot only reads the
+// page in front, and on Cloud to begin with for one set to work there.
+export const desktopCloud = (mascot: Pick<MascotProfile, "tools" | "worksInCloud">, available: { runner: boolean; cloud: boolean }): { fits: boolean; on: boolean } => {
+  const fits = (available.runner || available.cloud) && mascot.tools.includes("visit");
+  return { fits, on: fits && mascot.worksInCloud === true };
+};
+
+// Where a job from the box goes. The runner keeps going with this computer off, so it's used whenever there is one.
+export const desktopWhere = (mascot: Pick<MascotProfile, "tools" | "worksInCloud">, available: { runner: boolean; cloud: boolean }, wantsCloud: boolean): { runner: boolean; cloud: boolean } => {
+  const inCloud = desktopCloud(mascot, available).fits && wantsCloud === true;
+  return { runner: inCloud && available.runner, cloud: inCloud && !available.runner && available.cloud };
+};
+
+// Whether a time was today, on this computer's clock.
+export const sameDay = (a: number, b: number): boolean => new Date(a).toDateString() === new Date(b).toDateString();

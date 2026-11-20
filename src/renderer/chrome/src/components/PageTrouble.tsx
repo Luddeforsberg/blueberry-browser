@@ -35,7 +35,7 @@ export const PageTrouble: React.FC<{ trouble: TabTrouble | TabLoadError; onReloa
             <div>
                 <h1 className="text-20 font-semibold">{title}</h1>
                 {failedLoad && <p className="mt-1 max-w-md text-14 [overflow-wrap:anywhere]">{failedLoad.url}</p>}
-                <p className="mt-1 max-w-md text-14 text-muted-foreground">{text}</p>
+                <p className="mt-1 max-w-md text-14 text-ink-2">{text}</p>
             </div>
             <Button onClick={onReload}>Reload</Button>
         </div>

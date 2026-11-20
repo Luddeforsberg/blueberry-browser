@@ -35,7 +35,7 @@ describe("reading another browser's history", () => {
     vi.restoreAllMocks();
   });
 
-  it("names only browsers with a History file in a profile, Default or Profile N", async () => {
+  it("names only browsers with a History file in a profile, Default or Profile N, and counts their profiles", async () => {
     expect(await findBrowsers(data)).toEqual([]);
     mkdirSync(join(base, "Google", "Chrome", "Crashpad"), { recursive: true });
     mkdirSync(join(base, "Arc", "User Data", "Profile 2"), { recursive: true });
@@ -45,8 +45,39 @@ describe("reading another browser's history", () => {
 
     writeFileSync(join(base, "Arc", "User Data", "Profile 2", "History"), "");
     fixture([]);
-    expect(await findBrowsers(data)).toEqual([{ id: "chrome", name: "Chrome" }, { id: "arc", name: "Arc" }]);
+    fixture([], "Profile 1");
+    expect(await findBrowsers(data)).toEqual([
+      { id: "chrome", name: "Chrome", profiles: 2, icon: null },
+      { id: "arc", name: "Arc", profiles: 1, icon: null },
+    ]);
     expect(await findBrowsers(null)).toEqual([]);
+  });
+
+  it("asks for the icon of a browser's own app only where that app is installed, and keeps going without one", async () => {
+    fixture([]);
+    mkdirSync(join(base, "Arc", "User Data", "Default"), { recursive: true });
+    writeFileSync(join(base, "Arc", "User Data", "Default", "History"), "");
+    mkdirSync(join(base, "Microsoft Edge", "Default"), { recursive: true });
+    writeFileSync(join(base, "Microsoft Edge", "Default", "History"), "");
+    const empty = mkdtempSync(join(tmpdir(), "blueberry-apps-"));
+    const apps = mkdtempSync(join(tmpdir(), "blueberry-apps-"));
+    mkdirSync(join(apps, "Google Chrome.app"));
+    mkdirSync(join(apps, "Microsoft Edge.app"));
+    // Arc's app is a file here, not an app bundle, so it isn't the app.
+    writeFileSync(join(apps, "Arc.app"), "");
+    const asked: string[] = [];
+    const iconOf = async (file: string) => {
+      asked.push(file);
+      if (file.includes("Edge")) throw new Error("No icon");
+      return "data:image/png;base64,AAAA";
+    };
+
+    expect(await findBrowsers({ ...data, apps: [empty, apps] }, iconOf)).toEqual([
+      { id: "chrome", name: "Chrome", profiles: 1, icon: "data:image/png;base64,AAAA" },
+      { id: "arc", name: "Arc", profiles: 1, icon: null },
+      { id: "edge", name: "Edge", profiles: 1, icon: null },
+    ]);
+    expect(asked.sort()).toEqual([join(apps, "Google Chrome.app"), join(apps, "Microsoft Edge.app")]);
   });
 
   it("converts Chromium's time, and keeps only visits from the last 90 days up to now", async () => {
@@ -119,12 +150,12 @@ describe("reading another browser's history", () => {
 });
 
 describe("where browsers keep their data", () => {
-  const paths = { appData: "/app", localAppData: "/local", override: "/demo" };
+  const paths = { appData: "/app", localAppData: "/local", home: "/home", programFiles: ["/programs", undefined], override: "/demo" };
 
-  it("only lets an unpackaged app be pointed elsewhere", () => {
+  it("only lets an unpackaged app be pointed elsewhere, and then looks at no app installed here", () => {
     expect(browserDataFor("darwin", { ...paths, packaged: false })).toEqual({ base: "/demo", layout: "mac" });
-    expect(browserDataFor("darwin", { ...paths, packaged: true })).toEqual({ base: "/app", layout: "mac" });
-    expect(browserDataFor("win32", { ...paths, packaged: true })).toEqual({ base: "/local", layout: "windows" });
+    expect(browserDataFor("darwin", { ...paths, packaged: true })).toEqual({ base: "/app", layout: "mac", apps: ["/Applications", join("/home", "Applications")] });
+    expect(browserDataFor("win32", { ...paths, packaged: true })).toEqual({ base: "/local", layout: "windows", apps: ["/local", "/programs"] });
     expect(browserDataFor("linux", { ...paths, packaged: true })).toBeNull();
   });
 });

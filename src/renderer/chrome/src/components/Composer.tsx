@@ -1,10 +1,183 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowUp, Check, Cloud, Plus, Square } from 'lucide-react'
+import { ARM_MS } from '@common/components/cardKeys'
+import { ArrowUp, Check, ChevronDown, Cloud, Laptop, Lock, Plus } from 'lucide-react'
 import type { MascotProfile } from '@shared/library'
+import type { Mood } from '@common/components/Mascot'
 import { cn } from '@common/lib/utils'
-import { MascotChip, MascotPerch } from './MascotPerch'
+import { SHELL } from '@common/components/cardShell'
+import { useFlock } from '../contexts/LibraryContext'
+import { useShell } from '../contexts/ShellContext'
+import { Berry, useAssistantName } from './Berry'
+import { limitsInBrief } from '../shortWords'
+import { startMascot } from '../flockView'
+import { MenuRule, MenuSheet, menuRowClass } from './MenuSheet'
+import { AddMenu, type AddMenuOptions } from './AddMenu'
+import { BoxChips, useAddMenu } from './BoxAttachments'
+import { useAttachments, type Attached, type JobPlace } from '../useAttachments'
+import { BERRY } from '@shared/mascots'
+import { Tooltip } from '@common/components/Tooltip'
+import { SwitchSheet } from '@common/components/Controls'
+import { IconSwap } from '@common/components/IconSwap'
+import { usePresence } from '@common/components/motion'
 
-// The one input for talking to Berry, on the new tab page, the main chat and the chat panel.
+// DESIGN.md section 10, The prompt box: one component everywhere, a card set into a shell.
+
+const FOCUS = 'outline-none focus-visible:ring-2 focus-visible:ring-focus'
+
+// What the mascot in the pill shows while one gives way to another (see useMascotSwitch on the new tab).
+export interface PillFace {
+    mood: Mood
+    shut: boolean
+    // Changes each time a new one arrives, so it pops in again.
+    arrival: number
+}
+
+// The menu under the pill: one row per mascot, its face, its name and what it may do, with a tick on the current one.
+const MascotMenu: React.FC<{ chosenId: string; above: boolean; leaving: boolean; onChoose: (id: string) => void; onClose: (refocus: boolean) => void }> = ({ chosenId, above, leaving, onChoose, onClose }) => {
+    const { flock } = useFlock()
+    return (
+        <MenuSheet label="Choose who to ask" above={above} align="right" className="w-[316px]" leaving={leaving} onClose={onClose}>
+            {flock.map((mascot) => (
+                <MenuRow key={mascot.id} mascot={mascot} checked={mascot.id === chosenId} onChoose={() => onChoose(mascot.id)} />
+            ))}
+            <MenuRule />
+            <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                    startMascot()
+                    onClose(false)
+                }}
+                className={cn(menuRowClass(false), 'text-ink-2 hover:text-ink')}
+            >
+                <span className="size-7 flex items-center justify-center"><Plus className="size-4" strokeWidth={1.75} /></span>
+                New mascot
+            </button>
+        </MenuSheet>
+    )
+}
+
+const MenuRow: React.FC<{ mascot: MascotProfile; checked: boolean; onChoose: () => void }> = ({ mascot, checked, onChoose }) => {
+    const name = useAssistantName(mascot)
+    return (
+        <button
+            type="button"
+            role="menuitemradio"
+            aria-checked={checked}
+            onClick={onChoose}
+            className={menuRowClass(true)}
+        >
+            <Berry size={28} mascot={mascot} still />
+            <span className="flex-1 min-w-0">
+                <span className="block truncate">{name}</span>
+                <span className="block mt-px text-13 text-ink-2 truncate">{limitsInBrief(mascot)}</span>
+            </span>
+            {checked && <Check className="size-4 shrink-0 text-ink" strokeWidth={1.75} />}
+        </button>
+    )
+}
+
+// Says who this goes to. Where the choice is still open it opens the menu, and anywhere else it only says who.
+const MascotPill: React.FC<{
+    mascot: MascotProfile
+    face?: PillFace
+    small: boolean
+    // On the chat's card, where a quiet fill is `card-2`.
+    onCard: boolean
+    chooser?: { open: boolean; onToggle: () => void; onOpen: () => void; button: React.Ref<HTMLButtonElement> }
+}> = ({ mascot, face, small, onCard, chooser }) => {
+    const name = useAssistantName(mascot)
+    const { keepBerryStill } = useShell().settings
+    const look = cn('shrink-0 flex items-center gap-[7px] rounded-full bg-sheet shadow-[inset_0_0_0_1px_var(--line)] text-13 text-ink', small ? 'h-7 pl-1 pr-2' : 'h-[30px] pl-[5px] pr-[9px]')
+    const drawn = (
+        <span key={face?.arrival} className={cn('flex origin-[50%_70%]', face && face.arrival > 0 && (keepBerryStill ? 'animate-[mascot-fade_150ms_ease-out]' : 'animate-mascot-pop'))}>
+            <Berry size={20} mascot={mascot} mood={face?.mood ?? 'rest'} shut={face?.shut} />
+        </span>
+    )
+    if (!chooser) {
+        return (
+            <span aria-label={`This chat is with ${name}`} className={cn(look, 'pr-[11px] cursor-default')}>
+                {drawn}
+                <span className="max-w-28 truncate">{name}</span>
+            </span>
+        )
+    }
+    return (
+        <Tooltip words="Choose a mascot">
+            <button
+                ref={chooser.button}
+                type="button"
+                aria-label={`Asking ${name}. Choose who to ask`}
+                aria-haspopup="menu"
+                aria-expanded={chooser.open}
+                onClick={chooser.onToggle}
+                onKeyDown={(event) => {
+                    if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && !chooser.open) {
+                        event.preventDefault()
+                        chooser.onOpen()
+                    }
+                }}
+                className={cn(look, 'press', onCard ? 'hover:bg-card-2' : 'hover:bg-sheet-2', chooser.open && (onCard ? 'bg-card-2' : 'bg-sheet-2'), FOCUS)}
+            >
+                {drawn}
+                <span className="max-w-28 truncate">{name}</span>
+                <ChevronDown className={cn('size-3 text-ink-3 transition-transform duration-menu ease-crisp', chooser.open && 'rotate-180')} strokeWidth={1.75} />
+            </button>
+        </Tooltip>
+    )
+}
+
+// This Mac or Cloud, as a segmented control. The chosen side carries its name, the other is its icon alone, and choosing
+// the other slides the sheet across as one name opens out and the other closes.
+const WhereSwitch: React.FC<{ on: boolean; onToggle: () => void; small: boolean }> = ({ on, onToggle, small }) => {
+    const group = useRef<HTMLDivElement>(null)
+    const ruler = useRef<HTMLSpanElement>(null)
+    // The words follow the platform (DESIGN.md section 14).
+    const mac = useShell().theme.platform === 'mac'
+    const here = mac ? 'This Mac' : 'This PC'
+    const sides = ([false, true] as const).map((cloud) => ({
+        chosen: on === cloud,
+        Icon: cloud ? Cloud : Laptop,
+        label: cloud ? 'Cloud' : here,
+        // What each side does, in the state it's in.
+        tip: cloud
+            ? `${on ? 'Runs' : 'Run'} in the cloud, with your ${mac ? 'Mac' : 'PC'} off`
+            : `${on ? 'Run' : 'Runs'} on ${mac ? 'this Mac' : 'this PC'}`
+    }))
+    const side = cn('flex items-center rounded-full text-13', small ? 'h-6 px-2' : 'h-7 px-2.5')
+    const name = (chosen: boolean) => cn('whitespace-nowrap overflow-hidden', chosen ? 'max-w-20 ml-1.5 opacity-100' : 'max-w-0 ml-0 opacity-0')
+    return (
+        <div ref={group} role="radiogroup" aria-label="Where it runs" className="relative shrink-0 flex p-0.5 rounded-full bg-sheet-2">
+            {/* The sides as they'll end, for the sheet to head for. */}
+            <span ref={ruler} aria-hidden className="absolute inset-0 p-0.5 flex invisible pointer-events-none">
+                {sides.map(({ chosen, Icon, label }) => (
+                    <span key={label} data-side className={side}>
+                        <Icon className="size-4" strokeWidth={1.75} />
+                        <span className={name(chosen)}>{label}</span>
+                    </span>
+                ))}
+            </span>
+            <SwitchSheet group={group} ruler={ruler} chosen={on ? 1 : 0} className="bg-sheet shadow-[0_0_0_1px_var(--line),0_1px_2px_rgb(0_0_0/0.1)]" />
+            {sides.map(({ chosen, Icon, label, tip }) => (
+                <Tooltip key={label} words={tip}>
+                    <button
+                        type="button"
+                        role="radio"
+                        aria-checked={chosen}
+                        aria-label={label}
+                        onClick={() => !chosen && onToggle()}
+                        className={cn(side, 'press relative', chosen ? 'text-ink' : 'text-ink-3 hover:text-ink', FOCUS)}
+                    >
+                        <Icon className="size-4" strokeWidth={1.75} />
+                        <span aria-hidden className={cn(name(chosen), 'transition-[max-width,margin,opacity] duration-slide ease-crisp')}>{label}</span>
+                    </button>
+                </Tooltip>
+            ))}
+        </div>
+    )
+}
+
+// The one input for talking to a mascot, on the new tab, the main chat and the chat panel.
 export const Composer: React.FC<{
     label: string
     placeholder: string
@@ -16,50 +189,67 @@ export const Composer: React.FC<{
     // Moves the keyboard here each time this changes.
     focusKey?: number
     spellCheck?: boolean
-    // Shown above the text, such as the page Berry can see.
+    // The new tab's box is larger, with room for a longer ask. Everywhere else it's the chat's.
+    size?: 'hero' | 'chat'
+    // Shown above the text: the chips for what it's been given to read.
     attachment?: React.ReactNode
-    // The + button. With no handler and nothing for its menu, there's no + at all.
-    onAdd?: () => void
-    addLabel?: string
-    // Leaves out the + button where there's nothing to add.
-    noAdd?: boolean
+    // What the + menu offers. Without it, there's no +.
+    add?: AddMenuOptions
+    // Files dropped or pasted onto the box, which go where A file's do.
+    onFiles?: (files: File[]) => void
     // With no box of its own, because the window it's in is the box.
     bare?: boolean
     canSend: boolean
     onSend: () => void
-    // While a reply is running, the send button stops it.
+    // While a reply is running, Send stops it.
     onStop?: () => void
-    // Who this goes to. With `onChooseMascot`, pressing it opens the flock. Without, it just says who.
+    // Who this goes to. With `onChooseMascot`, pressing it opens the menu. Without, it just says who.
     mascot?: MascotProfile
     onChooseMascot?: (id: string) => void
-    // Whether this job is done in the cloud, where that's set up. It's an item in the + menu, and a mark on Send while on.
+    // Who's ticked in the menu, when the pill is still showing the one before (the new tab's switch).
+    chosenId?: string
+    face?: PillFace
+    // The placeholder fades while one mascot gives way to another.
+    quietPlaceholder?: boolean
+    // Whether this job is done in the cloud, where that's set up.
     cloud?: { on: boolean; onToggle: () => void }
-}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, spellCheck, attachment, onAdd, addLabel, noAdd, bare, canSend, onSend, onStop, mascot, onChooseMascot, cloud }) => {
+    // The chosen mascot's limits, in words, in the shell under the card. Null or empty slides it away.
+    limits?: string | null
+}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, spellCheck, size = 'chat', attachment, add, onFiles, bare, canSend, onSend, onStop, mascot, onChooseMascot, chosenId, face, quietPlaceholder, cloud, limits }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const [choosing, setChoosing] = useState(false)
-    const [menuOpen, setMenuOpen] = useState(false)
-    const menuRef = useRef<HTMLDivElement>(null)
-    const addRef = useRef<HTMLButtonElement>(null)
-    // The + menu only holds the cloud option, so it's there only where the + has nothing else to do.
-    const menu = !onAdd && cloud ? cloud : null
+    const [adding, setAdding] = useState(false)
+    // Each menu stays a moment after it closes, to go back into its button.
+    const choosingMenu = usePresence(choosing)
+    const addingMenu = usePresence(adding)
+    // Files are being dragged over the box. Counted, as entering a child leaves the parent.
+    const [dropping, setDropping] = useState(false)
+    const dragDepth = useRef(0)
+    const box = useRef<HTMLDivElement>(null)
+    const pill = useRef<HTMLButtonElement>(null)
+    const plus = useRef<HTMLButtonElement>(null)
+    const hero = size === 'hero'
+    // The desktop's box is the only one with smaller tools. In a chat they're the new tab's size.
+    const small = !!bare
+    // The chat's card is `card`, a step up from the page it's on in dark, and anything quiet on it is `card-2`. The new
+    // tab's sits on the well and the desktop's is a window of its own, so they keep `sheet` and `sheet-2`.
+    const onCard = !hero && !bare
+    // The last words, kept while the line slides away.
+    const [lastLimits, setLastLimits] = useState(limits ?? '')
+    useEffect(() => {
+        if (limits) setLastLimits(limits)
+    }, [limits])
 
     useEffect(() => {
-        if (!menuOpen) return
-        const close = (event: Event) => {
-            if (event instanceof KeyboardEvent) {
-                if (event.key !== 'Escape') return
-                setMenuOpen(false)
-                // The item that had focus goes with the menu, so it comes back to the button that opened it.
-                addRef.current?.focus()
-            } else if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false)
+        if (!choosing && !adding) return
+        const close = (event: PointerEvent) => {
+            if (box.current?.contains(event.target as Node)) return
+            setChoosing(false)
+            setAdding(false)
         }
         window.addEventListener('pointerdown', close)
-        window.addEventListener('keydown', close)
-        return () => {
-            window.removeEventListener('pointerdown', close)
-            window.removeEventListener('keydown', close)
-        }
-    }, [menuOpen])
+        return () => window.removeEventListener('pointerdown', close)
+    }, [choosing, adding])
 
     useLayoutEffect(() => {
         const textarea = textareaRef.current
@@ -75,130 +265,240 @@ export const Composer: React.FC<{
         textarea.setSelectionRange(textarea.value.length, textarea.value.length)
     }, [focusKey])
 
-    return (
-        <div
-            onClick={(event) => {
-                if (!(event.target as Element).closest('button')) textareaRef.current?.focus()
+    const closeMenu = (refocus: boolean) => {
+        setChoosing(false)
+        if (refocus) pill.current?.focus()
+    }
+    const closeAdding = (refocus: boolean) => {
+        setAdding(false)
+        if (refocus) plus.current?.focus()
+    }
+
+    // Only files: a link or words dragged in aren't added.
+    const carriesFiles = (event: React.DragEvent) => !!onFiles && [...event.dataTransfer.types].includes('Files')
+    const dropHandlers = onFiles
+        ? {
+              onDragEnter: (event: React.DragEvent) => {
+                  if (!carriesFiles(event)) return
+                  event.preventDefault()
+                  dragDepth.current++
+                  setDropping(true)
+              },
+              onDragOver: (event: React.DragEvent) => {
+                  if (!carriesFiles(event)) return
+                  event.preventDefault()
+                  event.dataTransfer.dropEffect = 'copy'
+              },
+              onDragLeave: (event: React.DragEvent) => {
+                  if (!carriesFiles(event)) return
+                  dragDepth.current = Math.max(0, dragDepth.current - 1)
+                  if (dragDepth.current === 0) setDropping(false)
+              },
+              onDrop: (event: React.DragEvent) => {
+                  if (!carriesFiles(event)) return
+                  event.preventDefault()
+                  dragDepth.current = 0
+                  setDropping(false)
+                  onFiles([...event.dataTransfer.files])
+                  textareaRef.current?.focus()
+              },
+          }
+        : {}
+
+    const sendLabel = onStop ? 'Stop' : cloud?.on ? 'Send to the cloud' : 'Send'
+    const sendButton = (
+        <Tooltip words={sendLabel}>
+            <button
+                type="button"
+                aria-label={sendLabel}
+                onClick={onStop ?? onSend}
+                disabled={!onStop && !canSend}
+                className={cn(
+                    'shrink-0 rounded-full flex items-center justify-center transition-[background-color,color,transform] duration-move ease-crisp active:scale-[.96]',
+                    small ? 'size-7' : 'size-8',
+                    'bg-ink text-sheet hover:bg-ink/85 disabled:text-faint disabled:active:scale-100',
+                    onCard ? 'disabled:bg-card-2' : 'disabled:bg-sheet-2',
+                    FOCUS
+                )}
+            >
+                <IconSwap
+                    shown={onStop ? 'stop' : 'send'}
+                    icons={{ send: <ArrowUp className="size-4" strokeWidth={1.75} />, stop: <span className={cn('block rounded-[2.5px] bg-current', small ? 'size-[9px]' : 'size-2.5')} /> }}
+                />
+            </button>
+        </Tooltip>
+    )
+
+    const textarea = (
+        <textarea
+            ref={textareaRef}
+            aria-label={label}
+            placeholder={placeholder}
+            value={value}
+            rows={rows}
+            autoFocus={autoFocus}
+            spellCheck={spellCheck}
+            onChange={(event) => onChange(event.target.value)}
+            onKeyDown={onKeyDown}
+            onPaste={(event) => {
+                // A picture or a file pasted is added, as A file adds it. Words pasted are typing, whatever else came with them.
+                const files = [...event.clipboardData.files]
+                if (!onFiles || files.length === 0 || event.clipboardData.types.includes('text/plain')) return
+                event.preventDefault()
+                onFiles(files)
             }}
             className={cn(
-                "relative w-full cursor-text",
-                bare ? "p-1.5 pl-2" : "p-2 pl-3 rounded-composer border bg-surface shadow-raised transition-colors focus-within:border-muted-foreground/30"
+                'block w-full resize-none bg-transparent text-ink caret-ink outline-none placeholder:text-faint placeholder:transition-opacity placeholder:duration-[120ms]',
+                hero ? 'text-15 min-h-[50px]' : 'text-15 min-h-[34px]',
+                quietPlaceholder && 'placeholder:opacity-0'
             )}
-        >
-            {choosing && mascot && onChooseMascot && (
-                <div className="mb-2 cursor-default">
-                    <MascotPerch
-                        selectedId={mascot.id}
-                        onChoose={(id) => {
-                            onChooseMascot(id)
-                            setChoosing(false)
-                            textareaRef.current?.focus()
-                        }}
-                        onClose={() => setChoosing(false)}
-                    />
-                </div>
-            )}
-            {attachment && <div className="mb-1 cursor-default">{attachment}</div>}
-            <div className="flex items-end gap-1">
-                <textarea
-                    ref={textareaRef}
-                    aria-label={label}
-                    placeholder={placeholder}
-                    value={value}
-                    rows={rows}
-                    autoFocus={autoFocus}
-                    spellCheck={spellCheck}
-                    onChange={(event) => onChange(event.target.value)}
-                    onKeyDown={onKeyDown}
-                    className={cn("flex-1 min-w-0 block px-2 py-[7px] resize-none bg-transparent text-16 outline-none", bare ? "placeholder:text-foreground/70" : "placeholder:text-muted-foreground")}
-                />
-                {mascot && (
-                    <MascotChip mascot={mascot} open={choosing} onPress={onChooseMascot && (() => setChoosing(!choosing))} />
+        />
+    )
+
+    // The desktop's box is its own window, so it's only the words and Send.
+    if (bare) {
+        return (
+            <div onClick={(event) => !(event.target as Element).closest('button') && textareaRef.current?.focus()} className="w-full flex items-end gap-1 p-1.5 pl-3 cursor-text">
+                <div className="flex-1 min-w-0 py-[5px]">{textarea}</div>
+                {sendButton}
+            </div>
+        )
+    }
+
+    const plusButton = add && (
+        <Tooltip words="Add a tab or a file">
+            <button
+                ref={plus}
+                type="button"
+                aria-label="Add a tab or a file"
+                aria-haspopup="menu"
+                aria-expanded={adding}
+                onClick={() => {
+                    setChoosing(false)
+                    setAdding(!adding)
+                }}
+                className={cn(
+                    'press shrink-0 flex items-center justify-center text-ink hover:bg-press',
+                    onCard ? 'bg-card-2' : 'bg-sheet-2',
+                    adding && 'bg-press',
+                    small ? 'size-7 rounded-row' : 'size-8 rounded-tile',
+                    FOCUS
                 )}
-                {!noAdd && (onAdd || menu) && (
-                    <div ref={menuRef} className="relative">
-                        <button
-                            ref={addRef}
-                            type="button"
-                            aria-label={menu ? 'More options' : (addLabel ?? 'Add to chat')}
-                            title={menu ? undefined : addLabel}
-                            aria-haspopup={menu ? 'menu' : undefined}
-                            aria-expanded={menu ? menuOpen : undefined}
-                            onClick={menu ? () => setMenuOpen(!menuOpen) : onAdd}
-                            className={cn(
-                                "size-9 rounded-full flex items-center justify-center outline-none transition-colors",
-                                "hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
-                                menuOpen && "bg-muted"
-                            )}
-                        >
-                            <Plus className="size-5" />
-                        </button>
-                        {menu && menuOpen && (
-                            <div role="menu" aria-label="More options" className="absolute right-0 top-full mt-2 z-20 w-60 p-1 rounded-card border bg-surface shadow-float cursor-default">
-                                <button
-                                    type="button"
-                                    role="menuitemcheckbox"
-                                    aria-checked={menu.on}
-                                    autoFocus
-                                    onClick={() => {
-                                        menu.onToggle()
-                                        setMenuOpen(false)
-                                        textareaRef.current?.focus()
-                                    }}
-                                    className="w-full h-9 px-2.5 flex items-center gap-2.5 rounded-control text-14 text-left outline-none transition-colors hover:bg-muted focus-visible:bg-muted"
-                                >
-                                    <Cloud className="size-4 shrink-0 text-muted-foreground" />
-                                    <span className="flex-1">Do this in the cloud</span>
-                                    {menu.on && <Check className="size-4 shrink-0 text-accent-ink" />}
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                )}
-                <button
-                    type="button"
-                    aria-label={onStop ? 'Stop' : cloud?.on ? 'Send to the cloud' : 'Send'}
-                    title={!onStop && cloud?.on ? 'Done in the cloud' : undefined}
-                    onClick={onStop ?? onSend}
-                    disabled={!onStop && !canSend}
+            >
+                {/* Open, it's the way to close: the + turns to a ×. */}
+                <Plus className={cn('size-4 transition-transform duration-menu ease-crisp', adding && 'rotate-45')} strokeWidth={1.75} />
+            </button>
+        </Tooltip>
+    )
+
+    return (
+        <div ref={box} className="relative w-full" {...dropHandlers}>
+            {/* At chat size it's a 16px card in a 20px shell, as an approval is, so the chat's cards read as one family. */}
+            <div className={cn(dropping ? 'bg-tray p-1 shadow-[inset_0_0_0_1.5px_rgb(var(--ink))]' : SHELL, hero ? 'rounded-shell' : 'rounded-card-shell')}>
+                <div
+                    onClick={(event) => {
+                        if (!(event.target as Element).closest('button,[role=menu],[role=group]')) textareaRef.current?.focus()
+                    }}
+                    data-sheet={onCard ? undefined : ''}
                     className={cn(
-                        bare ? "size-8 mb-0.5 disabled:opacity-40" : "size-9",
-                        "relative shrink-0 rounded-full flex items-center justify-center outline-none transition-colors",
-                        "bg-primary text-primary-foreground hover:brightness-110",
-                        "focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring focus-visible:ring-offset-surface",
-                        "disabled:hover:brightness-100"
+                        'group/box relative cursor-text',
+                        dropping ? 'bg-transparent' : cn('shadow-card-lift', onCard ? 'bg-card' : 'bg-sheet'),
+                        hero ? 'rounded-prompt pt-[18px] pr-3 pb-3 pl-5' : 'rounded-sheet pt-[13px] pr-[9px] pb-[9px] pl-4'
                     )}
                 >
-                    {onStop ? <Square className="size-3.5" fill="currentColor" /> : <ArrowUp className="size-[18px]" />}
-                    {!onStop && cloud?.on && (
-                        <span aria-hidden className="absolute -top-1 -right-1 size-[18px] rounded-full bg-surface border flex items-center justify-center text-accent-ink">
-                            <Cloud className="size-3" strokeWidth={2.5} />
-                        </span>
-                    )}
-                </button>
+                    {/* Dropping: the box keeps its size, and says what letting go does. */}
+                    {dropping && <p aria-hidden className="absolute inset-0 flex items-center justify-center text-15 text-ink pointer-events-none">Drop to add</p>}
+                    <div className={cn(dropping && 'invisible')}>
+                        {attachment && <div className="mb-2.5 -ml-1.5 cursor-default">{attachment}</div>}
+                        <div className={hero ? 'mb-1' : undefined}>{textarea}</div>
+                        <div className="-ml-2 flex items-center gap-[7px]">
+                            {plusButton}
+                            {cloud && <WhereSwitch on={cloud.on} onToggle={cloud.onToggle} small={small} />}
+                            <span className="flex-1" />
+                            {mascot && (
+                                <MascotPill
+                                    mascot={mascot}
+                                    face={face}
+                                    small={small}
+                                    onCard={onCard}
+                                    chooser={
+                                        onChooseMascot && {
+                                            open: choosing,
+                                            onToggle: () => {
+                                            setAdding(false)
+                                            setChoosing(!choosing)
+                                        },
+                                            onOpen: () => setChoosing(true),
+                                            button: pill
+                                        }
+                                    }
+                                />
+                            )}
+                            {sendButton}
+                        </div>
+                    </div>
+                </div>
+                {/* The chosen mascot's limits, and nothing else, for as long as it's chosen. */}
+                <div
+                    aria-hidden={!limits}
+                    // Hidden too once it has slid away, so it's out of reach of the keyboard and screen readers.
+                    className={cn('grid transition-[grid-template-rows,visibility] duration-panel ease-crisp', limits ? 'grid-rows-[1fr] visible' : 'grid-rows-[0fr] invisible')}
+                >
+                    <div className="min-h-0 overflow-hidden">
+                        <p className="min-h-[38px] px-3.5 py-[11px] flex items-start gap-2.5 text-13 text-ink-2">
+                            <Lock aria-hidden className="size-3.5 shrink-0 mt-px text-ink-3" strokeWidth={1.75} />
+                            <span className="min-w-0">{limits || lastLimits}</span>
+                        </p>
+                    </div>
+                </div>
             </div>
+            {addingMenu.shown && add && <AddMenu {...add} above={!hero} leaving={addingMenu.leaving} onClose={closeAdding} />}
+            {choosingMenu.shown && mascot && onChooseMascot && (
+                <MascotMenu
+                    chosenId={chosenId ?? mascot.id}
+                    above={!hero}
+                    leaving={choosingMenu.leaving}
+                    onChoose={(id) => {
+                        onChooseMascot(id)
+                        setChoosing(false)
+                        textareaRef.current?.focus()
+                    }}
+                    onClose={closeMenu}
+                />
+            )}
         </div>
     )
 }
 
+// While a question waits, what's sent from the prompt box is its answer, through `chat:decide` like a pressed one. An
+// answer is words only, so with anything attached it isn't sent, and stays in the box.
+export const answerInBox = (chatId: string, approvalId: string, words: string, attached: Attached): Promise<boolean> =>
+    attached.files.length > 0 || attached.tabs.length > 0 ? Promise.resolve(false) : window.chromeAPI.chat.decide(chatId, approvalId, true, words).catch(() => false)
+
 // A composer that sends on Enter, for both chats.
 export const ChatComposer: React.FC<{
-    onSend: (message: string) => void
+    // Whether main took the message. It may refuse one, as when an attached tab has been handed to the user since.
+    onSend: (message: string, attached: Attached) => Promise<boolean>
     onStop?: () => void
     disabled?: boolean
     placeholder: string
+    // Shown first among the chips, such as the page in front.
     attachment?: React.ReactNode
-    onAdd?: () => void
-    addLabel?: string
+    // Where the + adds a tab or a file. Without it, there's no +.
+    attach?: { chatId: string | null; mascot: MascotProfile; place: JobPlace; thisPage?: AddMenuOptions['thisPage'] }
     autoFocus?: boolean
     // Text to add to whatever is already being written. It's never sent without the user.
     draft?: string | null
     onDraftTaken?: () => void
     mascot?: MascotProfile
     onChooseMascot?: (id: string) => void
-}> = ({ onSend, onStop, disabled = false, placeholder, attachment, onAdd, addLabel, autoFocus, draft, onDraftTaken, mascot, onChooseMascot }) => {
+    // A question waits, so sending answers it, and Send shows over Stop once there's an answer to send.
+    answering?: boolean
+}> = ({ onSend, onStop, disabled = false, placeholder, attachment, attach, autoFocus, draft, onDraftTaken, mascot, onChooseMascot, answering = false }) => {
     const [value, setValue] = useState('')
     const [focusKey, setFocusKey] = useState(0)
+    const box = useAttachments(attach?.place ?? 'here')
+    const add = useAddMenu(box, { chatId: attach?.chatId ?? null, mascot: attach?.mascot ?? BERRY, place: attach?.place ?? 'here', thisPage: attach?.thisPage })
 
     // StrictMode runs this twice when the panel opens with a draft waiting, and it must only add it once.
     const draftTaken = useRef(false)
@@ -214,11 +514,23 @@ export const ChatComposer: React.FC<{
         onDraftTaken?.()
     }, [draft, onDraftTaken])
 
-    const send = () => {
+    // A question that has only just arrived isn't answered by a send already on its way, as a card's keys aren't.
+    const answeringSince = useRef(0)
+    useLayoutEffect(() => {
+        if (answering) answeringSince.current = performance.now()
+    }, [answering])
+
+    // What was typed and attached stays in the box until main has taken it, so a refused message can be sent again.
+    const sending = useRef(false)
+    const send = async () => {
         const message = value.trim()
-        if (!message || disabled) return
-        onSend(message)
+        if (!message || disabled || sending.current) return
+        if (answering && performance.now() - answeringSince.current < ARM_MS) return
+        sending.current = true
+        const sent = await onSend(message, box.sendable()).finally(() => (sending.current = false))
+        if (!sent) return
         setValue('')
+        box.clear()
     }
 
     return (
@@ -232,15 +544,16 @@ export const ChatComposer: React.FC<{
             onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
                     event.preventDefault()
-                    send()
+                    // A key held down never sends, so it can't answer a question that arrives while it's held.
+                    if (!event.repeat) void send()
                 }
             }}
-            attachment={attachment}
-            onAdd={onAdd}
-            addLabel={addLabel}
+            attachment={box.empty && !attachment ? undefined : <BoxChips box={box} before={attachment} />}
+            add={attach ? add : undefined}
+            onFiles={attach && attach.place !== 'runner' ? (files) => void box.addFiles(files) : undefined}
             canSend={!disabled && value.trim().length > 0}
-            onSend={send}
-            onStop={onStop}
+            onSend={() => void send()}
+            onStop={answering && value.trim() ? undefined : onStop}
             mascot={mascot}
             onChooseMascot={onChooseMascot}
         />

@@ -32,17 +32,22 @@ const actions = () =>
 const build = (overrides: Partial<PageMenuParams> = {}, acting = actions()) =>
   pageMenuTemplate(params(overrides), { canGoBack: false, canGoForward: true, assistantName: "Berry", recording: false }, acting);
 
-const labels = (items: ReturnType<typeof build>) => items.map((item) => item.label ?? "-");
+const labels = (items: ReturnType<typeof build>) => items.map((item) => ("label" in item ? item.label : "-"));
 
-const click = (items: ReturnType<typeof build>, label: string) =>
-  (items.find((item) => item.label === label)?.click as unknown as () => void)();
+const row = (items: ReturnType<typeof build>, label: string) => items.find((item) => "label" in item && item.label === label);
+
+const click = (items: ReturnType<typeof build>, label: string) => {
+  const found = row(items, label);
+  if (!found || !("click" in found)) throw new Error(`No ${label} to press`);
+  found.click?.();
+};
 
 describe("pageMenuTemplate", () => {
   it("offers navigation on a plain page, from the tab's real state", () => {
     const items = build();
     expect(labels(items)).toEqual(["Back", "Forward", "Reload", "-", "Select All", "-", "Show Berry How", "-", "Print…", "Inspect"]);
-    expect(items.find((item) => item.label === "Back")?.enabled).toBe(false);
-    expect(items.find((item) => item.label === "Forward")?.enabled).toBe(true);
+    expect(row(items, "Back")).toMatchObject({ enabled: false });
+    expect(row(items, "Forward")).toMatchObject({ enabled: true });
   });
 
   it("offers link actions on a link, but only opens web addresses", () => {
@@ -79,8 +84,8 @@ describe("pageMenuTemplate", () => {
   it("offers editing in a field, enabled by what the page allows", () => {
     const items = build({ isEditable: true, editFlags: { ...params().editFlags, canPaste: true } });
     expect(labels(items)).toEqual(["Undo", "Redo", "-", "Cut", "Copy", "Paste", "Select All", "-", "Inspect"]);
-    expect(items.find((item) => item.label === "Paste")?.enabled).toBe(true);
-    expect(items.find((item) => item.label === "Cut")?.enabled).toBe(false);
+    expect(row(items, "Paste")).toMatchObject({ enabled: true });
+    expect(row(items, "Cut")).toMatchObject({ enabled: false });
   });
 
   it("offers spelling suggestions only for a misspelled word in a field", () => {

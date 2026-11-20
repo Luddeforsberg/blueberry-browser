@@ -1,108 +1,134 @@
 /* DESIGN.md section 4. Components use these through Tailwind, never raw colours. */
 @layer base {
+  /* `.light` draws something in light mode inside a dark window, such as Settings' picture of a light one. */
+  .light,
   :root {
     color-scheme: light;
 
-    --background: 220 223 245;
-    --canvas: 252 252 255;
-    --surface: 255 255 255;
-    --tray: 242 243 251;
-    --card: 243 244 251;
-    --selected: 255 255 255;
-    --muted: 236 238 250;
-    --border: 225 227 242;
-    --foreground: 25 27 51;
-    --muted-foreground: 76 80 112;
-    --primary: 42 51 128;
-    --primary-foreground: 255 255 255;
-    --accent-ink: 47 58 168;
-    --bookmark: 250 204 21;
-    --success: 23 101 60;
-    --warning: 116 75 0;
-    --destructive: 171 36 28;
-    --destructive-foreground: 255 255 255;
-    --shadow-raised: 0 1px 3px rgb(46 52 120 / 0.08), 0 12px 40px rgb(46 52 120 / 0.16);
-    --shadow-selected: 0 2px 10px rgb(58 64 140 / 0.14);
-    --shadow-page: 0 1px 18px rgb(58 64 140 / 0.1);
-    --shadow-card: 0 14px 40px rgb(12 16 70 / 0.3);
-    --frame: linear-gradient(165deg, #c3cbf0 0%, #d6d9f4 30%, #e7e6f7 58%, #d4cfec 100%);
+    --ground: 245 245 246;
+    --tray: 232 232 235;
+    --well: 240 240 242;
+    --sheet: 255 255 255;
+    --sheet-2: 243 243 245;
+    /* A card set into a shell in a chat: the prompt box, an approval, your turn. The same as a sheet in light. */
+    --card: 255 255 255;
+    --card-2: 243 243 245;
+    --ink: 20 20 22;
+    --ink-2: 92 92 97;
+    --ink-3: 105 105 110;
+    --faint: 138 138 143;
+    --ask: 198 43 49;
+    --ask-bg: 251 228 227;
+    --focus: 63 81 220;
+    /* A tooltip: near-black in both modes, with white words. */
+    --tip: 20 20 22;
+    --tip-ink: 255 255 255;
+    /* Ink at a strength, so these are whole colours rather than channels. */
+    --line: rgb(20 20 22 / 0.09);
+    --dot: rgb(20 20 22 / 0.16);
+    --hover: rgb(20 20 22 / 0.05);
+    --press: rgb(20 20 22 / 0.09);
 
-    /* Berry's own colours, never the UI accent. */
-    --berry-ink: 24 28 46;
-    --berry-wing: 46 52 84;
-    --berry-nape: 158 166 190;
-    --berry-eye: 244 241 230;
-    --berry-pupil: 20 22 36;
-    --berry-beak: 62 68 102;
-    --berry-gear: 217 163 18;
-    --berry-gear-shade: 168 124 8;
-    --berry-rim: none;
+    --shadow-rim: 0 0 0 1px rgb(20 20 22 / 0.07), 0 1px 2px rgb(20 20 22 / 0.06);
+    /* A raised button, the chosen side of a switch, a hovered row on the well. */
+    --shadow-chip: 0 0 0 1px rgb(20 20 22 / 0.09), 0 1px 2px rgb(20 20 22 / 0.07);
+    /* A group of rows on the well, the active row in the sidebar. */
+    --shadow-up: 0 0 0 1px rgb(20 20 22 / 0.07), 0 1px 1px rgb(20 20 22 / 0.04), 0 3px 6px -1px rgb(20 20 22 / 0.05), 0 10px 20px -8px rgb(20 20 22 / 0.1);
+    /* The filled button: a highlight along its top edge and a small shadow under it (DESIGN.md section 8). */
+    --shadow-filled: inset 0 1px 0 rgb(255 255 255 / 0.14), 0 1px 2px rgb(20 20 22 / 0.25);
+    --shadow-card-lift: 0 0 0 1px rgb(20 20 22 / 0.07), 0 1px 2px rgb(20 20 22 / 0.06), 0 10px 24px -12px rgb(20 20 22 / 0.2);
+    --shadow-lift: 0 0 0 1px rgb(20 20 22 / 0.06), 0 1px 2px rgb(20 20 22 / 0.05), 0 14px 34px -10px rgb(20 20 22 / 0.16);
+    --shadow-tip: 0 4px 14px -4px rgb(0 0 0 / 0.35);
+
+    /* A site with no icon shows its letter on one of these, picked by its name (DESIGN.md section 8). */
+    --site-1: #3a3f47;
+    --site-2: #5e6ad2;
+    --site-3: #f24e1e;
+    --site-4: #d9483b;
+    --site-5: #1a73e8;
+    --site-6: #0b8a5f;
+    --site-7: #7a5af8;
+    --site-8: #ff6600;
+
+    /* The mascots' own colours (DESIGN.md section 9), never the chrome's. */
+    --berry-blueberry: #3f51dc;
+    --berry-blueberry-crown: #2a39b0;
+    --berry-blueberry-crown-hollow: #1d2878;
+    --berry-lingon: #df4b3b;
+    --berry-cloudberry: #f2ae35;
+    --berry-gooseberry: #86bf4e;
+    --berry-raspberry: #e86a9b;
+    --berry-currant: #262433;
+    --berry-stem: #6b4a2b;
+    --berry-leaf: #4e9a4a;
+    --berry-lingon-leaf: #2f7a3f;
+    --berry-lingon-leaf-small: #3f8f4a;
+    --berry-cloudberry-leaf: #8a9a3a;
+    --berry-gooseberry-stripe: #c4e69a;
+    --berry-gooseberry-tuft: #7a5a33;
+    --berry-raspberry-rim: #c4447a;
+    --berry-currant-tuft: #9a7a52;
+    --berry-currant-stem: #7b8a4a;
+    --berry-currant-bloom: #9d93d6;
+    --berry-gold: #f0b429;
+    --berry-cap: #2536c9;
+    --berry-headphones: #1d1e27;
+    --berry-bow: #ffffff;
+    --berry-bow-knot: #e86a9b;
+    /* Ink in both modes, so they never look like a second pair of eyes. Light on the currant, below. */
+    --berry-glasses: #1d1e27;
+    /* White eyes unless the body is pale, and the colours a mascot takes on the inverted address field. */
+    --berry-eye: #ffffff;
+    --berry-inverted-body: #eeede8;
+    --berry-inverted-eye: #1d1e27;
   }
 
   .dark {
     color-scheme: dark;
 
-    --background: 43 43 43;
-    --canvas: 31 31 31;
-    --surface: 36 36 36;
-    --tray: 24 24 24;
-    --card: 42 42 42;
-    --selected: 86 86 86;
-    --muted: 48 48 48;
-    --border: 64 64 64;
-    --foreground: 242 242 242;
-    --muted-foreground: 176 176 176;
-    --primary: 78 95 180;
-    --primary-foreground: 255 255 255;
-    --accent-ink: 163 174 251;
-    --bookmark: 253 224 71;
-    --success: 111 207 151;
-    --warning: 224 176 80;
-    --destructive: 245 158 150;
-    --destructive-foreground: 31 31 31;
-    --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.25), 0 10px 32px rgb(0 0 0 / 0.25);
-    --shadow-selected: inset 0 0 0 1px rgb(255 255 255 / 0.08);
-    --shadow-page: 0 1px 18px rgb(0 0 0 / 0.24);
-    --shadow-card: 0 14px 40px rgb(0 0 0 / 0.4);
-    --frame: linear-gradient(165deg, #38383b 0%, #2e2e30 40%, #262628 100%);
+    --ground: 19 19 18;
+    --tray: 31 31 29;
+    --well: 25 25 24;
+    --sheet: 39 39 37;
+    --sheet-2: 49 49 48;
+    /* A step up from the sheet the chat is on, so the card doesn't sink into it. */
+    --card: 49 49 48;
+    --card-2: 61 61 59;
+    --ink: 238 237 232;
+    --ink-2: 166 164 157;
+    --ink-3: 151 149 142;
+    --faint: 119 117 111;
+    --ask: 255 107 107;
+    --ask-bg: 58 31 31;
+    --focus: 143 160 255;
+    --tip: 11 11 11;
+    --line: rgb(255 255 255 / 0.09);
+    --dot: rgb(255 255 255 / 0.13);
+    --hover: rgb(255 255 255 / 0.06);
+    --press: rgb(255 255 255 / 0.1);
 
-    /* A dark bird, with a thin light rim so it holds its shape on a dark background. */
-    --berry-ink: 42 47 77;
-    --berry-wing: 61 68 112;
-    --berry-nape: 168 176 200;
-    --berry-eye: 244 241 230;
-    --berry-pupil: 20 22 36;
-    --berry-beak: 78 86 128;
-    --berry-rim: drop-shadow(0 0 0.75px rgb(255 255 255 / 0.45));
-    --berry-gear: 255 210 63;
-    --berry-gear-shade: 217 163 18;
+    --shadow-rim: 0 0 0 1px rgb(255 255 255 / 0.08);
+    --shadow-chip: 0 0 0 1px rgb(255 255 255 / 0.1), 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-up: 0 0 0 1px rgb(255 255 255 / 0.08), 0 10px 20px -8px rgb(0 0 0 / 0.5);
+    /* The button is light here, so its edge is the dark under it rather than a highlight on it. */
+    --shadow-filled: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-card-lift: 0 0 0 1px rgb(255 255 255 / 0.09), 0 10px 24px -12px rgb(0 0 0 / 0.55);
+    --shadow-lift: 0 0 0 1px rgb(255 255 255 / 0.07), 0 14px 34px -10px rgb(0 0 0 / 0.6);
+    /* A ring, so it shows on the ground. */
+    --shadow-tip: 0 0 0 1px rgb(255 255 255 / 0.12), 0 6px 16px -4px rgb(0 0 0 / 0.6);
+
+    /* The currant turns dusty so it still shows. */
+    --berry-currant: #6c6792;
+    --berry-blueberry-crown-hollow: #16205e;
+    --berry-headphones: #e9e8e3;
+    --berry-inverted-body: #1d1e27;
+    --berry-inverted-eye: #ffffff;
   }
 
   :root,
   .dark {
-    --glass-tint: rgb(var(--background) / 0.88);
-
-    /* The blueberry looks the same in light and dark. */
-    --berry-fruit-mid: 78 95 180;
-    --berry-fruit-dark: 42 51 128;
-    --berry-fruit-bloom: 164 175 224;
-    --berry-fruit-crown: 22 28 76;
-
-    /* The ring around a page while Berry is reading it. */
-    --shadow-reading: 0 0 0 2px rgb(127 139 216), 0 0 24px rgb(127 139 216 / 0.5);
-    /* The ring around the page card while the user is showing Berry something. */
-    --shadow-recording: 0 0 0 2px rgb(var(--destructive)), 0 0 18px rgb(var(--destructive) / 0.3);
-
-    /* Names kept from the starter theme, as aliases of the tokens above. */
-    --card-foreground: var(--foreground);
-    --popover: var(--surface);
-    --popover-foreground: var(--foreground);
-    --secondary: var(--muted);
-    --secondary-foreground: var(--foreground);
-    --accent: var(--muted);
-    --accent-foreground: var(--foreground);
-    --input: var(--border);
-    --ring: var(--accent-ink);
+    /* The ring around the page while the user is showing Berry something. */
+    --shadow-recording: 0 0 0 2px rgb(var(--ask)), 0 0 18px rgb(var(--ask) / 0.3);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -113,99 +139,31 @@
       animation-iteration-count: 1 !important;
       transition-duration: 1ms !important;
     }
+
+    /* A tooltip and an icon that changes still fade, with nothing moving or growing (DESIGN.md section 7). */
+    [data-fade] {
+      transform: none !important;
+      filter: none !important;
+      transition-property: opacity !important;
+      transition-duration: 110ms !important;
+    }
   }
 }
 
-/* The flock's colours, set on one mascot's drawing. The blueberry and the eye never change. */
+/* The pale bodies take ink eyes. The palette ids are the ones saved with a look (see BERRY_KIND in Mascot.tsx). */
 @layer base {
-  [data-mascot="robin"] {
-    --berry-ink: 143 59 34;
-    --berry-wing: 106 38 18;
-    --berry-nape: 242 138 76;
-    --berry-beak: 59 33 26;
-    --berry-gear: 31 143 134;
-    --berry-gear-shade: 20 102 95;
-  }
-  .dark [data-mascot="robin"] {
-    --berry-ink: 181 85 58;
-    --berry-wing: 138 58 34;
-    --berry-nape: 247 154 96;
-    --berry-beak: 232 201 176;
-    --berry-gear: 63 194 182;
-    --berry-gear-shade: 31 143 134;
-    --berry-rim: none;
-  }
-  [data-mascot="canary"] {
-    --berry-ink: 183 127 0;
-    --berry-wing: 143 97 0;
-    --berry-nape: 255 201 60;
-    --berry-beak: 217 96 26;
-    --berry-gear: 200 49 79;
-    --berry-gear-shade: 150 34 57;
-  }
-  .dark [data-mascot="canary"] {
-    --berry-ink: 224 168 16;
-    --berry-wing: 181 132 0;
-    --berry-nape: 255 224 122;
-    --berry-beak: 240 138 58;
-    --berry-gear: 240 96 126;
-    --berry-gear-shade: 200 49 79;
-    --berry-rim: none;
-  }
-  [data-mascot="parakeet"] {
-    --berry-ink: 31 138 76;
-    --berry-wing: 20 98 55;
-    --berry-nape: 154 217 79;
-    --berry-beak: 224 127 36;
-    --berry-gear: 217 84 43;
-    --berry-gear-shade: 166 60 27;
-  }
-  .dark [data-mascot="parakeet"] {
-    --berry-ink: 53 181 108;
-    --berry-wing: 31 138 76;
-    --berry-nape: 188 236 112;
-    --berry-beak: 243 154 67;
-    --berry-gear: 244 122 82;
-    --berry-gear-shade: 217 84 43;
-    --berry-rim: none;
-  }
+  [data-mascot="robin"],
+  [data-mascot="canary"],
+  [data-mascot="parakeet"],
   [data-mascot="flamingo"] {
-    --berry-ink: 209 63 124;
-    --berry-wing: 160 42 92;
-    --berry-nape: 255 176 204;
-    --berry-beak: 58 31 44;
-    --berry-gear: 27 143 163;
-    --berry-gear-shade: 19 106 121;
-  }
-  .dark [data-mascot="flamingo"] {
-    --berry-ink: 236 106 157;
-    --berry-wing: 200 69 125;
-    --berry-nape: 255 201 220;
-    --berry-beak: 246 219 229;
-    --berry-gear: 76 198 217;
-    --berry-gear-shade: 27 143 163;
-    --berry-rim: none;
-  }
-  [data-mascot="kingfisher"] {
-    --berry-ink: 15 126 163;
-    --berry-wing: 10 92 120;
-    --berry-nape: 245 139 60;
-    --berry-beak: 35 38 46;
-    --berry-gear: 232 169 0;
-    --berry-gear-shade: 181 132 0;
-  }
-  .dark [data-mascot="kingfisher"] {
-    --berry-ink: 43 168 207;
-    --berry-wing: 26 129 163;
-    --berry-nape: 251 159 88;
-    --berry-beak: 233 237 242;
-    --berry-gear: 255 210 63;
-    --berry-gear-shade: 232 169 0;
-    --berry-rim: none;
+    --berry-eye: #1d1e27;
   }
 
-  /* On every drawing of a bird, so the rim goes wherever it's drawn. */
-  .berry-rim {
-    filter: var(--berry-rim);
+  [data-mascot="jackdaw"] {
+    --berry-glasses: #f4f3ee;
+  }
+
+  [data-inverted] {
+    --berry-eye: var(--berry-inverted-eye);
   }
 }

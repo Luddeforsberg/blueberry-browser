@@ -1,11 +1,18 @@
 import React, { useEffect, useState } from 'react'
 import type { PublishedMascot } from '@shared/library'
+import { ACCOUNT_NAME_MAX } from '@shared/accountName'
 import { Button } from '@common/components/Button'
 import { AccountForm } from '../components/AccountForm'
+import { Avatar } from '../components/AccountMenu'
 import { CopyLink } from '../components/CopyLink'
-import { SettingsRow } from '../components/SettingsRow'
+import { cn } from '@common/lib/utils'
+import { LINE_BETWEEN, ROW } from '../components/PageFrame'
+import { SettingsGroup, SettingsRow } from '../components/SettingsRow'
+import { useShell } from '../contexts/ShellContext'
 import { useLibrary } from '../contexts/LibraryContext'
 import { useAccount } from '../useAccount'
+
+// Settings > Account. The name is the user's own, kept in Settings on this computer: nothing sends, prompts or publishes it.
 
 const NEEDED_FOR = 'publishing a mascot and keeping cloud jobs going with your Mac off'
 
@@ -26,52 +33,119 @@ const PublishedList: React.FC = () => {
     }
 
     if (list === undefined) return null
-    if (list === null) return <SettingsRow id="setting-published" title="What you’ve published" description="Couldn’t reach the Gallery to see." />
-    if (list.length === 0) return <SettingsRow id="setting-published" title="What you’ve published" description="Nothing yet. A mascot’s card in your flock has Publish." />
     return (
-        <div className="py-4">
-            <h3 className="text-14 font-semibold">What you’ve published</h3>
-            <ul aria-label="What you’ve published" className="mt-2 divide-y">
-                {list.map((mascot) => (
-                    <li key={mascot.id} className="flex items-center gap-3 py-2">
-                        <div className="flex-1 min-w-0">
-                            <p className="text-14 [overflow-wrap:anywhere]">{mascot.name}</p>
-                            <p className="text-12 text-muted-foreground [overflow-wrap:anywhere] tabular-nums">
-                                By {mascot.author} · {mascot.addCount === 1 ? '1 add' : `${mascot.addCount} adds`}
-                                {mascot.hidden && ' · Taken out of the Gallery by Blueberry'}
-                            </p>
-                        </div>
-                        {mascot.link && <CopyLink link={mascot.link} label={`Copy the link to ${mascot.name}`} />}
-                        <Button variant="outline" size="sm" aria-label={`Unpublish ${mascot.name}`} onClick={() => void unpublish(mascot.id)}>Unpublish</Button>
-                    </li>
-                ))}
-            </ul>
-            {problem && <p role="alert" className="mt-2 text-13 text-destructive">{problem}</p>}
-        </div>
+        <SettingsGroup label="Published in the Gallery">
+            {list === null && <SettingsRow id="setting-published" title="Couldn’t reach the Gallery to see." />}
+            {list?.length === 0 && <SettingsRow id="setting-published" title="Nothing yet" description="A mascot’s card on Your mascots has Publish." />}
+            {list && list.length > 0 && (
+                <ul aria-label="What you’ve published">
+                    {list.map((mascot) => (
+                        <li key={mascot.id} className={cn(ROW, LINE_BETWEEN, 'before:left-2 min-h-12 py-[9px] flex items-center gap-3')}>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-14 [overflow-wrap:anywhere]">{mascot.name}</p>
+                                <p className="mt-0.5 text-13 text-ink-2 [overflow-wrap:anywhere] tabular-nums">
+                                    By {mascot.author} · {mascot.addCount === 1 ? '1 add' : `${mascot.addCount} adds`}
+                                    {mascot.hidden && ' · Taken out of the Gallery by Blueberry'}
+                                </p>
+                            </div>
+                            {mascot.link && <CopyLink link={mascot.link} label={`Copy the link to ${mascot.name}`} />}
+                            <Button variant="raised" size="sm" aria-label={`Unpublish ${mascot.name}`} onClick={() => void unpublish(mascot.id)}>Unpublish</Button>
+                        </li>
+                    ))}
+                </ul>
+            )}
+            {problem && <SettingsRow id="setting-published-problem" title={<span role="alert" className="text-ask">{problem}</span>} />}
+        </SettingsGroup>
+    )
+}
+
+// Name, with Change turning it into a field. Enter or Save keeps it, Escape or Cancel doesn't, and an empty one clears it.
+const NameRow: React.FC = () => {
+    const { settings, updateSettings } = useShell()
+    const [draft, setDraft] = useState<string | null>(null)
+    const save = () => {
+        if (draft === null) return
+        updateSettings({ accountName: draft.trim() || null })
+        setDraft(null)
+    }
+
+    if (draft !== null) {
+        return (
+            <SettingsRow id="setting-name" title="Name" description="Only on this computer. It’s never sent anywhere.">
+                <form
+                    className="flex items-center gap-2"
+                    onSubmit={(event) => {
+                        event.preventDefault()
+                        save()
+                    }}
+                >
+                    <input
+                        aria-labelledby="setting-name"
+                        autoFocus
+                        maxLength={ACCOUNT_NAME_MAX}
+                        autoComplete="name"
+                        value={draft}
+                        onChange={(event) => setDraft(event.target.value)}
+                        onKeyDown={(event) => {
+                            if (event.key === 'Escape') setDraft(null)
+                        }}
+                        className="w-48 h-[26px] rounded-row border bg-sheet px-2.5 text-14 outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                    />
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setDraft(null)}>Cancel</Button>
+                    <Button type="submit" variant="raised" size="sm">Save</Button>
+                </form>
+            </SettingsRow>
+        )
+    }
+    return (
+        <SettingsRow id="setting-name" title="Name" description="Only on this computer. It’s never sent anywhere.">
+            <span className="min-w-0 truncate text-13 text-ink-2">{settings.accountName ?? 'Not set'}</span>
+            <Button variant="raised" size="sm" aria-label="Change your name" onClick={() => setDraft(settings.accountName ?? '')}>Change</Button>
+        </SettingsRow>
     )
 }
 
 export const AccountSettings: React.FC = () => {
     const [account, setAccount] = useAccount()
+    const { settings } = useShell()
     if (account.status === 'not-set-up') {
-        return <SettingsRow id="setting-account" title="No account" description={`This copy of Blueberry isn’t set up for accounts, which only ${NEEDED_FOR} need.`} />
+        return (
+            <SettingsGroup>
+                <SettingsRow id="setting-account" title="No account" description={`This copy of Blueberry isn’t set up for accounts, which only ${NEEDED_FOR} need.`} />
+            </SettingsGroup>
+        )
     }
     if (account.status === 'signed-out') {
         return (
-            <>
-                <SettingsRow id="setting-account" title="Not signed in" description={`Browsing, chatting and the Gallery never need one: it’s only for ${NEEDED_FOR}.`} />
-                <div className="py-4">
-                    <AccountForm problem={account.problem} onResult={setAccount} />
-                </div>
-            </>
+            <SettingsGroup>
+                <SettingsRow
+                    id="setting-account"
+                    title="Not signed in"
+                    description={`Browsing, chatting and the Gallery never need one: it’s only for ${NEEDED_FOR}.`}
+                    below={<AccountForm problem={account.problem} onResult={setAccount} />}
+                />
+            </SettingsGroup>
         )
     }
     return (
         <>
-            <SettingsRow id="setting-account" title={`Signed in as ${account.email}`} description="Only you see this address. It’s never published, and it’s kept encrypted on this computer.">
-                <Button variant="outline" onClick={() => void window.chromeAPI.account.signOut().then(setAccount)}>Sign out</Button>
-            </SettingsRow>
-            {account.problem && <p role="alert" className="py-4 text-13 text-warning">{account.problem}</p>}
+            <SettingsGroup>
+                <SettingsRow
+                    id="setting-account"
+                    lead={<Avatar name={settings.accountName} email={account.email} large />}
+                    title={<span className="font-medium">{settings.accountName ?? account.email}</span>}
+                    description={settings.accountName ? account.email : undefined}
+                >
+                    <Button variant="raised" size="sm" onClick={() => void window.chromeAPI.account.signOut().then(setAccount)}>Sign out</Button>
+                </SettingsRow>
+                {account.problem && <SettingsRow id="setting-account-problem" title={<span role="alert" className="text-ask">{account.problem}</span>} />}
+            </SettingsGroup>
+            <SettingsGroup label="You">
+                <NameRow />
+                <SettingsRow id="setting-email" title="Email" description="Only you see it. It’s never published, and it’s kept encrypted on this computer.">
+                    <span className="min-w-0 truncate text-13 text-ink-2">{account.email}</span>
+                </SettingsRow>
+            </SettingsGroup>
             <PublishedList />
         </>
     )

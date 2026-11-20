@@ -23,13 +23,16 @@ describe("BookmarkStore", () => {
     expect(new BookmarkStore(file).get()).toEqual([site]);
   });
 
-  it("toggling saves a site across restarts, and toggling again removes it", () => {
+  it("adding saves a site across restarts once, and removing its address takes it away", () => {
     const file = tempFile();
     const store = new BookmarkStore(file);
-    store.toggle(site.url, site.title);
+    store.add(site.url, site.title);
+    store.add(site.url, "A new title");
     expect(new BookmarkStore(file).get()).toMatchObject([{ title: site.title, url: site.url }]);
 
-    store.toggle(site.url, "A new title");
+    store.removeUrl("https://elsewhere.example/");
+    expect(store.get()).toHaveLength(1);
+    store.removeUrl(site.url);
     expect(store.get()).toEqual([]);
     expect(JSON.parse(readFileSync(file, "utf8"))).toEqual([]);
   });
@@ -37,9 +40,9 @@ describe("BookmarkStore", () => {
   it("keeps the icon the page named, only if it's on the web", () => {
     const file = tempFile();
     const store = new BookmarkStore(file);
-    store.toggle("https://a.example/", "A", "https://cdn.a.example/icon.png");
-    store.toggle("https://b.example/", "B", "data:image/png;base64,AAAA");
-    store.toggle("https://c.example/", "C");
+    store.add("https://a.example/", "A", "https://cdn.a.example/icon.png");
+    store.add("https://b.example/", "B", "data:image/png;base64,AAAA");
+    store.add("https://c.example/", "C");
     expect(new BookmarkStore(file).get().map(({ favicon }) => favicon)).toEqual(["https://cdn.a.example/icon.png", undefined, undefined]);
 
     writeFileSync(file, JSON.stringify([{ ...site, favicon: "javascript:alert(1)" }, { ...site, id: "b", favicon: 7 }]));
@@ -50,8 +53,8 @@ describe("BookmarkStore", () => {
     const icon = (length: number) => `https://a.example/${"i".repeat(length - "https://a.example/".length)}`;
     const file = tempFile();
     const store = new BookmarkStore(file);
-    store.toggle("https://a.example/", "A", icon(MAX_ICON_LENGTH));
-    store.toggle("https://b.example/", "B", icon(MAX_ICON_LENGTH + 1));
+    store.add("https://a.example/", "A", icon(MAX_ICON_LENGTH));
+    store.add("https://b.example/", "B", icon(MAX_ICON_LENGTH + 1));
     expect(store.get().map(({ favicon }) => favicon?.length)).toEqual([MAX_ICON_LENGTH, undefined]);
 
     writeFileSync(file, JSON.stringify([{ ...site, favicon: icon(MAX_ICON_LENGTH) }, { ...site, id: "b", favicon: icon(1024 * 1024) }]));
@@ -60,25 +63,46 @@ describe("BookmarkStore", () => {
 
   it("uses the address when a page has no title", () => {
     const store = new BookmarkStore(tempFile());
-    store.toggle(site.url, "");
+    store.add(site.url, "");
     expect(store.get()[0].title).toBe(site.url);
   });
 
   it("won't save anything but a web page", () => {
     const store = new BookmarkStore(tempFile());
-    store.toggle("about:blank", "Blank");
-    store.toggle("file:///etc/passwd", "Passwords");
+    store.add("about:blank", "Blank");
+    store.add("file:///etc/passwd", "Passwords");
     expect(store.get()).toEqual([]);
   });
 
-  it("removes one site by id and ignores an unknown id", () => {
+  it("places a site where it ends up, moving it if it's there already, and keeps its id", () => {
+    const file = tempFile();
+    const store = new BookmarkStore(file);
+    for (const name of ["a", "b", "c"]) store.add(`https://${name}.example/`, name.toUpperCase());
+    const titles = () => store.get().map(({ title }) => title);
+    const moved = { id: "kept", title: "D", url: "https://d.example/" };
+
+    store.place(moved, 1);
+    expect(titles()).toEqual(["A", "D", "B", "C"]);
+    expect(new BookmarkStore(file).get()[1].id).toBe("kept");
+    // Later, to the end, and earlier, counting the others.
+    store.place(moved, 3);
+    expect(titles()).toEqual(["A", "B", "C", "D"]);
+    store.place(moved, 0);
+    expect(titles()).toEqual(["D", "A", "B", "C"]);
+    // Past either end, or not a number, it stops at the end or the start.
+    store.place(moved, 99);
+    expect(titles()).toEqual(["A", "B", "C", "D"]);
+    store.place(moved, -4);
+    expect(titles()).toEqual(["D", "A", "B", "C"]);
+    store.place(moved, Number.NaN);
+    expect(titles()).toEqual(["D", "A", "B", "C"]);
+    expect(store.get().filter(({ url }) => url === moved.url)).toHaveLength(1);
+  });
+
+  it("won't place anything but a web page, or an icon from anywhere else", () => {
     const store = new BookmarkStore(tempFile());
-    store.toggle("https://a.example/", "A");
-    store.toggle("https://b.example/", "B");
-    const [first, second] = store.get();
-    store.remove("missing");
-    expect(store.get()).toEqual([first, second]);
-    store.remove(first.id);
-    expect(store.get()).toEqual([second]);
+    store.place({ id: "x", title: "X", url: "file:///etc/passwd" }, 0);
+    store.place({ id: "y", title: "Y", url: "https://y.example/", favicon: "data:image/png;base64,AAAA" }, 0);
+    expect(store.get()).toEqual([{ id: "y", title: "Y", url: "https://y.example/" }]);
   });
 });

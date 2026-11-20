@@ -14,6 +14,8 @@ import type {
 export interface StoredRoutine {
   id: string;
   name: string;
+  // The user chose the name, or it was named from what it does already, so a written one never replaces it.
+  nameSettled: boolean;
   instructions: string;
   schedule: RoutineSchedule;
   // Null is Berry.
@@ -27,8 +29,9 @@ export interface StoredRoutine {
   nextRunAt: number | null;
 }
 
-interface RoutineRow extends Omit<StoredRoutine, "schedule" | "paused" | "sites" | "inCloud"> {
+interface RoutineRow extends Omit<StoredRoutine, "schedule" | "paused" | "sites" | "inCloud" | "nameSettled"> {
   schedule: string;
+  nameSettled: number;
   sites: string;
   paused: number;
   inCloud: number;
@@ -73,14 +76,17 @@ const MIGRATIONS = [
   `ALTER TABLE routines ADD COLUMN sites TEXT NOT NULL DEFAULT '[]';`,
   `ALTER TABLE runs ADD COLUMN memory TEXT NOT NULL DEFAULT '[]';`,
   `ALTER TABLE routines ADD COLUMN in_cloud INTEGER NOT NULL DEFAULT 0;`,
+  // Every routine from before was named by the user.
+  `ALTER TABLE routines ADD COLUMN name_settled INTEGER NOT NULL DEFAULT 1;`,
 ];
 
-const ROUTINE_COLUMNS = "id, name, instructions, schedule, mascot_id AS mascotId, sites, in_cloud AS inCloud, paused, next_run_at AS nextRunAt";
+const ROUTINE_COLUMNS = "id, name, name_settled AS nameSettled, instructions, schedule, mascot_id AS mascotId, sites, in_cloud AS inCloud, paused, next_run_at AS nextRunAt";
 const RUN_COLUMNS =
   "id, routine_id AS routineId, status, started_at AS startedAt, ended_at AS endedAt, late_for AS lateFor, steps, result, error, approval, tokens, seen, memory";
 
-const toRoutine = ({ schedule, sites, paused, inCloud, ...row }: RoutineRow): StoredRoutine => ({
+const toRoutine = ({ schedule, sites, paused, inCloud, nameSettled, ...row }: RoutineRow): StoredRoutine => ({
   ...row,
+  nameSettled: nameSettled === 1,
   schedule: JSON.parse(schedule),
   sites: JSON.parse(sites),
   inCloud: inCloud === 1,
@@ -134,18 +140,26 @@ export class RoutineStore {
     return row.at;
   }
 
-  create({ name, instructions, schedule, mascotId = null, sites = [], inCloud = false }: RoutineDraft, nextRunAt: number | null): string {
+  create({ name, instructions, schedule, mascotId = null, sites = [], inCloud = false }: RoutineDraft, nextRunAt: number | null, nameSettled = true): string {
     const id = randomUUID();
     this.db
-      .prepare("INSERT INTO routines (id, name, instructions, schedule, mascot_id, sites, in_cloud, next_run_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-      .run(id, name, instructions, JSON.stringify(schedule), mascotId, JSON.stringify(sites), inCloud ? 1 : 0, nextRunAt, Date.now());
+      .prepare("INSERT INTO routines (id, name, name_settled, instructions, schedule, mascot_id, sites, in_cloud, next_run_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(id, name, nameSettled ? 1 : 0, instructions, JSON.stringify(schedule), mascotId, JSON.stringify(sites), inCloud ? 1 : 0, nextRunAt, Date.now());
     return id;
   }
 
-  update(id: string, { name, instructions, schedule, mascotId = null, sites = [], inCloud = false }: RoutineDraft, nextRunAt: number | null): boolean {
+  update(id: string, { name, instructions, schedule, mascotId = null, sites = [], inCloud = false }: RoutineDraft, nextRunAt: number | null, nameSettled = true): boolean {
     const { changes } = this.db
-      .prepare("UPDATE routines SET name = ?, instructions = ?, schedule = ?, mascot_id = ?, sites = ?, in_cloud = ?, next_run_at = ? WHERE id = ?")
-      .run(name, instructions, JSON.stringify(schedule), mascotId, JSON.stringify(sites), inCloud ? 1 : 0, nextRunAt, id);
+      .prepare("UPDATE routines SET name = ?, name_settled = ?, instructions = ?, schedule = ?, mascot_id = ?, sites = ?, in_cloud = ?, next_run_at = ? WHERE id = ?")
+      .run(name, nameSettled ? 1 : 0, instructions, JSON.stringify(schedule), mascotId, JSON.stringify(sites), inCloud ? 1 : 0, nextRunAt, id);
+    return changes > 0;
+  }
+
+  // False if the user named it, or it was deleted, while the name was being written.
+  setWrittenName(id: string, name: string): boolean {
+    const { changes } = this.db
+      .prepare("UPDATE routines SET name = ?, name_settled = 1 WHERE id = ? AND name_settled = 0")
+      .run(name, id);
     return changes > 0;
   }
 

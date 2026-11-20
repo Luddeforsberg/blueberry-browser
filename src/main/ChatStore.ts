@@ -3,6 +3,8 @@ import { randomUUID } from "crypto";
 import { dirname } from "path";
 import { DatabaseSync } from "node:sqlite";
 import type { ChatThreadMessage, ChatThreadSummary } from "../shared/library";
+import type { FileKind } from "../shared/attachments";
+import type { PreparedFile } from "./Attachments";
 import { migrate } from "./database";
 
 export interface StoredChat extends ChatThreadSummary {
@@ -32,7 +34,29 @@ const MIGRATIONS = [
   `ALTER TABLE chats ADD COLUMN source TEXT;`,
   // The pages a reply's job opened and closed when it ended.
   `ALTER TABLE messages ADD COLUMN pages TEXT;`,
+  // What went with a message, by name, to show over it. The files themselves are in message_files, which only main
+  // reads and which goes with its chat.
+  `ALTER TABLE messages ADD COLUMN attached TEXT;
+   CREATE TABLE message_files (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     chat_id TEXT NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+     message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+     kind TEXT NOT NULL CHECK (kind IN ('picture', 'pdf', 'text')),
+     name TEXT NOT NULL,
+     fact TEXT,
+     mime TEXT,
+     data BLOB,
+     text TEXT
+   );
+   CREATE INDEX message_files_by_chat ON message_files(chat_id, message_id, id);`,
+  // Whether the user has looked at the chat since its last reply ended. Chats from before this count as seen.
+  `ALTER TABLE chats ADD COLUMN seen INTEGER NOT NULL DEFAULT 1;`,
+  // How a reply's job went, for the screen: what it said between steps, when it began and how long it took.
+  `ALTER TABLE messages ADD COLUMN work TEXT;`,
 ];
+
+// A file kept with the message it went with, for the model only. Never part of a chat a renderer gets.
+export type StoredFile = Pick<PreparedFile, "kind" | "name" | "fact" | "mime" | "data" | "text">;
 
 // Saved chats, in a SQLite file in the user data folder. Built-in SQLite needs no native module to
 // rebuild for Electron, and the same code runs under Vitest.
@@ -42,14 +66,16 @@ export class ChatStore {
   constructor(file: string) {
     if (file !== ":memory:") mkdirSync(dirname(file), { recursive: true });
     this.db = new DatabaseSync(file);
-    this.db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
+    // A deleted chat's files are written over, not only let go, so nothing of them stays in the file.
+    this.db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA secure_delete = ON;");
     migrate(this.db, MIGRATIONS);
   }
 
   summaries(): ChatThreadSummary[] {
-    return this.db
-      .prepare("SELECT id, title, updated_at AS updatedAt, mascot_id AS mascotId, source AS \"from\" FROM chats ORDER BY updated_at DESC, rowid DESC")
-      .all() as unknown as ChatThreadSummary[];
+    const rows = this.db
+      .prepare("SELECT id, title, updated_at AS updatedAt, mascot_id AS mascotId, source AS \"from\", seen FROM chats ORDER BY updated_at DESC, rowid DESC")
+      .all() as unknown as Array<ChatThreadSummary & { seen: number }>;
+    return rows.map(({ seen, ...chat }) => ({ ...chat, unseen: seen === 0 }));
   }
 
   // What each of the newest chats began with, for noticing what the user keeps asking. A chat another app started
@@ -76,13 +102,15 @@ export class ChatStore {
       .get(id) as unknown as ChatThreadSummary | undefined;
     if (!summary) return null;
     const rows = this.db
-      .prepare("SELECT role, content, steps, memory, pages FROM messages WHERE chat_id = ? ORDER BY id")
-      .all(id) as unknown as Array<Pick<ChatThreadMessage, "role" | "content"> & { steps: string | null; memory: string | null; pages: string | null }>;
-    const messages = rows.map(({ steps, memory, pages, ...message }): ChatThreadMessage => ({
+      .prepare("SELECT role, content, steps, memory, pages, attached, work FROM messages WHERE chat_id = ? ORDER BY id")
+      .all(id) as unknown as Array<Pick<ChatThreadMessage, "role" | "content"> & { steps: string | null; memory: string | null; pages: string | null; attached: string | null; work: string | null }>;
+    const messages = rows.map(({ steps, memory, pages, attached, work, ...message }): ChatThreadMessage => ({
       ...message,
       ...(steps ? { steps: JSON.parse(steps) } : {}),
       ...(memory ? { memoryIds: JSON.parse(memory) } : {}),
       ...(pages ? { pages: JSON.parse(pages) } : {}),
+      ...(attached ? { attached: JSON.parse(attached) } : {}),
+      ...(work ? JSON.parse(work) : {}),
     }));
     return { ...summary, messages };
   }
@@ -115,21 +143,49 @@ export class ChatStore {
     return changes > 0;
   }
 
+  // False if nothing changed, so a chat already seen isn't sent again.
+  setSeen(id: string, seen: boolean): boolean {
+    return this.db.prepare("UPDATE chats SET seen = ? WHERE id = ? AND seen <> ?").run(seen ? 1 : 0, id, seen ? 1 : 0).changes > 0;
+  }
+
   deleteChat(id: string): boolean {
     return this.db.prepare("DELETE FROM chats WHERE id = ?").run(id).changes > 0;
   }
 
-  addMessage(chatId: string, message: ChatThreadMessage): void {
-    this.db
-      .prepare("INSERT INTO messages (chat_id, role, content, steps, memory, pages) VALUES (?, ?, ?, ?, ?, ?)")
-      .run(
-        chatId,
-        message.role,
-        message.content,
-        message.steps?.length ? JSON.stringify(message.steps) : null,
-        message.memoryIds?.length ? JSON.stringify(message.memoryIds) : null,
-        message.pages?.length ? JSON.stringify(message.pages) : null
-      );
-    this.db.prepare("UPDATE chats SET updated_at = ? WHERE id = ?").run(Date.now(), chatId);
+  // `files` are kept with the message, in the same step, and only `filesOf` reads them back.
+  addMessage(chatId: string, message: ChatThreadMessage, files: readonly StoredFile[] = []): void {
+    this.db.exec("BEGIN");
+    try {
+      const { lastInsertRowid: messageId } = this.db
+        .prepare("INSERT INTO messages (chat_id, role, content, steps, memory, pages, attached, work) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+        .run(
+          chatId,
+          message.role,
+          message.content,
+          message.steps?.length ? JSON.stringify(message.steps) : null,
+          message.memoryIds?.length ? JSON.stringify(message.memoryIds) : null,
+          message.pages?.length ? JSON.stringify(message.pages) : null,
+          message.attached?.length ? JSON.stringify(message.attached) : null,
+          message.startedAt !== undefined ? JSON.stringify({ said: message.said ?? [], startedAt: message.startedAt, took: message.took }) : null
+        );
+      const insert = this.db.prepare("INSERT INTO message_files (chat_id, message_id, kind, name, fact, mime, data, text) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+      files.forEach((file) => insert.run(chatId, messageId, file.kind, file.name, file.fact, file.mime, file.data, file.text));
+      this.db.prepare("UPDATE chats SET updated_at = ? WHERE id = ?").run(Date.now(), chatId);
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  // The files that went with each of a chat's messages, in the order of its messages, for the model and nothing else.
+  filesOf(chatId: string): StoredFile[][] {
+    const messages = this.db.prepare("SELECT id FROM messages WHERE chat_id = ? ORDER BY id").all(chatId) as unknown as Array<{ id: number }>;
+    const rows = this.db
+      .prepare("SELECT message_id AS messageId, kind, name, fact, mime, data, text FROM message_files WHERE chat_id = ? ORDER BY message_id, id")
+      .all(chatId) as unknown as Array<{ messageId: number; kind: FileKind; name: string; fact: string | null; mime: string | null; data: Uint8Array | null; text: string | null }>;
+    return messages.map(({ id }) =>
+      rows.filter(({ messageId }) => messageId === id).map(({ kind, name, fact, mime, data, text }) => ({ kind, name, fact, mime, data: data && Buffer.from(data), text }))
+    );
   }
 }

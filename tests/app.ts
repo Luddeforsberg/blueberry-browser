@@ -43,24 +43,48 @@ export async function closeWithin(close: () => Promise<void>, kill: () => void, 
   kill();
 }
 
-// Windows needs the whole tree named, or the app's helper processes stay behind.
+// Signal 0 only asks whether the process is there.
+const isRunning = (pid: number): boolean => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// Windows needs the whole tree named, or the app's helper processes stay behind. taskkill fails when part of the tree has
+// already ended while it worked, which is only a failure if the app is still running.
 export const killApp = (app: ElectronApplication) => {
   const { pid } = app.process();
-  if (process.platform === "win32" && pid) execFileSync("taskkill", ["/pid", String(pid), "/T", "/F"]);
-  else app.process().kill("SIGKILL");
+  if (process.platform !== "win32" || !pid) {
+    app.process().kill("SIGKILL");
+    return;
+  }
+  try {
+    execFileSync("taskkill", ["/pid", String(pid), "/T", "/F"], { stdio: "pipe" });
+  } catch (error) {
+    if (isRunning(pid)) throw error;
+  }
 };
 
 // Launches the built app in out/, so run `pnpm exec electron-vite build` first.
 // Pass a profile folder to launch again with the same saved settings.
-// Tests skip onboarding unless they ask for a first launch.
+// Tests skip onboarding unless they ask for a first launch, and start with only Berry unless they ask for the starters.
 // They have no model unless they pass one, and a .env file can't change that: it never overrides these.
+// `preload` adds scripts for the main process to load first, as tests/features/driveFakes.cjs is for `drive`.
 export async function launchApp(
   userDataDir = mkdtempSync(join(tmpdir(), "blueberry-test-")),
-  { firstLaunch = false, modelEnv = {} }: { firstLaunch?: boolean; modelEnv?: Record<string, string> } = {}
+  {
+    firstLaunch = false,
+    starters = false,
+    modelEnv = {},
+    preload = [],
+  }: { firstLaunch?: boolean; starters?: boolean; modelEnv?: Record<string, string>; preload?: string[] } = {}
 ): Promise<ElectronApplication> {
   const settingsFile = join(userDataDir, "settings.json");
   if (!firstLaunch && !existsSync(settingsFile)) {
-    writeFileSync(settingsFile, JSON.stringify({ onboarded: true }));
+    writeFileSync(settingsFile, JSON.stringify({ onboarded: true, startersAdded: !starters }));
   }
 
   // Some shells export ELECTRON_RUN_AS_NODE, which would start Node instead of the app.
@@ -88,7 +112,7 @@ export async function launchApp(
     electron.launch({
       executablePath: electronPath as unknown as string,
       // A fresh profile keeps tests apart and away from the developer's real browsing data.
-      args: [...background, "-r", join(__dirname, "fakeKeychain.cjs"), "-r", join(__dirname, "fakeShortcut.cjs"), "-r", join(__dirname, "fakeProtocol.cjs"), ".", `--user-data-dir=${userDataDir}`],
+      args: [...background, ...preload.flatMap((file) => ["-r", file]), "-r", join(__dirname, "fakeKeychain.cjs"), "-r", join(__dirname, "fakeShortcut.cjs"), "-r", join(__dirname, "fakeProtocol.cjs"), ".", `--user-data-dir=${userDataDir}`],
       env,
       timeout: LAUNCH_TIMEOUT_MS,
     })
@@ -98,6 +122,29 @@ export async function launchApp(
   const close = app.close.bind(app);
   app.close = () => closeWithin(close, () => killApp(app));
   return app;
+}
+
+// Our menus and Asking first are drawn in the menu view, over the window (DESIGN.md section 8). Tests press in it as a
+// person would, since nothing else can answer it.
+const menuRow = (view: Page, label: string) =>
+  view.getByRole("menuitem", { name: label, exact: true }).or(view.getByRole("menuitemcheckbox", { name: label, exact: true }));
+
+export async function chooseFromMenu(app: ElectronApplication, label: string): Promise<void> {
+  await menuRow(await findView(app, "view=menu"), label).click();
+}
+
+// The rows of the menu that's open, in order, with "-" for a hairline.
+export async function openMenuRows(app: ElectronApplication): Promise<string[]> {
+  const view = await findView(app, "view=menu");
+  return view
+    .locator('[role=menu]:not([aria-hidden="true"])')
+    .first()
+    .evaluate((menu) => [...menu.children].map((child) => child.getAttribute("aria-label") ?? "-"));
+}
+
+export async function answerAsk(app: ElectronApplication, button: string): Promise<void> {
+  const view = await findView(app, "view=menu");
+  await view.getByRole("alertdialog").getByRole("button", { name: button, exact: true }).click();
 }
 
 // Each WebContentsView shows up as its own Playwright window. A window can exist before it reaches

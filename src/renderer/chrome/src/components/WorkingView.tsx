@@ -1,18 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { ArrowLeft, CircleStop } from 'lucide-react'
 import type { ChatApproval, MascotProfile, WorkOutcome, WorkTab, WorkView } from '@shared/library'
 import { cn } from '@common/lib/utils'
 import { useBrowser } from '../contexts/BrowserContext'
 import { useShell } from '../contexts/ShellContext'
 import { Berry, useAssistantName } from './Berry'
 import { Favicon } from './Favicon'
-import { SHIMMER_TEXT } from './ChatMessage'
+import { Pips } from '@common/components/Pips'
+import { chipClass } from './ChatMessage'
 import { liveFrameLock, useCloudView } from '../cloudView'
-
-const PERCH_SIZE = 48
-// The drawing's feet are this far up from the bottom of its box.
-const PERCH_FEET = 0.05
-const MOST_SITES_NAMED = 3
+import { Tooltip } from '@common/components/Tooltip'
 
 // Pictures arrive many times a second, so they go straight to the picture showing them, and nothing else draws again.
 export interface WorkFrames {
@@ -66,17 +62,6 @@ export const useWorkView = (chatId: string | null, pictureWidth: number): { view
     return { view: view?.chatId === chatId ? view : null, frames }
 }
 
-const useElapsed = ({ startedAt, endedAt }: Pick<WorkView, 'startedAt' | 'endedAt'>): string => {
-    const [now, setNow] = useState(() => Date.now())
-    useEffect(() => {
-        if (endedAt !== null) return undefined
-        const timer = setInterval(() => setNow(Date.now()), 1000)
-        return () => clearInterval(timer)
-    }, [endedAt])
-    const seconds = Math.max(0, Math.floor(((endedAt ?? now) - startedAt) / 1000))
-    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
-}
-
 const OUTCOME: Record<WorkOutcome, string> = { done: 'Done', stopped: 'Stopped here', failed: 'It didn’t finish' }
 
 const askingWords = (approval: ChatApproval): string =>
@@ -90,20 +75,13 @@ const WITHOUT_PICTURE: Record<Exclude<WorkTab['state'], 'picture'>, (name: strin
     none: () => 'No picture of this page',
 }
 
-const sitesInWords = (sites: string[]): string => {
-    const named = sites.slice(0, MOST_SITES_NAMED)
-    const rest = sites.length - named.length
-    if (rest > 0) return `${named.join(', ')} and ${rest} more`
-    return named.length > 1 ? `${named.slice(0, -1).join(', ')} and ${named.at(-1)}` : named[0]
-}
-
 // A page in the cloud, from its cloud tab's own live view, locked as it is before taking over, or the local test
 // browser's pictures. Nothing of it is captured or kept here.
 const CloudPicture: React.FC<{ tab: WorkTab }> = ({ tab }) => {
     const { view, frame } = useCloudView(tab.id)
     if (view?.kind === 'live') {
         const lock = liveFrameLock(false)
-        return <iframe title={`Live view of ${tab.title}`} src={view.url} sandbox="allow-same-origin allow-scripts" inert={lock.inert} tabIndex={lock.tabIndex} className={cn('absolute inset-0 size-full border-0', lock.className)} />
+        return <iframe aria-label={`Live view of ${tab.title}`} src={view.url} sandbox="allow-same-origin allow-scripts" inert={lock.inert} tabIndex={lock.tabIndex} className={cn('absolute inset-0 size-full border-0', lock.className)} />
     }
     return view?.kind === 'frames' && frame
         ? <img src={`data:image/jpeg;base64,${frame}`} alt="" draggable={false} className="absolute inset-0 size-full object-contain object-top" />
@@ -115,7 +93,7 @@ const CloudPicture: React.FC<{ tab: WorkTab }> = ({ tab }) => {
 const Picture: React.FC<{ tab: WorkTab; frames: WorkFrames; name: string; big?: boolean }> = ({ tab, frames, name, big = false }) => {
     const picture = useSyncExternalStore(frames.subscribe, () => frames.get(tab.id))
     if (tab.state !== 'picture') {
-        return <div className="absolute inset-0 flex items-center justify-center bg-tray p-3 text-center text-13 text-muted-foreground">{WITHOUT_PICTURE[tab.state](name)}</div>
+        return <div className="absolute inset-0 flex items-center justify-center bg-tray p-3 text-center text-14 text-ink-2">{WITHOUT_PICTURE[tab.state](name)}</div>
     }
     if (tab.cloud) return big ? <CloudPicture tab={tab} /> : <div className="absolute inset-0 bg-tray" />
     return picture ? <img src={picture} alt="" decoding="sync" draggable={false} className="absolute inset-0 size-full object-cover object-top" /> : <div className="absolute inset-0 bg-tray" />
@@ -124,64 +102,51 @@ const Picture: React.FC<{ tab: WorkTab; frames: WorkFrames; name: string; big?: 
 // The user has this tab, so there's no picture to show.
 const isUsers = (tab: WorkTab) => tab.state === 'held' || tab.state === 'yours'
 
-// The tab it's working in, as a small window, with its site along the top like the page card's own address row. While
-// the user has the tab there's nothing to picture, so it's only that row, saying so.
-const WorkWindow: React.FC<{
-    tab: WorkTab
-    frames: WorkFrames
-    name: string
-    live: boolean
-    aspect: number
-    onPress: () => void
-    perched: React.ReactNode
-}> = ({ tab, frames, name, live, aspect, onPress, perched }) => (
-    <div className="relative">
-        {perched && (
-            <span className="absolute right-5 z-10 pointer-events-none" style={{ bottom: `calc(100% - ${PERCH_SIZE * PERCH_FEET}px)` }}>
-                {perched}
-            </span>
+// The tab it's working in, on a sheet with `lift`, with its site along the top. While the user has the tab there's
+// nothing to picture, so it's only that row, saying so.
+const WorkWindow: React.FC<{ tab: WorkTab; frames: WorkFrames; name: string; aspect: number }> = ({ tab, frames, name, aspect }) => (
+    <div className="overflow-hidden rounded-tile bg-sheet shadow-lift">
+        <div className="h-[26px] px-2.5 flex items-center gap-[7px] border-b bg-sheet-2 text-11 text-ink-3">
+            <Favicon src={tab.favicon} site={tab.site} className="size-3" />
+            <span className="truncate">{tab.site}</span>
+            {isUsers(tab) && <span className="ml-auto shrink-0 text-ink-2">You have this tab</span>}
+        </div>
+        {!isUsers(tab) && (
+            <div className="relative bg-tray" style={{ aspectRatio: aspect }}>
+                <Picture tab={tab} frames={frames} name={name} big />
+            </div>
         )}
-        <button
-            type="button"
-            onClick={onPress}
-            aria-label={`Go to the tab on ${tab.site}`}
-            className={cn(
-                "group block w-full overflow-hidden rounded-card bg-surface text-left outline-none transition-shadow duration-layout focus-visible:ring-2 focus-visible:ring-ring",
-                live ? "shadow-reading" : "shadow-page"
-            )}
-        >
-            {isUsers(tab) ? (
-                <span className="h-10 px-3 flex items-center gap-2 text-13">
-                    <Favicon src={tab.favicon} site={tab.site} />
-                    <span className="truncate text-muted-foreground transition-colors group-hover:text-foreground">{tab.site}</span>
-                    <span className="ml-auto shrink-0">You have this tab</span>
-                </span>
-            ) : (
-                <>
-                    <span className="h-7 px-2.5 flex items-center gap-1.5 border-b text-12 text-muted-foreground transition-colors group-hover:text-foreground">
-                        <Favicon src={tab.favicon} site={tab.site} />
-                        <span className="truncate">{tab.site}</span>
-                    </span>
-                    <span className="relative block bg-tray" style={{ aspectRatio: aspect }}>
-                        <Picture tab={tab} frames={frames} name={name} big />
-                    </span>
-                </>
-            )}
-        </button>
     </div>
 )
 
-const SmallWindow: React.FC<{ tab: WorkTab; frames: WorkFrames; name: string; aspect: number; onPress: () => void }> = ({ tab, frames, name, aspect, onPress }) => (
-    <button type="button" onClick={onPress} aria-label={`Go to the tab on ${tab.site}`} className="group w-[104px] flex flex-col gap-1 text-left outline-none rounded-control focus-visible:ring-2 focus-visible:ring-ring">
-        <span style={{ aspectRatio: aspect }} className="relative block w-full overflow-hidden rounded-control border bg-tray transition-colors group-hover:border-muted-foreground">
-            <Picture tab={tab} frames={frames} name={name} />
-        </span>
-        <span className="truncate text-11 text-muted-foreground transition-colors group-hover:text-foreground">{tab.site}</span>
-    </button>
-)
+// One of the job's tabs, under the picture: the one it's in is a sheet, and one loading has the pips for its icon.
+// Any other goes to that tab, to watch, as Go to tab does for the one it's in.
+const TabChip: React.FC<{ tab: WorkTab; loading: boolean; onGo: () => void }> = ({ tab, loading, onGo }) => {
+    const look = (
+        <>
+            {loading ? <span className="size-4 shrink-0 flex items-center justify-center"><Pips pattern="think" /></span> : <Favicon src={tab.favicon} site={tab.site} />}
+            <span className="truncate">{tab.site}</span>
+        </>
+    )
+    return (
+        <li className="min-w-0 max-w-full flex">
+            {tab.current ? (
+                <span className={cn(chipClass(), 'bg-sheet text-ink shadow-rim pointer-events-none')}>{look}</span>
+            ) : (
+                <Tooltip words="Go to this tab">
+                    <button type="button" onClick={onGo} className={chipClass()}>
+                        {look}
+                    </button>
+                </Tooltip>
+            )}
+        </li>
+    )
+}
 
-// Beside the chat while a job uses tabs: you can watch the bird working in the little window. Only ever words on the
-// page and that window, and everything to answer stays in the chat, which this only points to.
+const QUIET = 'h-6 px-1.5 rounded-row text-13 outline-none transition-colors hover:bg-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-focus'
+
+// Beside the main chat while a job uses tabs, in a well: where the mascot is, a picture of the tab it's in, the job's
+// tabs, and Go to tab, which only goes there to watch. Everything to answer stays in the chat, which this only points to.
 export const WorkingView: React.FC<{
     view: WorkView
     frames: WorkFrames
@@ -189,97 +154,80 @@ export const WorkingView: React.FC<{
     approval: ChatApproval | null
     // The page's own shape, so a picture is all of it.
     aspect: number
-    onStop: () => void
+    onHide: () => void
     onShowAsking: () => void
-}> = ({ view, frames, mascot, approval, aspect, onStop, onShowAsking }) => {
-    const { switchTab } = useBrowser()
-    const { showBerry, birdOnPages, keepBerryStill } = useShell().settings
+}> = ({ view, frames, mascot, approval, aspect, onHide, onShowAsking }) => {
+    const { tabs, switchTab } = useBrowser()
     const name = useAssistantName(mascot)
-    const elapsed = useElapsed(view)
     const current = view.tabs.find((tab) => tab.current) ?? view.tabs[0]
-    const others = view.tabs.filter((tab) => tab !== current)
     const ended = view.outcome !== null
-    // The bird is in the picture while it's working there, and only comes out to the edge when it isn't. There's none
-    // drawn in a cloud page.
-    const inPicture = !ended && current.state === 'picture' && !current.cloud && birdOnPages && !keepBerryStill
-    const perched = showBerry && !inPicture
-        ? <Berry mood={ended ? (view.outcome === 'done' ? 'delivered' : 'rest') : approval ? 'asking' : 'rest'} size={PERCH_SIZE} mascot={mascot} />
-        : null
+    const loading = (id: string) => tabs.some((tab) => tab.id === id && tab.isLoading)
+    const count = `${view.tabs.length} ${view.tabs.length === 1 ? 'tab' : 'tabs'}`
 
     return (
-        <div className="flex flex-col animate-fade-in">
-            <WorkWindow tab={current} frames={frames} name={name} live={!ended && current.state === 'picture'} aspect={aspect} perched={perched} onPress={() => void switchTab(current.id)} />
-
-            <div role="status" className="mt-4 text-16 text-foreground">
-                {ended ? (
-                    OUTCOME[view.outcome!]
-                ) : approval ? (
-                    askingWords(approval)
-                ) : (
-                    <span className={cn("line-clamp-2", SHIMMER_TEXT)}>{view.doing ?? 'Thinking'}</span>
-                )}
-            </div>
-
-            {/* A handoff is answered in the tab itself, which the window above goes to. */}
-            {!ended && approval && !approval.handoff && (
-                <button type="button" onClick={onShowAsking} className="-mx-1.5 mt-1 w-fit h-6 px-1.5 flex items-center gap-1 rounded-control text-13 text-accent-ink outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
-                    <ArrowLeft aria-hidden className="size-3.5" />
-                    Answer in the chat
-                </button>
-            )}
-
-            <div className="mt-1 min-h-6 flex items-center gap-2 text-13 text-muted-foreground">
-                {showBerry && <Berry size={20} mascot={mascot} />}
-                <span className="truncate">{name}</span>
-                <span aria-hidden>·</span>
-                <span className="tabular-nums">{elapsed}</span>
-                {!ended && (
-                    <button type="button" onClick={onStop} className="-mr-1.5 ml-auto h-6 px-1.5 shrink-0 flex items-center gap-1 rounded-control outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
-                        <CircleStop aria-hidden className="size-3.5" />
-                        Stop
+        <div className="flex-1 px-[18px] py-4 flex flex-col animate-fade-in">
+            <div className="h-[30px] flex items-center gap-3 text-14">
+                <h2 role="status" className="min-w-0 truncate font-regular text-ink">
+                    {ended ? OUTCOME[view.outcome!] : approval ? askingWords(approval) : `${name} is on ${current.site}`}
+                </h2>
+                <span className="ml-auto -mr-1.5 flex items-center gap-1 shrink-0">
+                    {/* A handoff is answered in the tab itself, which Go to tab goes to. */}
+                    {!ended && approval && !approval.handoff && (
+                        <button type="button" onClick={onShowAsking} className={cn(QUIET, 'text-ink')}>
+                            Answer in the chat
+                        </button>
+                    )}
+                    <button type="button" onClick={onHide} className={cn(QUIET, 'text-ink-3')}>
+                        Hide work
                     </button>
-                )}
+                </span>
             </div>
 
-            {others.length > 0 && (
-                <ul aria-label="Its other tabs" className="mt-4 pt-4 border-t flex flex-wrap gap-3">
-                    {others.map((tab) => (
-                        <li key={tab.id}>
-                            <SmallWindow tab={tab} frames={frames} name={name} aspect={aspect} onPress={() => void switchTab(tab.id)} />
-                        </li>
-                    ))}
-                </ul>
-            )}
+            <div className="mt-4">
+                <WorkWindow tab={current} frames={frames} name={name} aspect={aspect} />
+            </div>
 
-            {view.sites.length > 1 && (
-                <p className="mt-4 pt-4 border-t text-12 text-muted-foreground [overflow-wrap:anywhere]">Been on {sitesInWords(view.sites)}</p>
-            )}
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                <ul aria-label="Its tabs" className="contents">
+                    {view.tabs.map((tab) => <TabChip key={tab.id} tab={tab} loading={loading(tab.id)} onGo={() => void switchTab(tab.id)} />)}
+                </ul>
+                <button
+                    type="button"
+                    onClick={() => void switchTab(current.id)}
+                    aria-label={`Go to the tab on ${current.site}`}
+                    className={cn(chipClass(true), 'px-2.5')}
+                >
+                    Go to tab
+                </button>
+            </div>
+
+            <p className="mt-auto pt-4 flex justify-between gap-3 font-mono text-11.5 text-ink-3">
+                <span>{count}, behind yours</span>
+                {!ended && <span>closes when done</span>}
+            </p>
         </div>
     )
 }
 
-// With no room beside the chat: the same words on one line above the composer, with no picture and nothing captured.
+// With no room beside the chat: where it is, on one line above the composer, with no picture and nothing captured.
+// It holds still, since the live step in the conversation is what moves.
 export const WorkingStrip: React.FC<{ view: WorkView; mascot: MascotProfile; approval: ChatApproval | null }> = ({ view, mascot, approval }) => {
     const { switchTab } = useBrowser()
     const { showBerry } = useShell().settings
     const name = useAssistantName(mascot)
-    const elapsed = useElapsed(view)
     const current = view.tabs.find((tab) => tab.current) ?? view.tabs[0]
     return (
         <button
             type="button"
             onClick={() => void switchTab(current.id)}
             aria-label={`Go to the tab on ${current.site}`}
-            className="-mx-2 mb-2 w-[calc(100%+16px)] h-8 px-2 flex items-center gap-2 rounded-control text-13 text-muted-foreground text-left outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+            className="-mx-2 mb-2 w-[calc(100%+16px)] h-8 px-2 flex items-center gap-2 rounded-row text-14 text-ink-2 text-left outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-focus"
         >
-            {showBerry && <Berry mood={approval ? 'asking' : 'fetching'} size={24} mascot={mascot} />}
-            <span role="status" className="min-w-0 truncate text-foreground">
-                {approval ? askingWords(approval) : <span className={SHIMMER_TEXT}>{view.doing ?? `${name} is thinking`}</span>}
+            {showBerry && <Berry mood={approval ? 'asking' : 'rest'} size={20} mascot={mascot} still />}
+            <span role="status" className="min-w-0 truncate text-ink">
+                {approval ? askingWords(approval) : `${name} is on ${current.site}`}
             </span>
-            <span aria-hidden>·</span>
-            <span className="truncate">{current.site}</span>
-            <span aria-hidden>·</span>
-            <span className="tabular-nums">{elapsed}</span>
+            <span className="ml-auto shrink-0 font-mono text-11.5 text-ink-3">Go to tab</span>
         </button>
     )
 }

@@ -27,7 +27,7 @@ test("an approval answered from Needs you lets the job carry on", async () => {
   const app = await launchApp(undefined, { modelEnv: model.env });
   try {
     const chrome = await findView(app, "view=chrome");
-    await chrome.getByRole("button", { name: "Needs you" }).click();
+    await chrome.evaluate(() => window.chromeAPI.browser.openPage("needs-you"));
     await expect(chrome.getByText("Nothing needs you right now.")).toBeVisible();
 
     const address = `${site.origin}/orders?from=inbox`;
@@ -35,17 +35,69 @@ test("an approval answered from Needs you lets the job carry on", async () => {
     model.replyWith("All done");
     const sent = await chrome.evaluate(() => window.chromeAPI.chat.send(null, "Open my orders", { seePage: false }));
 
-    const row = chrome.getByRole("listitem", { name: "Berry is asking" });
-    // The row names the site, and the exact address is right there before Allow.
-    await expect(row.getByRole("heading")).toHaveText("Open 127.0.0.1 in a new tab");
-    await expect(row.getByText(`Open ${address} in a new tab`)).toBeAttached();
-    await expect(chrome.getByRole("button", { name: /Needs you.*1 waiting/ })).toBeVisible();
-    await row.getByRole("button", { name: "Allow", exact: true }).click();
+    const card = chrome.getByRole("region", { name: "Approval needed" });
+    // The card names the site, and the exact address is right there before Allow, with the query it's asking about marked.
+    await expect(card.getByRole("heading")).toHaveText("I’d like to open 127.0.0.1 in a new tab");
+    await expect(card.getByText(`Open ${address} in a new tab`)).toBeVisible();
+    await expect(card.locator("mark")).toHaveText("?from=inbox");
+    await expect(card.getByText("Asking because this could carry data, marked above.")).toBeVisible();
+    await expect(chrome.getByText("1 thing is waiting, from 1 chat.")).toBeVisible();
+    await expect(chrome.getByRole("tab", { name: /^Chats.*1 needs you/ })).toBeVisible();
+    const waiting = await chrome.evaluate(() => window.chromeAPI.library.getLibrary().then(({ needsYou }) => needsYou[0]?.approval.why));
+    expect(waiting).toEqual({ reason: "carries-data", mark: "?from=inbox" });
 
+    // The open card has the keyboard, so its keys show and Enter allows, once it has been there half a second.
+    await expect(card).toBeFocused();
+    await expect(card.getByRole("button", { name: "Allow", exact: true })).toHaveAttribute("aria-keyshortcuts", "Enter");
+    await expect(card.locator("kbd")).toHaveText(["↵", "esc"]);
+    await chrome.waitForTimeout(600);
+    await chrome.keyboard.press("Enter");
+
+    await expect(chrome.getByText("Allowed. Berry carries on.")).toBeVisible();
+    await expect(chrome.getByText("1 of 1 answered")).toBeVisible();
     await expect.poll(async () => (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id))?.messages.at(-1)?.content).toBe("All done");
     await expect(chrome.getByText("Nothing needs you right now.")).toBeVisible();
     // Its tab closed once it was done.
     expect((await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).some((tab) => tab.url === address)).toBe(false);
+  } finally {
+    await app.close();
+    model.close();
+    site.close();
+  }
+});
+
+test("Enter in the prompt box while an approval waits never allows it", async () => {
+  const site = await startSite();
+  const model = await startFakeModel();
+  const app = await launchApp(undefined, { modelEnv: model.env });
+  try {
+    const chrome = await findView(app, "view=chrome");
+    model.replyWith("Hello");
+    const sent = await chrome.evaluate(() => window.chromeAPI.chat.send(null, "Hi", { seePage: false }));
+    await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), sent!.id);
+    await expect(chrome.getByText("Hello")).toBeVisible();
+
+    // The card comes while the user is typing in the prompt box, and they keep typing and press Enter.
+    model.callTools({ name: "open_tab", args: { url: `${site.origin}/orders?from=inbox` } });
+    model.replyWith("All done");
+    const box = chrome.getByRole("textbox", { name: "Message" });
+    await box.click();
+    await chrome.keyboard.type("Open my orders");
+    await chrome.keyboard.press("Enter");
+    const card = chrome.getByRole("region", { name: "Approval needed" });
+    await expect(card).toBeVisible();
+    await chrome.keyboard.type("Actually, use the other account");
+    await chrome.waitForTimeout(600);
+    await chrome.keyboard.press("Enter");
+
+    // The keyboard was never put on the card, so it shows no keys and Enter went to the box. A reply that's running
+    // takes no new message, so the words stay there to send, and the approval still waits.
+    await expect(card.locator("kbd")).toHaveCount(0);
+    await expect(box).toHaveValue("Actually, use the other account");
+    await chrome.waitForTimeout(300);
+    expect(await chrome.evaluate(() => window.chromeAPI.library.getLibrary().then(({ needsYou }) => needsYou.length))).toBe(1);
+    await expect(card).toBeVisible();
+    expect((await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).some((tab) => tab.url.includes("/orders"))).toBe(false);
   } finally {
     await app.close();
     model.close();
@@ -64,10 +116,15 @@ test("a sign-in goes to the user, nothing typed reaches the model, and I'm done 
     model.callTools({ name: "open_tab", args: { url: address } });
     model.callTools({ name: "hand_to_user", args: { need: "sign-in" } });
     const sent = await chrome.evaluate((origin) => window.chromeAPI.chat.send(null, `Check my orders on ${origin}`, { seePage: false }), site.origin);
-    await chrome.getByRole("button", { name: "Needs you" }).click();
+    await chrome.evaluate(() => window.chromeAPI.browser.openPage("needs-you"));
 
-    const row = chrome.getByRole("listitem", { name: "Berry is asking" });
-    await expect(row.getByRole("heading")).toHaveText("Berry needs you to sign in on 127.0.0.1");
+    const row = chrome.getByRole("region", { name: "Berry needs you" });
+    await expect(row.getByRole("heading")).toHaveText("Sign in on 127.0.0.1");
+    // The card has the keyboard, but no key gives the tab back.
+    await expect(row).toBeFocused();
+    await chrome.waitForTimeout(600);
+    await chrome.keyboard.press("Enter");
+    await expect(row).toBeVisible();
     const asked = model.requests.length;
 
     // The user goes there, signs in by themselves, and Berry can't reach the tab meanwhile, even from another chat.
@@ -145,7 +202,7 @@ test("from the phone: pair, press Allow, and a code goes in the page without eve
     const known = telegram.sent.length;
     telegram.strangerSends("Hello");
     await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ phoneAlways: true }));
-    await chrome.getByRole("button", { name: "Needs you" }).click();
+    await chrome.evaluate(() => window.chromeAPI.browser.openPage("needs-you"));
     await expect(chrome.getByText("Replies from your phone are on")).toBeVisible();
     expect(telegram.sent.length).toBe(known);
 
@@ -163,8 +220,8 @@ test("from the phone: pair, press Allow, and a code goes in the page without eve
     // A code: anything that isn't one is refused and nothing is typed.
     const code = await lastSent("Berry needs a code for 127.0.0.1. Reply with it.");
     expect(code.buttons).toEqual([]);
-    const row = chrome.getByRole("listitem", { name: "Berry is asking" });
-    await expect(row.getByRole("heading")).toHaveText("Berry needs a code for 127.0.0.1");
+    const row = chrome.getByRole("region", { name: "Berry needs you" });
+    await expect(row.getByRole("heading")).toHaveText("Enter the code on 127.0.0.1");
     const notACode = telegram.userSends("hunter2 is my password");
     await lastSent("doesn’t look like a code");
     await expect.poll(() => telegram.deleted).toContain(notACode);

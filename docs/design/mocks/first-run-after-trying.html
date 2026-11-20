@@ -1,0 +1,207 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Blueberry design: the first run, after trying it</title><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"><style>
+*{box-sizing:border-box}
+body{margin:32px auto;max-width:640px;padding:0 16px;background:#F6F5F2}
+.cap{margin:34px 2px 12px}
+.cap:first-child{margin-top:0}
+.cap b{display:block;font:600 17px/1.4 var(--font-sans),system-ui,sans-serif;color:var(--foreground,#111)}
+.cap span{display:block;font:400 14px/21px var(--font-sans),system-ui,sans-serif;color:var(--muted-foreground,#777);margin-top:3px;max-width:980px}
+.pair{display:grid;grid-template-columns:640px 640px;gap:20px;align-items:start}
+.tag{font:500 11px/1 var(--font-mono),monospace;color:var(--muted-foreground,#777);margin:0 2px 7px;letter-spacing:.06em}
+.pair img{display:block;width:640px;border-radius:14px;box-shadow:0 0 0 1px rgba(128,128,128,.28)}
+.pg{width:640px;border-radius:14px;box-shadow:0 0 0 1px rgba(128,128,128,.28);background:#fff;color:var(--ink);padding:26px 22px 28px;
+ font-family:Geist,system-ui,sans-serif;font-size:14px;line-height:20px;letter-spacing:-.005em;-webkit-font-smoothing:antialiased;
+ --ink:#151514;--ink2:#5F5E5A;--ink3:#6C6A65;--faint:#8C8A84;--line:rgba(21,21,20,.09);--hover:rgba(21,21,20,.05);--tray:#E1E0DB;--sheet2:#F3F2EF;--ask:#C62B31;--askbg:#FBE4E3;--focus:#3F51DC;
+ --chip:0 0 0 1px rgba(21,21,20,.09),0 1px 2px rgba(21,21,20,.07)}
+.pg.ground{background:#E6E5E0}
+svg.i{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex:none}
+svg.go{width:14px;height:14px;color:var(--faint)}
+.b{flex:none;display:block}
+.fv{width:16px;height:16px;border-radius:4px;flex:none;display:grid;place-items:center;color:#fff;font:600 9px/1 Geist,sans-serif}
+.t{font:400 11.5px/1 "Geist Mono",monospace;color:var(--faint);flex:none;letter-spacing:0}
+.mono{font-family:"Geist Mono",monospace;font-size:11.5px;letter-spacing:0}
+.grow{flex:1}
+h3{margin:0;font-size:20px;line-height:26px;font-weight:600;letter-spacing:-.015em}
+.ph{display:flex;align-items:center;gap:8px;min-height:34px}
+.psub{margin:4px 0 0;color:var(--ink2);font-size:14px}
+.btn{height:32px;padding:0 12px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;flex:none;white-space:nowrap}
+.btn.sm{height:28px;padding:0 10px}
+.btn.fill{background:#151514;color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 1px 2px rgba(21,21,20,.25)}
+.btn.raised{background:#fff;box-shadow:var(--chip)}
+.btn.quiet{color:var(--ink2);padding:0 8px}
+.btn.quiet svg{width:14px;height:14px}
+.recdot{width:7px;height:7px;border-radius:50%;background:var(--ask);display:block}
+.iconbtn{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:var(--ink3);flex:none}
+.find{height:32px;width:190px;border-radius:999px;background:var(--sheet2);display:flex;align-items:center;gap:7px;padding:0 12px;color:var(--faint);font-size:13px}
+.find svg{width:14px;height:14px}
+.day{display:flex;align-items:baseline;gap:8px;margin:22px 0 4px;padding:0 8px}
+.day b{font-size:13px;font-weight:500}
+.day span{font-size:13px;color:var(--faint)}
+.hrow{height:36px;display:flex;align-items:center;gap:10px;padding:0 8px;border-radius:9px}
+.hrow b{font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hrow small{font-size:13px;color:var(--ink3);flex:1;white-space:nowrap}
+.hrow.hov,.drow.hov,.rrow.hov,.step.hov{background:var(--hover)}
+.hrow .iconbtn{margin-right:-4px}
+.drow{display:flex;align-items:center;gap:10px;padding:10px 8px;border-radius:11px;position:relative}
+.drow+.drow::before,.rrow+.rrow::before{content:"";position:absolute;left:56px;right:8px;top:0;height:1px;background:var(--line)}
+.drow.hov::before,.drow.hov+.drow::before,.rrow.hov::before,.rrow.hov+.rrow::before{display:none}
+.ftile{width:36px;height:36px;border-radius:9px;background:var(--sheet2);box-shadow:inset 0 0 0 1px var(--line);display:grid;place-items:center;font:500 10.5px/1 "Geist Mono",monospace;color:var(--ink2);flex:none}
+.w{flex:1;min-width:0;display:flex;flex-direction:column}
+.w>b{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.w>small{font-size:13px;line-height:19px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.w>small em{font-style:normal;color:var(--ink3)}
+.bar{height:2px;border-radius:2px;background:var(--line);margin-top:7px;display:block}
+.bar u{display:block;height:2px;border-radius:2px;background:var(--ink)}
+.drow.gone b{color:var(--ink3);text-decoration:line-through;text-decoration-color:var(--faint);font-weight:400}
+.grp{display:flex;align-items:baseline;gap:7px;margin:22px 0 2px;padding:0 8px;font-size:13px}
+.grp b{font-weight:500}
+.grp span{color:var(--faint);font:400 11.5px/1 "Geist Mono",monospace}
+.grp.ask b{color:var(--ask)}
+.rrow{display:flex;align-items:center;gap:12px;padding:9px 8px;border-radius:11px;position:relative;min-height:56px}
+.rrow.big{min-height:62px}
+.rrow+.rrow::before{left:48px}
+.rrow.big+.rrow.big::before{left:56px}
+.lim{font-size:13px;color:var(--ink3);flex:none}
+.back{display:flex;align-items:center;gap:4px;color:var(--ink2);font-size:13px;margin-bottom:18px}
+.back svg{width:14px;height:14px}
+.rhead{display:flex;align-items:center;gap:14px}
+.rhead small{font-size:14px;color:var(--ink2);margin-top:2px}
+.lab{display:flex;align-items:center;justify-content:space-between;margin:26px 0 6px;min-height:28px}
+.lab.first{margin-top:20px}
+.lab b{font-size:13px;font-weight:500;color:var(--ink2)}
+.does{margin:0;font-size:15px;line-height:23px;max-width:540px}
+.facts{display:grid;grid-template-columns:1.25fr 1fr 1fr;margin-top:18px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.fact{padding:11px 14px 12px;display:flex;flex-direction:column;gap:2px;border-left:1px solid var(--line)}
+.fact:first-child{border-left:0;padding-left:0}
+.fact small{font-size:12px;color:var(--ink3)}
+.fact b{font-weight:500;display:flex;align-items:center;gap:6px}
+.runs{position:relative;padding-left:2px}
+.run{display:flex;gap:14px;position:relative;padding-bottom:14px}
+.run>i{width:9px;height:9px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--faint);background:#fff;margin-top:6px;flex:none;position:relative;z-index:1}
+.run.open>i{background:var(--ink);box-shadow:none}
+.run.bad>i{background:var(--ask);box-shadow:none}
+.run::before{content:"";position:absolute;left:4px;top:10px;bottom:-6px;width:1px;background:var(--line)}
+.run:last-child::before{display:none}
+.rh{display:flex;align-items:baseline;gap:9px}
+.rh b{font-weight:500}
+.rh em{font-style:normal;color:var(--ink2);font-size:13px;flex:1}
+.run.bad .rh em{color:var(--ask)}
+.run p{margin:7px 0 0;font-size:15px;line-height:22px}
+.run p.dim{font-size:14px;color:var(--ink2);margin-bottom:9px}
+.run .btn{align-self:flex-start}
+.fold{display:flex;align-items:center;gap:5px;margin-top:6px;font:400 11.5px/1 "Geist Mono",monospace;color:var(--ink3)}
+.del{margin-top:14px;color:var(--ask);font-size:13px;font-weight:500}
+.pips{display:grid;grid-template-columns:repeat(3,3px);gap:2px;flex:none}
+.pips u{width:3px;height:3px;border-radius:50%;background:rgba(21,21,20,.16)}
+.pips u.on{background:var(--ink)}
+.pips.red u.on{background:var(--ask)}
+.recbar{display:flex;align-items:center;gap:10px;height:40px;padding:0 6px 0 14px;border-radius:999px;background:#fff;box-shadow:var(--chip);width:max-content;min-width:330px}
+.recbar b{font-weight:500}
+.site{display:flex;align-items:center;gap:8px;margin:24px 0 6px;padding:0 8px;font-size:13px}
+.site b{font-weight:500}
+.trail{position:relative}
+.trail::before{content:"";position:absolute;left:15px;top:20px;bottom:24px;width:1px;background:var(--line)}
+.step{display:flex;align-items:flex-start;gap:12px;padding:8px 8px;border-radius:10px;position:relative}
+.mk{width:15px;height:20px;display:grid;place-items:center;background:#fff;flex:none;position:relative;z-index:1}
+.step.hov .mk{background:#F2F2F1}
+.lockic{width:14px;height:14px;color:var(--ink3)}
+.step .w>b{font-weight:400;white-space:normal}
+.step .w>small{color:var(--ink3)}
+.tok{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 3px 0 7px;border-radius:7px;background:#EEF0FD;color:#2A39B0;font-weight:500;vertical-align:1px}
+.tok u{text-decoration:none;font:400 10.5px/16px "Geist Mono",monospace;color:#2A39B0;background:#fff;border-radius:5px;padding:0 5px;box-shadow:0 0 0 1px rgba(42,57,176,.18)}
+.stage{display:flex;flex-direction:column;align-items:center;padding:8px 0 4px}
+.stage>.b{margin-bottom:-6px;position:relative;z-index:1}
+.shell{width:520px;background:var(--tray);border-radius:24px;padding:4px}
+.card{background:#fff;border-radius:20px;padding:20px 22px 22px;box-shadow:0 0 0 1px rgba(21,21,20,.07),0 1px 2px rgba(21,21,20,.06),0 10px 24px -12px rgba(21,21,20,.2)}
+.q{text-align:center;margin-top:8px}
+.qs{margin:6px auto 16px;text-align:center;color:var(--ink2);max-width:380px}
+.say{margin:0;padding:0 0 0 22px;font-size:15px;line-height:30px}
+.under{display:flex;align-items:center;justify-content:space-between;padding:6px 4px 4px 10px}
+.dots{display:flex;gap:5px;align-items:center}
+.dots u{width:5px;height:5px;border-radius:50%;background:rgba(21,21,20,.25)}
+.dots u.on{width:18px;border-radius:3px;background:var(--ink)}
+.seg{display:grid;grid-template-columns:repeat(5,1fr);height:32px;background:var(--tray);border-radius:10px;padding:2px;margin-top:14px;font-size:13px;color:var(--ink2)}
+.seg span{display:grid;place-items:center;border-radius:8px}
+.seg .on{background:#fff;color:var(--ink);font-weight:500;box-shadow:var(--chip)}
+.srow{display:flex;align-items:center;gap:16px;padding:13px 0;border-top:1px solid var(--line);min-height:52px}
+.lab+.srow{border-top:0}
+.srow.tall{align-items:flex-start}
+.srow>b{flex:1;font-weight:500}
+.srow .w>small{white-space:normal}
+.pics{display:flex;gap:10px}
+.pic{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:13px;color:var(--ink2)}
+.pic i{width:72px;height:46px;border-radius:9px;background:#ECEBE7;box-shadow:inset 0 0 0 1px var(--line);display:block;position:relative;overflow:hidden}
+.pic i::after{content:"";position:absolute;left:22px;top:5px;right:5px;bottom:5px;border-radius:5px;background:#fff;box-shadow:0 0 0 1px var(--line)}
+.pic.dark i{background:#131312}.pic.dark i::after{background:#272725}
+.pic.sys i{background:linear-gradient(90deg,#ECEBE7 50%,#131312 50%)}.pic.sys i::after{background:linear-gradient(90deg,#fff 38%,#272725 38%)}
+.pic.top i::after{left:5px;top:13px}
+.pic.on{color:var(--ink);font-weight:500}
+.pic.on i{outline:1.5px solid var(--ink);outline-offset:2px}
+.seg2{display:flex;height:30px;background:var(--tray);border-radius:999px;padding:2px;font-size:13px;color:var(--ink2);flex:none}
+.seg2 span{padding:0 11px;display:grid;place-items:center;border-radius:999px}
+.seg2 .on{background:#fff;color:var(--ink);font-weight:500;box-shadow:var(--chip)}
+.sw{width:34px;height:20px;border-radius:999px;background:var(--sheet2);box-shadow:inset 0 0 0 1px var(--line);position:relative;flex:none}
+.sw::after{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:var(--chip)}
+
+.pair img{width:auto;max-width:640px}
+.pg.ground{padding:22px 22px 26px}
+.lg{flex:none;display:block}
+.tag.in{margin:22px 0 8px;text-align:center}
+.backc{width:28px;height:28px;border-radius:50%;background:#fff;box-shadow:var(--chip);display:grid;place-items:center;color:var(--ink2)}
+.backc svg{width:14px;height:14px}
+.btn.fill.off{background:rgba(21,21,20,.08);color:var(--faint);box-shadow:none}
+.card .t{display:block}
+.svcs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:2px}
+.svc{height:60px;border-radius:14px;display:flex;align-items:center;gap:12px;padding:0 14px;box-shadow:inset 0 0 0 1px var(--line);color:var(--ink2);position:relative}
+.svc.on{background:#fff;color:var(--ink);box-shadow:0 0 0 1.5px var(--ink)}
+.svc .w>small{color:var(--ink3)}
+.svc i{position:absolute;right:12px;top:50%;margin-top:-4px;width:8px;height:8px;border-radius:50%;background:var(--ink)}
+.kf{height:46px;margin-top:10px;border-radius:14px;background:var(--sheet2);box-shadow:inset 0 0 0 1px var(--line);display:flex;align-items:center;gap:10px;padding:0 8px 0 14px;font-size:15px}
+.kf.foc{background:#fff;box-shadow:0 0 0 2px var(--focus)}
+.kf.bad{box-shadow:inset 0 0 0 1px rgba(198,43,49,.45)}
+.kic{width:15px;height:15px;color:var(--ink3)}
+.kf .ph{color:var(--faint);flex:1}
+.km{font-size:12.5px;color:var(--ink)}
+.caret{display:inline-block;width:1.5px;height:18px;background:var(--ink);margin-right:1px;vertical-align:-4px;text-decoration:none}
+.khint{display:flex;justify-content:space-between;gap:14px;margin:9px 4px 0;font-size:12.5px;line-height:18px;color:var(--ink3)}
+.lk{color:var(--ink);font-weight:500;display:inline-flex;align-items:center;gap:3px;white-space:nowrap;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.lk svg{width:12px;height:12px}
+.trying{display:flex;align-items:center;gap:8px;color:var(--ink2);margin-right:6px}
+.pill{height:22px;padding:0 9px 0 8px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;background:var(--sheet2);margin-right:4px;flex:none}
+.pill u{width:6px;height:6px;border-radius:50%;background:var(--focus)}
+.card .pill{background:#fff;box-shadow:var(--chip)}
+.says{display:flex;align-items:center;gap:9px;margin:10px 4px 0;font-size:14px}
+.says.bad{color:var(--ask);font-size:13px;line-height:19px}
+.later{display:flex;justify-content:space-between;gap:14px;width:500px;margin:10px 0 0;font-size:12.5px;color:var(--ink3)}
+.shell.flat{width:520px;margin:0 auto}
+.card.tight{padding:12px 14px 14px}
+.card.tight .kf{margin-top:0}
+.card.tight .brows{margin-top:0}
+.strips{display:flex;flex-direction:column;gap:8px}
+.brows{display:flex;flex-direction:column;gap:6px;margin-top:2px}
+.brow{height:58px;border-radius:14px;display:flex;align-items:center;gap:12px;padding:0 14px 0 12px;box-shadow:inset 0 0 0 1px var(--line)}
+.brow.on{background:#fff;box-shadow:0 0 0 1.5px var(--ink)}
+.app{width:34px;height:34px;border-radius:9px;background:#fff;box-shadow:var(--chip);display:grid;place-items:center;flex:none}
+.ring{width:18px;height:18px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--faint);flex:none;display:grid;place-items:center;color:#fff}
+.ring.on{background:var(--ink);box-shadow:none}
+.ring svg{width:11px;height:11px;stroke-width:2.6}
+.hfacts{margin:14px 4px 0}
+.hfacts p{display:flex;gap:9px;margin:0 0 6px;font-size:13px;line-height:19px;color:var(--ink2)}
+.hfacts svg{width:14px;height:14px;margin-top:3px;color:var(--ink3)}
+.promise{display:flex;gap:11px;margin:0;padding:12px 14px;border-radius:14px;background:var(--sheet2);font-size:13.5px;line-height:20px;color:var(--ink2)}
+.promise b{color:var(--ink);font-weight:500}
+.promise svg{margin-top:2px;color:var(--ink)}
+.card .lab.first{margin-top:14px}
+.card .srow{padding:11px 0}
+.sw.on{background:var(--focus);box-shadow:none}
+.sw.on::after{left:16px}
+.nt{display:flex;flex-direction:column;align-items:center;padding:26px 0 10px}
+.hello{display:flex;align-items:center;gap:12px;font-size:28px;line-height:34px;font-weight:500;letter-spacing:-.02em;margin:0 0 20px}
+.pbox{padding:16px 14px 12px;border-radius:22px}
+.pbox .ph{color:var(--faint);font-size:15px;padding:0 4px}
+.tools{display:flex;align-items:center;gap:8px;margin-top:26px}
+.plus,.send{width:30px;height:30px;border-radius:10px;background:var(--sheet2);display:grid;place-items:center;color:var(--ink2)}
+.send{border-radius:50%;color:var(--faint)}
+.chipb{height:28px;border-radius:999px;box-shadow:var(--chip);display:flex;align-items:center;gap:6px;padding:0 8px 0 7px;font-size:13px;font-weight:500;background:#fff}
+.jrow{display:flex;align-items:center;gap:12px;padding:9px 8px;min-height:54px}
+.jrow.done b{color:var(--ink3);text-decoration:line-through;text-decoration-color:var(--faint);font-weight:400}
+</style></head><body><div class="cap"><b>Give me a brain</b><span>Two tiles with the services’ own marks, and one field under them.</span></div><div class="pg ground"><div class="stage"><svg class="b" style="width:56px;height:56px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#2A39B0"/><circle cx="12" cy="13.6" r="9.2" fill="#3F51DC"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/></svg><div class="shell" style="width:520px"><div class="card"><span class="t">3 / 5</span><h3 class="q">Give me a brain.</h3><p class="qs">I think with an AI service, using a key that’s yours.</p><div class="svcs"><span class="svc on"><svg class="lg" style="width:22px;height:22px" viewBox="0 0 24 24"><path fill="currentColor" d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg><span class="w"><b>OpenAI</b><small>GPT models</small></span><i></i></span><span class="svc "><svg class="lg" style="width:20px;height:20px" viewBox="0 0 24 24"><path fill="currentColor" d="M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z"/></svg><span class="w"><b>Anthropic</b><small>Claude models</small></span></span></div><div class="kf foc"><svg class="i kic" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.3-9.3M16 7l3 3"/></svg><span class="ph"><u class="caret"></u>Paste your OpenAI key</span><span class="btn raised sm">Paste</span></div><p class="khint"><span>Kept encrypted on this computer. You pay OpenAI for what I use.</span><span class="lk">Get a key<svg class="i " viewBox="0 0 24 24"><path d="M7 17 17 7M8 7h9v9"/></svg></span></p></div><div class="under"><span class="backc"><svg class="i " viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></span><span class="dots"><u class=""></u><u class=""></u><u class="on"></u><u class=""></u><u class=""></u></span><span class="btn fill off">Try the key</span></div></div><p class="later"><span class="lk">I’ll do this later</span><span>Without a key I can’t answer, but everything else works.</span></p></div><div class="tag in">WHILE IT TRIES, WHEN IT WORKS, AND WHEN IT’S TURNED DOWN</div><div class="strips"><div class="shell flat"><div class="card tight"><div class="kf"><svg class="i kic" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span class="mono km">sk-••••••••••••••••JWAA</span><span class="grow"></span><span class="mono trying"><span class="pips "><u class="on"></u><u class="on"></u><u class="on"></u><u class=""></u><u class=""></u><u class="on"></u><u class=""></u><u class=""></u><u class=""></u></span>Trying it..</span></div></div></div><div class="shell flat"><div class="card tight"><div class="kf"><svg class="i kic" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span class="mono km">sk-••••••••••••••••JWAA</span><span class="grow"></span><span class="pill ok"><u></u>Works</span></div><p class="says"><svg class="b" style="width:20px;height:20px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#2A39B0"/><circle cx="12" cy="13.6" r="9.2" fill="#3F51DC"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/></svg><span>“Hello, Sam. That works. I can think now.”</span></p></div></div><div class="shell flat"><div class="card tight"><div class="kf bad"><svg class="i kic" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.3-9.3M16 7l3 3"/></svg><span class="mono km">••••••••••••••••••••••••</span><span class="grow"></span><span class="btn raised sm">Paste</span></div><p class="says bad">OpenAI turned that key down. Check that it’s whole, and that the account behind it can still be charged.</p></div></div></div></div><div class="cap"><b>Bring your history over</b><span>Each browser’s own icon, read from the app on this computer, and the pips while it comes across. The marks here are stand-ins.</span></div><div class="pg ground"><div class="stage"><svg class="b" style="width:56px;height:56px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#2A39B0"/><circle cx="12" cy="13.6" r="9.2" fill="#3F51DC"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/></svg><div class="shell" style="width:520px"><div class="card"><span class="t">4 / 5</span><h3 class="q">Shall I bring your history over?</h3><p class="qs">Then I can suggest things from day one, and the address field knows where you’ve been.</p><div class="brows"><div class="brow on"><span class="app"><svg class="lg" style="width:22px;height:22px" viewBox="0 0 24 24"><path fill="#4285F4" d="M12 0C8.21 0 4.831 1.757 2.632 4.501l3.953 6.848A5.454 5.454 0 0 1 12 6.545h10.691A12 12 0 0 0 12 0zM1.931 5.47A11.943 11.943 0 0 0 0 12c0 6.012 4.42 10.991 10.189 11.864l3.953-6.847a5.45 5.45 0 0 1-6.865-2.29zm13.342 2.166a5.446 5.446 0 0 1 1.45 7.09l.002.001h-.002l-5.344 9.257c.206.01.413.016.621.016 6.627 0 12-5.373 12-12 0-1.54-.29-3.011-.818-4.364zM12 16.364a4.364 4.364 0 1 1 0-8.728 4.364 4.364 0 0 1 0 8.728Z"/></svg></span><span class="w"><b>Chrome</b><small>2 profiles</small></span><span class="ring on"><svg class="i " viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg></span></div><div class="brow "><span class="app"><svg class="lg" style="width:22px;height:22px" viewBox="0 0 24 24"><path fill="#0C7FD8" d="M21.86 17.86q.14 0 .25.12.1.13.1.25t-.11.33l-.32.46-.43.53-.44.5q-.21.25-.38.42l-.22.23q-.58.53-1.34 1.04-.76.51-1.6.91-.86.4-1.74.64t-1.67.24q-.9 0-1.69-.28-.8-.28-1.48-.78-.68-.5-1.22-1.17-.53-.66-.92-1.44-.38-.77-.58-1.6-.2-.83-.2-1.67 0-1 .32-1.96.33-.97.87-1.8.14.95.55 1.77.41.82 1.02 1.5.6.68 1.38 1.21.78.54 1.64.9.86.36 1.77.56.92.2 1.8.2 1.12 0 2.18-.24 1.06-.23 2.06-.72l.2-.1.2-.05zm-15.5-1.27q0 1.1.27 2.15.27 1.06.78 2.03.51.96 1.24 1.77.74.82 1.66 1.4-1.47-.2-2.8-.74-1.33-.55-2.48-1.37-1.15-.83-2.08-1.9-.92-1.07-1.58-2.33T.36 14.94Q0 13.54 0 12.06q0-.81.32-1.49.31-.68.83-1.23.53-.55 1.2-.96.66-.4 1.35-.66.74-.27 1.5-.39.78-.12 1.55-.12.7 0 1.42.1.72.12 1.4.35.68.23 1.32.57.63.35 1.16.83-.35 0-.7.07-.33.07-.65.23v-.02q-.63.28-1.2.74-.57.46-1.05 1.04-.48.58-.87 1.26-.38.67-.65 1.39-.27.71-.42 1.44-.15.72-.15 1.38zM11.96.06q1.7 0 3.33.39 1.63.38 3.07 1.15 1.43.77 2.62 1.93 1.18 1.16 1.98 2.7.49.94.76 1.96.28 1 .28 2.08 0 .89-.23 1.7-.24.8-.69 1.48-.45.68-1.1 1.22-.64.53-1.45.88-.54.24-1.11.36-.58.13-1.16.13-.42 0-.97-.03-.54-.03-1.1-.12-.55-.1-1.05-.28-.5-.19-.84-.5-.12-.09-.23-.24-.1-.16-.1-.33 0-.15.16-.35.16-.2.35-.5.2-.28.36-.68.16-.4.16-.95 0-1.06-.4-1.96-.4-.91-1.06-1.64-.66-.74-1.52-1.28-.86-.55-1.79-.89-.84-.3-1.72-.44-.87-.14-1.76-.14-1.55 0-3.06.45T.94 7.55q.71-1.74 1.81-3.13 1.1-1.38 2.52-2.35Q6.68 1.1 8.37.58q1.7-.52 3.58-.52Z"/></svg></span><span class="w"><b>Edge</b><small>1 profile</small></span><span class="ring"></span></div></div><div class="hfacts"><p><svg class="i " viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg>Addresses, page titles and visit times, from the last 90 days</p><p><svg class="i " viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>Never passwords, cookies or what you typed</p><p><svg class="i " viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>It stays on this computer</p></div></div><div class="under"><span class="backc"><svg class="i " viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></span><span class="dots"><u class=""></u><u class=""></u><u class=""></u><u class="on"></u><u class=""></u></span><span class="btn fill ">Bring it in</span></div></div><p class="later"><span class="lk">Skip</span><span>You can bring it in later, from Settings.</span></p></div><div class="tag in">WHILE IT COMES ACROSS, AND AFTERWARDS</div><div class="strips"><div class="shell flat"><div class="card tight"><div class="brows"><div class="brow on"><span class="app"><svg class="lg" style="width:22px;height:22px" viewBox="0 0 24 24"><path fill="#4285F4" d="M12 0C8.21 0 4.831 1.757 2.632 4.501l3.953 6.848A5.454 5.454 0 0 1 12 6.545h10.691A12 12 0 0 0 12 0zM1.931 5.47A11.943 11.943 0 0 0 0 12c0 6.012 4.42 10.991 10.189 11.864l3.953-6.847a5.45 5.45 0 0 1-6.865-2.29zm13.342 2.166a5.446 5.446 0 0 1 1.45 7.09l.002.001h-.002l-5.344 9.257c.206.01.413.016.621.016 6.627 0 12-5.373 12-12 0-1.54-.29-3.011-.818-4.364zM12 16.364a4.364 4.364 0 1 1 0-8.728 4.364 4.364 0 0 1 0 8.728Z"/></svg></span><span class="w"><b>Chrome</b><small>2 profiles</small></span><span class="mono trying"><span class="pips "><u class="on"></u><u class="on"></u><u class="on"></u><u class=""></u><u class=""></u><u class="on"></u><u class=""></u><u class=""></u><u class=""></u></span>Bringing it in..</span></div></div></div></div><div class="shell flat"><div class="card tight"><div class="brows"><div class="brow on"><span class="app"><svg class="lg" style="width:22px;height:22px" viewBox="0 0 24 24"><path fill="#4285F4" d="M12 0C8.21 0 4.831 1.757 2.632 4.501l3.953 6.848A5.454 5.454 0 0 1 12 6.545h10.691A12 12 0 0 0 12 0zM1.931 5.47A11.943 11.943 0 0 0 0 12c0 6.012 4.42 10.991 10.189 11.864l3.953-6.847a5.45 5.45 0 0 1-6.865-2.29zm13.342 2.166a5.446 5.446 0 0 1 1.45 7.09l.002.001h-.002l-5.344 9.257c.206.01.413.016.621.016 6.627 0 12-5.373 12-12 0-1.54-.29-3.011-.818-4.364zM12 16.364a4.364 4.364 0 1 1 0-8.728 4.364 4.364 0 0 1 0 8.728Z"/></svg></span><span class="w"><b>Chrome</b><small>1,204 visits came across</small></span><span class="pill ok"><u></u>Done</span></div></div></div></div></div></div><div class="cap"><b>What I can see</b><span>One statement that’s always true, then three real settings.</span></div><div class="pg ground"><div class="stage"><svg class="b" style="width:56px;height:56px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#2A39B0"/><circle cx="12" cy="13.6" r="9.2" fill="#3F51DC"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/></svg><div class="shell" style="width:520px"><div class="card"><span class="t">5 / 5</span><h3 class="q">What I can see.</h3><p class="qs">One thing is always true. The rest are real settings, here or later.</p><p class="promise"><svg class="i " viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><span><b>I read a page only when you ask,</b> and the chat always shows which one. That part isn’t a setting.</span></p><div class="lab first"><b>Up to you</b></div><div class="srow"><span class="w"><b>Ask before I act</b><small>When risky is before I delete, send or buy.</small></span><span class="seg2"><span class="on">When risky</span><span>Always</span></span></div><div class="srow"><span class="w"><b>Suggestions from your history</b><small>A summary of it goes to the AI service.</small></span><span class="sw on"></span></div><div class="srow"><span class="w"><b>Offers to remember what you tell me</b><small>Only what you say yes to is kept, on this computer.</small></span><span class="sw on"></span></div></div><div class="under"><span class="backc"><svg class="i " viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></span><span class="dots"><u class=""></u><u class=""></u><u class=""></u><u class=""></u><u class="on"></u></span><span class="btn fill ">Start browsing</span></div></div></div></div><div class="cap"><b>The new tab knows your name</b><span>With no name it stays “Where to?”.</span></div><div class="pg ground"><div class="nt"><p class="hello"><svg class="b" style="width:34px;height:34px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#2A39B0"/><circle cx="12" cy="13.6" r="9.2" fill="#3F51DC"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/></svg>Where to, Sam?</p><div class="shell" style="width:520px;border-radius:26px"><div class="card pbox"><span class="ph">Ask Berry, or type an address</span><div class="tools"><span class="plus"><svg class="i " viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><span class="grow"></span><span class="chipb"><svg class="b" style="width:16px;height:16px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#2A39B0"/><circle cx="12" cy="13.6" r="9.2" fill="#3F51DC"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/></svg>Berry<svg class="i go" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span><span class="send"><svg class="i " viewBox="0 0 24 24"><path d="M7 17 17 7M8 7h9v9"/></svg></span></div></div></div><div style="width:520px;margin-top:20px"><div class="grp" style="margin-top:0"><b>First jobs</b><span>1 of 3</span><span class="grow"></span><span class="lk" style="font-family:inherit">Hide</span></div><div class="jrow done"><span class="ring on"><svg class="i " viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg></span><span class="w"><b>Bring your history in</b><small>Done. I’ll use it to suggest things.</small></span></div><div class="jrow "><span class="ring"></span><span class="w"><b>Find the cheapest USB-C cable, and ask me before buying</b><small>A first job. I’ll stop and ask before I click Buy.</small></span><svg class="i go" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></div></div></div></div></body></html>

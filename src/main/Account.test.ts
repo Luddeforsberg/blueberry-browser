@@ -32,7 +32,7 @@ describe("Account", () => {
   it("keeps the session encrypted and never in its state, and comes back signed in", async () => {
     const { account, file } = start({ signIn: async () => session("one") });
     const state = await account.signIn(" ana@example.com ", "hunter2-password");
-    expect(state).toEqual({ status: "signed-in", email: "ana@example.com", problem: null });
+    expect(state).toEqual({ status: "signed-in", email: "ana@example.com", problem: null, problemAbout: null });
     const saved = readFileSync(file, "utf8");
     expect(saved).not.toContain("access-one");
     expect(saved).not.toContain("hunter2");
@@ -53,12 +53,20 @@ describe("Account", () => {
     expect(state.problem).toContain(words);
   });
 
-  it("says to confirm when a sign-up gives no session, and asks for both fields first", async () => {
+  it("says which field a problem is about", async () => {
+    const { account } = start({ signUp: async () => { throw new ServerError(422, "user_already_exists"); } });
+    expect((await account.signUp("a@b.se", "a-long-password")).problemAbout).toBe("email");
+    const offline = start({ signIn: async () => { throw new Unreachable(); } }).account;
+    expect((await offline.signIn("a@b.se", "pw")).problemAbout).toBeNull();
+  });
+
+  it("says to confirm when a sign-up gives no session, and asks for both fields and 8 characters first", async () => {
     const signUp = vi.fn(async () => null);
     const { account } = start({ signUp });
     expect((await account.signUp("", "pw")).problem).toContain("Enter your email");
+    expect(await account.signUp("a@b.se", "1234567")).toMatchObject({ problem: "Use at least 8 characters.", problemAbout: "password" });
     expect(signUp).not.toHaveBeenCalled();
-    const state = await account.signUp("a@b.se", "pw");
+    const state = await account.signUp("a@b.se", "12345678");
     expect(state.status).toBe("signed-out");
     expect(state.problem).toContain("confirm");
   });
@@ -125,7 +133,7 @@ describe("Account", () => {
     await fourth;
     answer(2, new ServerError(400, "invalid_credentials"));
     await third;
-    expect(account.state).toEqual({ status: "signed-in", email: "ana@example.com", problem: null });
+    expect(account.state).toEqual({ status: "signed-in", email: "ana@example.com", problem: null, problemAbout: null });
   });
 
   it("forgets the session here even if the server can't be told", async () => {

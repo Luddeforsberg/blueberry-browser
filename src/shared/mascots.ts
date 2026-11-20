@@ -4,13 +4,14 @@ import type { MascotAccessory, MascotDraft, MascotPalette, MascotProfile, Mascot
 
 export const BERRY_ID = "berry";
 
+// The ids are the old birds', kept because looks are saved under them. Each is drawn and named as a berry.
 export const PALETTES: { id: MascotPalette; label: string }[] = [
-  { id: "jackdaw", label: "Jackdaw" },
-  { id: "robin", label: "Robin" },
-  { id: "canary", label: "Canary" },
-  { id: "parakeet", label: "Parakeet" },
-  { id: "flamingo", label: "Flamingo" },
-  { id: "kingfisher", label: "Kingfisher" },
+  { id: "kingfisher", label: "Blueberry" },
+  { id: "robin", label: "Lingon" },
+  { id: "canary", label: "Cloudberry" },
+  { id: "parakeet", label: "Gooseberry" },
+  { id: "flamingo", label: "Raspberry" },
+  { id: "jackdaw", label: "Currant" },
 ];
 
 export const ACCESSORIES: { id: MascotAccessory; label: string }[] = [
@@ -32,7 +33,8 @@ export const MASCOT_TOOLS: { id: MascotTool; label: string; hint: string }[] = [
 export const BERRY: MascotProfile = {
   id: BERRY_ID,
   name: "Berry",
-  look: { palette: "jackdaw", accessory: "none" },
+  // The blueberry, with nothing on.
+  look: { palette: "kingfisher", accessory: "none" },
   instructions: "",
   sites: [],
   tools: MASCOT_TOOLS.map(({ id }) => id),

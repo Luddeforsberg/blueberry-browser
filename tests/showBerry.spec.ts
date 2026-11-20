@@ -49,18 +49,29 @@ test("show Berry a job once, see the notes, and it becomes a routine that runs",
       await browser.closeTab(newTab.id);
     });
     await chrome.getByRole("button", { name: "Show Berry how" }).click();
-    const notice = chrome.getByRole("status").filter({ hasText: "Berry’s watching" });
+    const notice = chrome.getByRole("status").filter({ hasText: "Watching" });
     await expect(notice).toBeVisible();
+    const hint = notice.getByText("Do the job once, then press Done");
+    await expect(hint).toBeVisible();
 
-    // From Routines, through the address bar. Nothing on a page can answer this view's channels.
-    await chrome.evaluate(async (url) => {
-      const { browser } = window.chromeAPI;
-      const tabs = await browser.getTabs();
-      await browser.navigateTab(tabs[0].id, url);
-    }, `${origin}/shop`);
+    // Routines isn't watched, so a new tab says what to do, with nothing on it to ask, and asks where the job starts.
+    await expect(chrome.getByRole("heading", { name: "Show me how." })).toBeVisible();
+    await expect(chrome.getByRole("textbox", { name: /ask/i })).toHaveCount(0);
+    const start = chrome.getByRole("textbox", { name: "Where does it start?" });
+    await expect(start).toBeFocused();
+    await chrome.keyboard.type(`${origin}/shop`);
+    await chrome.keyboard.press("Enter");
     const page = await findView(app, `${origin}/shop`);
     await page.waitForLoadState();
     await page.waitForTimeout(300);
+    // Going there is the first step.
+    await expect(hint).toHaveCount(0);
+    await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.recording.state())).steps[0]?.text).toMatch(/127\.0\.0\.1/);
+    // Routines goes, so nothing else can come forward when a tab closes.
+    await chrome.evaluate(async () => {
+      const { browser } = window.chromeAPI;
+      await browser.closeTab((await browser.getTabs()).find(({ page }) => page === "routines")!.id);
+    });
 
     // A click the page faked for itself isn't one of the user's.
     await page.evaluate(() => document.getElementById("fake")?.click());
@@ -116,14 +127,14 @@ test("show Berry a job once, see the notes, and it becomes a routine that runs",
       await browser.closeTab(tabs.find(({ page }) => page === "settings")!.id);
     });
 
-    // Left in the field when Stop is pressed, and not forgotten.
+    // Left in the field when Done is pressed, and not forgotten.
     await page.getByRole("textbox", { name: "Plain box" }).click();
     await page.keyboard.type("left over");
 
-    await notice.getByRole("button", { name: "Stop" }).click();
+    await notice.getByRole("button", { name: "Done" }).click();
     await expect(chrome.getByRole("heading", { name: "What I watched" })).toBeVisible();
     await expect(notice).toHaveCount(0);
-    // Nothing's left watching in the page once Stop is pressed.
+    // Nothing's left watching in the page once Done is pressed.
     const stillThere = await app.evaluate(({ webContents }, url) => {
       const tab = webContents.getAllWebContents().find((contents) => contents.getURL().startsWith(url));
       return tab?.executeJavaScriptInIsolatedWorld(1001, [{ code: "typeof globalThis.__watching" }]);
@@ -165,7 +176,7 @@ test("show Berry a job once, see the notes, and it becomes a routine that runs",
       changes: [{ label: "Search term", value: "usb-c cable" }],
     }));
     await chrome.getByRole("button", { name: "Turn this into a routine" }).click();
-    await expect(chrome.getByRole("heading", { name: "New routine" })).toBeVisible();
+    await expect(chrome.getByRole("heading", { name: "What should I do?" })).toBeVisible();
     const sent = JSON.stringify(model.titleRequests[0].messages);
     expect(sent).toContain("Add to cart");
     expect(sent).not.toContain(PASSWORD);
@@ -173,27 +184,53 @@ test("show Berry a job once, see the notes, and it becomes a routine that runs",
     // A page's name for something goes as data, marked as such.
     expect(sent).toContain("page_label");
 
-    await expect(chrome.getByRole("textbox", { name: "Name" })).toHaveValue("Buy a cable");
-    await expect(chrome.getByRole("textbox", { name: "Sites it may use" })).toHaveValue("127.0.0.1");
     const library = await chrome.evaluate(() => window.chromeAPI.library.getLibrary());
     expect(library.routines).toHaveLength(0);
     expect((await chrome.evaluate(() => window.chromeAPI.recording.state())).steps).toHaveLength(0);
 
-    // Changing what might change changes the instructions.
-    await chrome.getByRole("textbox", { name: "Search term" }).fill("hdmi cable");
-    await chrome.getByRole("textbox", { name: "Search term" }).blur();
-    await expect(chrome.getByRole("textbox", { name: "What should it do?" })).toHaveValue(/hdmi cable/);
+    // What might change is marked where it stands. Typing over it changes it, and it stays marked.
+    const steps = chrome.getByRole("textbox", { name: "What should I do?" });
+    await steps.getByText("usb-c cable").selectText();
+    await chrome.keyboard.type("hdmi cable");
+    await expect(steps).toHaveText(`1. Go to ${origin}/shop\n2. Search for hdmi cablesame each run`);
+    // Its mark is a button that says what happens to it, and switches it, from the keyboard or the pointer.
+    const asking = "Before you start, ask me for the search term to use. Last time it was hdmi cable.";
+    await chrome.keyboard.press("Tab");
+    await expect(chrome.getByRole("button", { name: "Search term: same each run" })).toBeFocused();
+    await chrome.keyboard.press("Enter");
+    await expect(chrome.getByRole("button", { name: "Search term: ask me each run" })).toBeFocused();
+    await expect(chrome.getByText(asking)).toBeVisible();
+    await chrome.getByRole("button", { name: "Search term: ask me each run" }).click();
+    await expect(chrome.getByText(asking)).toHaveCount(0);
+    await chrome.getByRole("button", { name: "Search term: same each run" }).click();
+
+    // Only when asked, by Berry, and only on the sites it was shown.
+    await chrome.getByRole("button", { name: "Continue" }).click();
+    await expect(chrome.getByRole("radio", { name: "Only when you ask" })).toHaveAttribute("aria-checked", "true");
+    await chrome.getByRole("button", { name: "Continue" }).click();
+    await chrome.getByRole("button", { name: "Continue" }).click();
+    await expect(chrome.getByRole("radio", { name: "Only these sites" })).toHaveAttribute("aria-checked", "true");
+    await expect(chrome.getByRole("list", { name: "Sites it may use" }).getByRole("listitem")).toHaveText(["127.0.0.1", "Add a site"]);
 
     // The run goes the normal way, and the tools stop it going off the sites it was shown.
     model.reset();
     model.callTools({ name: "open_tab", args: { url: "https://evil.example/" } });
     model.replyWith("Done, and I stayed where you showed me.");
-    await chrome.getByRole("button", { name: "Save and run it now" }).click();
+    await chrome.getByRole("button", { name: "Save routine" }).click();
+    await chrome.getByRole("button", { name: "Run it now" }).click();
     await expect(chrome.getByRole("heading", { name: "Buy a cable" })).toBeVisible();
-    await expect(chrome.getByText("When you ask")).toBeVisible();
+    await expect(chrome.getByText("Only when you ask").first()).toBeVisible();
     await expect(chrome.getByText("Done, and I stayed where you showed me.").first()).toBeVisible({ timeout: 20_000 });
     await expect(chrome.getByText(/Stayed off evil\.example/).first()).toBeVisible();
-    expect(JSON.stringify(model.requests[0].messages)).toContain("hdmi cable");
+    // It asks through the line before the steps, like any question.
+    expect(JSON.stringify(model.requests[0].messages)).toContain(asking);
+
+    // Changing what it does from its page marks the value again, and switching it there takes the line away.
+    const [routine] = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).routines;
+    await chrome.evaluate((id) => window.chromeAPI.browser.openPage("routines", { param: `${id}/does` }), routine.id);
+    await chrome.getByRole("button", { name: "Search term: ask me each run" }).click();
+    await chrome.getByRole("button", { name: "Save" }).click();
+    await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).routines[0].instructions).toBe(`1. Go to ${origin}/shop\n2. Search for hdmi cable`);
 
   } finally {
     await app.close();
@@ -230,11 +267,8 @@ test("copying from a page and pasting it in is noted, and a secret is copied wit
     const chrome = await findView(app, "view=chrome");
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("routines"));
     await chrome.getByRole("button", { name: "Show Berry how" }).click();
-    await chrome.evaluate(async (url) => {
-      const { browser } = window.chromeAPI;
-      const tabs = await browser.getTabs();
-      await browser.navigateTab(tabs.find(({ page }) => page === "routines")!.id, url);
-    }, `${origin}/profile`);
+    await chrome.getByRole("textbox", { name: "Where does it start?" }).fill(`${origin}/profile`);
+    await chrome.keyboard.press("Enter");
     const page = await findView(app, `${origin}/profile`);
     await page.waitForLoadState();
     await page.waitForTimeout(300);
@@ -245,9 +279,9 @@ test("copying from a page and pasting it in is noted, and a secret is copied wit
     await page.mouse.down();
     await page.mouse.move(name!.x + name!.width - 1, name!.y + name!.height / 2, { steps: 5 });
     await page.mouse.up();
-    await page.keyboard.press("Meta+c");
+    await page.keyboard.press("ControlOrMeta+c");
     await page.getByRole("textbox", { name: "Name" }).click();
-    await page.keyboard.press("Meta+v");
+    await page.keyboard.press("ControlOrMeta+v");
     await expect(page.getByRole("textbox", { name: "Name" })).toHaveValue("Anna Svensson");
 
     await page.frameLocator("#sheet").getByRole("textbox", { name: "Cell A2" }).click();
@@ -259,23 +293,23 @@ test("copying from a page and pasting it in is noted, and a secret is copied wit
 
     await page.getByRole("textbox", { name: "Password", exact: true }).click();
     await page.keyboard.type(PASSWORD);
-    await page.keyboard.press("Meta+a");
-    await page.keyboard.press("Meta+c");
+    await page.keyboard.press("ControlOrMeta+a");
+    await page.keyboard.press("ControlOrMeta+c");
     // A revealed password can be copied, and it's still a password.
     await page.getByRole("textbox", { name: "Shown password" }).click();
     await page.keyboard.type("shown-secret");
     await page.getByRole("button", { name: "Show password" }).click();
     await page.getByRole("textbox", { name: "Shown password" }).click();
-    await page.keyboard.press("Meta+a");
-    await page.keyboard.press("Meta+c");
+    await page.keyboard.press("ControlOrMeta+a");
+    await page.keyboard.press("ControlOrMeta+c");
     // Pasted somewhere plain, it's still a secret.
     await page.getByRole("textbox", { name: "Name" }).click();
-    await page.keyboard.press("Meta+a");
-    await page.keyboard.press("Meta+v");
+    await page.keyboard.press("ControlOrMeta+a");
+    await page.keyboard.press("ControlOrMeta+v");
     await expect(page.getByRole("textbox", { name: "Name" })).toHaveValue("shown-secret");
     await page.getByRole("textbox", { name: "Password", exact: true }).click();
 
-    await chrome.getByRole("button", { name: "Stop" }).click();
+    await chrome.getByRole("button", { name: "Done" }).click();
     await expect(chrome.getByRole("heading", { name: "What I watched" })).toBeVisible();
     const notes = chrome.locator("ol li");
     await expect(notes.filter({ hasText: "Copied “Anna Svensson”" })).toHaveCount(1);
@@ -298,7 +332,7 @@ test("copying from a page and pasting it in is noted, and a secret is copied wit
   }
 });
 
-test("with nothing to go through, there's nothing to send", async () => {
+test("with nothing noted, there's nothing to send, and it can start again", async () => {
   const app = await launchApp();
   try {
     const chrome = await findView(app, "view=chrome");
@@ -307,8 +341,17 @@ test("with nothing to go through, there's nothing to send", async () => {
     await expect(chrome.getByRole("button", { name: "Show Berry how" })).toHaveCount(0);
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("routines"));
     await chrome.getByRole("button", { name: "Show Berry how" }).click();
-    await chrome.getByRole("button", { name: "Stop" }).click();
-    await expect(chrome.getByRole("button", { name: "Turn this into a routine" })).toBeDisabled();
+    await chrome.getByRole("button", { name: "Done" }).click();
+    await expect(chrome.getByRole("heading", { name: "I didn’t catch anything." })).toBeVisible();
+    await expect(chrome.getByRole("button", { name: "Turn this into a routine" })).toHaveCount(0);
+
+    // Again, as pressing Show Berry how does: the page goes, and the tab that says what to do is in front.
+    await chrome.getByRole("button", { name: "Show me again" }).click();
+    await expect(chrome.getByRole("heading", { name: "Show me how." })).toBeVisible();
+    await expect(chrome.getByRole("heading", { name: "What I watched" })).toHaveCount(0);
+    expect((await chrome.evaluate(() => window.chromeAPI.recording.state())).status).toBe("recording");
+
+    await chrome.getByRole("button", { name: "Done" }).click();
     await chrome.getByRole("button", { name: "Close", exact: true }).click();
     await expect(chrome.getByRole("heading", { name: "What I watched" })).toHaveCount(0);
     expect((await chrome.evaluate(() => window.chromeAPI.recording.state())).status).toBe("idle");

@@ -1,3 +1,7 @@
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const motion = require("./src/renderer/common/motion.json");
+const ms = (name) => `${motion.ms[name]}ms`;
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: ["class"],
@@ -10,204 +14,176 @@ module.exports = {
         "2xl": "1400px",
       },
     },
-    // Replaced rather than extended, so anything outside DESIGN.md doesn't generate a class.
+    // DESIGN.md section 4. Replaced rather than extended, so anything outside it doesn't generate a class.
     colors: {
       inherit: "inherit",
       current: "currentColor",
       transparent: "transparent",
-      border: "rgb(var(--border) / <alpha-value>)",
-      input: "rgb(var(--input) / <alpha-value>)",
-      ring: "rgb(var(--ring) / <alpha-value>)",
-      background: "rgb(var(--background) / <alpha-value>)",
-      canvas: "rgb(var(--canvas) / <alpha-value>)",
+      ground: "rgb(var(--ground) / <alpha-value>)",
       tray: "rgb(var(--tray) / <alpha-value>)",
-      selected: "rgb(var(--selected) / <alpha-value>)",
-      surface: "rgb(var(--surface) / <alpha-value>)",
-      foreground: "rgb(var(--foreground) / <alpha-value>)",
-      "glass-tint": "var(--glass-tint)",
-      success: "rgb(var(--success) / <alpha-value>)",
-      warning: "rgb(var(--warning) / <alpha-value>)",
-      bookmark: "rgb(var(--bookmark) / <alpha-value>)",
-      primary: {
-        DEFAULT: "rgb(var(--primary) / <alpha-value>)",
-        foreground: "rgb(var(--primary-foreground) / <alpha-value>)",
-      },
-      secondary: {
-        DEFAULT: "rgb(var(--secondary) / <alpha-value>)",
-        foreground: "rgb(var(--secondary-foreground) / <alpha-value>)",
-      },
-      destructive: {
-        DEFAULT: "rgb(var(--destructive) / <alpha-value>)",
-        foreground: "rgb(var(--destructive-foreground) / <alpha-value>)",
-      },
-      muted: {
-        DEFAULT: "rgb(var(--muted) / <alpha-value>)",
-        foreground: "rgb(var(--muted-foreground) / <alpha-value>)",
-      },
-      accent: {
-        DEFAULT: "rgb(var(--accent) / <alpha-value>)",
-        foreground: "rgb(var(--accent-foreground) / <alpha-value>)",
-        ink: "rgb(var(--accent-ink) / <alpha-value>)",
-      },
-      popover: {
-        DEFAULT: "rgb(var(--popover) / <alpha-value>)",
-        foreground: "rgb(var(--popover-foreground) / <alpha-value>)",
-      },
-      berry: {
-        ink: "rgb(var(--berry-ink) / <alpha-value>)",
-        wing: "rgb(var(--berry-wing) / <alpha-value>)",
-        nape: "rgb(var(--berry-nape) / <alpha-value>)",
-        eye: "rgb(var(--berry-eye) / <alpha-value>)",
-        pupil: "rgb(var(--berry-pupil) / <alpha-value>)",
-        beak: "rgb(var(--berry-beak) / <alpha-value>)",
-        gear: "rgb(var(--berry-gear) / <alpha-value>)",
-        "gear-shade": "rgb(var(--berry-gear-shade) / <alpha-value>)",
-        "fruit-mid": "rgb(var(--berry-fruit-mid) / <alpha-value>)",
-        "fruit-dark": "rgb(var(--berry-fruit-dark) / <alpha-value>)",
-        "fruit-bloom": "rgb(var(--berry-fruit-bloom) / <alpha-value>)",
-        "fruit-crown": "rgb(var(--berry-fruit-crown) / <alpha-value>)",
-      },
-      card: {
-        DEFAULT: "rgb(var(--card) / <alpha-value>)",
-        foreground: "rgb(var(--card-foreground) / <alpha-value>)",
-      },
+      well: "rgb(var(--well) / <alpha-value>)",
+      sheet: "rgb(var(--sheet) / <alpha-value>)",
+      "sheet-2": "rgb(var(--sheet-2) / <alpha-value>)",
+      card: "rgb(var(--card) / <alpha-value>)",
+      "card-2": "rgb(var(--card-2) / <alpha-value>)",
+      ink: "rgb(var(--ink) / <alpha-value>)",
+      "ink-2": "rgb(var(--ink-2) / <alpha-value>)",
+      "ink-3": "rgb(var(--ink-3) / <alpha-value>)",
+      faint: "rgb(var(--faint) / <alpha-value>)",
+      line: "var(--line)",
+      dot: "var(--dot)",
+      hover: "var(--hover)",
+      press: "var(--press)",
+      dim: "var(--dim)",
+      ask: "rgb(var(--ask) / <alpha-value>)",
+      "ask-bg": "rgb(var(--ask-bg) / <alpha-value>)",
+      focus: "rgb(var(--focus) / <alpha-value>)",
+      tip: "rgb(var(--tip) / <alpha-value>)",
+      "tip-ink": "rgb(var(--tip-ink) / <alpha-value>)",
     },
     borderColor: ({ theme }) => ({
       ...theme("colors"),
-      DEFAULT: theme("colors.border"),
+      DEFAULT: theme("colors.line"),
     }),
+    // The focus ring always has a gap in the ground's colour (DESIGN.md section 8).
+    ringColor: ({ theme }) => ({
+      ...theme("colors"),
+      DEFAULT: "rgb(var(--focus))",
+    }),
+    ringOffsetWidth: { DEFAULT: "2px", 0: "0px", 2: "2px" },
+    // A whole colour, not a channel list: the base styles use the default as it is, with no alpha to put in.
+    ringOffsetColor: ({ theme }) => ({
+      ...theme("colors"),
+      DEFAULT: "rgb(var(--ground))",
+    }),
+    // Rows and small chips, tiles and groups, sheets and cards in the chat and their shell, menus, the prompt card and
+    // its shell.
     borderRadius: {
       none: "0",
-      control: "8px",
-      card: "12px",
-      panel: "22px",
-      composer: "26px",
+      row: "9px",
+      tile: "12px",
+      sheet: "16px",
+      "card-shell": "20px",
+      menu: "22px",
+      prompt: "24px",
+      shell: "28px",
       full: "9999px",
     },
-    // DESIGN.md section 4: floating content, composer, selected rows, and the page's left edge.
     boxShadow: {
       none: "none",
-      raised: "var(--shadow-raised)",
-      selected: "var(--shadow-selected)",
-      page: "var(--shadow-page)",
-      card: "var(--shadow-card)",
-      reading: "var(--shadow-reading)",
+      rim: "var(--shadow-rim)",
+      chip: "var(--shadow-chip)",
+      up: "var(--shadow-up)",
+      filled: "var(--shadow-filled)",
+      "card-lift": "var(--shadow-card-lift)",
+      lift: "var(--shadow-lift)",
+      ask: "var(--shadow-ask)",
       recording: "var(--shadow-recording)",
-      float: "0 8px 24px rgb(0 0 0 / 0.16)",
+      tip: "var(--shadow-tip)",
     },
     fontFamily: {
-      sans: [
-        "-apple-system",
-        "BlinkMacSystemFont",
-        '"Segoe UI Variable Text"',
-        '"Segoe UI"',
-        "sans-serif",
-      ],
-      mono: ["ui-monospace", "SFMono-Regular", "Consolas", "monospace"],
+      sans: ['"Geist Variable"', "system-ui", "sans-serif"],
+      mono: ['"Geist Mono Variable"', "ui-monospace", "monospace"],
     },
+    // DESIGN.md section 5. 11.5 and 11 are Geist Mono's.
     fontSize: {
       11: ["11px", "16px"],
+      11.5: ["11.5px", "16px"],
       12: ["12px", "16px"],
-      13: ["13px", "18px"],
+      13: ["13px", "19px"],
       14: ["14px", "20px"],
-      15: ["15px", "24px"],
-      16: ["16px", "25px"],
-      20: ["20px", "28px"],
-      34: ["34px", { lineHeight: "40px", letterSpacing: "-0.02em" }],
+      15: ["15px", "23px"],
+      20: ["20px", { lineHeight: "28px", letterSpacing: "-0.015em" }],
+      30: ["30px", { lineHeight: "36px", letterSpacing: "-0.025em" }],
     },
+    // Semibold is a page's title alone.
     fontWeight: {
       regular: "400",
+      medium: "500",
       semibold: "600",
     },
+    // DESIGN.md section 7, from motion.json, which the renderers' timers read too.
     transitionDuration: {
-      DEFAULT: "100ms",
-      fast: "100ms",
-      layout: "240ms",
-      slowest: "320ms",
+      DEFAULT: ms("fast"),
+      fast: ms("fast"),
+      tip: ms("tip"),
+      menu: ms("menu"),
+      move: ms("move"),
+      slide: ms("slide"),
+      panel: ms("panel"),
+      switch: ms("switch"),
     },
     transitionTimingFunction: {
-      DEFAULT: "cubic-bezier(.32, .72, 0, 1)",
-      crisp: "cubic-bezier(.32, .72, 0, 1)",
+      DEFAULT: motion.ease,
+      crisp: motion.ease,
     },
     extend: {
       spacing: {
         4.5: "1.125rem",
       },
+      // The live line's words: `ink-3` with a band of `ink` passing through (DESIGN.md section 7).
       backgroundImage: {
         shimmer:
-          "linear-gradient(90deg, rgb(var(--muted-foreground) / 0.55) 20%, rgb(var(--accent-ink)) 38%, rgb(var(--foreground)) 50%, rgb(var(--accent-ink)) 62%, rgb(var(--muted-foreground) / 0.55) 80%)",
+          "linear-gradient(90deg, rgb(var(--ink-3)) 38%, rgb(var(--ink)) 50%, rgb(var(--ink-3)) 62%)",
       },
       animation: {
-        "fade-in": "fade-in 240ms cubic-bezier(.32, .72, 0, 1) forwards",
-        "answered": "answered 1600ms cubic-bezier(.32, .72, 0, 1) forwards",
-        shimmer: "shimmer 1300ms linear infinite",
-        // Berry's own motion. Bounce belongs to Berry, never the chrome.
-        "berry-bob": "berry-bob 900ms ease-in-out infinite",
-        "berry-feather": "berry-feather 1200ms ease-in forwards",
-        "berry-pose": "berry-pose 160ms ease-out",
-        "berry-settle": "berry-settle 420ms ease-out",
-        "berry-blink": "berry-blink 6s linear infinite",
-        "berry-toss": "berry-toss 1400ms ease-in-out infinite",
-        "berry-flap": "berry-flap 150ms ease-in-out infinite alternate",
-        "berry-swing": "berry-swing 2600ms ease-in-out infinite alternate",
-        "berry-swing-back": "berry-swing 2600ms ease-in-out -900ms infinite alternate",
-        "berry-peck": "berry-peck 700ms ease-in-out infinite",
-        "berry-print": "berry-print 30s ease-in forwards",
-        "berry-hop": "berry-hop 420ms ease-out",
+        "fade-in": "fade-in 280ms cubic-bezier(.2, .8, .2, 1) forwards",
+        "answered": "answered 1600ms cubic-bezier(.2, .8, .2, 1) forwards",
+        shimmer: "shimmer 2400ms linear infinite",
+        // Overshoot is the mascots' alone: one pops when it arrives (DESIGN.md section 7).
+        "mascot-pop": "mascot-pop 340ms cubic-bezier(.3, 1.5, .5, 1)",
+        // Moving between the steps of making a mascot: the card's contents slide, and with the motion held still, fade.
+        "step-next": "step-next 200ms cubic-bezier(.2, .8, .2, 1)",
+        "step-back": "step-back 200ms cubic-bezier(.2, .8, .2, 1)",
+        "step-fade": "mascot-fade 200ms cubic-bezier(.2, .8, .2, 1)",
+        // A menu grows from its button, and goes back into it a little quicker (DESIGN.md section 7).
+        // Words arriving in place of others, as a tooltip's do when it moves to a neighbour.
+        fade: `mascot-fade ${ms("move")} ${motion.ease}`,
+        "menu-in": `menu-in ${ms("menu")} ${motion.ease}`,
+        "menu-in-above": `menu-in-above ${ms("menu")} ${motion.ease}`,
+        "menu-out": `menu-out ${ms("fast")} ${motion.ease} forwards`,
+        "menu-out-above": `menu-out-above ${ms("fast")} ${motion.ease} forwards`,
+        // The Gallery's page opening and going back.
+        "gallery-fade": `mascot-fade ${ms("panel")} ${motion.ease}`,
       },
       keyframes: {
         shimmer: {
-          "0%": { backgroundPosition: "150% 0" },
-          "100%": { backgroundPosition: "-50% 0" },
+          "0%": { backgroundPosition: "130% 0" },
+          "100%": { backgroundPosition: "-130% 0" },
         },
-        "berry-bob": {
-          "0%, 100%": { transform: "translateY(0)" },
-          "50%": { transform: "translateY(-3px)" },
+        // A menu opening, and a mascot changing with the motion held still.
+        "menu-in": {
+          "0%": { transform: "scale(.96) translateY(-4px)", opacity: "0" },
+          "100%": { transform: "none", opacity: "1" },
         },
-        "berry-pose": {
+        "menu-in-above": {
+          "0%": { transform: "scale(.96) translateY(4px)", opacity: "0" },
+          "100%": { transform: "none", opacity: "1" },
+        },
+        "menu-out": {
+          "0%": { transform: "none", opacity: "1" },
+          "100%": { transform: "scale(.96) translateY(-4px)", opacity: "0" },
+        },
+        "menu-out-above": {
+          "0%": { transform: "none", opacity: "1" },
+          "100%": { transform: "scale(.96) translateY(4px)", opacity: "0" },
+        },
+        "mascot-fade": {
           "0%": { opacity: "0" },
           "100%": { opacity: "1" },
         },
-        "berry-settle": {
-          "0%": { transform: "translate(-6px, -20px)" },
-          "65%": { transform: "translate(0, 0)" },
-          "82%": { transform: "translate(0, -3px)" },
-          "100%": { transform: "translate(0, 0)" },
+        "step-next": {
+          "0%": { opacity: "0", transform: "translateX(24px)" },
+          "100%": { opacity: "1", transform: "none" },
         },
-        "berry-blink": {
-          "0%, 95%, 100%": { transform: "scaleY(1)" },
-          "97.5%": { transform: "scaleY(0.08)" },
+        "step-back": {
+          "0%": { opacity: "0", transform: "translateX(-24px)" },
+          "100%": { opacity: "1", transform: "none" },
         },
-        "berry-toss": {
-          "0%, 100%": { transform: "translateY(0)" },
-          "50%": { transform: "translateY(14px)" },
-        },
-        "berry-swing": {
-          "0%": { transform: "rotate(-12deg)" },
-          "100%": { transform: "rotate(14deg)" },
-        },
-        "berry-peck": {
-          "0%, 55%, 100%": { transform: "rotate(0deg)" },
-          "25%": { transform: "rotate(38deg)" },
-        },
-        "berry-hop": {
-          "0%": { transform: "translateY(0) scale(1, 1)" },
-          "20%": { transform: "translateY(0) scale(1.06, 0.92)" },
-          "55%": { transform: "translateY(-14%) scale(0.97, 1.04)" },
-          "85%": { transform: "translateY(0) scale(1.04, 0.96)" },
-          "100%": { transform: "translateY(0) scale(1, 1)" },
-        },
-        "berry-print": {
-          "0%": { opacity: "0.3" },
-          "100%": { opacity: "0" },
-        },
-        "berry-flap": {
-          "0%": { transform: "rotate(-16deg)" },
-          "100%": { transform: "rotate(24deg)" },
-        },
-        "berry-feather": {
-          "0%": { transform: "translate(0, 0) rotate(0deg)", opacity: "1" },
-          "100%": { transform: "translate(-4px, 14px) rotate(-40deg)", opacity: "0" },
+        "mascot-pop": {
+          "0%": { transform: "scale(.5)", opacity: ".2" },
+          "55%": { transform: "scale(1.14)", opacity: "1" },
+          "100%": { transform: "none" },
         },
         // Stays long enough to read, then goes in the time a panel takes.
         answered: {
@@ -220,38 +196,40 @@ module.exports = {
         },
       },
       typography: {
+        // A reply in a chat: 15px at 1.55, as every message is (DESIGN.md section 5).
         DEFAULT: {
           css: {
-            "--tw-prose-body": "rgb(var(--foreground))",
-            "--tw-prose-headings": "rgb(var(--foreground))",
-            "--tw-prose-bold": "rgb(var(--foreground))",
-            "--tw-prose-links": "rgb(var(--accent-ink))",
-            "--tw-prose-code": "rgb(var(--foreground))",
-            "--tw-prose-pre-code": "rgb(var(--foreground))",
-            "--tw-prose-pre-bg": "rgb(var(--tray))",
-            "--tw-prose-counters": "rgb(var(--muted-foreground))",
-            "--tw-prose-bullets": "rgb(var(--muted-foreground))",
-            "--tw-prose-quotes": "rgb(var(--foreground))",
-            "--tw-prose-quote-borders": "rgb(var(--border))",
-            "--tw-prose-hr": "rgb(var(--border))",
-            "--tw-prose-th-borders": "rgb(var(--border))",
-            "--tw-prose-td-borders": "rgb(var(--border))",
-            fontSize: "16px",
-            lineHeight: "25px",
-            h1: { fontSize: "20px", lineHeight: "28px", fontWeight: "600" },
-            h2: { fontSize: "20px", lineHeight: "28px", fontWeight: "600" },
-            h3: { fontSize: "16px", lineHeight: "25px", fontWeight: "600" },
-            h4: { fontSize: "16px", lineHeight: "25px", fontWeight: "600" },
-            strong: { fontWeight: "600" },
-            code: { fontSize: "13px", fontWeight: "400" },
+            "--tw-prose-body": "rgb(var(--ink))",
+            "--tw-prose-headings": "rgb(var(--ink))",
+            "--tw-prose-bold": "rgb(var(--ink))",
+            "--tw-prose-links": "rgb(var(--ink))",
+            "--tw-prose-code": "rgb(var(--ink))",
+            "--tw-prose-pre-code": "rgb(var(--ink))",
+            "--tw-prose-pre-bg": "rgb(var(--sheet-2))",
+            "--tw-prose-counters": "rgb(var(--ink-3))",
+            "--tw-prose-bullets": "rgb(var(--ink-3))",
+            "--tw-prose-quotes": "rgb(var(--ink))",
+            "--tw-prose-quote-borders": "var(--line)",
+            "--tw-prose-hr": "var(--line)",
+            "--tw-prose-th-borders": "var(--line)",
+            "--tw-prose-td-borders": "var(--line)",
+            fontSize: "15px",
+            lineHeight: "1.55",
+            h1: { fontSize: "18px", lineHeight: "26px", fontWeight: "500" },
+            h2: { fontSize: "18px", lineHeight: "26px", fontWeight: "500" },
+            h3: { fontSize: "15px", lineHeight: "1.55", fontWeight: "500" },
+            h4: { fontSize: "15px", lineHeight: "1.55", fontWeight: "500" },
+            strong: { fontWeight: "500" },
+            code: { fontFamily: "inherit", fontSize: "13px", fontWeight: "400" },
             "code::before": { content: "none" },
             "code::after": { content: "none" },
-            pre: { borderRadius: "8px" },
-            a: { fontWeight: "400", textDecoration: "none" },
-            "a:hover": { textDecoration: "underline" },
+            pre: { borderRadius: "9px" },
+            a: { fontWeight: "400", textDecoration: "underline", textDecorationColor: "var(--line)", textUnderlineOffset: "3px" },
+            "a:hover": { textDecorationColor: "currentColor" },
           },
         },
       },
+
     },
   },
   // eslint-disable-next-line @typescript-eslint/no-require-imports

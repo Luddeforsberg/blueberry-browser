@@ -89,7 +89,7 @@ test("a site's sign-in comes into the cloud after confirming, can be taken out, 
     model.replyWith("Carried on");
     const sent = await chrome.evaluate((address) => window.chromeAPI.chat.send(null, `Check my account on ${address}`, { seePage: false, cloud: true }), site);
     expect(sent).not.toBeNull();
-    await expect(chrome.getByRole("button", { name: /Needs you.*1 waiting/ })).toBeVisible({ timeout: 20_000 });
+    await expect(chrome.getByRole("tab", { name: /^Chats.*1 needs you/ })).toBeVisible({ timeout: 20_000 });
     const waiting = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).needsYou[0];
     expect(waiting.approval.handoff).toMatchObject({ need: "sign-in", site: "127.0.0.1" });
     // It points at the cloud tab, so Go to the tab works.

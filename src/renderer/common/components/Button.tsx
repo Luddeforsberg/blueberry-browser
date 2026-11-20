@@ -5,24 +5,26 @@ import * as React from "react";
 import { cn } from "../lib/utils";
 
 const buttonVariants = cva(
-    "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-14 font-regular disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring aria-invalid:border-destructive [.native-page_&]:cursor-pointer select-none",
+    "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-14 font-medium transition-[background-color,transform] duration-fast active:scale-[.96] disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-focus aria-invalid:border-ask [.native-page_&]:cursor-pointer select-none",
     {
         variants: {
-            // Three roles: primary for the one decision, outline beside it, and quiet text for the rest.
-            // Destructive is only the recording's Stop, where red is the status itself.
+            // DESIGN.md section 8. Three roles: filled for the one decision, raised beside it, and quiet text for the
+            // rest. Off is `faint`, on `tray` where it has a fill. Raised takes `hover` over its own sheet, and in dark
+            // the sheet a step up, so it still stands off the sheet it's on.
             variant: {
-                default: "bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-primary/40 disabled:opacity-100",
-                outline: "border bg-surface text-foreground hover:bg-muted active:brightness-95",
-                ghost: "hover:bg-muted active:brightness-95",
-                destructive:
-                    "bg-destructive text-destructive-foreground hover:brightness-95 active:brightness-90",
+                default: "bg-ink text-ground shadow-filled hover:bg-ink/85 disabled:bg-tray disabled:text-faint disabled:shadow-none",
+                raised: "bg-sheet dark:bg-sheet-2 text-ink shadow-chip hover:[background-image:linear-gradient(var(--hover),var(--hover))] active:[background-image:linear-gradient(var(--press),var(--press))] disabled:bg-tray disabled:text-faint disabled:shadow-none",
+                ghost: "text-ink-2 hover:bg-hover hover:text-ink active:bg-press disabled:text-faint",
+                // The one decision when it can't be undone, in Asking first.
+                danger: "bg-ask text-ground shadow-filled hover:bg-ask/85 disabled:bg-tray disabled:text-faint disabled:shadow-none",
             },
+            // 32px, or 28px where the button belongs to a row.
             size: {
-                default: "h-9 px-4 py-2 has-[>svg]:px-3",
-                xs: "h-7 gap-1.5 px-2.5 has-[>svg]:px-2",
-                sm: "h-8 gap-1.5 px-3 has-[>svg]:px-2.5",
-                lg: "h-10 px-6 has-[>svg]:px-4",
-                icon: "size-9",
+                default: "h-8 gap-1.5 px-[13px] has-[>svg]:px-3",
+                xs: "h-6 gap-1.5 px-2.5 has-[>svg]:px-2",
+                sm: "h-7 gap-1.5 px-[11px] has-[>svg]:px-2.5",
+                lg: "h-9 px-4 has-[>svg]:px-3",
+                icon: "size-8",
                 "icon-xs": "size-6",
             },
         },
@@ -33,9 +35,10 @@ const buttonVariants = cva(
     }
 );
 
+// No `title`: the chrome doesn't use the system's tooltip. Wrap the button in `Tooltip` instead (DESIGN.md section 8).
 const Button = React.forwardRef<
     HTMLButtonElement,
-    React.ComponentProps<"button"> &
+    Omit<React.ComponentProps<"button">, "title"> &
     VariantProps<typeof buttonVariants> & {
         asChild?: boolean;
     }

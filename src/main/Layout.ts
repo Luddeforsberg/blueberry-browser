@@ -1,18 +1,20 @@
-import type { DesktopBerrySpot, DesktopEdge, DesktopLineAnchor, Layout, LayoutMode, Point, Rect } from "../shared/ipc";
+import type { DesktopBerrySpot, DesktopEdge, Layout, LayoutMode, Point, Rect } from "../shared/ipc";
+import { DESKTOP_BOX, DESKTOP_DROP, DESKTOP_DROP_MOST, DESKTOP_FILLET, DESKTOP_SHADOW } from "../shared/desktopSizes";
 
 export type { Layout, LayoutMode, Rect };
 
 // DESIGN.md section 2, to tune.
-export const SIDEBAR_WIDTH = { default: 280, min: 200, max: 360 };
-export const CHAT_WIDTH = { default: 400, min: 320, max: 480 };
-export const ADDRESS_ROW_HEIGHT = 40;
-// In horizontal mode there is no sidebar to hold the bookmarks, so the toolbar has a bar for them too.
-export const TOOLBAR_HEIGHT_WITH_BOOKMARKS = 76;
-export const TAB_ROW_HEIGHT = 40;
-// The page card floats on the frame, with this much of it showing around the card.
+export const SIDEBAR_WIDTH = { default: 248, min: 200, max: 360 };
+export const CHAT_WIDTH = { default: 348, min: 320, max: 480 };
+// The toolbar is a row on the ground above the page. In the vertical layout the window buttons share it.
+export const TOOLBAR_HEIGHT = 48;
+// The horizontal layout's three rows above the page: tabs, the toolbar, and the bookmarks bar, which is only there with
+// something saved, since there's no sidebar to hold the bookmarks.
+export const TAB_ROW_HEIGHT = 42;
+const HORIZONTAL_TOOLBAR_HEIGHT = 44;
+const BOOKMARKS_BAR_HEIGHT = 40;
+// The gutter: the ground showing between the page's sheet and the window's right and bottom edges, and between sheets.
 export const PAGE_INSET = 8;
-// The window buttons line up with the address row, which sits one inset down.
-export const VERTICAL_TOP_ROW_HEIGHT = ADDRESS_ROW_HEIGHT + 2 * PAGE_INSET;
 export const FLOATING_INSET = 8;
 // The find bar's card with 12px on every side, for its shadow.
 export const FIND_BAR = { width: 384, height: 72 };
@@ -36,6 +38,8 @@ export interface LayoutOptions {
   sidebarWidth: number;
   chatWidth: number;
   platform: NodeJS.Platform;
+  // Whether anything is saved, for the horizontal layout's bookmarks bar.
+  savedSites?: boolean;
 }
 
 const EMPTY: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -49,120 +53,253 @@ export const promptRect = (page: Rect, cardHeight: number): Rect => {
   return { x: page.x, y: page.y, width: Math.min(PROMPT_WIDTH, page.width), height };
 };
 
-// The bird on the edge of the screen. Its window keeps one size wherever it stands, so nothing resizes while it moves or
-// speaks, and the bird tucks by being moved past the side of the window that lies along the edge.
-export const DESKTOP_BIRD_SIZE = 72;
-// Along the edge it keeps this much room, because its tail and wings go past the drawing.
-const DESKTOP_ROOM = 96;
-const DESKTOP_WINDOW = { width: 430, height: 112 };
-// How much of it shows when tucked: the top of its head and its eye. More when something is waiting on the user.
-export const DESKTOP_PEEK = 30;
-export const DESKTOP_PEEK_WAITING = 42;
-// Its toes are a little inside the drawing, so that much goes past the edge.
-const DESKTOP_TOES_PAST = 2;
-const DESKTOP_GAP = 8;
-const DESKTOP_MARGIN = 8;
+// The list under the address field while it's being edited: a menu sheet as wide as the field, 8px under it, with 40px
+// rows, 6px inside its edges, and a hairline with 6px either side before asking a mascot. The view has room round the
+// sheet for the whole of its `lift` shadow, but none above it, so it never covers the field.
+const SUGGESTIONS = { gap: 8, row: 40, padding: 6, rule: 13, side: 24, below: 40 };
+
+export const suggestionsRect = (
+  field: Rect,
+  rows: number,
+  ruled: boolean,
+  window: { width: number; height: number }
+): { view: Rect; sheet: Rect } => {
+  const { gap, row, padding, rule, side, below } = SUGGESTIONS;
+  const sheetHeight = 2 * padding + rows * row + (ruled ? rule : 0);
+  const x = Math.max(Math.round(field.x) - side, 0);
+  const y = Math.round(field.y + field.height + gap);
+  const width = Math.max(Math.min(Math.round(field.width) + 2 * side, window.width - x), 0);
+  const height = Math.max(Math.min(sheetHeight + below, window.height - y), 0);
+  const sheetX = Math.round(field.x) - x;
+  const sheet = { x: sheetX, y: 0, width: Math.max(Math.min(Math.round(field.width), width - sheetX), 0), height: Math.min(sheetHeight, height) };
+  return { view: { x, y, width, height }, sheet };
+};
+
+// A tooltip over the page: a strip as wide as the window, with room under the pill for its shadow and only a little above
+// it, so the strip never reaches the control it belongs to. Along a row the strip stays where it is and the pill slides
+// inside it, so moving to a neighbour moves nothing native, which would judder.
+const TOOLTIP_ROOM = { above: 2, below: 14 };
+export const tooltipRect = (pill: Rect, window: { width: number; height: number }): { view: Rect; pill: Rect } => {
+  const { above, below } = TOOLTIP_ROOM;
+  const y = Math.min(Math.max(Math.round(pill.y) - above, 0), window.height);
+  const height = Math.max(Math.min(Math.round(pill.height) + above + below, window.height - y), 0);
+  return {
+    view: { x: 0, y, width: Math.max(window.width, 0), height },
+    pill: { x: Math.round(pill.x), y: Math.round(pill.y) - y, width: Math.round(pill.width), height: Math.round(pill.height) },
+  };
+};
+
+// Our menus (DESIGN.md section 8). A menu opens 4px under its button, or at the pointer, and a submenu 4px beside its
+// row, with its first row level with it. All of them stay 8px inside the area, moving in, or opening upward when there's
+// no room below. The view holds the sheets and room for their `lift` shadow, which falls mostly downwards and is darkest
+// in dark mode, so it fades out before the view's edge even over a white page.
+const MENU = { gap: 4, edge: 8, padding: 6, room: { side: 32, above: 16, below: 48 } };
+
+export interface MenuSheetBox {
+  // "" for the menu, and a submenu by its row's place: "3", "3.1".
+  path: string;
+  width: number;
+  height: number;
+  // Where its row starts in the sheet above it.
+  rowTop: number;
+}
+
+const parentPath = (path: string): string | null => (path === "" ? null : path.split(".").slice(0, -1).join("."));
+
+// Where each sheet goes in the view, and the view in the area. Anchors and the area are in the same coordinates: the
+// window's, or the screen's for the desktop. Null without the menu itself, or with a submenu whose row isn't placed.
+export const menuPlacement = (anchor: Rect, sheets: MenuSheetBox[], area: Rect): { view: Rect; sheets: Record<string, Point> } | null => {
+  const { gap, edge, padding, room } = MENU;
+  const right = area.x + area.width - edge;
+  const bottom = area.y + area.height - edge;
+  const fit = (sheet: MenuSheetBox) => ({
+    width: Math.round(Math.min(sheet.width, area.width - 2 * edge)),
+    height: Math.round(Math.min(sheet.height, area.height - 2 * edge)),
+  });
+  const placed = new Map<string, Rect>();
+
+  const root = sheets.find(({ path }) => path === "");
+  if (!root) return null;
+  const { width, height } = fit(root);
+  const point = anchor.width === 0 && anchor.height === 0;
+  const below = point ? anchor.y : anchor.y + anchor.height + gap;
+  const above = point ? anchor.y - height : anchor.y - gap - height;
+  const y = below + height <= bottom ? below : above >= area.y + edge ? above : clamp(below, area.y + edge, bottom - height);
+  placed.set("", { x: Math.round(clamp(anchor.x, area.x + edge, right - width)), y: Math.round(y), width, height });
+
+  // Parents before their submenus.
+  const nested = sheets.filter(({ path }) => path !== "").sort((a, b) => a.path.split(".").length - b.path.split(".").length);
+  for (const sheet of nested) {
+    const parent = placed.get(parentPath(sheet.path) ?? "");
+    if (!parent) return null;
+    const { width, height } = fit(sheet);
+    const toRight = parent.x + parent.width + gap;
+    const toLeft = parent.x - gap - width;
+    const x = toRight + width <= right ? toRight : toLeft >= area.x + edge ? toLeft : right - toRight > toLeft - area.x ? clamp(toRight, area.x + edge, right - width) : area.x + edge;
+    const y = clamp(parent.y + sheet.rowTop - padding, area.y + edge, bottom - height);
+    placed.set(sheet.path, { x: Math.round(x), y: Math.round(y), width, height });
+  }
+
+  const rects = [...placed.values()];
+  const left = Math.max(Math.min(...rects.map((rect) => rect.x)) - room.side, area.x);
+  const top = Math.max(Math.min(...rects.map((rect) => rect.y)) - room.above, area.y);
+  const viewRight = Math.min(Math.max(...rects.map((rect) => rect.x + rect.width)) + room.side, area.x + area.width);
+  const viewBottom = Math.min(Math.max(...rects.map((rect) => rect.y + rect.height)) + room.below, area.y + area.height);
+  return {
+    view: { x: left, y: top, width: viewRight - left, height: viewBottom - top },
+    sheets: Object.fromEntries([...placed].map(([path, rect]) => [path, { x: rect.x - left, y: rect.y - top }])),
+  };
+};
+
+// A tab's preview card (DESIGN.md section 8): 280px wide, its picture 16:10, then up to two lines of title, its site
+// and, while a mascot works there, a line saying so. Its words take at most `words` and the working line `working`.
+export const TAB_PREVIEW = { width: 280, picture: 175, words: 77, working: 22 };
+// From the sidebar's edge, under the tab row, and from the window's edges.
+const TAB_PREVIEW_GAP = { sidebar: 8, row: 6, edge: 8 };
+// Room in the view for the card's `lift` shadow, which falls mostly downwards.
+const TAB_PREVIEW_SHADOW = { side: 24, below: 40 };
+
+// The tallest the card can be, counting its title as two lines.
+const tabPreviewHeight = (card: { picture: boolean; working: boolean }): number =>
+  (card.picture ? TAB_PREVIEW.picture : 0) + TAB_PREVIEW.words + (card.working ? TAB_PREVIEW.working : 0);
+
+// Where a tab's card goes, for a tab whose row is at `row` in the window. Its view starts at the sidebar's edge or the tab
+// row's, so it never covers a tab, and it's one strip along the tabs, the window's height beside the sidebar and its width
+// under the row, so following the pointer from tab to tab moves the card inside it and never the native view.
+export const tabPreviewRect = (
+  layout: Pick<Layout, "mode" | "sidebarOpen" | "sidebarWidth" | "tabStrip">,
+  row: Rect,
+  card: { picture: boolean; working: boolean },
+  window: { width: number; height: number }
+): { view: Rect; card: Rect } => {
+  const { edge } = TAB_PREVIEW_GAP;
+  const height = tabPreviewHeight(card);
+  const width = TAB_PREVIEW.width;
+  if (layout.mode === "vertical") {
+    // The sidebar's edge, or the floating sidebar's card's when it's collapsed.
+    const sidebarEdge = layout.sidebarOpen ? layout.sidebarWidth : FLOATING_INSET + layout.sidebarWidth;
+    const viewWidth = Math.max(Math.min(TAB_PREVIEW_GAP.sidebar + width + TAB_PREVIEW_SHADOW.side, window.width - sidebarEdge), 0);
+    const x = Math.max(Math.min(TAB_PREVIEW_GAP.sidebar, window.width - edge - width - sidebarEdge), 0);
+    const y = clamp(Math.round(row.y), edge, window.height - edge - height);
+    return {
+      view: { x: sidebarEdge, y: 0, width: viewWidth, height: Math.max(window.height, 0) },
+      card: { x, y, width, height },
+    };
+  }
+  const rowBottom = layout.tabStrip.y + layout.tabStrip.height;
+  const tallest = tabPreviewHeight({ picture: true, working: true });
+  const viewHeight = Math.max(Math.min(TAB_PREVIEW_GAP.row + tallest + TAB_PREVIEW_SHADOW.below, window.height - rowBottom), 0);
+  return {
+    view: { x: 0, y: rowBottom, width: Math.max(window.width, 0), height: viewHeight },
+    card: { x: clamp(Math.round(row.x), edge, window.width - edge - width), y: TAB_PREVIEW_GAP.row, width, height },
+  };
+};
+
+// The drop on the edge of the screen (DESIGN.md, On your desktop), with its sizes in src/shared/desktopSizes.ts. Its
+// window keeps one size wherever it stands, big enough for everything the drop says by itself, so nothing native moves
+// or resizes while it grows.
+const DESKTOP_SHEETS_FROM_EDGE = DESKTOP_DROP.out + 8;
 // Let go this close to a corner, and that's where it goes.
 const DESKTOP_CORNER_SNAP = 56;
-// The middle of its head, along the drawing, and how wide a target that makes.
-const DESKTOP_HEAD_AT = 40;
-const DESKTOP_HEAD_WIDTH = 52;
-// With nothing saved, right of the middle of the bottom: on top of a Dock of the usual width, and clear of most work.
-export const DESKTOP_DEFAULT_SPOT = { edge: "bottom", fraction: 0.66 } as const;
+// With nothing saved, the right edge, a little below the middle, where no taskbar or Dock is under it.
+export const DESKTOP_DEFAULT_SPOT = { edge: "right", fraction: 0.6 } as const;
+
+type Spot = Pick<DesktopBerrySpot, "edge" | "fraction">;
 
 export interface DesktopPlace {
   window: Rect;
-  // The top left of the bird in the window, out in full.
-  out: Point;
-  // Which way along the edge it faces, so that it looks towards the middle of the screen.
-  flip: boolean;
-  line: DesktopLineAnchor;
+  // The middle of the drop, on the edge, in the window. It can be outside the window, for the sheets beside it.
+  anchor: Point;
 }
 
 const clamp = (value: number, low: number, high: number): number => Math.min(Math.max(value, low), Math.max(low, high));
 
-// On the screen, the bird's top left when it's out, and which way the middle of the screen is.
-const birdOnScreen = (area: Rect, { edge, fraction }: Pick<DesktopBerrySpot, "edge" | "fraction">) => {
-  const along = (start: number, length: number) =>
-    Math.round(start + clamp(fraction, 0, 1) * Math.max(length - DESKTOP_ROOM, 0) + (DESKTOP_ROOM - DESKTOP_BIRD_SIZE) / 2);
-  const x =
-    edge === "left"
-      ? area.x - DESKTOP_TOES_PAST
-      : edge === "right"
-        ? area.x + area.width - DESKTOP_BIRD_SIZE + DESKTOP_TOES_PAST
-        : along(area.x, area.width);
-  const y =
-    edge === "top"
-      ? area.y - DESKTOP_TOES_PAST
-      : edge === "bottom"
-        ? area.y + area.height - DESKTOP_BIRD_SIZE + DESKTOP_TOES_PAST
-        : along(area.y, area.height);
-  return { x, y, towardsRight: x + DESKTOP_BIRD_SIZE / 2 <= area.x + area.width / 2 };
+export const sideEdge = (edge: DesktopEdge): boolean => edge === "left" || edge === "right";
+
+// From its middle to the end of a fillet, along the edge, so that at rest it's wholly on screen however far along it is.
+const DESKTOP_REACH = DESKTOP_FILLET + DESKTOP_DROP.along / 2;
+
+// The middle of the drop on the screen: a point on the edge.
+const dropMiddle = (area: Rect, { edge, fraction }: Spot): Point => {
+  const across = sideEdge(edge);
+  const start = across ? area.y : area.x;
+  const length = across ? area.height : area.width;
+  const along = Math.round(start + Math.min(DESKTOP_REACH, length / 2) + clamp(fraction, 0, 1) * Math.max(length - 2 * DESKTOP_REACH, 0));
+  if (edge === "right") return { x: area.x + area.width, y: along };
+  if (edge === "left") return { x: area.x, y: along };
+  if (edge === "top") return { x: along, y: area.y };
+  return { x: along, y: area.y + area.height };
 };
 
-// Where the bird's window goes for a spot on the edge, always wholly inside the work area, with the words on the side
-// towards the middle of the screen.
-export const desktopPlace = (area: Rect, spot: Pick<DesktopBerrySpot, "edge" | "fraction">): DesktopPlace => {
+// A window against the edge, `out` from it and `along` it, centred on the drop and wholly inside the work area.
+const againstEdge = (area: Rect, edge: DesktopEdge, middle: Point, out: number, along: number): Rect => {
+  const width = Math.min(sideEdge(edge) ? out : along, area.width);
+  const height = Math.min(sideEdge(edge) ? along : out, area.height);
+  const x = edge === "right" ? area.x + area.width - width : edge === "left" ? area.x : clamp(middle.x - width / 2, area.x, area.x + area.width - width);
+  const y = edge === "bottom" ? area.y + area.height - height : edge === "top" ? area.y : clamp(middle.y - height / 2, area.y, area.y + area.height - height);
+  return { x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) };
+};
+
+const placed = (window: Rect, middle: Point): DesktopPlace => ({ window, anchor: { x: middle.x - window.x, y: middle.y - window.y } });
+
+// The drop's own window. Along a side edge it grows out of it, and along the top or bottom it grows along it.
+export const desktopPlace = (area: Rect, spot: Spot): DesktopPlace => {
+  const middle = dropMiddle(area, spot);
+  const { long, thick } = DESKTOP_DROP_MOST;
+  const across = thick + 2 * (DESKTOP_FILLET + DESKTOP_SHADOW);
+  return placed(
+    sideEdge(spot.edge)
+      ? againstEdge(area, spot.edge, middle, long + DESKTOP_SHADOW, across)
+      : againstEdge(area, spot.edge, middle, thick + DESKTOP_SHADOW, long + 2 * (DESKTOP_FILLET + DESKTOP_SHADOW)),
+    middle
+  );
+};
+
+// The drop at rest in its window, without its fillets: what takes the pointer until the view says what it's drawing.
+export const desktopRestingDrop = ({ anchor }: Pick<DesktopPlace, "anchor">, edge: DesktopEdge): Rect => {
+  const { along, out } = DESKTOP_DROP;
+  if (sideEdge(edge)) return { x: edge === "right" ? anchor.x - out : anchor.x, y: anchor.y - along / 2, width: out, height: along };
+  return { x: anchor.x - along / 2, y: edge === "bottom" ? anchor.y - out : anchor.y, width: along, height: out };
+};
+
+// The prompt box's window: from the same place on the edge, so the drop can grow into it. Along a side edge it grows
+// out of the edge, and along the top or bottom it grows along it. `thick` is the box's own, taller with more lines.
+export const desktopBoxPlace = (area: Rect, spot: Spot, thick: number = DESKTOP_BOX.thick): DesktopPlace => {
+  const middle = dropMiddle(area, spot);
+  const across = Math.max(thick, DESKTOP_BOX.thick) + 2 * DESKTOP_BOX.around;
+  return placed(
+    sideEdge(spot.edge)
+      ? againstEdge(area, spot.edge, middle, DESKTOP_BOX.long + DESKTOP_SHADOW, across)
+      : againstEdge(area, spot.edge, middle, across, DESKTOP_BOX.long + 2 * (DESKTOP_FILLET + DESKTOP_SHADOW)),
+    middle
+  );
+};
+
+// The tray and the ask: beside the drop, towards the middle of the screen, and wholly on screen at any size.
+export const desktopSheetsPlace = (area: Rect, spot: Spot, size: { width: number; height: number }): DesktopPlace => {
+  const middle = dropMiddle(area, spot);
   const { edge } = spot;
-  const bird = birdOnScreen(area, spot);
-  const { towardsRight } = bird;
-  const width = Math.min(DESKTOP_WINDOW.width, area.width);
-  const height = Math.min(DESKTOP_WINDOW.height, area.height);
-  const wantedX =
-    edge === "left"
-      ? area.x
-      : edge === "right"
-        ? area.x + area.width - width
-        : towardsRight
-          ? bird.x - (DESKTOP_ROOM - DESKTOP_BIRD_SIZE) / 2
-          : bird.x + DESKTOP_BIRD_SIZE + (DESKTOP_ROOM - DESKTOP_BIRD_SIZE) / 2 - width;
-  const wantedY =
-    edge === "top" ? area.y : edge === "bottom" ? area.y + area.height - height : bird.y + DESKTOP_BIRD_SIZE / 2 - height / 2;
-  const window: Rect = {
-    x: Math.round(clamp(wantedX, area.x, area.x + area.width - width)),
-    y: Math.round(clamp(wantedY, area.y, area.y + area.height - height)),
-    width,
-    height,
+  const width = Math.min(size.width, area.width);
+  const height = Math.min(size.height, area.height);
+  const x =
+    edge === "right"
+      ? area.x + area.width - DESKTOP_SHEETS_FROM_EDGE - width
+      : edge === "left"
+        ? area.x + DESKTOP_SHEETS_FROM_EDGE
+        : middle.x - width / 2;
+  const y =
+    edge === "bottom"
+      ? area.y + area.height - DESKTOP_SHEETS_FROM_EDGE - height
+      : edge === "top"
+        ? area.y + DESKTOP_SHEETS_FROM_EDGE
+        : middle.y - height / 2;
+  const window = {
+    x: Math.round(clamp(x, area.x, area.x + area.width - width)),
+    y: Math.round(clamp(y, area.y, area.y + area.height - height)),
+    width: Math.round(width),
+    height: Math.round(height),
   };
-  const out = { x: bird.x - window.x, y: bird.y - window.y };
-  const fromSide = towardsRight ? out.x + DESKTOP_BIRD_SIZE + DESKTOP_GAP : width - out.x + DESKTOP_GAP;
-  return {
-    window,
-    out,
-    flip: edge === "left" ? bird.y + DESKTOP_BIRD_SIZE / 2 > area.y + area.height / 2 : edge === "right" ? bird.y + DESKTOP_BIRD_SIZE / 2 <= area.y + area.height / 2 : !towardsRight,
-    line: {
-      side: towardsRight ? "left" : "right",
-      fromSide,
-      maxWidth: Math.max(width - fromSide - DESKTOP_MARGIN, 0),
-      across: edge === "top" ? "top" : edge === "bottom" ? "bottom" : "middle",
-      // Two lines of words stay inside the window, wherever along the edge it is.
-      middle: Math.round(clamp(out.y + DESKTOP_BIRD_SIZE / 2, 32, height - 32)),
-    },
-  };
-};
-
-// Where the bird is when tucked: past the edge, by all but what shows.
-export const desktopTucked = ({ out }: Pick<DesktopPlace, "out">, edge: DesktopEdge, peek: number): Point => {
-  const hidden = DESKTOP_BIRD_SIZE - DESKTOP_TOES_PAST - peek;
-  return {
-    x: out.x + (edge === "left" ? -hidden : edge === "right" ? hidden : 0),
-    y: out.y + (edge === "top" ? -hidden : edge === "bottom" ? hidden : 0),
-  };
-};
-
-// The part of a tucked bird that's on screen, in the window: its head, showing past the edge. This is all it takes the
-// pointer with, so nothing else in the window can get in the way of what's beneath.
-export const desktopPeekHit = (place: Pick<DesktopPlace, "out" | "flip">, edge: DesktopEdge, peek: number): Rect => {
-  const { x, y } = desktopTucked(place, edge, peek);
-  const head = place.flip ? DESKTOP_BIRD_SIZE - DESKTOP_HEAD_AT : DESKTOP_HEAD_AT;
-  const start = head - DESKTOP_HEAD_WIDTH / 2;
-  if (edge === "bottom") return { x: x + start, y, width: DESKTOP_HEAD_WIDTH, height: peek };
-  if (edge === "top") return { x: x + start, y: y + DESKTOP_BIRD_SIZE - peek, width: DESKTOP_HEAD_WIDTH, height: peek };
-  // On its side, the top of the drawing points away from the edge and its length runs along it.
-  const along = edge === "left" ? y + start : y + DESKTOP_BIRD_SIZE - start - DESKTOP_HEAD_WIDTH;
-  return edge === "left"
-    ? { x: x + DESKTOP_BIRD_SIZE - peek, y: along, width: peek, height: DESKTOP_HEAD_WIDTH }
-    : { x, y: along, width: peek, height: DESKTOP_HEAD_WIDTH };
+  return placed(window, middle);
 };
 
 // The nearest edge to a point on a display, and how far along it. Near a corner, it's the corner.
@@ -174,34 +311,14 @@ export const desktopSpotAt = (area: Rect, displayId: number, point: Point): Desk
     ["right", area.x + area.width - point.x],
   ];
   const [edge] = distances.reduce((nearest, next) => (next[1] < nearest[1] ? next : nearest));
-  const horizontal = edge === "top" || edge === "bottom";
+  const horizontal = !sideEdge(edge);
   const start = horizontal ? area.x : area.y;
   const length = horizontal ? area.width : area.height;
   const at = (horizontal ? point.x : point.y) - start;
   if (at < DESKTOP_CORNER_SNAP) return { displayId, edge, fraction: 0 };
   if (length - at < DESKTOP_CORNER_SNAP) return { displayId, edge, fraction: 1 };
-  const room = length - DESKTOP_ROOM;
-  return { displayId, edge, fraction: room > 0 ? clamp((at - DESKTOP_ROOM / 2) / room, 0, 1) : 0 };
-};
-
-// The composer, beside the bird on the side towards the middle of the screen, and wholly on screen at any size.
-export const desktopComposerBounds = (area: Rect, spot: Pick<DesktopBerrySpot, "edge" | "fraction">, size: { width: number; height: number }): Rect => {
-  const bird = birdOnScreen(area, spot);
-  const width = Math.min(size.width, area.width - 2 * DESKTOP_MARGIN);
-  const height = Math.min(size.height, area.height - 2 * DESKTOP_MARGIN);
-  const x = bird.towardsRight ? bird.x + DESKTOP_BIRD_SIZE + DESKTOP_GAP : bird.x - DESKTOP_GAP - width;
-  const y =
-    spot.edge === "top"
-      ? area.y + DESKTOP_MARGIN
-      : spot.edge === "bottom"
-        ? area.y + area.height - DESKTOP_MARGIN - height
-        : bird.y + DESKTOP_BIRD_SIZE / 2 - height / 2;
-  return {
-    x: Math.round(clamp(x, area.x + DESKTOP_MARGIN, area.x + area.width - DESKTOP_MARGIN - width)),
-    y: Math.round(clamp(y, area.y + DESKTOP_MARGIN, area.y + area.height - DESKTOP_MARGIN - height)),
-    width: Math.round(width),
-    height: Math.round(height),
-  };
+  const room = length - 2 * DESKTOP_REACH;
+  return { displayId, edge, fraction: room > 0 ? clamp((at - DESKTOP_REACH) / room, 0, 1) : 0 };
 };
 
 export const desktopHit = (point: Point, window: Rect, hits: Rect[]): boolean =>
@@ -210,17 +327,6 @@ export const desktopHit = (point: Point, window: Rect, hits: Rect[]): boolean =>
     const top = window.y + y;
     return point.x >= left && point.x < left + width && point.y >= top && point.y < top + height;
   });
-
-// The way there, as an arc over the straight line, for `t` from 0 to 1. It starts and lands gently.
-export const desktopFlightPoint = (from: Point, to: Point, t: number): Point => {
-  const eased = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
-  const peak = Math.max(Math.min(from.y, to.y) - Math.min(Math.hypot(to.x - from.x, to.y - from.y) * 0.18, 120), 0);
-  const rest = 1 - eased;
-  return {
-    x: Math.round(from.x + (to.x - from.x) * eased),
-    y: Math.round(rest * rest * from.y + 2 * rest * eased * peak + eased * eased * to.y),
-  };
-};
 
 // The only place that decides where the window's regions go.
 export function computeLayout(
@@ -232,8 +338,9 @@ export function computeLayout(
   const chatWidth = clampWidth(options.chatWidth, CHAT_WIDTH);
   const vertical = mode === "vertical";
 
+  // The chat panel is a second sheet, with the gutter between it and the page.
   const pageWidth = (sidebar: boolean, chat: boolean) =>
-    window.width - (sidebar ? sidebarWidth : PAGE_INSET) - (chat ? chatWidth : PAGE_INSET);
+    window.width - (sidebar ? sidebarWidth : PAGE_INSET) - (chat ? chatWidth + PAGE_INSET : 0) - PAGE_INSET;
 
   // When space runs out, the sidebar collapses first and the chat closes next.
   let sidebar = vertical && options.sidebarOpen;
@@ -242,20 +349,21 @@ export function computeLayout(
   if (chat && pageWidth(sidebar, chat) < MIN_PAGE_WIDTH) chat = false;
 
   const left = sidebar ? sidebarWidth : 0;
-  const right = chat ? chatWidth : 0;
   const { height } = window;
-  const middleWidth = Math.max(window.width - left - right, 0);
   const cardX = sidebar ? left : PAGE_INSET;
-  const cardRight = window.width - (chat ? right : PAGE_INSET);
+  const chatX = Math.max(window.width - PAGE_INSET - chatWidth, 0);
+  const cardRight = chat ? chatX - PAGE_INSET : window.width - PAGE_INSET;
   const cardWidth = Math.max(cardRight - cardX, 0);
 
   // The top row holds the window buttons: the toolbar when vertical, the tab row when horizontal.
   // Off a Mac, the menu button is part of what's kept clear, so whatever sits in the top right corner leaves room for it.
-  const topRow = vertical ? VERTICAL_TOP_ROW_HEIGHT : TAB_ROW_HEIGHT;
+  const topRow = vertical ? TOOLBAR_HEIGHT : TAB_ROW_HEIGHT;
   const mac = platform === "darwin";
   // Linux has no window buttons of its own here, only the menu button.
   const systemButtons = platform === "win32" ? WINDOWS_CONTROLS_WIDTH : 0;
-  const controlsWidth = mac ? MAC_CONTROLS_WIDTH : systemButtons + MENU_BUTTON_SIZE + 2 * MENU_BUTTON_GAP;
+  // In the horizontal layout the menu button is at the toolbar's end, so the tab row keeps only the system's buttons clear.
+  const menuInTopRow = !mac && vertical;
+  const controlsWidth = mac ? MAC_CONTROLS_WIDTH : systemButtons + (menuInTopRow ? MENU_BUTTON_SIZE + 2 * MENU_BUTTON_GAP : 0);
   const controls: Rect = mac
     ? { x: 0, y: 0, width: controlsWidth, height: topRow }
     : {
@@ -264,18 +372,29 @@ export function computeLayout(
         width: Math.min(controlsWidth, window.width),
         height: topRow,
       };
+  // In the horizontal layout it ends the toolbar instead, at the gutter's width from the window's edge.
   const menuButton: Rect = mac
     ? EMPTY
-    : {
-        x: Math.max(window.width - systemButtons - MENU_BUTTON_GAP - MENU_BUTTON_SIZE, 0),
-        y: Math.round((topRow - MENU_BUTTON_SIZE) / 2),
-        width: MENU_BUTTON_SIZE,
-        height: MENU_BUTTON_SIZE,
-      };
+    : menuInTopRow
+      ? {
+          x: Math.max(window.width - systemButtons - MENU_BUTTON_GAP - MENU_BUTTON_SIZE, 0),
+          y: Math.round((topRow - MENU_BUTTON_SIZE) / 2),
+          width: MENU_BUTTON_SIZE,
+          height: MENU_BUTTON_SIZE,
+        }
+      : {
+          x: Math.max(window.width - PAGE_INSET - MENU_BUTTON_SIZE, 0),
+          y: TAB_ROW_HEIGHT + Math.round((HORIZONTAL_TOOLBAR_HEIGHT - MENU_BUTTON_SIZE) / 2),
+          width: MENU_BUTTON_SIZE,
+          height: MENU_BUTTON_SIZE,
+        };
 
-  const tabStrip = vertical ? EMPTY : { x: 0, y: 0, width: middleWidth, height: TAB_ROW_HEIGHT };
-  const toolbarY = vertical ? PAGE_INSET : TAB_ROW_HEIGHT;
-  const toolbarHeight = vertical ? ADDRESS_ROW_HEIGHT : TOOLBAR_HEIGHT_WITH_BOOKMARKS;
+  // The tab row and the toolbar run over the chat panel too, so the panel's button stays at the window's edge.
+  const tabStrip = vertical ? EMPTY : { x: 0, y: 0, width: window.width, height: TAB_ROW_HEIGHT };
+  const toolbarY = vertical ? 0 : TAB_ROW_HEIGHT;
+  const addressHeight = vertical ? TOOLBAR_HEIGHT : HORIZONTAL_TOOLBAR_HEIGHT;
+  const toolbarHeight = vertical ? TOOLBAR_HEIGHT : HORIZONTAL_TOOLBAR_HEIGHT + (options.savedSites ? BOOKMARKS_BAR_HEIGHT : 0);
+  const toolbarX = vertical ? cardX : 0;
   const pageY = toolbarY + toolbarHeight;
   const pageHeight = Math.max(height - pageY - PAGE_INSET, 0);
   const findBarWidth = Math.min(FIND_BAR.width, cardWidth);
@@ -305,9 +424,14 @@ export function computeLayout(
       height: Math.min(FIND_BAR.height, pageHeight),
     },
     tabStrip,
-    toolbar: { x: cardX, y: toolbarY, width: cardWidth, height: toolbarHeight },
-    addressRow: { x: cardX, y: toolbarY, width: cardWidth, height: ADDRESS_ROW_HEIGHT },
-    chat: chat ? { x: window.width - right, y: 0, width: right, height } : EMPTY,
+    toolbar: { x: toolbarX, y: toolbarY, width: Math.max(window.width - toolbarX, 0), height: toolbarHeight },
+    addressRow: { x: toolbarX, y: toolbarY, width: Math.max(window.width - toolbarX, 0), height: addressHeight },
+    // In the horizontal layout, what Chats and a mascot's card open over: everything under the toolbar's own row. It
+    // covers the page too, since a tab's view would cover the chrome, and a press anywhere in it closes them.
+    popover: vertical
+      ? EMPTY
+      : { x: 0, y: toolbarY + addressHeight, width: window.width, height: Math.max(height - toolbarY - addressHeight, 0) },
+    chat: chat ? { x: chatX, y: pageY, width: chatWidth, height: pageHeight } : EMPTY,
     page: {
       x: cardX,
       y: pageY,

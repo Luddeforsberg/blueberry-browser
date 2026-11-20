@@ -1,130 +1,72 @@
 import React from 'react'
-import { ChevronLeft, ChevronRight, PanelLeft, PanelRight, Pin, RotateCw, Star, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, PanelLeft, PanelRight, RotateCw, X } from 'lucide-react'
 import { useBrowser } from '../contexts/BrowserContext'
-import { NO_SAVED_SITES, useLibrary, useSavedSites } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
 import { AddressBar } from './AddressBar'
 import { DownloadsButton } from './DownloadsButton'
-import { Favicon, siteIcon } from './Favicon'
+import { HorizontalToolbar } from './HorizontalToolbar'
 import { ToolBarButton } from './ToolBarButton'
-import { HandoffNotice, NeedsYouNotice } from './NeedsYou'
+import { SHORTCUTS } from '@shared/shortcuts'
+import { NeedsYouNotice } from './NeedsYouNotice'
 import { RoutineNotice } from './RoutineNotice'
-import { StopWorkButton, WorkingNotice } from './WorkingNotice'
-import { NARROW_PAGE, RecordingNotice, useRecording } from './ShowBerry'
-
-// Pinned sites and bookmarks, one row under the address bar. In the vertical layout they're in the sidebar.
-const BookmarksBar: React.FC = () => {
-    const { createTab } = useBrowser()
-    const sites = useSavedSites()
-
-    return (
-        <ul
-            aria-label="Bookmarks"
-            // Too many still scroll, by trackpad or an ordinary wheel, and the one cut off at the edge says there's more.
-            onWheel={(event) => {
-                if (event.deltaX === 0) event.currentTarget.scrollLeft += event.deltaY
-            }}
-            className="h-9 shrink-0 flex items-center gap-0.5 px-2 border-b overflow-x-auto [&::-webkit-scrollbar]:hidden"
-        >
-            {sites.length === 0 && <li className="shrink-0 px-2 text-13 text-muted-foreground">{NO_SAVED_SITES}</li>}
-            {sites.map((site) => (
-                <li key={site.id} className="shrink-0">
-                    <button
-                        type="button"
-                        onClick={() => createTab(site.url)}
-                        onContextMenu={(event) => {
-                            event.preventDefault()
-                            void window.chromeAPI.library.showBookmarkMenu(site.id)
-                        }}
-                        className="h-7 px-2 flex items-center gap-2 rounded-control text-13 outline-none transition-colors app-region-no-drag hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                        <Favicon src={site.favicon ?? siteIcon(site.url)} site={site.url} />
-                        {site.title}
-                    </button>
-                </li>
-            ))}
-        </ul>
-    )
-}
+import { WorkingNotice } from './WorkingNotice'
+import { RecordingNotice } from './ShowBerry'
 
 // Shows only when the page isn't at 100%. Pressing it goes back there.
 export const ZoomButton: React.FC<{ percent: number; onReset: () => void }> = ({ percent, onReset }) => (
-    <ToolBarButton label={`Zoom ${percent}%, reset to 100%`} onClick={onReset} className="w-auto px-2 text-12 tabular-nums">
+    <ToolBarButton label={`Zoom ${percent}%, reset to 100%`} onClick={onReset} className="w-auto px-2 font-mono text-11.5 tabular-nums">
         {percent}%
     </ToolBarButton>
 )
 
+// DESIGN.md section 10: back, forward and reload in `ink-3`, the address field, then the chat panel button, on the ground.
+// The horizontal layout has a toolbar of its own, from edge to edge.
 export const Toolbar: React.FC = () => {
+    const { layout } = useShell()
+    return layout.mode === 'horizontal' ? <HorizontalToolbar /> : <VerticalToolbar />
+}
+
+const VerticalToolbar: React.FC = () => {
     const { activeTab, goBack, goForward, reload, stop } = useBrowser()
     const { layout, theme, toggleSidebar, toggleChat } = useShell()
-    const { pinned, bookmarks } = useLibrary()
-    const bookmarked = bookmarks.some((bookmark) => bookmark.url === activeTab?.url)
-    const isPinned = pinned.some((pin) => pin.url === activeTab?.url)
-    const canSave = !!activeTab && !activeTab.page && /^https?:\/\//i.test(activeTab.url)
 
-    // With no sidebar, the toolbar is the window's top-left corner, where macOS puts its buttons.
-    // In horizontal mode the tab row above takes the window buttons instead.
-    const vertical = layout.mode === 'vertical'
-    // Saying it's watching matters more, and these are in the File menu too.
-    const giveWay = useRecording().status === 'recording' && layout.page.width < NARROW_PAGE
-    const leftClear = vertical && !layout.sidebarOpen && theme.platform === 'mac' ? layout.controls.width : 8
-    const rightClear = vertical && !layout.chatOpen && theme.platform !== 'mac' ? layout.controls.width : 8
+    // With no sidebar, the toolbar is the window's top-left corner, where macOS puts its buttons. Off a Mac they're at the
+    // top right, and the toolbar runs to the window's edge.
+    const leftClear = !layout.sidebarOpen && theme.platform === 'mac' ? layout.controls.width : 6
+    const rightClear = theme.platform !== 'mac' ? layout.controls.width : 6
 
     return (
         <div className="h-full flex flex-col">
-            <div
-                className="relative flex-1 min-h-0 flex items-center gap-0.5 app-region-drag"
-                style={{ paddingLeft: leftClear, paddingRight: rightClear }}
-            >
-                {vertical && !layout.sidebarOpen && (
-                    <ToolBarButton Icon={PanelLeft} label="Show sidebar" onClick={toggleSidebar} />
+            {/* Three columns, with the two outer ones sharing what's left equally, so the address field is over the middle
+                of the page, in line with what's centred on it, and not pushed aside by however many buttons are on one
+                side. It only leaves the middle when a side needs more than its half. */}
+            <div className="relative h-12 shrink-0 grid grid-cols-[minmax(max-content,1fr)_minmax(0,584px)_minmax(max-content,1fr)] items-center app-region-drag has-[input:focus]:[-webkit-app-region:no-drag]">
+                <div className="flex items-center gap-0.5" style={{ paddingLeft: leftClear }}>
+                {!layout.sidebarOpen && (
+                    <ToolBarButton Icon={PanelLeft} label="Show sidebar" shortcut={SHORTCUTS.sidebar} onClick={toggleSidebar} />
                 )}
-                <ToolBarButton Icon={ChevronLeft} label="Back" onClick={goBack} active={activeTab?.canGoBack ?? false} />
-                <ToolBarButton Icon={ChevronRight} label="Forward" onClick={goForward} active={activeTab?.canGoForward ?? false} />
+                <ToolBarButton Icon={ChevronLeft} label="Back" shortcut={SHORTCUTS.back} onClick={goBack} active={activeTab?.canGoBack ?? false} />
+                <ToolBarButton Icon={ChevronRight} label="Forward" shortcut={SHORTCUTS.forward} onClick={goForward} active={activeTab?.canGoForward ?? false} />
                 {activeTab?.isLoading ? (
                     <ToolBarButton Icon={X} label="Stop loading" onClick={stop} />
                 ) : (
-                    <ToolBarButton Icon={RotateCw} label="Reload" onClick={reload} active={activeTab !== null && !activeTab.page} />
+                    <ToolBarButton Icon={RotateCw} label="Reload" shortcut={SHORTCUTS.reload} onClick={reload} active={activeTab !== null && !activeTab.page} />
                 )}
+                </div>
 
-                <div className="flex-1 min-w-0 px-1">
+                <div className="min-w-0 px-3">
                     <AddressBar />
                 </div>
 
-                <RecordingNotice />
-                <StopWorkButton />
+                <div className="flex items-center justify-end gap-0.5" style={{ paddingRight: rightClear }}>
+                <RecordingNotice className="mx-1 app-region-no-drag" />
                 {activeTab && activeTab.zoomPercent !== 100 && (
                     <ZoomButton percent={activeTab.zoomPercent} onReset={() => void window.chromeAPI.browser.resetZoom(activeTab.id)} />
                 )}
-                <HandoffNotice />
-                {/* The sidebar says this when it's open. */}
-                {(!vertical || !layout.sidebarOpen) && <NeedsYouNotice />}
-                {(!vertical || !layout.sidebarOpen) && <WorkingNotice />}
-                {(!vertical || !layout.sidebarOpen) && <RoutineNotice />}
-
-                {/* Our own pages can't be saved, so they don't offer to. */}
-                {!giveWay && !activeTab?.page && (
-                    <>
-                        <ToolBarButton
-                            label={bookmarked ? 'Remove bookmark' : 'Bookmark this page'}
-                            active={canSave}
-                            toggled={bookmarked}
-                            className={bookmarked ? 'bg-transparent hover:bg-transparent' : undefined}
-                            onClick={() => void window.chromeAPI.library.toggleBookmark()}
-                        >
-                            <Star className={bookmarked ? 'size-4 fill-current text-bookmark' : 'size-4'} />
-                        </ToolBarButton>
-
-                        <ToolBarButton
-                            label={isPinned ? 'Unpin this page' : 'Pin this page'}
-                            active={canSave}
-                            toggled={isPinned}
-                            onClick={() => void window.chromeAPI.library.togglePin()}
-                        >
-                            <Pin className={isPinned ? 'size-4 fill-current' : 'size-4'} />
-                        </ToolBarButton>
-                    </>
-                )}
+                {/* The sidebar says these when it's open. */}
+                {!layout.sidebarOpen && <NeedsYouNotice />}
+                {!layout.sidebarOpen && <WorkingNotice />}
+                {!layout.sidebarOpen && <RoutineNotice />}
 
                 <DownloadsButton />
 
@@ -132,12 +74,13 @@ export const Toolbar: React.FC = () => {
                     <ToolBarButton
                         Icon={PanelRight}
                         label={layout.chatOpen ? 'Hide Berry' : 'Show Berry'}
+                        shortcut={SHORTCUTS.chat}
                         onClick={toggleChat}
                         toggled={layout.chatOpen}
                     />
                 )}
+                </div>
             </div>
-            {!vertical && <BookmarksBar />}
         </div>
     )
 }

@@ -122,7 +122,7 @@ test("a job on the runner keeps going without the app's agent, waits on Needs yo
     await expect(chrome.getByRole("region", { name: "In the cloud" })).toBeVisible();
 
     // The runner asks, and the app shows it in Needs you like any other.
-    await expect(chrome.getByRole("button", { name: /Needs you.*1 waiting/ })).toBeVisible({ timeout: 30_000 });
+    await expect(chrome.getByRole("tab", { name: /^Chats.*1 needs you/ })).toBeVisible({ timeout: 30_000 });
     const card = chrome.getByRole("region", { name: "Approval needed" });
     await expect(card.locator("p").getByText(`Click the button “Place order” on ${shop}`)).toBeVisible();
     await shoot(chrome, "chat-waiting");
@@ -138,7 +138,7 @@ test("a job on the runner keeps going without the app's agent, waits on Needs yo
     });
     expect(steps?.length).toBeGreaterThan(0);
 
-    await chrome.getByRole("button", { name: /Needs you.*1 waiting/ }).click();
+    await chrome.evaluate(() => window.chromeAPI.browser.openPage("needs-you"));
     await shoot(chrome, "needs-you");
     await chrome.getByRole("button", { name: "Allow", exact: true }).click();
 

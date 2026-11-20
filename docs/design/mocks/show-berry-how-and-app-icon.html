@@ -1,0 +1,194 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Blueberry design: starting Show Berry how, and the app icon</title><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"><style>
+*{box-sizing:border-box}
+body{margin:32px auto;max-width:640px;padding:0 16px;background:#F6F5F2}
+.cap{margin:34px 2px 12px}
+.cap:first-child{margin-top:0}
+.cap b{display:block;font:600 17px/1.4 var(--font-sans),system-ui,sans-serif;color:var(--foreground,#111)}
+.cap span{display:block;font:400 14px/21px var(--font-sans),system-ui,sans-serif;color:var(--muted-foreground,#777);margin-top:3px;max-width:980px}
+.pair{display:grid;grid-template-columns:640px 640px;gap:20px;align-items:start}
+.tag{font:500 11px/1 var(--font-mono),monospace;color:var(--muted-foreground,#777);margin:0 2px 7px;letter-spacing:.06em}
+.pair img{display:block;width:640px;border-radius:14px;box-shadow:0 0 0 1px rgba(128,128,128,.28)}
+.pg{width:640px;border-radius:14px;box-shadow:0 0 0 1px rgba(128,128,128,.28);background:#fff;color:var(--ink);padding:26px 22px 28px;
+ font-family:Geist,system-ui,sans-serif;font-size:14px;line-height:20px;letter-spacing:-.005em;-webkit-font-smoothing:antialiased;
+ --ink:#151514;--ink2:#5F5E5A;--ink3:#6C6A65;--faint:#8C8A84;--line:rgba(21,21,20,.09);--hover:rgba(21,21,20,.05);--tray:#E1E0DB;--sheet2:#F3F2EF;--ask:#C62B31;--askbg:#FBE4E3;--focus:#3F51DC;
+ --chip:0 0 0 1px rgba(21,21,20,.09),0 1px 2px rgba(21,21,20,.07)}
+.pg.ground{background:#E6E5E0}
+svg.i{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex:none}
+svg.go{width:14px;height:14px;color:var(--faint)}
+.b{flex:none;display:block}
+.fv{width:16px;height:16px;border-radius:4px;flex:none;display:grid;place-items:center;color:#fff;font:600 9px/1 Geist,sans-serif}
+.t{font:400 11.5px/1 "Geist Mono",monospace;color:var(--faint);flex:none;letter-spacing:0}
+.mono{font-family:"Geist Mono",monospace;font-size:11.5px;letter-spacing:0}
+.grow{flex:1}
+h3{margin:0;font-size:20px;line-height:26px;font-weight:600;letter-spacing:-.015em}
+.ph{display:flex;align-items:center;gap:8px;min-height:34px}
+.psub{margin:4px 0 0;color:var(--ink2);font-size:14px}
+.btn{height:32px;padding:0 12px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;flex:none;white-space:nowrap}
+.btn.sm{height:28px;padding:0 10px}
+.btn.fill{background:#151514;color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 1px 2px rgba(21,21,20,.25)}
+.btn.raised{background:#fff;box-shadow:var(--chip)}
+.btn.quiet{color:var(--ink2);padding:0 8px}
+.btn.quiet svg{width:14px;height:14px}
+.recdot{width:7px;height:7px;border-radius:50%;background:var(--ask);display:block}
+.iconbtn{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:var(--ink3);flex:none}
+.find{height:32px;width:190px;border-radius:999px;background:var(--sheet2);display:flex;align-items:center;gap:7px;padding:0 12px;color:var(--faint);font-size:13px}
+.find svg{width:14px;height:14px}
+.day{display:flex;align-items:baseline;gap:8px;margin:22px 0 4px;padding:0 8px}
+.day b{font-size:13px;font-weight:500}
+.day span{font-size:13px;color:var(--faint)}
+.hrow{height:36px;display:flex;align-items:center;gap:10px;padding:0 8px;border-radius:9px}
+.hrow b{font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hrow small{font-size:13px;color:var(--ink3);flex:1;white-space:nowrap}
+.hrow.hov,.drow.hov,.rrow.hov,.step.hov{background:var(--hover)}
+.hrow .iconbtn{margin-right:-4px}
+.drow{display:flex;align-items:center;gap:10px;padding:10px 8px;border-radius:11px;position:relative}
+.drow+.drow::before,.rrow+.rrow::before{content:"";position:absolute;left:56px;right:8px;top:0;height:1px;background:var(--line)}
+.drow.hov::before,.drow.hov+.drow::before,.rrow.hov::before,.rrow.hov+.rrow::before{display:none}
+.ftile{width:36px;height:36px;border-radius:9px;background:var(--sheet2);box-shadow:inset 0 0 0 1px var(--line);display:grid;place-items:center;font:500 10.5px/1 "Geist Mono",monospace;color:var(--ink2);flex:none}
+.w{flex:1;min-width:0;display:flex;flex-direction:column}
+.w>b{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.w>small{font-size:13px;line-height:19px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.w>small em{font-style:normal;color:var(--ink3)}
+.bar{height:2px;border-radius:2px;background:var(--line);margin-top:7px;display:block}
+.bar u{display:block;height:2px;border-radius:2px;background:var(--ink)}
+.drow.gone b{color:var(--ink3);text-decoration:line-through;text-decoration-color:var(--faint);font-weight:400}
+.grp{display:flex;align-items:baseline;gap:7px;margin:22px 0 2px;padding:0 8px;font-size:13px}
+.grp b{font-weight:500}
+.grp span{color:var(--faint);font:400 11.5px/1 "Geist Mono",monospace}
+.grp.ask b{color:var(--ask)}
+.rrow{display:flex;align-items:center;gap:12px;padding:9px 8px;border-radius:11px;position:relative;min-height:56px}
+.rrow.big{min-height:62px}
+.rrow+.rrow::before{left:48px}
+.rrow.big+.rrow.big::before{left:56px}
+.lim{font-size:13px;color:var(--ink3);flex:none}
+.back{display:flex;align-items:center;gap:4px;color:var(--ink2);font-size:13px;margin-bottom:18px}
+.back svg{width:14px;height:14px}
+.rhead{display:flex;align-items:center;gap:14px}
+.rhead small{font-size:14px;color:var(--ink2);margin-top:2px}
+.lab{display:flex;align-items:center;justify-content:space-between;margin:26px 0 6px;min-height:28px}
+.lab.first{margin-top:20px}
+.lab b{font-size:13px;font-weight:500;color:var(--ink2)}
+.does{margin:0;font-size:15px;line-height:23px;max-width:540px}
+.facts{display:grid;grid-template-columns:1.25fr 1fr 1fr;margin-top:18px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.fact{padding:11px 14px 12px;display:flex;flex-direction:column;gap:2px;border-left:1px solid var(--line)}
+.fact:first-child{border-left:0;padding-left:0}
+.fact small{font-size:12px;color:var(--ink3)}
+.fact b{font-weight:500;display:flex;align-items:center;gap:6px}
+.runs{position:relative;padding-left:2px}
+.run{display:flex;gap:14px;position:relative;padding-bottom:14px}
+.run>i{width:9px;height:9px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--faint);background:#fff;margin-top:6px;flex:none;position:relative;z-index:1}
+.run.open>i{background:var(--ink);box-shadow:none}
+.run.bad>i{background:var(--ask);box-shadow:none}
+.run::before{content:"";position:absolute;left:4px;top:10px;bottom:-6px;width:1px;background:var(--line)}
+.run:last-child::before{display:none}
+.rh{display:flex;align-items:baseline;gap:9px}
+.rh b{font-weight:500}
+.rh em{font-style:normal;color:var(--ink2);font-size:13px;flex:1}
+.run.bad .rh em{color:var(--ask)}
+.run p{margin:7px 0 0;font-size:15px;line-height:22px}
+.run p.dim{font-size:14px;color:var(--ink2);margin-bottom:9px}
+.run .btn{align-self:flex-start}
+.fold{display:flex;align-items:center;gap:5px;margin-top:6px;font:400 11.5px/1 "Geist Mono",monospace;color:var(--ink3)}
+.del{margin-top:14px;color:var(--ask);font-size:13px;font-weight:500}
+.pips{display:grid;grid-template-columns:repeat(3,3px);gap:2px;flex:none}
+.pips u{width:3px;height:3px;border-radius:50%;background:rgba(21,21,20,.16)}
+.pips u.on{background:var(--ink)}
+.pips.red u.on{background:var(--ask)}
+.recbar{display:flex;align-items:center;gap:10px;height:40px;padding:0 6px 0 14px;border-radius:999px;background:#fff;box-shadow:var(--chip);width:max-content;min-width:330px}
+.recbar b{font-weight:500}
+.site{display:flex;align-items:center;gap:8px;margin:24px 0 6px;padding:0 8px;font-size:13px}
+.site b{font-weight:500}
+.trail{position:relative}
+.trail::before{content:"";position:absolute;left:15px;top:20px;bottom:24px;width:1px;background:var(--line)}
+.step{display:flex;align-items:flex-start;gap:12px;padding:8px 8px;border-radius:10px;position:relative}
+.mk{width:15px;height:20px;display:grid;place-items:center;background:#fff;flex:none;position:relative;z-index:1}
+.step.hov .mk{background:#F2F2F1}
+.lockic{width:14px;height:14px;color:var(--ink3)}
+.step .w>b{font-weight:400;white-space:normal}
+.step .w>small{color:var(--ink3)}
+.tok{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 3px 0 7px;border-radius:7px;background:#EEF0FD;color:#2A39B0;font-weight:500;vertical-align:1px}
+.tok u{text-decoration:none;font:400 10.5px/16px "Geist Mono",monospace;color:#2A39B0;background:#fff;border-radius:5px;padding:0 5px;box-shadow:0 0 0 1px rgba(42,57,176,.18)}
+.stage{display:flex;flex-direction:column;align-items:center;padding:8px 0 4px}
+.stage>.b{margin-bottom:-6px;position:relative;z-index:1}
+.shell{width:520px;background:var(--tray);border-radius:24px;padding:4px}
+.card{background:#fff;border-radius:20px;padding:20px 22px 22px;box-shadow:0 0 0 1px rgba(21,21,20,.07),0 1px 2px rgba(21,21,20,.06),0 10px 24px -12px rgba(21,21,20,.2)}
+.q{text-align:center;margin-top:8px}
+.qs{margin:6px auto 16px;text-align:center;color:var(--ink2);max-width:380px}
+.say{margin:0;padding:0 0 0 22px;font-size:15px;line-height:30px}
+.under{display:flex;align-items:center;justify-content:space-between;padding:6px 4px 4px 10px}
+.dots{display:flex;gap:5px;align-items:center}
+.dots u{width:5px;height:5px;border-radius:50%;background:rgba(21,21,20,.25)}
+.dots u.on{width:18px;border-radius:3px;background:var(--ink)}
+.seg{display:grid;grid-template-columns:repeat(5,1fr);height:32px;background:var(--tray);border-radius:10px;padding:2px;margin-top:14px;font-size:13px;color:var(--ink2)}
+.seg span{display:grid;place-items:center;border-radius:8px}
+.seg .on{background:#fff;color:var(--ink);font-weight:500;box-shadow:var(--chip)}
+.srow{display:flex;align-items:center;gap:16px;padding:13px 0;border-top:1px solid var(--line);min-height:52px}
+.lab+.srow{border-top:0}
+.srow.tall{align-items:flex-start}
+.srow>b{flex:1;font-weight:500}
+.srow .w>small{white-space:normal}
+.pics{display:flex;gap:10px}
+.pic{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:13px;color:var(--ink2)}
+.pic i{width:72px;height:46px;border-radius:9px;background:#ECEBE7;box-shadow:inset 0 0 0 1px var(--line);display:block;position:relative;overflow:hidden}
+.pic i::after{content:"";position:absolute;left:22px;top:5px;right:5px;bottom:5px;border-radius:5px;background:#fff;box-shadow:0 0 0 1px var(--line)}
+.pic.dark i{background:#131312}.pic.dark i::after{background:#272725}
+.pic.sys i{background:linear-gradient(90deg,#ECEBE7 50%,#131312 50%)}.pic.sys i::after{background:linear-gradient(90deg,#fff 38%,#272725 38%)}
+.pic.top i::after{left:5px;top:13px}
+.pic.on{color:var(--ink);font-weight:500}
+.pic.on i{outline:1.5px solid var(--ink);outline-offset:2px}
+.seg2{display:flex;height:30px;background:var(--tray);border-radius:999px;padding:2px;font-size:13px;color:var(--ink2);flex:none}
+.seg2 span{padding:0 11px;display:grid;place-items:center;border-radius:999px}
+.seg2 .on{background:#fff;color:var(--ink);font-weight:500;box-shadow:var(--chip)}
+.sw{width:34px;height:20px;border-radius:999px;background:var(--sheet2);box-shadow:inset 0 0 0 1px var(--line);position:relative;flex:none}
+.sw::after{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:var(--chip)}
+
+.pair img{width:640px}
+.pg{--ink:#141416;--ink2:#5C5C61;--ink3:#69696E;--faint:#8A8A8F;--tray:#E8E8EB;--sheet2:#F3F3F5;--line:rgba(20,20,22,.09)}
+.pg.bare{padding:0;background:#F5F5F6;overflow:hidden}
+.win{padding:0 8px 8px}
+.bar{height:44px;display:flex;align-items:center;gap:8px;padding:0 2px}
+.addr{height:30px;width:210px;border-radius:9px;background:var(--tray);display:flex;align-items:center;gap:7px;padding:0 10px;font-size:13px;color:var(--ink2)}
+.addr svg{width:13px;height:13px}
+.rec{height:32px;border-radius:999px;background:#fff;box-shadow:var(--chip);display:inline-flex;align-items:center;gap:9px;padding:0 3px 0 12px;font-size:13px}
+.rec b{font-weight:500}
+.rw{color:var(--ink2)}
+.pagew{background:#fff;border-radius:12px;box-shadow:0 0 0 1px var(--line);padding:22px 22px 30px;min-height:330px}
+.win>.pagew:first-child{margin-top:8px}
+.pagew.ring{box-shadow:0 0 0 2px var(--ask)}
+.mid{display:flex;flex-direction:column;align-items:center;text-align:center;padding-top:34px}
+.mid.low{padding-top:44px}
+.mid h2{margin:14px 0 6px;font-size:20px;line-height:26px;font-weight:600;letter-spacing:-.015em}
+.mid p{margin:0;max-width:400px;color:var(--ink2);font-size:14px;line-height:21px}
+.mid p.small{margin-top:14px;font-size:13px;color:var(--ink3)}
+.where{margin-top:18px;width:420px;height:44px;border-radius:14px;background:#fff;box-shadow:0 0 0 2px var(--focus);display:flex;align-items:center;gap:10px;padding:0 14px;font-size:15px;text-align:left}
+.where svg{width:15px;height:15px;color:var(--ink3)}
+.where .ph{color:var(--faint)}
+.caret{display:inline-block;width:1.5px;height:18px;background:var(--ink);margin-right:1px;vertical-align:-4px;text-decoration:none}
+.gos{display:flex;gap:8px;margin-top:12px}
+.go{height:30px;border-radius:999px;box-shadow:var(--chip);background:#fff;display:inline-flex;align-items:center;gap:7px;padding:0 11px 0 8px;font-size:13px;font-weight:500}
+.acts{display:flex;gap:6px;margin-top:18px}
+.hd{margin:26px 0 0;padding-bottom:9px;border-bottom:1px solid var(--line);font-size:15px;line-height:22px;font-weight:600;letter-spacing:-.01em}
+.pg .srow>b{font-weight:500}
+.hd+.srow{border-top:0}
+.srow.col{display:block;padding-bottom:6px}
+.srow .top{display:flex;align-items:center;gap:16px}
+.srow .top .w>small{white-space:normal}
+.lab2{margin:14px 0 8px;font-size:12px;font-weight:500;color:var(--ink2)}
+.whos{display:flex;gap:6px;flex-wrap:wrap}
+.who{width:86px;display:flex;flex-direction:column;align-items:center;gap:7px;padding:8px 0 7px;border-radius:14px}
+.who em{font-style:normal;font-size:12.5px;color:var(--ink2);white-space:nowrap}
+.who.on{background:var(--sheet2)}
+.who.on em{color:var(--ink);font-weight:500}
+.who.on .ic{box-shadow:0 0 0 2px #fff,0 0 0 3.5px var(--ink)}
+.ic{border-radius:24%;display:grid;place-items:center;flex:none;position:relative;box-shadow:0 0 0 1px rgba(20,20,22,.08),0 2px 5px -1px rgba(20,20,22,.14)}
+.ic.dots::before{content:"";position:absolute;inset:0;border-radius:inherit;background-image:radial-gradient(rgba(20,20,22,.16) 1px,transparent 1.2px);background-size:7px 7px;background-position:3px 3px;
+ -webkit-mask-image:radial-gradient(circle at 50% 50%,transparent 46%,#000 100%)}
+.ic.night.dots::before{background-image:radial-gradient(rgba(255,255,255,.2) 1px,transparent 1.2px)}
+.ic .b{position:relative}
+.taskbar{margin:22px auto 0;width:max-content;display:flex;gap:6px;padding:7px 9px;border-radius:16px;background:rgba(225,225,230,.8);box-shadow:0 0 0 1px rgba(20,20,22,.08)}
+.dk{width:48px;height:48px;border-radius:10px;display:grid;place-items:center;position:relative}
+.dk.on{background:rgba(255,255,255,.75)}
+.dk.on::after{content:"";position:absolute;bottom:2px;left:50%;margin-left:-7px;width:14px;height:3px;border-radius:2px;background:var(--focus)}
+.note{margin:12px 2px 0;font:400 13px/19px var(--font-sans),system-ui,sans-serif;color:var(--muted-foreground,#777);max-width:620px}
+.solo{display:grid;grid-template-columns:640px 640px;gap:20px;align-items:start}
+</style></head><body><div class="cap"><b>Show Berry how: after you press it</b><span>Started from one of our own pages, a tab that says what to do and asks where the job starts. The recorder says the same until the first step.</span></div><div class="pg bare"><div class="win"><div class="bar"><span class="addr"><svg class="i " viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>New tab</span><span class="grow"></span><span class="rec"><span class="pips red"><u class="on"></u><u class="on"></u><u class="on"></u><u class="on"></u><u class="on"></u><u class="on"></u><u class="on"></u><u class="on"></u><u class="on"></u></span><b>Watching</b><span class="rw">Do the job once, then press Done</span><span class="btn fill sm">Done</span></span></div><div class="pagew ring"><div class="mid"><svg class="b" style="width:56px;height:56px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#2A39B0"/><circle cx="12" cy="13.6" r="9.2" fill="#3F51DC"/><rect x="8.3" y="11.4" width="2.1" height="4.6" rx="1.05" fill="#fff"/><rect x="13.3" y="9.6" width="2.5" height="6.4" rx="1.25" fill="#fff"/></svg><h2>Show me how.</h2><p>Go to where the job starts and do it once. I note what you click and type as steps, and never a password.</p><div class="where"><svg class="i " viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="ph"><u class="caret"></u>Where does it start?</span></div><div class="gos"><span class="go"><span class="fv" style="background:#1A73E8">K</span>klm.com</span><span class="go"><span class="fv" style="background:#FF6600">P</span>prisjakt.nu</span><span class="go"><span class="fv" style="background:#3A3F47">G</span>github.com</span></div><p class="small">Or go to a tab you already have open.</p></div></div></div></div><div class="cap"><b>Show Berry how: nothing noted</b><span>The mascot in the middle, saying what happened. The face here is a stand-in for its real mood.</span></div><div class="pg bare"><div class="win"><div class="pagew"><div class="ph" style="padding:0 0 0 4px"><h3>What I watched</h3></div><div class="mid low"><svg class="b" style="width:64px;height:64px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#2A39B0"/><circle cx="12" cy="13.6" r="9.2" fill="#3F51DC"/><path d="M8.2 14.6q1.4-2.6 2.8 0M13 14.6q1.4-2.6 2.8 0" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/><path d="M10.4 18.4q1.6-1.3 3.2 0" fill="none" stroke="#fff" stroke-width="1.2" stroke-linecap="round"/></svg><h2>I didn’t catch anything.</h2><p>Clicking, typing and going to a page leave steps. Scrolling and looking around don’t.</p><div class="acts"><span class="btn fill">Show me again</span><span class="btn quiet">Close</span></div></div></div></div></div><div class="cap"><b>The app’s icon</b><span>Under Look in Settings: whose face is on the icon, and what’s behind it.</span></div><div class="pg "><div class="ph"><h3>Settings</h3></div><div class="seg"><span class="on">General</span><span>Mascots</span><span>Privacy</span><span>Connections</span><span>Account</span></div><h4 class="hd">Look</h4><div class="srow"><b>Theme</b><span class="t">as now</span></div><div class="srow"><b>Tabs</b><span class="t">as now</span></div><div class="srow col"><div class="top"><span class="w"><b>App icon</b><small>The mascot on Blueberry’s icon in your taskbar, and what’s behind it.</small></span><span class="ic  glow" style="width:72px;height:72px;background:radial-gradient(circle at 50% 46%,#fff 0,#fff 26%,color-mix(in srgb,#F2AE35 46%,#fff) 100%)"><svg class="b" style="width:46px;height:46px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#3F51DC"/><circle cx="12" cy="13.6" r="9.2" fill="#F2AE35"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#3A2A10"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#3A2A10"/></svg></span></div><div class="lab2">Who</div><div class="whos"><span class="who "><span class="ic dots paper" style="width:56px;height:56px;background:radial-gradient(circle at 50% 40%,#fff 0,#F1F1F3 100%)"><svg class="b" style="width:36px;height:36px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#2A39B0"/><circle cx="12" cy="13.6" r="9.2" fill="#3F51DC"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/></svg></span><em>Berry</em></span><span class="who on"><span class="ic dots paper" style="width:56px;height:56px;background:radial-gradient(circle at 50% 40%,#fff 0,#F1F1F3 100%)"><svg class="b" style="width:36px;height:36px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#3F51DC"/><circle cx="12" cy="13.6" r="9.2" fill="#F2AE35"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#3A2A10"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#3A2A10"/></svg></span><em>Plain Words</em></span><span class="who "><span class="ic dots paper" style="width:56px;height:56px;background:radial-gradient(circle at 50% 40%,#fff 0,#F1F1F3 100%)"><svg class="b" style="width:36px;height:36px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#9A7A52"/><circle cx="12" cy="13.6" r="9.2" fill="#262433"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/></svg></span><em>Competitor W…</em></span><span class="who "><span class="ic dots paper" style="width:56px;height:56px;background:radial-gradient(circle at 50% 40%,#fff 0,#F1F1F3 100%)"><svg class="b" style="width:36px;height:36px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#4E9A4A"/><circle cx="12" cy="13.6" r="9.2" fill="#DF4B3B"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/></svg></span><em>Meeting Prep</em></span><span class="who "><span class="ic dots paper" style="width:56px;height:56px;background:radial-gradient(circle at 50% 40%,#fff 0,#F1F1F3 100%)"><svg class="b" style="width:36px;height:36px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#4E9A4A"/><circle cx="12" cy="13.6" r="9.2" fill="#E86A9B"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/></svg></span><em>Newsletter B…</em></span><span class="who "><span class="ic dots paper" style="width:56px;height:56px;background:radial-gradient(circle at 50% 40%,#fff 0,#F1F1F3 100%)"><svg class="b" style="width:36px;height:36px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#7A5A33"/><circle cx="12" cy="13.6" r="9.2" fill="#86BF4E"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/></svg></span><em>Scout</em></span></div><div class="lab2">Behind it</div><div class="whos"><span class="who "><span class="ic dots paper" style="width:44px;height:44px;background:radial-gradient(circle at 50% 40%,#fff 0,#F1F1F3 100%)"><svg class="b" style="width:28px;height:28px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#3F51DC"/><circle cx="12" cy="13.6" r="9.2" fill="#F2AE35"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#3A2A10"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#3A2A10"/></svg></span><em>Paper</em></span><span class="who "><span class="ic dots night" style="width:44px;height:44px;background:radial-gradient(circle at 50% 40%,#2A2A2E 0,#141416 100%)"><svg class="b" style="width:28px;height:28px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#3F51DC"/><circle cx="12" cy="13.6" r="9.2" fill="#F2AE35"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#3A2A10"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#3A2A10"/></svg></span><em>Night</em></span><span class="who "><span class="ic  soft" style="width:44px;height:44px;background:color-mix(in srgb,#F2AE35 20%,#fff)"><svg class="b" style="width:28px;height:28px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#3F51DC"/><circle cx="12" cy="13.6" r="9.2" fill="#F2AE35"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#3A2A10"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#3A2A10"/></svg></span><em>Its colour</em></span><span class="who on"><span class="ic  glow" style="width:44px;height:44px;background:radial-gradient(circle at 50% 46%,#fff 0,#fff 26%,color-mix(in srgb,#F2AE35 46%,#fff) 100%)"><svg class="b" style="width:28px;height:28px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#3F51DC"/><circle cx="12" cy="13.6" r="9.2" fill="#F2AE35"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#3A2A10"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#3A2A10"/></svg></span><em>Glow</em></span></div></div></div><div class="cap"><b>In the taskbar</b><span>It changes at once, while Blueberry is open.</span></div><div class="pg "><div class="taskbar"><span class="dk "><span class="ic" style="width:40px;height:40px;background:#D9D9DE"></span></span><span class="dk "><span class="ic" style="width:40px;height:40px;background:#C9D4F5"></span></span><span class="dk on"><span class="ic  glow" style="width:40px;height:40px;background:radial-gradient(circle at 50% 46%,#fff 0,#fff 26%,color-mix(in srgb,#F2AE35 46%,#fff) 100%)"><svg class="b" style="width:26px;height:26px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#3F51DC"/><circle cx="12" cy="13.6" r="9.2" fill="#F2AE35"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#3A2A10"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#3A2A10"/></svg></span></span><span class="dk "><span class="ic" style="width:40px;height:40px;background:#E4D9C9"></span></span><span class="dk "><span class="ic" style="width:40px;height:40px;background:#D3E6D6"></span></span></div></div></body></html>

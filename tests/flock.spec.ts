@@ -45,33 +45,23 @@ test.afterEach(async () => {
   await app?.close();
 });
 
-test("a mascot is made, chats inside its limits, and is still itself after a restart", async () => {
+test("a mascot chats inside its limits, and is still itself after a restart", async () => {
   model.reset();
   const profile = mkdtempSync(join(tmpdir(), "blueberry-flock-"));
   app = await launchApp(profile, { modelEnv: model.env });
   let chrome = await findView(app, "view=chrome");
 
-  await chrome.getByRole("button", { name: "Flock", exact: true }).click();
-  await expect(chrome.getByRole("list", { name: "Your flock" }).getByRole("heading", { name: "Berry" })).toBeVisible();
-  await expect(chrome.getByRole("button", { name: "Edit Berry" })).toHaveCount(0);
-
-  await chrome.getByRole("button", { name: "New mascot" }).click();
-  await chrome.getByRole("button", { name: "Add to flock" }).click();
-  await expect(chrome.getByRole("alert")).toHaveText("Give it a name.");
-  await chrome.getByRole("button", { name: "Kingfisher" }).click();
-  await chrome.getByRole("button", { name: "Crown" }).click();
-  await chrome.getByLabel("Name").fill("Scout");
-  await chrome.getByLabel("What it’s for").fill("Always answer like a sea captain.");
-  await chrome.getByRole("radio", { name: "Only these sites" }).click();
-  await chrome.getByLabel("Sites it may use").fill("127.0.0.1");
-  await chrome.getByRole("button", { name: "Add to flock" }).click();
-  await expect(chrome.getByRole("heading", { name: "Scout" })).toBeVisible();
+  // Making one in steps is in mascotsPage.spec.ts. This one is about what its limits hold.
+  await chrome.evaluate(() =>
+    window.chromeAPI.mascots.save(null, { name: "Scout", look: { palette: "kingfisher", accessory: "crown" }, instructions: "Always answer like a sea captain.", sites: ["127.0.0.1"], tools: ["visit", "click", "type"] })
+  );
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock"));
 
   // In a chat as Scout, an address off its site is refused with no card, and never loads.
   const offLimits = `http://localhost:${port}/secret`;
   model.callTools({ name: "open_tab", args: { url: offLimits } });
   model.replyWith("Aye, ", "I can't go there.");
-  await chrome.getByRole("button", { name: "Chat" }).nth(1).click();
+  await chrome.getByRole("button", { name: "Chat with Scout" }).click();
   await chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Scout" }).fill("Open that page");
   await chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Scout" }).press("Enter");
   await expect(chrome.getByText("Aye, I can't go there.")).toBeVisible();

@@ -3,44 +3,12 @@ import { useBrowser } from '../contexts/BrowserContext'
 import { useChat, type Message } from '../contexts/ChatContext'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useAssistantName, BerrySpot } from './Berry'
-import { AssistantMessage, ChatApprovalCard, ChatError, ThinkingMessage, UserMessage, useFollowReply } from './ChatMessage'
+import { AssistantMessage, ChatApprovalCard, ThinkingMessage, UserMessage, WentWrong, didWork, useFollowReply, type ReplyActions } from './ChatMessage'
+import { chatRoutine } from '../routinesView'
 import { MemoryOffers } from './MemoryInChat'
-import { PageCard } from './PageCard'
-import { ChatComposer } from './Composer'
+import { PageChip } from './AttachmentChips'
+import { ChatComposer, answerInBox } from './Composer'
 import { siteAllowed } from '@shared/mascots'
-import type { MascotProfile } from '@shared/library'
-
-// Conversation Turn Component
-interface ConversationTurn {
-    user?: Message
-    assistant?: Message
-}
-
-const ConversationTurnComponent: React.FC<{
-    turn: ConversationTurn
-    isLoading?: boolean
-    waiting?: boolean
-    mascot: MascotProfile
-    failed?: boolean
-}> = ({ turn, isLoading, waiting, mascot, failed }) => (
-    <div className="flex flex-col gap-5">
-        {turn.user && <UserMessage content={turn.user.content} />}
-        {turn.assistant && (
-            <AssistantMessage
-                content={turn.assistant.content}
-                steps={turn.assistant.steps}
-                statusLine={turn.assistant.statusLine}
-                isStreaming={turn.assistant.isStreaming}
-                waiting={waiting}
-                mascot={mascot}
-                failed={failed}
-                memoryIds={turn.assistant.memoryIds}
-                pages={turn.assistant.pages}
-            />
-        )}
-        {isLoading && <ThinkingMessage mascot={mascot} />}
-    </div>
-)
 
 const hostOf = (url: string) => {
     try {
@@ -50,102 +18,108 @@ const hostOf = (url: string) => {
     }
 }
 
-// Main Chat Component
+// The chat panel's conversation: the same messages, steps, cards and prompt box as the main chat, beside a page.
 export const Chat: React.FC = () => {
-    const { messages, isLoading, error, chatId, approval, sendMessage, stop, pageAccess: enabled, setPageAccess: change, draft, takeDraft, mascotId } = useChat()
+    const { messages, isLoading, error, chatId, title, approval, sendMessage, stop, pageAccess: enabled, setPageAccess: change, draft, takeDraft, mascotId } = useChat()
     const { find, chosen, choose } = useFlock()
     // A chat not started yet goes to whoever is chosen. After that, it stays with the mascot it started with.
     const mascot = chatId ? find(mascotId) : chosen
+    const library = useLibrary()
+    // An offer to remember arrives after the reply has ended, and has to be followed down like a step.
+    const offers = library.memory.offers.filter((offer) => offer.sourceId === chatId).length
     const scrollerRef = useFollowReply(
         messages.filter((message) => message.role === 'user').length,
         messages[messages.length - 1]?.content,
-        (messages[messages.length - 1]?.steps?.length ?? 0) + (approval ? 1 : 0)
+        (messages[messages.length - 1]?.steps?.length ?? 0) + (approval ? 1 : 0) + offers
     )
     const name = useAssistantName(mascot)
     const { activeTab } = useBrowser()
     const host = activeTab && !activeTab.page ? hostOf(activeTab.url) : null
     const canUseSite = !!activeTab && siteAllowed(activeTab.url, mascot.sites)
-    const heldByUser = useLibrary().needsYou.some(({ approval }) => !!activeTab && approval.handoff?.tabId === activeTab.id)
+    const heldByUser = library.needsYou.some(({ approval }) => !!activeTab && approval.handoff?.tabId === activeTab.id)
 
-    // Group messages into conversation turns
-    const conversationTurns: ConversationTurn[] = []
-    for (let i = 0; i < messages.length; i++) {
-        if (messages[i].role === 'user') {
-            const turn: ConversationTurn = { user: messages[i] }
-            if (messages[i + 1]?.role === 'assistant') {
-                turn.assistant = messages[i + 1]
-                i++ // Skip next message since we've paired it
-            }
-            conversationTurns.push(turn)
-        } else if (messages[i].role === 'assistant' &&
-            (i === 0 || messages[i - 1]?.role !== 'user')) {
-            // Handle standalone assistant messages
-            conversationTurns.push({ assistant: messages[i] })
-        }
+    // While a question waits, the prompt box is where it's answered.
+    const question = approval?.question ? approval : null
+    const last = messages.at(-1)
+    // Before the reply has anything to show, there's no message for it yet.
+    const thinking = isLoading && last?.role === 'user'
+    const failedReply = error && last?.role === 'assistant' ? last : null
+    const actions: ReplyActions = {
+        onSay: (words) => void sendMessage(words, mascot.id),
+        routineFromChat: chatId && didWork(messages) ? () => chatRoutine(title ?? '', messages, mascotId) : undefined,
     }
-
-    // Check if we need to show loading after the last turn
-    const showLoadingAfterLastTurn = isLoading &&
-        messages[messages.length - 1]?.role === 'user'
 
     return (
         <div className="flex flex-col h-full">
             <div ref={scrollerRef} className="flex-1 min-h-0 overflow-y-auto">
                 {messages.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center gap-3 px-6 text-center animate-fade-in">
-                        {name !== 'Assistant' && <BerrySpot size={72} />}
-                        <p className="text-14 text-muted-foreground">
+                        <BerrySpot size={40} mascot={mascot} />
+                        <p className="text-14 text-ink-2">
                             Ask about this page, or anything else.
                         </p>
                     </div>
                 ) : (
-                    <div className="px-5 pt-3 pb-4 flex flex-col gap-6">
-                        {conversationTurns.map((turn, index) => (
-                            <ConversationTurnComponent
-                                key={`turn-${index}`}
-                                turn={turn}
-                                waiting={approval !== null}
-                                mascot={mascot}
-                                failed={!!error && index === conversationTurns.length - 1}
-                                isLoading={
-                                    showLoadingAfterLastTurn &&
-                                    index === conversationTurns.length - 1
-                                }
-                            />
-                        ))}
-                        {chatId && approval && <ChatApprovalCard chatId={chatId} approval={approval} mascot={mascot} />}
-                        {error && <ChatError message={error} />}
+                    <div className="px-3.5 pt-2 pb-4 flex flex-col gap-6">
+                        {messages.map((message: Message, index) =>
+                            message.role === 'user' ? (
+                                <UserMessage key={message.id} content={message.content} attached={message.attached} />
+                            ) : (
+                                <AssistantMessage
+                                    key={message.id}
+                                    content={message.content}
+                                    steps={message.steps}
+                                    said={message.said}
+                                    startedAt={message.startedAt}
+                                    took={message.took}
+                                    isStreaming={message.isStreaming}
+                                    waiting={approval !== null}
+                                    mascot={mascot}
+                                    error={message === failedReply && error ? error : undefined}
+                                    memoryIds={message.memoryIds}
+                                    pages={message.pages}
+                                    actions={!isLoading && index === messages.length - 1 ? actions : undefined}
+                                />
+                            )
+                        )}
+                        {thinking && <ThinkingMessage mascot={mascot} waiting={approval !== null} />}
+                        {chatId && approval && <div className="-mt-2"><ChatApprovalCard chatId={chatId} approval={approval} mascot={mascot} /></div>}
+                        {error && !isLoading && !failedReply && <WentWrong message={error} mascot={mascot} actions={actions} />}
                         {!isLoading && <MemoryOffers key={chatId} sourceId={chatId} mascot={mascot} />}
                     </div>
                 )}
             </div>
 
-            <div className="p-3 pt-1">
+            <div className="px-3.5 pb-3.5 pt-1">
                 <ChatComposer
-                    onSend={(message) => void sendMessage(message, mascot.id)}
+                    onSend={(message, attached) => (chatId && question ? answerInBox(chatId, question.id, message, attached) : sendMessage(message, mascot.id, attached))}
+                    answering={!!question}
                     mascot={mascot}
                     onChooseMascot={chatId ? undefined : choose}
                     draft={draft}
                     onDraftTaken={takeDraft}
-                    disabled={isLoading}
+                    disabled={isLoading && !question}
                     onStop={isLoading ? stop : undefined}
-                    placeholder={name === 'Assistant' ? 'Ask a question' : `Ask ${name}`}
+                    placeholder={question ? (question.answers?.length ? `Answer ${name}, or pick one above` : `Answer ${name}`) : name === 'Assistant' ? 'Write a message' : isLoading ? `Tell ${name} something while it works` : `Tell ${name} something`}
                     attachment={
                         heldByUser ? (
-                            <p className="px-2 py-1 text-12 text-muted-foreground">{name} can’t see this tab while it’s with you.</p>
+                            <p className="basis-full px-2 py-1 text-13 text-ink-2">{name} can’t see this tab while it’s with you.</p>
                         ) : host && !canUseSite ? (
-                            <p className="px-2 py-1 text-12 text-muted-foreground">{name} isn’t allowed on {host}, so it can’t see this page.</p>
+                            <p className="basis-full px-2 py-1 text-13 text-ink-2">{name} isn’t allowed on {host}, so it can’t see this page.</p>
                         ) : enabled && host ? (
-                            <PageCard
-                                title={activeTab?.title || host}
-                                host={host}
-                                favicon={activeTab?.favicon}
-                                onRemove={() => change(false)}
-                            />
+                            <PageChip title={activeTab?.title || host} host={host} favicon={activeTab?.favicon} onRemove={() => change(false)} />
                         ) : undefined
                     }
-                    onAdd={!enabled && host && canUseSite ? () => change(true) : undefined}
-                    addLabel={!enabled && host && canUseSite ? 'Add this page' : undefined}
+                    attach={{
+                        chatId,
+                        mascot,
+                        place: 'here',
+                        // The page in front, while it isn't a chip already.
+                        thisPage:
+                            host && !enabled
+                                ? { site: host, favicon: activeTab?.favicon ?? null, problem: heldByUser ? 'It’s with you for now' : !canUseSite ? `${name} isn’t allowed on ${host}` : null, onAdd: () => change(true) }
+                                : undefined,
+                    }}
                 />
             </div>
         </div>

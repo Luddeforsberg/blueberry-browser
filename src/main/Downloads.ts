@@ -200,6 +200,13 @@ export class Downloads {
     }
   }
 
+  // The folder new files go to, made if it's gone, as a new download would.
+  async openFolder(): Promise<boolean> {
+    const error = await this.deps.openPath(this.folder());
+    if (error) console.error("Failed to open the downloads folder:", error);
+    return !error;
+  }
+
   // Files can go at any time without telling us, so this looks whenever someone is about to see the list.
   async refresh(): Promise<DownloadInfo[]> {
     await Promise.all(this.records.filter((entry) => entry.state === "completed").map((entry) => this.checkFile(entry)));
