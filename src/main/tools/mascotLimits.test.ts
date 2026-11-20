@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createPageTools } from "./browserTools";
 import type { Tab } from "../tabs/Tab";
 import type { MascotTool } from "../../shared/library";
+import { MASCOT_TOOLS } from "../../shared/mascots";
 import { defined } from "../../shared/testing";
 
 const IMAGE = Buffer.from("picture");
@@ -56,6 +57,24 @@ describe("a mascot's limits", () => {
     expect(canClick).toContain("click");
     expect(canClick).not.toContain("type_text");
     expect(canClick).not.toContain("go_to");
+  });
+
+  // Berry has no limits, so the filter never sees its tools: a tool missing from TOOL_NEEDS would still reach it.
+  it("lists every tool in TOOL_NEEDS, so a mascot with every permission gets all of Berry's", () => {
+    const names = (limits?: { name: string; sites: string[]; tools: MascotTool[] }) =>
+      createPageTools({
+        activeTab: () => null,
+        allTabs: () => [],
+        openTab: vi.fn(),
+        closeTab: () => true,
+        ask: async () => null,
+        canSee: () => true,
+        onUse: () => {},
+        search: async () => [],
+        fetchPage: async (url) => ({ url, status: 200, markdown: "" }),
+        limits,
+      }).map(({ name }) => name);
+    expect(names({ name: "Everything", sites: [], tools: MASCOT_TOOLS.map(({ id }) => id) })).toEqual(names());
   });
 
   it.each([

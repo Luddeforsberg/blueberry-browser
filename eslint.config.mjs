@@ -4,6 +4,7 @@ import eslintPluginReact from "eslint-plugin-react";
 import eslintPluginReactHooks from "eslint-plugin-react-hooks";
 import eslintPluginReactRefresh from "eslint-plugin-react-refresh";
 import { boundaries } from "./eslint.boundaries.mjs";
+import { callBlocks } from "./eslint.calls.mjs";
 import { fenceBlocks } from "./eslint.fences.mjs";
 import { complexityOver, linesOver, paramsOver } from "./eslint.limits.mjs";
 
@@ -164,8 +165,10 @@ export default tseslint.config(
       "no-restricted-syntax": ["error", { selector: "ImportExpression", message: "Code that runs in a page imports nothing at run time." }],
     },
   },
-  // Who may import what: the rules AGENTS.md states, and page code only through src/main/tools/pageCode.ts.
+  // Who may import what, and page code only through src/main/tools/pageCode.ts.
   ...boundaries,
+  // Who may use a member: a page's pixels, input to a page, a held tab, and the desktop mascot's clipboard and screen.
+  ...callBlocks,
   // Risky things written in one place each: fetch, timers in renderers, raw controls and double casts.
   ...fenceBlocks,
   ...Object.entries(linesOver).map(([file, max]) => ({ files: [file], rules: { "max-lines": ["error", max] } })),
