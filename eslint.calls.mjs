@@ -1,23 +1,21 @@
 // Members no import rule sees: who may take a page's pixels, send input to a page or past a tab held for the user, and
 // what the mascot on the desktop never touches. Each check refuses any reference to the members it names outside the
-// files it allows: a call, `.bind`, `["name"]`, destructuring `{ name }`, or importing `{ name }`. Where a name is also
+// files it allows: a call, `.bind`, a literal `["name"]`, destructuring `{ name }`, or importing `{ name }`. A name held
+// in a variable, or a member read through a type of its own, gets past it. Where a name is also
 // used for something unrelated, `declaredIn` narrows it, with types, to the member that file declares. No check sees
 // where an allowed caller sends what it gets, so docs/ARCHITECTURE.md says that.
 //
 // Like eslint.fences.mjs, each check is a rule of its own, so checks don't undo each other or the rules
 // eslint.boundaries.mjs sets. Every file named here must exist, so a rename can't quietly turn a check off.
 
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync } from "node:fs";
 
 const APP = ["src/main/**/*.{ts,tsx}", "runner/src/**/*.ts"];
 const main = (...paths) => paths.map((p) => `src/main/${p}`);
 
-// The desktop mascot's own renderer files, helpers too, by name, so a new one is held from the start. Shared components
-// it borrows from the chrome are outside this check.
-const RENDERER = "src/renderer/chrome/src";
-const DESKTOP_RENDERER = readdirSync(new URL(RENDERER, import.meta.url))
-  .filter((name) => /^(Desktop|desktop|useDesktop).*\.tsx?$/.test(name))
-  .map((name) => `${RENDERER}/${name}`);
+// The desktop mascot's own renderer files, helpers too, by name in any folder, so a new or moved one is held from the
+// start. Shared components it borrows from the chrome are outside this check.
+const DESKTOP_RENDERER = ["src/renderer/chrome/src/**/{Desktop,desktop,useDesktop}*.{ts,tsx}"];
 
 const checks = [
   {

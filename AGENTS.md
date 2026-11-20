@@ -68,7 +68,7 @@ Most rules are checks, and each says why when it fails: `eslint.boundaries.mjs` 
 - Only `Layout.ts`, with `floatingPlaces.ts` and `desktopPlaces.ts`, decides where regions go. Don't hard-code a size anywhere else.
 - Limits only narrow. A mascot's tools and sites, a routine's sites, and the sites, tools and ask level a job arrives with can take away, never add. A deleted or missing mascot never falls back to Berry.
 - Only the user answers an approval or a handoff. Nothing on the runner or the relay, no MCP app and no model can. An app, the phone page or the desktop mascot may answer a question, but never with anything shaped like a code.
-- The words on an approval card come from code, never from the model or a page.
+- The reason on an approval card comes from code, never from the model or a page. The action's exact words stay on it in full.
 - Anything from a page, a server, a link or another app is a stranger's: check it where it comes in, show it as text, and label it untrusted for the model.
 - Each secret goes only the way Secrets in ARCHITECTURE.md says. Don't give one a new route.
 - No service key or secret belongs in the repo or the app. Supabase gets the publishable key only.
