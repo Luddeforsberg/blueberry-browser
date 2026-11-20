@@ -62,7 +62,8 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
   const inCloud = library.chats.some((chat) => chat.id === chatId && chat.cloud);
   const scrollerRef = useFollowReply(
     messages.filter((message) => message.role === "user").length,
-    last?.content,
+    // Null once it's over, so ending counts as a change and what comes under the reply is followed too.
+    running ? last?.content : null,
     (last?.steps?.length ?? 0) + (thread?.approval ? 1 : 0) + offers,
   );
 

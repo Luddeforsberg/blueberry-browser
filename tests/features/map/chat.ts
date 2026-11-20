@@ -154,12 +154,8 @@ export const chatFeatures: Feature[] = [
       },
       reply: {
         open: async (drive) => {
-          await createTab(drive, drive.site.url("shop.example"));
-          await drive.chrome.evaluate(() => window.chromeAPI.layout.toggleChat());
-          const box = drive.chrome.getByRole("textbox", { name: /ask|Message/i }).first();
           drive.model.replyWith("This page sells USB-C cables. The cheapest is 1 m for 49 kr.");
-          await box.fill("What's the cheapest here?");
-          await box.press("Enter");
+          await askInPanel(drive, "What's the cheapest here?");
           await seen(drive.chrome, "The cheapest is 1 m for 49 kr.");
         },
       },

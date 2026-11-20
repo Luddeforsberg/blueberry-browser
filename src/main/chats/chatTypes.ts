@@ -61,7 +61,7 @@ export interface Run {
 // A chat's last reply once it's over: what its working view, the next reply and suggestions need of it, and nothing live,
 // so the run itself can go once its transcript is saved.
 export interface EndedRun {
-  readonly mascot: Pick<MascotProfile, "id" | "sites">;
+  readonly mascot: { readonly id: string; readonly sites: readonly string[] };
   readonly startedAt: number;
   readonly endedAt: number;
   readonly outcome: WorkOutcome;

@@ -78,6 +78,18 @@ describe("transcriptOf", () => {
     });
   });
 
+  it("says nothing went wrong while a reply is being written", () => {
+    expect(shape(thread({ messages: [asked, answered, asked], partial: "", error: "Rate limited." }))).toMatchObject({
+      entries: [
+        ["0", "user", false, null],
+        ["1", "assistant", false, null],
+        ["2", "user", false, null],
+        ["3", "assistant", true, null],
+      ],
+      error: null,
+    });
+  });
+
   it("puts an error only on the last reply, never an earlier one", () => {
     const { entries } = transcriptOf(thread({ messages: [asked, answered, asked, answered], error: "Rate limited." }));
     expect(entries.map(({ error }) => error)).toEqual([null, null, null, "Rate limited."]);

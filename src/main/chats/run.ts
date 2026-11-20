@@ -27,7 +27,7 @@ export const newRun = (
 });
 
 export const endedRun = (run: Run, outcome: WorkOutcome): EndedRun => ({
-  mascot: { id: run.mascot.id, sites: run.mascot.sites },
+  mascot: { id: run.mascot.id, sites: [...run.mascot.sites] },
   startedAt: run.startedAt,
   endedAt: Date.now(),
   outcome,

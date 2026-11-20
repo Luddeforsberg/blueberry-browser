@@ -47,7 +47,8 @@ export const Chat: React.FC = () => {
   const last = messages.at(-1);
   const scrollerRef = useFollowReply(
     messages.filter((message) => message.role === "user").length,
-    last?.content,
+    // Null once it's over, so ending counts as a change and what comes under the reply is followed too.
+    running ? last?.content : null,
     (last?.steps?.length ?? 0) + (approval ? 1 : 0) + offers,
   );
   const name = useAssistantName(mascot);
