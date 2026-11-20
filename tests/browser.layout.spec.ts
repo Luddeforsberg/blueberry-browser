@@ -131,13 +131,15 @@ test("in the tab row at the smallest window, the active tab has as much room for
     );
 
   await expect.poll(async () => (await titles()).length).toBe(6);
-  // New tabs open from nothing, so the row is measured once they have.
-  await expect(row.locator("li[style*='max-width']")).toHaveCount(0);
-  const six = await titles();
-  const others = six.filter((tab) => !tab.active).map((tab) => tab.title);
-  // The mascot perches on the active tab and its close button always shows, so it's wider to make up for them.
-  expect(six.find((tab) => tab.active)!.title).toBeGreaterThanOrEqual(Math.min(...others) - 1);
-  expect(Math.min(...others)).toBeGreaterThan(40);
+  // New tabs open from nothing, the row slides to its new width, and each tab hears its own width a frame later, so this
+  // holds once the row has come to rest, which a slow runner can take a while to reach.
+  await expect(async () => {
+    const six = await titles();
+    const others = six.filter((tab) => !tab.active).map((tab) => tab.title);
+    // The mascot perches on the active tab and its close button always shows, so it's wider to make up for them.
+    expect(six.find((tab) => tab.active)!.title).toBeGreaterThanOrEqual(Math.min(...others) - 1);
+    expect(Math.min(...others)).toBeGreaterThan(40);
+  }).toPass({ timeout: 5_000 });
 
   for (let i = 0; i < 4; i++) await chrome.evaluate(() => window.chromeAPI.browser.createTab());
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings"));
