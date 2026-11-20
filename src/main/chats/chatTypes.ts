@@ -4,7 +4,7 @@ import type { ActionApproval } from "../../shared/ipc";
 import type { ChatStore } from "./ChatStore";
 import type { Tab } from "../tabs/Tab";
 import type { CdpTab } from "../tools/CdpTab";
-import type { ChatApproval, ChatStep, ChatThread, MascotProfile, SaidOnTheWay } from "../../shared/library";
+import type { ChatApproval, ChatStep, ChatThread, MascotProfile, SaidOnTheWay, WorkOutcome } from "../../shared/library";
 import type { ChatMemory } from "./jobMemory";
 
 // What the parts of `Chats` work with: what it was made with, the state it owns and the few things every part does.
@@ -22,7 +22,9 @@ export interface Run {
   breakBeforeText: boolean;
   approval: (ChatApproval & { askedAt: number; answer: (allow: boolean, text?: string) => void }) | null;
   tabs: Set<Tab>;
-  // Every tab it has used in this reply and every site it's been on, latest last.
+  // Every tab it has used in this reply and every site it's been on, latest last. A site counts only as a tool uses a tab,
+  // the same as the tools count it within the reply, and never from where a tab is now, so reading the working view
+  // changes nothing.
   used: Set<Tab>;
   sites: Set<string>;
   startedAt: number;
@@ -54,6 +56,22 @@ export interface Run {
   onEnd?: ((ended: EndedReply) => void) | undefined;
   // The user typed this here and is there to answer, so it may ask or plan before starting.
   userPresent: boolean;
+}
+
+// A chat's last reply once it's over: what its working view, the next reply and suggestions need of it, and nothing live,
+// so the run itself can go once its transcript is saved.
+export interface EndedRun {
+  readonly mascot: { readonly id: string; readonly sites: readonly string[] };
+  readonly startedAt: number;
+  readonly endedAt: number;
+  readonly outcome: WorkOutcome;
+  readonly withPage: boolean;
+  readonly cloud: boolean;
+  // The tabs it used, by id, latest last.
+  readonly tabIds: readonly string[];
+  // The sites this reply was on, latest last, and every site this chat's replies have been on, for the next one.
+  readonly sites: readonly string[];
+  readonly beenTo: readonly string[];
 }
 
 // How one reply ended, for whoever started it.
@@ -187,7 +205,7 @@ export interface ChatParts {
   // Why a chat's last reply failed, until its next message.
   errors: Map<string, string>;
   // Each chat's last reply once it's over, so its working view can settle on how it went. Memory only.
-  finished: Map<string, { run: Run; endedAt: number }>;
+  finished: Map<string, EndedRun>;
   // The "Can see" toggle, read each time, since it can change while a reply runs.
   pageAccess: () => boolean;
   publish: (chatId: string, run: Run) => void;

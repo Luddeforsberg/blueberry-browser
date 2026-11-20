@@ -9,6 +9,7 @@ import { CloudSessions, type CloudBrowser } from "./cloudBrowser";
 import { CloudLogins, loginSite, type StoredCookie } from "./cloudLogins";
 import { sendToRenderer } from "../window/ipc";
 import { localChrome } from "./localChrome";
+import { Latest } from "../../shared/lateWork";
 
 // Settings > Cloud and the cloud tabs in the window. The Browserbase key and project id are kept with `safeStorage` and
 // never leave main once saved. The live view, or the pictures standing in for it, go to the chrome and nowhere else: not
@@ -42,6 +43,8 @@ export class CloudTabs implements ChatCloud {
   private problem: string | null = null;
   private readonly taken = new Set<string>();
   private watching: CdpTab | null = null;
+  // Stopping the last tab's picture takes a moment, and the user may have moved on again by then.
+  private readonly watches = new Latest();
   // The size the chrome last asked for, for a page a job is working in. A job's input aims at fixed points, so the page
   // only changes size once the job lets go of it.
   private readonly pendingFits = new Map<string, { width: number; height: number }>();
@@ -242,7 +245,9 @@ export class CloudTabs implements ChatCloud {
     if (page === this.watching) return;
     const was = this.watching;
     this.watching = page;
+    const turn = this.watches.next();
     await was?.watch(null);
+    if (!turn.current) return;
     await page?.watch((data) => {
       const chrome = this.hooks.chrome();
       if (this.watching === page && !chrome.isDestroyed()) sendToRenderer(chrome, "cloud:frame", { tabId: page.id, data });
@@ -356,6 +361,7 @@ export class CloudTabs implements ChatCloud {
     this.ending ??= (async () => {
       this.logins.cancelPending();
       this.watching = null;
+      this.watches.end();
       await this.sessions?.end();
     })().catch(() => {});
     return this.ending;

@@ -7,6 +7,7 @@ import type { CloudSessions } from "../../src/main/cloud/cloudBrowser";
 import type { ChatApproval } from "../../src/shared/library";
 import type { ClaimedJob, JobUpdate, RunnerDb } from "./db";
 import type { PushKind } from "./push";
+import { Latest } from "../../src/shared/lateWork";
 
 // One job, run the way a chat with no page runs in the app: the same `Chats.runTask`, agent, tools, mascot limits,
 // approvals and step limit, in the cloud browser's pages. What it does is written to the job's row as it happens. An
@@ -113,6 +114,24 @@ export interface RunJobOptions {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// The live view the job's row shows, for the page asked for last. Every step asks again, and a lookup can take a while,
+// so one for an earlier page that answers late never replaces the page the user is being asked to type into.
+export const followLiveView = (
+  lookUp: (pageId: string) => Promise<string | null>,
+  show: (liveView: string) => void,
+): ((pageId: string | null) => Promise<void>) => {
+  const lookups = new Latest();
+  let shown: string | null = null;
+  return async (pageId) => {
+    const turn = lookups.next();
+    const url = pageId ? await lookUp(pageId).catch(() => null) : null;
+    const next = url && isLiveView(url) ? url : null;
+    if (!turn.current || next === shown) return;
+    shown = next;
+    show(next ?? "");
+  };
+};
+
 export const runJob = async (job: ClaimedJob, options: RunJobOptions): Promise<"done" | "failed" | "stopped"> => {
   const {
     db,
@@ -177,15 +196,11 @@ export const runJob = async (job: ClaimedJob, options: RunJobOptions): Promise<"
   };
 
   // The page handed to the user while they're asked to do something there, and otherwise the one the job used last.
-  let liveView: string | null = null;
-  const showLiveView = async (approval: ChatApproval | null) => {
-    const pageId = approval?.handoff?.tabId || chats.work(job.id)?.currentId;
-    const url = pageId ? await browser.liveView(pageId).catch(() => null) : null;
-    const next = url && isLiveView(url) ? url : null;
-    if (next === liveView) return;
-    liveView = next;
-    void write({ liveView: next ?? "" });
-  };
+  const follow = followLiveView(
+    (pageId) => browser.liveView(pageId),
+    (liveView) => void write({ liveView }),
+  );
+  const showLiveView = (approval: ChatApproval | null) => follow(approval?.handoff?.tabId || chats.work(job.id)?.currentId || null);
 
   const waitingOn = (approval: ChatApproval) => chats.waiting().some((run) => run.id === job.id && run.approval.id === approval.id);
 

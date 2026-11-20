@@ -78,6 +78,20 @@ describe("one poll at a time", () => {
     defined(finishes[2])();
   });
 
+  it("never runs two when a call comes from the answer to the one before", async () => {
+    let running = 0;
+    let most = 0;
+    const poll = oneAtATime(async () => {
+      most = Math.max(most, ++running);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      running--;
+    });
+    const first = poll();
+    const queued = poll();
+    await Promise.all([first, queued, first.then(() => poll())]);
+    expect(most).toBe(1);
+  });
+
   it("runs again after one that failed", async () => {
     let runs = 0;
     const poll = oneAtATime(async () => {

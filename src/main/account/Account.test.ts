@@ -98,6 +98,26 @@ describe("Account", () => {
     expect(await account.accessToken()).toBe("access-two");
   });
 
+  it("never hands a refresh's caller the token of an account that signed in while it was on its way", async () => {
+    const refreshed: ((fresh: ServerSession) => void)[] = [];
+    const refresh = vi.fn(() => new Promise<ServerSession>((resolve) => refreshed.push(resolve)));
+    const bob = (name: string, expiresIn?: number) => ({ ...session(name, expiresIn), email: "bob@example.com" });
+    const signIns = [session("alice", 30_000), bob("bob", 30_000)];
+    const { account } = start({ signIn: async () => defined(signIns.shift()), refresh, signOut: async () => {} });
+    await account.signIn("ana@example.com", "pw");
+    const forAlice = account.accessToken();
+    await account.signIn("bob@example.com", "pw");
+    // Bob's own token is about to end too, so he gets a refresh of his own rather than waiting on Alice's.
+    const forBob = account.accessToken();
+    expect(refresh).toHaveBeenLastCalledWith("refresh-bob", "bob@example.com");
+    defined(refreshed[1])(bob("bob-two"));
+    expect(await forBob).toBe("access-bob-two");
+    defined(refreshed[0])(session("alice-two"));
+    expect(await forAlice).toBeNull();
+    expect(account.state.email).toBe("bob@example.com");
+    expect(await account.accessToken()).toBe("access-bob-two");
+  });
+
   it("signs out when the server has ended the session, but not when it can't be reached", async () => {
     const down = start({
       signIn: async () => session("one", 30_000),

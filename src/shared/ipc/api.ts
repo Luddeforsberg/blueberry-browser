@@ -168,7 +168,7 @@ interface AddressAPI {
   suggestHistory: (text: string) => Promise<VisitedPage[]>;
   show: (request: AddressSuggestionsRequest) => Promise<void>;
   close: () => Promise<void>;
-  pick: (index: number) => Promise<void>;
+  pick: (listId: number, index: number) => Promise<void>;
   onSuggestions: (callback: (shown: AddressSuggestionsShown | null) => void) => Unsubscribe;
   onPicked: (callback: (row: AddressSuggestion) => void) => Unsubscribe;
 }

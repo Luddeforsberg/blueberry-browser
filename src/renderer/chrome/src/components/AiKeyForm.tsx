@@ -25,6 +25,7 @@ const PROBLEMS: Record<Exclude<Said, "works" | "trying" | null>, (service: AiSer
   "not-a-key": () => "That doesn’t look like a key. Paste the whole key, with nothing around it.",
   "not-safe": () => "This computer can’t keep the key encrypted, so it wasn’t saved.",
   "not-saved": () => "The key works, but it couldn’t be saved. Try again.",
+  overtaken: () => "Another key or a removal came in while this one was being tried, so this one wasn’t kept. Try again to use it.",
 };
 
 // The key itself was wrong, rather than the service out of reach or nothing pasted, so the field says so too.

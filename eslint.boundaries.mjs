@@ -148,6 +148,8 @@ const rules = [
     [
       "settings/AiKey.ts",
       "settings/AiKey.test.ts",
+      // Where the app's one key is made, beside the stores, and handed to each window.
+      "index.ts",
       "window/Window.ts",
       "window/WindowParts.ts",
       "window/makeAccount.ts",
@@ -243,7 +245,7 @@ const rules = [
   onlyFrom(
     "address suggestions",
     file("AddressSuggestions"),
-    ["window/Window.ts", "window/WindowParts.ts"],
+    ["window/Window.ts", "window/WindowParts.ts", "window/AddressSuggestions.test.ts"],
     "No tool, mascot, MCP app or phone can reach what's typed in the address field.",
   ),
   onlyFrom(

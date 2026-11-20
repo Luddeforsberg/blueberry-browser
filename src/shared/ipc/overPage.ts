@@ -23,8 +23,10 @@ export interface AddressSuggestionsRequest {
   field: Rect;
 }
 
-// What the suggestions view draws: the rows, and where the sheet goes in the view, from the layout owner.
+// What the suggestions view draws: the rows, and where the sheet goes in the view, from the layout owner. A press names
+// `listId` with its row, so it acts on the list that was drawn and never on a newer one main has since been sent.
 export interface AddressSuggestionsShown {
+  listId: number;
   rows: AddressSuggestion[];
   selected: number | null;
   sheet: Rect;

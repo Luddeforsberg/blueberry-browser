@@ -82,7 +82,7 @@ export const SuggestionsApp: React.FC = () => {
   }, [theme?.isDark]);
 
   if (!theme || !shown) return null;
-  const { rows, selected, sheet } = shown;
+  const { listId, rows, selected, sheet } = shown;
   const enter = theme.platform === "mac" ? "⌘" : "Ctrl";
 
   return (
@@ -106,7 +106,7 @@ export const SuggestionsApp: React.FC = () => {
               // On the press, since the field loses the keyboard to this view as it happens and closes the list.
               onMouseDown={(event) => {
                 event.preventDefault();
-                if (event.button === 0) void window.chromeAPI.address.pick(index);
+                if (event.button === 0) void window.chromeAPI.address.pick(listId, index);
               }}
               className={cn(menuRowClass(false), index === selected && "bg-sheet-2")}
             >

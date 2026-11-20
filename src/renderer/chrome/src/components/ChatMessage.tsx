@@ -314,18 +314,6 @@ export const WentWrong: React.FC<{ message: string; mascot?: MascotProfile; acti
   </WithFace>
 );
 
-// Thinking, before a reply has anything to show, where there's no reply yet to show it in. The face is the pips.
-export const ThinkingMessage: React.FC<{ mascot?: MascotProfile; waiting?: boolean }> = ({ mascot, waiting = false }) => {
-  const { showBerry } = useShell().settings;
-  return (
-    <WithFace mascot={mascot} mood={waiting ? "asking" : "thinking"} gutter={false}>
-      <div role="status" className="h-6 flex items-center">
-        {statusRow(waiting, showBerry)}
-      </div>
-    </WithFace>
-  );
-};
-
 // Why something failed, worded with what to do about it.
 export const ChatError: React.FC<{ message: string }> = ({ message }) => (
   <p role="alert" className="text-14 text-ask animate-fade-in">

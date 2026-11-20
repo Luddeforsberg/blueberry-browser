@@ -1,29 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
-import type { ChatThread } from "@shared/library";
 import type { Attached } from "../useAttachments";
-import { ChatContext, useChatThread, type ChatContextType, type Message } from "./useChat";
-
-const toMessages = (thread: ChatThread | null): Message[] => {
-  if (!thread) return [];
-  const saved: Message[] = thread.messages.map((message, index) => ({ id: `msg-${index}`, ...message }));
-  // Before the first words arrive, the thinking state stands in for the reply.
-  return thread.partial || thread.statusLine || thread.steps.length > 0 || thread.approval
-    ? [
-        ...saved,
-        {
-          id: "partial",
-          role: "assistant",
-          content: thread.partial ?? "",
-          statusLine: thread.statusLine,
-          steps: thread.steps,
-          said: thread.said,
-          startedAt: thread.startedAt ?? undefined,
-          memoryIds: thread.memoryIds,
-          isStreaming: true,
-        },
-      ]
-    : saved;
-};
+import { transcriptOf } from "../chatTranscript";
+import { ChatContext, useChatThread, type ChatContextType } from "./useChat";
 
 // The chat panel's conversation. New chat leaves this one in the sidebar and starts another.
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -73,9 +51,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const takeDraft = useCallback(() => setDraft(null), []);
 
   const value: ChatContextType = {
-    messages: toMessages(thread),
-    isLoading: thread?.partial != null,
-    error: thread?.error ?? null,
+    transcript: transcriptOf(thread),
     chatId,
     title: thread?.title ?? null,
     approval: thread?.approval ?? null,

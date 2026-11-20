@@ -20,14 +20,21 @@ export const createAccount = (w: WindowParts, server: GalleryServer | null): Acc
     w.macJobs?.sync();
   });
 
-export const createAiKey = (w: WindowParts): AiKey => {
-  // Only the service and the last four characters go to the chrome. The key itself goes to the model and nowhere else.
-  const aiKey = new AiKey(join(app.getPath("userData"), "ai-key.json"), () => {
+// The app's one AI key, made once with the stores, whatever windows come and go.
+export const appAiKey = (): AiKey => {
+  const aiKey = new AiKey(join(app.getPath("userData"), "ai-key.json"));
+  setSavedKeyReader(() => aiKey.inUse, { ownAddressOnly: app.isPackaged });
+  return aiKey;
+};
+
+// Only the service and the last four characters go to the chrome. The key itself goes to the model and nowhere else.
+// The window stops listening once it has closed.
+export const listenToAiKey = (w: WindowParts): void => {
+  const stop = w.aiKey.onChange(() => {
     sendToRenderer(w.chromeView.view.webContents, "ai-key:updated", w.aiKey.state);
     if (w.aiKey.inUse) w.settingsChanges.firstJobDone("key");
   });
-  setSavedKeyReader(() => w.aiKey.inUse, { ownAddressOnly: app.isPackaged });
-  return aiKey;
+  w.baseWindow.once("closed", stop);
 };
 
 export const createGallery = (w: WindowParts, server: GalleryServer | null, stores: WindowStores): Gallery =>

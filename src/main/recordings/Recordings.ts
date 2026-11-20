@@ -3,6 +3,7 @@ import { sendToRenderer } from "../window/ipc";
 import { DRAFT_PROMPT, draftFromReply, plainDraft, Trail, trailAddress, trailForModel } from "./recordingTrail";
 import { finishWatching, nextNotes } from "./recorderScript";
 import type { RecordedDraftResult, RecordingState } from "../../shared/library";
+import { Latest, type Turn } from "../../shared/lateWork";
 import type { Tab } from "../tabs/Tab";
 
 // Past this it stops by itself, so a recording nobody remembers doesn't go on watching.
@@ -23,6 +24,8 @@ interface RecordingsDeps {
 }
 
 interface Watched {
+  // The recording it was watched for. What the page answers after that one is over goes nowhere.
+  recording: Turn;
   // Each new page starts this again, and an answer from an older one is ignored.
   page: number;
   listening: boolean;
@@ -46,8 +49,10 @@ export class Recordings {
   // The address bar was used on this tab, so the next page's query may be a search typed there.
   private fromAddressBar: string | null = null;
   private timer: NodeJS.Timeout | null = null;
-  // Throwing the trail away while it's being written up means that answer has nowhere to go.
-  private drafting = 0;
+  // Each recording, from start until it's thrown away, sent or the window goes. A stop or a write-up still on its way
+  // when that happens belongs to a recording that's over, so it changes nothing, even once another has started.
+  private readonly recordings = new Latest();
+  private session: Turn | null = null;
   private stopping = false;
 
   constructor(private readonly deps: RecordingsDeps) {}
@@ -70,7 +75,8 @@ export class Recordings {
     const fromOurPage = !this.deps.activeTab();
     // An earlier trail still being gone through goes now, along with its page.
     this.deps.closeReview();
-    this.drafting++;
+    this.session = this.recordings.next();
+    this.stopping = false;
     this.trail = new Trail();
     this.status = "recording";
     this.startedAt = Date.now();
@@ -96,18 +102,18 @@ export class Recordings {
   // Any change of tabs comes through here. A tab first seen now gets watched, and going to one that's already there is a
   // step. Going to one of our own pages and back isn't anything.
   sync(): void {
-    if (!this.isRecording || this.stopping) return;
+    if (!this.isRecording || this.stopping || !this.session) return;
     const tab = this.deps.activeTab();
     this.onOurPage = !tab;
     if (!tab || tab === this.current) return;
     this.current = tab;
-    if (!this.watched.has(tab)) this.watch(tab);
+    if (!this.watched.has(tab)) this.watch(tab, this.session);
     // A brand new tab says where it went once it's there.
     if (tab.hasLoaded && this.trail.steps.length > 0) this.trail.switched(tab.url);
     this.publish();
   }
 
-  private watch(tab: Tab): void {
+  private watch(tab: Tab, recording: Turn): void {
     const contents = tab.webContents;
     let opening = !tab.hasLoaded;
     const moved = (_: unknown, url: string, isMainFrame = true) => {
@@ -120,7 +126,7 @@ export class Recordings {
       this.publish();
       this.limitReached();
     };
-    const entry: Watched = { page: 0, listening: false, ended: false, stopListening: () => {} };
+    const entry: Watched = { recording, page: 0, listening: false, ended: false, stopListening: () => {} };
     const newPage = (_: unknown, url: string) => {
       moved(_, url);
       entry.page++;
@@ -162,7 +168,7 @@ export class Recordings {
         if (entry.page === page) entry.listening = false;
         return;
       }
-      if (!Array.isArray(notes)) return;
+      if (!Array.isArray(notes) || !entry.recording.current) return;
       this.take(tab, notes);
       // Asking again is what starts the watching in a page, so it mustn't happen once it's over.
       if (entry.page !== page || entry.ended) return;
@@ -189,7 +195,8 @@ export class Recordings {
   }
 
   async stop(cut: RecordingState["cut"] = null): Promise<void> {
-    if (!this.isRecording || this.stopping) return;
+    const { session } = this;
+    if (!this.isRecording || this.stopping || !session) return;
     this.stopping = true;
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
@@ -202,9 +209,10 @@ export class Recordings {
           tab.listenInPage(finishWatching).catch(() => []),
           new Promise((resolve) => setTimeout(() => resolve([]), FINISH_MS)),
         ]);
-        this.take(tab, Array.isArray(left) ? left : []);
+        if (session.current) this.take(tab, Array.isArray(left) ? left : []);
       }),
     );
+    if (!session.current) return;
     this.watched.clear();
     this.current = null;
     this.stopping = false;
@@ -222,7 +230,8 @@ export class Recordings {
 
   // Also for the review tab closing: going away from it doesn't leave the trail lying around.
   discard(): void {
-    this.drafting++;
+    this.recordings.end();
+    this.stopping = false;
     if (this.isRecording) {
       if (this.timer) clearTimeout(this.timer);
       this.timer = null;
@@ -245,7 +254,7 @@ export class Recordings {
     if (this.status !== "review") return { ok: false, error: "There’s nothing here to write up." };
     const { steps } = this.trail;
     if (steps.length === 0) return { ok: false, error: "There’s nothing left to write up." };
-    const attempt = ++this.drafting;
+    const { session } = this;
     this.status = "drafting";
     this.error = null;
     this.publish();
@@ -257,7 +266,7 @@ export class Recordings {
       } catch (error) {
         // It's all still here, and they can try again. The reason is printed rather than shown, as it can be long.
         console.error("Failed to write up a recording:", error);
-        if (attempt === this.drafting) {
+        if (session?.current) {
           this.status = "review";
           this.error = "I couldn’t reach the model. Nothing was saved, so you can try again.";
           this.publish();
@@ -265,13 +274,13 @@ export class Recordings {
         return { ok: false, error: this.error ?? "" };
       }
     }
-    if (attempt !== this.drafting) return { ok: false, error: "" };
+    if (!session?.current) return { ok: false, error: "" };
     this.discard();
     return { ok: true, draft };
   }
 
   destroy(): void {
-    this.drafting++;
+    this.recordings.end();
     if (this.timer) clearTimeout(this.timer);
     this.watched.clear();
   }

@@ -66,7 +66,6 @@ export const paramsOver = {
   "src/main/remoteJobs/RunnerJobs.ts": 5,
   "src/main/tabs/Tab.ts": 5,
   "src/main/tabs/WebPage.ts": 5,
-  "src/main/window/Window.ts": 10,
   "src/main/window/WindowMenus.ts": 5,
   "src/main/tools/askFirst.test.ts": 5,
   "src/main/cloud/cloudBrowser.ts": 5,

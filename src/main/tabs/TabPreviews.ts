@@ -5,6 +5,7 @@ import { TAB_PREVIEW, tabPreviewRect } from "../window/floatingPlaces";
 import type { Layout } from "../window/Layout";
 import { Tab } from "./Tab";
 import type { Rect, TabPreviewRequest, ThemeState } from "../../shared/ipc";
+import { Latest } from "../../shared/lateWork";
 
 // The card's picture at twice its width, 16:10 and cut from the top of the page.
 const PICTURE_WIDTH = TAB_PREVIEW.width * 2;
@@ -32,8 +33,7 @@ export class TabPreviews {
   readonly chromeView: ChromeView = createChromeView("preview");
   private readonly pictures = new Map<string, string>();
   // The capture running for each tab, so a slow one can't land over a newer one.
-  private readonly taking = new Map<string, number>();
-  private takes = 0;
+  private readonly taking = new Latest<string>();
   private bounds: Rect | null = null;
   // What the card was last asked for, while it shows.
   private shown: TabPreviewRequest | null = null;
@@ -53,11 +53,10 @@ export class TabPreviews {
   // Keeps how the tab looks now. As the user leaves a tab, it's started before the tab is hidden and never waited for,
   // so it doesn't hold up the switch.
   async keep(tab: Tab): Promise<void> {
-    const take = ++this.takes;
-    this.taking.set(tab.id, take);
+    const take = this.taking.next(tab.id);
     const picture = await tab.picture(PICTURE_WIDTH, PICTURE_CUT).catch(() => null);
-    if (this.taking.get(tab.id) !== take) return;
-    this.taking.delete(tab.id);
+    if (!take.current) return;
+    this.taking.end(tab.id);
     // Closed while it was on its way.
     if (this.deps.tab(tab.id) !== tab || !picture) return;
     this.pictures.set(tab.id, `data:image/jpeg;base64,${picture.toString("base64")}`);
@@ -65,7 +64,7 @@ export class TabPreviews {
 
   forget(tabId: string): void {
     this.pictures.delete(tabId);
-    this.taking.delete(tabId);
+    this.taking.end(tabId);
     if (this.shown?.tabId === tabId) this.hide();
   }
 

@@ -1,5 +1,6 @@
 import type { NativeImage, WebContents, WebFrameMain } from "electron";
 import type { Tab } from "./Tab";
+import { Latest, type Turn } from "../../shared/lateWork";
 
 // An id of our own, away from the page's world (0) and Electron's low numbers.
 const AGENT_WORLD = 1000;
@@ -57,14 +58,17 @@ export class TabPage {
   // The user has been handed this tab. Everything Berry does to a page goes through these methods, so a call already
   // on its way when that happened stops here, rather than clicking or reading in the middle of their sign-in.
   private _heldForUser = false;
-  holdsStarted = 0;
+  private readonly holds = new Latest();
+  // Ends when the tab is next handed to the user, so work that took a while can tell one started meanwhile, even if it
+  // has been given back since.
+  sinceHeld: Turn = this.holds.next();
 
   get heldForUser(): boolean {
     return this._heldForUser;
   }
 
   set heldForUser(held: boolean) {
-    if (held && !this._heldForUser) this.holdsStarted++;
+    if (held && !this._heldForUser) this.sinceHeld = this.holds.next();
     this._heldForUser = held;
     if (held) this.tab.actor.held();
   }

@@ -1,5 +1,6 @@
 import { siteOf } from "../tools/browserTools";
 import type { Tab } from "../tabs/Tab";
+import type { CdpTab } from "../tools/CdpTab";
 import type { MascotProfile, UsedPage } from "../../shared/library";
 import { BERRY, permissionsInWords, siteAllowed } from "../../shared/mascots";
 import type { TabChoice } from "../../shared/attachments";
@@ -156,6 +157,16 @@ export class Jobs extends Map<string, Job> {
         favicon: tab.favicon,
         problem: this.tabProblem(tab, chatId, mascot),
       }));
+  }
+
+  // Who has a tab a reply used, here or in the cloud: the user while it's handed to them, the user too once they've taken
+  // it back or if the job can't reach it, whatever the job did there earlier, and otherwise the job. A page in the cloud
+  // is never sent with a message or attached, so only its own count there.
+  holderOf(chatId: string, tab: Tab | CdpTab, withPage: boolean): "held" | "yours" | "job" {
+    const job = this.get(chatId);
+    if (this.handoffs.handedOver.has(tab.id) || ("heldForUser" in tab && tab.heldForUser)) return "held";
+    if (job?.takenOver.has(tab.id) || !(withPage || job?.own.has(tab.id) || job?.attached.has(tab.id))) return "yours";
+    return "job";
   }
 
   // The chat whose running reply opened this tab and still has it. The sidebar shows it there, not with the user's tabs.

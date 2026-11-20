@@ -21,7 +21,9 @@ const fileIn = () => join(mkdtempSync(join(tmpdir(), "blueberry-ai-key-")), "ai-
 const start = (answer: "works" | "refused" | "unreachable" = "works", file = fileIn()) => {
   const changes = vi.fn();
   const tries = vi.fn(async () => answer);
-  return { store: new AiKey(file, changes, tries), changes, tries, file };
+  const store = new AiKey(file, tries);
+  store.onChange(changes);
+  return { store, changes, tries, file };
 };
 
 // No run of five characters from the key: the last four are all that may go to a renderer.
@@ -41,7 +43,7 @@ describe("AiKey", () => {
     expect(changes).toHaveBeenCalledOnce();
     expect(store.inUse).toEqual({ service: "openai", key: KEY });
     expect(readFileSync(file, "utf8")).not.toContain(KEY);
-    expect(new AiKey(file, () => {}).inUse).toEqual({ service: "openai", key: KEY });
+    expect(new AiKey(file).inUse).toEqual({ service: "openai", key: KEY });
   });
 
   it.each(["refused", "unreachable"] as const)("says a key the service %s and keeps nothing", async (answer) => {
@@ -86,16 +88,39 @@ describe("AiKey", () => {
     expect(existsSync(file)).toBe(false);
 
     let answer: (outcome: "works") => void = () => {};
-    const slow = new AiKey(
-      fileIn(),
-      () => {},
-      () => new Promise((resolve) => (answer = resolve)),
-    );
+    const slow = new AiKey(fileIn(), () => new Promise((resolve) => (answer = resolve)));
     const trying = slow.try("openai", KEY);
     slow.remove();
     answer("works");
-    expect((await trying).state).toEqual({ service: null, last4: null });
+    expect(await trying).toEqual({ outcome: "overtaken", state: { service: null, last4: null } });
     expect(slow.inUse).toBeNull();
+  });
+
+  it("keeps the newest try's key when an older one answers last, and says the older one was overtaken", async () => {
+    const answers: ((outcome: "works") => void)[] = [];
+    const file = fileIn();
+    const store = new AiKey(file, () => new Promise((resolve) => answers.push(resolve)));
+    const changes = vi.fn();
+    const stop = store.onChange(changes);
+    const NEWER = `${KEY.slice(0, -4)}9z9Z`;
+    const older = store.try("openai", KEY);
+    const newer = store.try("openai", NEWER);
+    answers[1]?.("works");
+    expect((await newer).outcome).toBe("works");
+    answers[0]?.("works");
+    expect(await older).toEqual({ outcome: "overtaken", state: { service: "openai", last4: "9z9Z" } });
+    expect(new AiKey(file).inUse?.key).toBe(NEWER);
+    expect(changes).toHaveBeenCalledOnce();
+    stop();
+    store.remove();
+    expect(changes).toHaveBeenCalledOnce();
+
+    // The newest submission wins even when it isn't a key, so the slow one before it keeps nothing.
+    const slow = store.try("openai", KEY);
+    expect((await store.try("openai", "not a key")).outcome).toBe("not-a-key");
+    answers[2]?.("works");
+    expect((await slow).outcome).toBe("overtaken");
+    expect(store.inUse).toBeNull();
   });
 });
 

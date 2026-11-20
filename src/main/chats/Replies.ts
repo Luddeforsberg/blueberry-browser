@@ -8,6 +8,7 @@ import { BERRY, narrowSites } from "../../shared/mascots";
 import { publicApproval, type Approvals } from "./Approvals";
 import type { ChatTitles } from "./chatTitles";
 import type { ChatParts, Run, TaskProgress, TaskResult } from "./chatTypes";
+import { endedRun, newRun } from "./run";
 import type { Handoffs } from "./Handoffs";
 import type { JobMemory } from "./jobMemory";
 import type { Jobs } from "./Jobs";
@@ -158,7 +159,10 @@ export class Replies {
     if (run.cloud) this.cloud?.release(chatId);
     // Deleted while replying, so there's nowhere to save it.
     if (this.runs.get(chatId) !== run) return;
-    this.finished.set(chatId, { run, endedAt: Date.now() });
+    const error = this.errors.get(chatId) ?? null;
+    const outcome = signal.aborted ? "stopped" : error ? "failed" : "done";
+    const ended = endedRun(run, outcome);
+    this.finished.set(chatId, ended);
     this.runs.delete(chatId);
     const pages = this.jobs.closeJobTabs(chatId, run);
     this.publishWorkingTabs();
@@ -175,18 +179,19 @@ export class Replies {
         took: Date.now() - run.startedAt,
       });
     }
-    const error = this.errors.get(chatId) ?? null;
     // Finished while the user was somewhere else, so the sidebar shows it as done until they open it.
     if (!signal.aborted && this.browser.chatInFront && !this.browser.chatInFront(chatId)) this.store.setSeen(chatId, false);
-    run.onEnd?.({ reply: run.partial, steps, outcome: run.controller.signal.aborted ? "stopped" : error ? "failed" : "done", error });
+    run.onEnd?.({ reply: run.partial, steps, outcome, error });
     this.notify(chatId);
-    if (run.partial && !this.errors.has(chatId)) void this.titles.nameChat(chatId);
+    if (run.partial && !error) void this.titles.nameChat(chatId);
     // Another app wrote what this chat started with, so none of it is what the user said about themselves.
     if (this.store.chat(chatId)?.from) return;
-    this.jobMemory.offerToRemember(chatId, run, this.errors.has(chatId), {
+    // An offer is only wanted while this is still the chat's last reply. Its summary says so, so nothing waiting on the
+    // model holds on to the run.
+    this.jobMemory.offerToRemember(chatId, run, error !== null, {
       said: this.jobMemory.userWords(chatId),
       routine: null,
-      stillWanted: () => this.finished.get(chatId)?.run === run,
+      stillWanted: () => this.finished.get(chatId) === ended,
     });
   }
 
@@ -249,19 +254,7 @@ export class Replies {
   ): Promise<TaskResult> {
     let tokens = 0;
     const mascot = this.mascotOf(mascotId);
-    const run: Run = {
-      controller: new AbortController(),
-      partial: "",
-      statusLine: null,
-      steps: [],
-      said: [],
-      breakBeforeText: false,
-      approval: null,
-      tabs: new Set(),
-      used: new Set(),
-      sites: new Set(),
-      startedAt: Date.now(),
-      withPage: false,
+    const run: Run = newRun({
       // A routine's own sites can only narrow what its mascot may do.
       mascot: { ...mascot, sites: narrowSites(mascot.sites, sites) },
       onChange: () =>
@@ -273,13 +266,9 @@ export class Replies {
           memoryIds: run.memoryIds,
         }),
       earlierSites: new Set(),
-      memoryIds: [],
-      memoryNote: "",
-      answers: [],
-      handedOver: false,
       cloud,
       userPresent: false,
-    };
+    });
     this.runs.set(id, run);
     this.jobs.taskPopups.set(id, new Set());
     let error: string | null = null;

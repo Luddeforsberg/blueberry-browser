@@ -270,9 +270,9 @@ export class Tab implements PageTarget {
   async picture(width: number, cut?: number): Promise<Buffer | null> {
     const view = this.web.existingView;
     if (!view || !this.canBePictured) return null;
-    const { holdsStarted } = this.page;
+    const { sinceHeld } = this.page;
     const image = await this.page.fromPage(() => view.webContents.capturePage()).catch(() => null);
-    if (!image || image.isEmpty() || !this.canBePictured || holdsStarted !== this.page.holdsStarted) return null;
+    if (!image || image.isEmpty() || !this.canBePictured || !sinceHeld.current) return null;
     const size = image.getSize();
     const top = cut
       ? image.crop({
