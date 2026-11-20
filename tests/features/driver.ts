@@ -72,6 +72,9 @@ export async function driveFeature(feature: Feature, stateName: string, look: Lo
         BLUEBERRY_DRIVE_HOSTS: site.hostRules,
       },
       preload: [join(__dirname, "driveFakes.cjs")],
+      // A scale of 1 whatever the screen, so pictures are the same size. On a Mac the screen's scale is read before
+      // driveFakes.cjs could set it.
+      args: ["--force-device-scale-factor=1"],
     });
     // A state that can't be reached fails in seconds, not at the end of the test's time.
     app.context().setDefaultTimeout(STEP_TIMEOUT_MS);

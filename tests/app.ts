@@ -67,7 +67,8 @@ const killApp = (app: ElectronApplication) => {
 // Pass a profile folder to launch again with the same saved settings.
 // Tests skip onboarding unless they ask for a first launch, and start with only Berry unless they ask for the starters.
 // They have no model unless they pass one, and a .env file can't change that: it never overrides these.
-// `preload` adds scripts for the main process to load first, as tests/features/driveFakes.cjs is for `drive`.
+// `preload` adds scripts for the main process to load first, as tests/features/driveFakes.cjs is for `drive`, and `args`
+// adds switches for Chromium that have to be there from the start.
 export async function launchApp(
   userDataDir = mkdtempSync(join(tmpdir(), "blueberry-test-")),
   {
@@ -75,7 +76,8 @@ export async function launchApp(
     starters = false,
     modelEnv = {},
     preload = [],
-  }: { firstLaunch?: boolean; starters?: boolean; modelEnv?: Record<string, string>; preload?: string[] } = {},
+    args = [],
+  }: { firstLaunch?: boolean; starters?: boolean; modelEnv?: Record<string, string>; preload?: string[]; args?: string[] } = {},
 ): Promise<ElectronApplication> {
   const settingsFile = join(userDataDir, "settings.json");
   if (!firstLaunch && !existsSync(settingsFile)) {
@@ -118,6 +120,7 @@ export async function launchApp(
         join(__dirname, "fakeProtocol.cjs"),
         ".",
         `--user-data-dir=${userDataDir}`,
+        ...args,
       ],
       env,
       timeout: LAUNCH_TIMEOUT_MS,
