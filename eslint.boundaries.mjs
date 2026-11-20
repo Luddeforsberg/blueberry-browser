@@ -330,7 +330,7 @@ const rules = [
     ["cloud/CloudTabs.ts"],
     "The cloud's key and live view go to the chrome only, never to a tool or a chat.",
   ),
-  // Calls no import rule sees: who may take a page's pixels, or get past a tab held for the user.
+  // Calls no import rule sees: who may take a page's pixels, get past a tab held for the user, or read the clipboard.
   calledOnlyFrom("capturePage", ["tabs/Tab.ts", "tabs/TabPage.ts"], "A page's pixels are taken in Tab alone."),
   calledOnlyFrom(
     "picture",
@@ -342,6 +342,12 @@ const rules = [
     ["tabs", "phone/codeEntry.ts"],
     "Nothing gets past the hold on a tab handed to the user but a code from the phone, typed by codeEntry.ts.",
   ),
+  {
+    in: [...main("desktop"), ...["App", "Box", "Drop", "Panel", "Sheets"].map((part) => `src/renderer/chrome/src/Desktop${part}.tsx`)],
+    syntax:
+      "MemberExpression[property.name=/^(clipboard|desktopCapturer)$/], ImportSpecifier[imported.name=/^(clipboard|desktopCapturer)$/]",
+    message: "The mascot on the desktop never reads the screen, the clipboard or another app.",
+  },
   onlyFrom(
     "the parts of RunnerJobs",
     file("CloudSharing", "RunnerDiscovery", "RunnerPolls", "runnerJobsFile", "runnerTypes", "runnerJobsTesting"),
