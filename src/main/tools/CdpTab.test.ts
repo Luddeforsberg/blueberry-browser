@@ -201,7 +201,9 @@ describe.skipIf(!findChrome())("a page in a browser over CDP", () => {
   it("answers a smooth scroll where it ends, even one that starts late, and at once where the page can't go", async () => {
     const long = await cloud.open("job", "cloud-8", `${origin}/long`, { onChange: () => {} });
     await long.settled();
-    // Where it answered, where it came to rest, and whether it answered at once, timed in the page.
+    // Where it answered, where it came to rest, and whether it answered at once, timed in the page. Where the system
+    // turns smooth scrolling off, as on some CI runners, a scroll that moves is instant too, so only one that can't go is
+    // held to answering at once.
     const scroll = async (direction: "up" | "down", page = long, first = "") => {
       const { top, ms } = await page.runInPage<{ top: number; ms: number }>(
         `${first}(async (started) => ({ ...(await ${scrollPage(direction, true)}), ms: performance.now() - started }))(performance.now())`,
@@ -211,10 +213,10 @@ describe.skipIf(!findChrome())("a page in a browser over CDP", () => {
     // Busy for 200ms just after the call, as a page still loading can be, so the scroll hasn't started 120ms in.
     const late = await scroll("down", long, "setTimeout(() => { const end = performance.now() + 200; while (performance.now() < end); });");
     expect(late.top).toBeGreaterThan(0);
-    expect(late).toEqual({ top: late.settled, settled: late.settled, quick: false });
+    expect(late.top).toBe(late.settled);
     const normal = await scroll("down");
     expect(normal.top).toBeGreaterThan(late.top);
-    expect(normal).toEqual({ top: normal.settled, settled: normal.settled, quick: false });
+    expect(normal.top).toBe(normal.settled);
     // Already at the bottom, already at the top, and a page too short to scroll.
     await long.runInPage("scrollTo(0, document.documentElement.scrollHeight)");
     const bottom = await scroll("down");
