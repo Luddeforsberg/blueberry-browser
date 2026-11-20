@@ -1,6 +1,7 @@
 import type { CDPSession, Frame, Page } from "playwright-core";
 import type { TabLoadError, TabTrouble } from "../../shared/ipc";
 import type { AgentInput, PageFrame, PageTarget } from "./pageTarget";
+import type { Outcome } from "./pageInput";
 import { CdpInput } from "./cdpInput";
 import { CdpNavigationLimits } from "./cdpNavigationLimits";
 import { CdpScreencast } from "./cdpScreencast";
@@ -318,10 +319,18 @@ export class CdpTab implements PageTarget {
     }
   }
 
-  async agentGoBack(): Promise<void> {
+  // Turned down if the browser says no, and unknown if it hasn't answered in time, since it may still go.
+  async agentGoBack(): Promise<Outcome> {
     const back = this.history.entries[this.history.index - 1];
-    if (!back) throw new Error("There's no earlier page");
-    await this.fromPage(() => this.session.send("Page.navigateToHistoryEntry", { entryId: back.id }));
+    if (!back || this.closed || this._trouble) return "refused";
+    const sent = this.session.send("Page.navigateToHistoryEntry", { entryId: back.id }).then(
+      () => "confirmed" as const,
+      (error: unknown) => {
+        console.error("The browser didn't go back:", error);
+        return "refused" as const;
+      },
+    );
+    return withTimeout(sent, PAGE_ANSWER_MS, "late").catch(() => "unknown" as const);
   }
 
   async settled(): Promise<void> {

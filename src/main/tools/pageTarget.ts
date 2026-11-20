@@ -1,10 +1,11 @@
 import type { TabLoadError, TabTrouble } from "../../shared/ipc";
 import type { PageActor } from "./PageActor";
+import type { Outcome } from "./pageInput";
 
 // What Berry's tools need from a tab, and nothing more. `Tab` is the Electron one, and `CdpTab` is a page in a browser
 // reached over the Chrome DevTools Protocol, such as one in the cloud. Types only, so the tools load in plain Node.
-// Anything that acts resolves once the browser has taken it and rejects if it didn't, so a tool never reports what was
-// turned down. Whether the page then got it is `Outcome` in `pageInput.ts`.
+// Anything that acts says how it went, never hiding that the browser turned it down: it rejects, or answers the action's
+// `Outcome` (`pageInput.ts`) where an answer that never came has to be told apart from a no.
 
 // A frame from another origin. Its scripts run in its own page's world, so nothing it says about itself is believed.
 export interface PageFrame {
@@ -47,7 +48,7 @@ export interface PageTarget {
 
   loadURL(url: string): Promise<void>;
   // Berry going back, which leaves the tab the job's. Anything else going back is the user.
-  agentGoBack(): Promise<void>;
+  agentGoBack(): Promise<Outcome>;
   // Waits for whatever an action started to load, within reason.
   settled(): Promise<void>;
   // For as long as `act` runs, the page can't take this tab anywhere `allows` says no to. Says which addresses it stopped.

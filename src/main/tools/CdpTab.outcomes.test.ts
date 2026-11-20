@@ -22,14 +22,33 @@ const PAGES: Record<string, string> = {
   addEventListener("keydown", (event) => event.stopImmediatePropagation(), true);
   document.getElementById("search").addEventListener("submit", (event) => { event.preventDefault(); globalThis.sent++; });
 </script>`,
-  // An editor that always keeps what it started with, whatever is typed over it.
+  // Two forms that save in place, counting each.
+  "/forms": `<!doctype html><title>Forms</title>
+<form id="search"><input aria-label="Query"><button>Go</button></form>
+<form id="other"><input id="elsewhere" aria-label="Elsewhere"><button>Send</button></form>
+<script>
+  globalThis.sent = { search: 0, other: 0 };
+  for (const form of document.forms) form.addEventListener("submit", (event) => { event.preventDefault(); globalThis.sent[form.id]++; });
+</script>`,
+  // An editor that always keeps what it started with, one that drops blank lines, and one that keeps what it's given.
   "/editor": `<!doctype html><title>Notes</title>
 <div id="notes" contenteditable="true" role="textbox" aria-label="Notes">Old note</div>
+<div id="tight" contenteditable="true" role="textbox" aria-label="Tight" style="white-space: pre-wrap"></div>
+<div contenteditable="true" role="textbox" aria-label="Plain"></div>
 <script>
   globalThis.enters = 0;
   const notes = document.getElementById("notes");
   notes.addEventListener("keydown", (event) => { if (event.key === "Enter") globalThis.enters++; });
   notes.addEventListener("input", () => { if (!notes.innerText.startsWith("Old note")) notes.innerText = "Old note " + notes.innerText; });
+  const tight = document.getElementById("tight");
+  tight.addEventListener("input", () => { if (/\\n\\n/.test(tight.innerText)) tight.innerText = tight.innerText.replace(/\\n\\n+/g, "\\n"); });
+</script>`,
+  // Runs away from the pointer once it arrives, counting each time anything hovers it.
+  "/shy": `<!doctype html><title>Shy</title><button id="shy" style="margin: 100px">Shy</button>
+<script>
+  globalThis.hovers = 0;
+  const shy = document.getElementById("shy");
+  shy.addEventListener("mouseenter", () => { globalThis.hovers++; shy.style.marginLeft = "600px"; });
 </script>`,
   "/rows": `<!doctype html><title>Feed</title><button>Keep</button><div id="feed"></div>
 <script>
@@ -104,12 +123,38 @@ describe.skipIf(!findChrome())("what Berry knows of what it did, over CDP", () =
     expect(await tab.runInPage("document.querySelector('input').value")).toBe("berries");
   }, 10_000);
 
+  it("stops a real Enter the page sends to another form on its way, and presses the named field's instead", async () => {
+    await goTo("/forms");
+    const ref = await refOf("Query");
+    const send = tab.sendAgentInput.bind(tab);
+    const spy = vi.spyOn(tab, "sendAgentInput").mockImplementation(async (event) => {
+      if (event.type === "keyDown") await tab.page.evaluate("document.getElementById('elsewhere').focus()");
+      return send(event);
+    });
+    try {
+      expect(await tool("type_text").run({ ref, text: "berries", submit: true })).toMatch(/^Done\./);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(await tab.page.evaluate("globalThis.sent")).toEqual({ search: 1, other: 0 });
+  }, 10_000);
+
   it("says a field didn't take it when the editor keeps what it had, and submits nothing", async () => {
     await goTo("/editor");
     const ref = await refOf("Notes");
     expect(await tool("type_text").run({ ref, text: "New note", submit: true })).toMatch(/holds something other than that text/);
     expect(await tool("type_text").run({ ref, text: "" })).toMatch(/holds something other than that text/);
     expect(await tab.page.evaluate("globalThis.enters")).toBe(0);
+    const twoParagraphs = "First\n\nSecond";
+    expect(await tool("type_text").run({ ref: await refOf("Tight"), text: twoParagraphs })).toMatch(/holds something other/);
+    expect(await tool("type_text").run({ ref: await refOf("Plain"), text: twoParagraphs })).toMatch(/^Done\./);
+    expect(await tool("type_text").run({ ref: await refOf("Plain"), text: "One\nTwo" })).toMatch(/^Done\./);
+  });
+
+  it("doesn't hover again by script after a real hover the page moved away from", async () => {
+    await goTo("/shy");
+    expect(await tool("hover").run({ ref: await refOf("Shy") })).toMatch(/isn't over it now/);
+    expect(await tab.page.evaluate("globalThis.hovers")).toBe(1);
   });
 
   it("lets go of rows the page threw away, and keeps a ref for one that's still there", async () => {

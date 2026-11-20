@@ -3,6 +3,7 @@ import type { Layout, TabLoadError, TabTrouble } from "../../shared/ipc";
 import { PageActor, type ActorOptions } from "../tools/PageActor";
 import type { SavedWebTab } from "./Session";
 import type { PageTarget } from "../tools/pageTarget";
+import type { Outcome } from "../tools/pageInput";
 import { NavigationLimits } from "./NavigationLimits";
 import { TabPage } from "./TabPage";
 import { WebPage } from "./WebPage";
@@ -128,9 +129,10 @@ export class Tab implements PageTarget {
     this.web.goBack(false);
   }
   // The window's history goes back at once or not at all, so there's nothing to wait for.
-  async agentGoBack(): Promise<void> {
-    if (!this.canGoBack) throw new Error("There's no earlier page");
+  async agentGoBack(): Promise<Outcome> {
+    if (!this.canGoBack) return "refused";
     this.web.goBack(true);
+    return "confirmed";
   }
   goForward(): void {
     this.web.goForward();

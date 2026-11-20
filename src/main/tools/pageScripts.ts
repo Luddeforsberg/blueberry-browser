@@ -36,9 +36,12 @@ export const watchPress = (ref: string, { x, y }: { x: number; y: number }, pres
 // Ends the watch `watchPress` set, however the press went, and no other.
 export const endWatch = (id: string): string => inPage(page.endWatch, { id });
 
-// False until the key `aimKey` set up for arrives, then true. A new page has no record, so null means the key took the
-// page somewhere.
+// False until the key `aimKey` or `aimKeyAt` set up for arrives, then true, or "missed" if it was stopped on its way
+// somewhere else. A new page has no record, so null means the key took the page somewhere.
 export const keyLanded = inPage(page.keyLanded, undefined);
+
+// Ends the watch for a key that never came.
+export const endKeyWatch = inPage(page.endKeyWatch, undefined);
 
 // What became of the press the watch `id` was set for, ending that watch once it's known, or "ended" if it ended first.
 export const pressLanded = (id: string): string => inPage(page.pressLanded, { id });
@@ -57,6 +60,10 @@ export const planDrag = (ref: string, toRef: string): string => inPage(page.plan
 
 // Where a key would go, and set up to notice that it did.
 export const aimKey = inPage(page.aimKey, undefined);
+
+// Set up for a key that goes only to this element, if the focus is on it, and is stopped anywhere else. False if the
+// focus is elsewhere, null if the element has gone.
+export const aimKeyAt = (ref: string): string => inPage(page.aimKeyAt, { ref });
 
 export const typeIntoElement = (ref: string, text: string): string => inPage(page.typeIntoElement, { ref, text });
 

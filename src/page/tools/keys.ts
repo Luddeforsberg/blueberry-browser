@@ -15,10 +15,16 @@ export interface FocusInfo {
 const focusInside = (el: AnyElement | null): Element | null | undefined =>
   el?.shadowRoot?.activeElement || (el && isFrame(el) ? el.contentDocument?.activeElement : null);
 
-// Where a key would go, and set up to notice that it did.
-export const aimKey = (): FocusInfo => {
+// Where a real key would go now.
+const focused = (): AnyElement | null => {
   let at: AnyElement | null = document.activeElement;
   for (let inner = focusInside(at); inner; inner = focusInside(at)) at = inner;
+  return at;
+};
+
+// Where a key would go, and set up to notice that it did.
+export const aimKey = (): FocusInfo => {
+  const at = focused();
   if (isFrame(at)) return { role: null, name: null, foreignFrame: true };
   expectKey(at?.ownerDocument.defaultView ?? window);
   if (!at || at === at.ownerDocument.body || at === at.ownerDocument.documentElement)
@@ -26,25 +32,40 @@ export const aimKey = (): FocusInfo => {
   return { role: roleOf(at), name: nameOf(at), foreignFrame: false };
 };
 
-// False until the key `aimKey` set up for arrives, then true. A new page has no record, so null means the key took
-// the page somewhere.
-export const keyLanded = (): boolean | null => state.keyed ?? null;
+// Set up for a key that goes only to this element, if the focus is on it. Anywhere else, a real key wouldn't reach it.
+export const aimKeyAt = ({ ref }: { ref: string }): boolean | null =>
+  withElement(ref, (el) => {
+    if (focused() !== el) return false;
+    expectKey(el.ownerDocument.defaultView ?? window, el);
+    return true;
+  });
+
+// False until the key `aimKey` or `aimKeyAt` set up for arrives, then true, or "missed" if it was stopped on its way
+// somewhere else. A new page has no record, so null means the key took the page somewhere.
+export const keyLanded = (): boolean | "missed" | null => state.keyed ?? null;
+
+export const endKeyWatch = (): void => state.stopKeyWatch?.();
 
 const NOT_A_FIELD: (string | undefined)[] = ["checkbox", "radio", "button", "submit", "reset", "image", "file"];
 
-// Text as a rich editor shows it: a new line may come back as a block, which reads as one or more, a space as one that
-// doesn't break, an empty line held open by a character with no width, and an empty editor as a single line break.
+// Text as a rich editor shows it: a space may come back as one that doesn't break, an empty line held open by a
+// character with no width, and the end with a line break or two.
 const asShown = (text: string): string =>
   text
     .replace(/\r\n?/g, "\n")
     .replace(/\u00a0/g, " ")
     .replace(/[\u200b\ufeff]/g, "")
-    .replace(/\n+/g, "\n")
-    .replace(/\n$/, "");
+    .replace(/\n+$/, "");
 
-// Whether the field holds exactly what was typed, and nothing it had before.
-const holds = (el: PageElement, text: string): boolean =>
-  el.isContentEditable ? asShown(el.innerText) === asShown(text) : el.value === text;
+// Whether the field holds exactly what was typed, and nothing it had before. In a rich editor each new line may come
+// back as a block, which reads as one line break or two, but never fewer.
+const holds = (el: PageElement, text: string): boolean => {
+  if (!el.isContentEditable) return el.value === text;
+  const lines = asShown(text)
+    .split("\n")
+    .map((line) => line.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  return new RegExp(`^${lines.join("\n\n?")}$`).test(asShown(el.innerText));
+};
 
 export const typeIntoElement = ({ ref, text }: { ref: string; text: string }): string | null =>
   withElement(ref, (el) => {

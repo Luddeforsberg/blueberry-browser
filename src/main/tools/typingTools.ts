@@ -1,7 +1,9 @@
 import { z } from "zod";
 import {
   aimKey,
+  aimKeyAt,
   beginTyping,
+  endKeyWatch,
   finishTyping,
   hasFocus,
   keyLanded,
@@ -26,15 +28,17 @@ export const typingTools = <T extends PageTarget>(context: ToolContext<T>) => {
     context;
 
   // A real Enter where it can reach, which also submits a form the way a person's does. Only into the field the card
-  // named: if the focus has moved, or real keys can't get there, this goes to that field by script instead. The script
-  // is chosen before anything is sent, never after a real Enter that may have arrived, which would submit twice.
+  // named: if the focus isn't on it, this goes to that field by script instead, and a real one the page sends somewhere
+  // else on its way is stopped there. The script never follows a real Enter that may have arrived, which would submit
+  // twice.
   const pressEnter = async (tab: T, ref: string): Promise<Outcome> => {
-    if (!frameOf(tab, ref) && (await tab.runInPage<boolean | null>(hasFocus(ref)))) {
-      const focus = await tab.runInPage<FocusInfo>(aimKey);
-      if (!focus.foreignFrame) {
+    if (!frameOf(tab, ref) && (await tab.runInPage<boolean | null>(aimKeyAt(ref)))) {
+      try {
         await pressKey(tab, "Enter", false);
-        const outcome = outcomeOf(await landed(() => tab.runInPage<boolean | null>(keyLanded)));
+        const outcome = outcomeOf(await landed(() => tab.runInPage<boolean | "missed" | null>(keyLanded)));
         if (outcome !== "refused") return outcome;
+      } finally {
+        await tab.runInPage(endKeyWatch).catch(() => {});
       }
     }
     return (await onRef<string>(tab, ref, scriptedEnter)) === null ? "refused" : "confirmed";

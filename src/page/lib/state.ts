@@ -10,8 +10,10 @@ export interface ToolState {
   // False until the input arrives, then true, "missed" for a press that was stopped, or "cut" for one that reached
   // the element before the rest of the click was stopped.
   landed?: boolean | "missed" | "cut";
-  // False until a key arrives, then true. Apart from `landed`, so a key never answers for a click.
-  keyed?: boolean;
+  // False until a key arrives, then true, or "missed" for one aimed at an element that was stopped elsewhere. Apart from
+  // `landed`, so a key never answers for a click.
+  keyed?: boolean | "missed";
+  stopKeyWatch?: (() => void) | null;
   stopWatching?: (() => void) | null;
   // The id of the watch on, which whoever set it ends with.
   watch?: string | null;
