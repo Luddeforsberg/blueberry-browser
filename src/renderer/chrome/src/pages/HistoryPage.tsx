@@ -105,7 +105,8 @@ export const HistoryPage: React.FC = () => {
   const isBerry = useAssistantName() === "Berry";
   const [query, setQuery] = useState("");
   const [entries, setEntries] = useState<HistoryEntry[] | null>(null);
-  const [next, setNext] = useState<HistoryCursor | null>(null);
+  // Where the next page starts, for the words whose page said so: once they change, there's no more of them to show.
+  const [next, setNext] = useState<{ query: string; cursor: HistoryCursor } | null>(null);
   const [failed, setFailed] = useState(false);
 
   // Only the newest read counts: a search for words since changed, or Show more pressed again, never lands.
@@ -117,7 +118,7 @@ export const HistoryPage: React.FC = () => {
         const page = await browser.searchHistory({ query: text, before: before ?? undefined });
         if (!turn.current) return;
         setEntries((shown) => (before ? [...(shown ?? []), ...page.entries] : page.entries));
-        setNext(page.next);
+        setNext(page.next ? { query: text, cursor: page.next } : null);
         setFailed(false);
       } catch (error) {
         if (!turn.current) return;
@@ -206,9 +207,9 @@ export const HistoryPage: React.FC = () => {
         </SettingsGroup>
       ))}
 
-      {next && (
+      {next?.query === query && (
         <div className="mt-5 flex justify-center">
-          <Button variant="raised" onClick={() => void load(query, next)}>
+          <Button variant="raised" onClick={() => void load(next.query, next.cursor)}>
             Show more
           </Button>
         </div>

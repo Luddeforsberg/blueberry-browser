@@ -1,4 +1,4 @@
-import { OneAtATime } from "@shared/lateWork";
+import { Latest, OneAtATime, type Turn } from "@shared/lateWork";
 import { ATTACHMENT_WORDS, MAX_FILE_BYTES, MAX_FILES, type FileChip } from "@shared/attachments";
 
 // The files in one prompt box, owned here from the moment one is asked for until main has let go of it. Main decides
@@ -24,12 +24,14 @@ const refused = (name: string, problem: string): FileChip => ({
   problem,
 });
 
-// Adds go one at a time, so each counts what the one before it kept, and one that comes back after the box has gone is
-// let go of at once.
+// Adds go one at a time, so each counts what the one before it kept. Each belongs to the box as it was when it was
+// asked for: one still waiting its turn after that box has gone never starts, and one that comes back after it is let
+// go of at once, even if the box is there again by then.
 export class FileStaging {
   private chips: FileChip[] = [];
   private readonly adds = new OneAtATime();
-  private open = true;
+  private readonly boxes = new Latest();
+  private box: Turn = this.boxes.next();
 
   constructor(
     private readonly calls: StagingCalls,
@@ -46,13 +48,13 @@ export class FileStaging {
   }
 
   choose(): Promise<void> {
-    return this.adds.run(async () => this.take(await this.calls.chooseFiles(this.kept())));
+    return this.add(async () => this.calls.chooseFiles(this.kept()));
   }
 
   // Only the bytes go, never a path, and only of the files there's room for, no more of each than it takes to say it's
   // too big. The rest are refused by their size and count alone, so a hundred files dropped read five.
   drop(list: readonly Dropped[]): Promise<void> {
-    return this.adds.run(async () => {
+    return this.add(async () => {
       let room = MAX_FILES - this.kept().length;
       const read = await Promise.all(
         list.map(async (file) => {
@@ -71,7 +73,7 @@ export class FileStaging {
       const answered = readable.length > 0 ? await this.calls.addFiles(readable, this.kept()) : [];
       // Main answers each file in the order it was given, so the chips stay in the order they were dropped.
       let next = 0;
-      this.take(read.map((one) => ("bytes" in one ? (answered[next++] ?? refused(one.name, ATTACHMENT_WORDS.unreadable)) : one)));
+      return read.map((one) => ("bytes" in one ? (answered[next++] ?? refused(one.name, ATTACHMENT_WORDS.unreadable)) : one));
     });
   }
 
@@ -93,22 +95,24 @@ export class FileStaging {
 
   // The box is there, again after StrictMode takes it away to check.
   start(): void {
-    this.open = true;
+    if (!this.box.current) this.box = this.boxes.next();
   }
 
   // The box has gone, so everything main keeps for it is let go of, now and as any add still out comes back.
   close(): void {
-    this.open = false;
+    this.boxes.end();
     this.discard(this.chips);
     this.chips = [];
   }
 
-  private take(chips: FileChip[]): void {
-    if (!this.open) {
-      this.discard(chips);
-      return;
-    }
-    if (chips.length > 0) this.set([...this.chips, ...chips]);
+  private add(work: () => Promise<FileChip[]>): Promise<void> {
+    const box = this.box;
+    return this.adds.run(async () => {
+      if (!box.current) return;
+      const chips = await work();
+      if (!box.current) this.discard(chips);
+      else if (chips.length > 0) this.set([...this.chips, ...chips]);
+    });
   }
 
   private discard(chips: readonly FileChip[]): void {

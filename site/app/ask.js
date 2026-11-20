@@ -24,11 +24,11 @@ export const decide = async (entry, allow, answer, said) => {
   if (deciding.has(ask.approval_id) || state.answered.has(ask.approval_id)) return null;
   deciding.add(ask.approval_id);
   try {
-    const written = await api.rpc("decide_cloud_approval", { p_approval: ask.approval_id, p_allow: allow, p_answer: answer });
+    const written = await api.asAccount().rpc("decide_cloud_approval", { p_approval: ask.approval_id, p_allow: allow, p_answer: answer });
     state.answered.add(ask.approval_id);
     return { words: written ? said : "That was already answered." };
   } catch (error) {
-    return problemWords(error);
+    return error instanceof api.AccountGone ? null : problemWords(error);
   } finally {
     deciding.delete(ask.approval_id);
   }

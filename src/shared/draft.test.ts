@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { leftAfterSend } from "./promptSend";
+import { leftAfterSend } from "./draft";
 
 describe("what stays in a prompt box once its message is taken", () => {
   it("is nothing when it's what was sent", () => {

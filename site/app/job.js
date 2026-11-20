@@ -1,4 +1,4 @@
-import { followUpHistory, mascotSnapshot } from "../shared.js";
+import { followUpHistory, leftAfterSend, mascotSnapshot } from "../shared.js";
 import * as api from "./api.js";
 import { decide, hold, openAsk } from "./ask.js";
 import { drawMascot, copyButton, el, grow, icon, patch, pips, replyText, stepPips, stopSquare, submitsOnce } from "./dom.js";
@@ -30,8 +30,6 @@ import {
 // and at the bottom either who's working with Stop, or the box to go on.
 
 const LATEST_STEPS = 8;
-// Whose earlier steps are showing while it goes.
-const allSteps = new Set();
 
 const back = (label = "Back to home", href = "#") => el("a", { className: "round", href, ariaLabel: label, dataKey: "back" }, icon("back"));
 
@@ -58,7 +56,7 @@ const trail = (job, conversationId) => {
   // The step it's on is the live line, which says what it's waiting for if it is.
   const live = steps.at(-1) && !steps.at(-1).done ? steps.at(-1) : null;
   const done = live ? steps.slice(0, -1) : steps;
-  const open = allSteps.has(job.id);
+  const open = state.allSteps.has(job.id);
   const shown = open ? done : done.slice(-LATEST_STEPS);
   const hidden = done.length - shown.length;
   return [
@@ -70,7 +68,7 @@ const trail = (job, conversationId) => {
             className: "fold",
             dataKey: `more-${job.id}`,
             onclick: () => {
-              allSteps.add(job.id);
+              state.allSteps.add(job.id);
               hooks.show();
             },
           },
@@ -242,8 +240,10 @@ const followUp = (conversationId, job) => {
     el("div", { className: "box" }, el("span", { className: "who lone" }, drawMascot(mascot, "rest", 28, { named: false })), box, send),
   );
   submitsOnce(form, async () => {
-    const prompt = box.value.trim();
+    const written = box.value;
+    const prompt = written.trim();
     if (!prompt) return box.focus();
+    const as = api.asAccount();
     problem.replaceChildren();
     send.disabled = true;
     // As the conversation is now, not as it was when this was drawn: a poll doesn't draw over what's typed.
@@ -253,9 +253,9 @@ const followUp = (conversationId, job) => {
       // Only as a mascot the phone still has, with its limits as they are now.
       const sender = senderOf(latest);
       if (!sender) return "gone";
-      const last = await api.jobWithHistory(latest.id);
+      const last = await as.jobWithHistory(latest.id);
       if (!last) throw new api.ApiError(404);
-      await api.rpc("start_cloud_job", {
+      await as.rpc("start_cloud_job", {
         p_prompt: prompt,
         p_history: followUpHistory(last),
         p_mascot: mascotSnapshot(sender),
@@ -285,11 +285,15 @@ const followUp = (conversationId, job) => {
         send.disabled = false;
         return;
       }
-      state.drafts.delete(conversationId);
-      box.value = "";
-      box.blur();
+      box.value = leftAfterSend(box.value, written);
+      if (box.value) state.drafts.set(conversationId, box.value);
+      else {
+        state.drafts.delete(conversationId);
+        box.blur();
+      }
       await hooks.load();
     } catch (error) {
+      if (error instanceof api.AccountGone) return;
       problem.replaceChildren(el("p", { className: "problem", role: "alert", textContent: problemWords(error) }));
       send.disabled = false;
     }
@@ -310,8 +314,9 @@ const working = (job) => {
     button.disabled = true;
     try {
       // False when it had already ended, which the read below shows.
-      if ((await api.rpc("stop_cloud_job", { p_job: job.id })) === true) saying(`Stopping ${mascot.name}.`);
+      if ((await api.asAccount().rpc("stop_cloud_job", { p_job: job.id })) === true) saying(`Stopping ${mascot.name}.`);
     } catch (error) {
+      if (error instanceof api.AccountGone) return;
       state.problem = problemWords(error);
       button.disabled = false;
     }
@@ -402,7 +407,7 @@ export const mountJob = (app, id) => {
       JSON.stringify([
         found.jobs,
         [...state.unfolded],
-        [...allSteps].includes(job.id),
+        [...state.allSteps].includes(job.id),
         state.said,
         state.problem,
         state.mascots.map((one) => one.id),

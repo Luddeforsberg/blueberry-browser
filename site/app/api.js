@@ -185,3 +185,24 @@ export const mascots = async () =>
   );
 
 export const runner = async () => listOf(await rpc("my_cloud_runner"))[0] ?? null;
+
+// Work done for the account signed in now that sends something, or reads and then sends: each call refuses to start once
+// someone else is signed in, or nobody is, and its answer is dropped then too, so nothing read for one account is sent as
+// another, and nothing that comes back for one is kept for the next. What's doing the work stops quietly on `AccountGone`.
+export class AccountGone extends ApiError {
+  constructor() {
+    super(401, "The account changed while it was on its way");
+  }
+}
+export const asAccount = () => {
+  const turn = account;
+  const within =
+    (call) =>
+    async (...args) => {
+      if (!turn.current) throw new AccountGone();
+      const answer = await call(...args);
+      if (!turn.current) throw new AccountGone();
+      return answer;
+    };
+  return { rpc: within(rpc), jobWithHistory: within(jobWithHistory), still: () => turn.current };
+};

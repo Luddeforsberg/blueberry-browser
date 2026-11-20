@@ -14,8 +14,9 @@ const storage = () => {
   };
 };
 const local = storage();
+const visit = storage();
 vi.stubGlobal("localStorage", local);
-vi.stubGlobal("sessionStorage", storage());
+vi.stubGlobal("sessionStorage", visit);
 const ALICE = {
   accessToken: "alice",
   refreshToken: "r-alice",
@@ -43,6 +44,7 @@ const api = (await import(/* @vite-ignore */ new URL("../../site/app/api.js", im
   signIn: (email: string, password: string) => Promise<void>;
   signedIn: () => { email: string } | null;
   accountTurn: () => Turn;
+  asAccount: () => { rpc: (name: string) => Promise<unknown>; jobWithHistory: (id: string) => Promise<unknown> };
 };
 const phone = (await import(/* @vite-ignore */ new URL("../../site/app/state.js", import.meta.url).href)) as {
   state: {
@@ -57,7 +59,10 @@ const phone = (await import(/* @vite-ignore */ new URL("../../site/app/state.js"
 const job = (id: string, status = "done") => ({ id, status, conversation_id: id, created_at: "2026-11-20T10:00:00Z" });
 const json = (body: unknown) => new Response(JSON.stringify(body));
 
-// Signed in as Alice, until the last test lets her session run out.
+const signInAnswer = (name: string) =>
+  json({ access_token: name, refresh_token: `r-${name}`, expires_in: 3600, user: { id: `u-${name}`, email: `${name}@example.com` } });
+
+// Signed in as Alice, until a test near the end lets her session run out.
 describe("the phone page's account", () => {
   afterAll(() => vi.unstubAllGlobals());
   beforeEach(() => {
@@ -93,6 +98,7 @@ describe("the phone page's account", () => {
     Object.assign(phone.state, { jobs: [job("alice-job")], linked: true, mascotsShared: "2026-11-20" });
     phone.state.drafts.set("", "Alice's unsent words");
     phone.state.answered.add("alice-approval");
+    visit.setItem("blueberry.mascot", "m-alices-own");
     const polling = api.accountTurn();
 
     answer = async () => new Response(JSON.stringify({ message: "JWT expired" }), { status: 401 });
@@ -102,14 +108,28 @@ describe("the phone page's account", () => {
     expect(phone.state).toMatchObject({ jobs: null, linked: null, mascotsShared: null });
     expect(phone.state.drafts.size).toBe(0);
     expect(phone.state.answered.size).toBe(0);
+    expect(visit.getItem("blueberry.mascot")).toBeNull();
 
     // Bob signs in on the same page, and his first poll is still out: nothing of Alice's is there to draw meanwhile.
-    answer = async () =>
-      json({ access_token: "bob", refresh_token: "r-bob", expires_in: 3600, user: { id: "u-bob", email: "bob@example.com" } });
+    answer = async () => signInAnswer("bob");
     await api.signIn("bob@example.com", "password");
     expect(api.signedIn()).toMatchObject({ email: "bob@example.com" });
     expect(phone.state.jobs).toBeNull();
     expect(phone.state.drafts.size).toBe(0);
     expect(api.accountTurn().current).toBe(true);
+  });
+
+  it("sends nothing of a follow-up read for one account once another has signed in", async () => {
+    let history: (body: Response) => void = () => {};
+    answer = (url) => (url.includes("/auth/") ? Promise.resolve(signInAnswer("carol")) : new Promise((resolve) => (history = resolve)));
+    const bobs = api.asAccount();
+    const reading = bobs.jobWithHistory("bob-job");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await api.signIn("carol@example.com", "password");
+    history(json([{ id: "bob-job", history: [] }]));
+
+    await expect(reading).rejects.toMatchObject({ status: 401 });
+    await expect(bobs.rpc("start_cloud_job")).rejects.toMatchObject({ status: 401 });
+    expect(asked.filter((path) => path.includes("start_cloud_job"))).toEqual([]);
   });
 });

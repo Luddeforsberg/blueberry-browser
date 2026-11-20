@@ -311,6 +311,12 @@ var oneAtATime = (work) => {
 };
 var runnerLinkDue = (checkedAt, now) => checkedAt === null || now - checkedAt >= RUNNER_LINK_EVERY_MS;
 
+// src/shared/draft.ts
+var leftAfterSend = (now, sent) => {
+  if (now === sent) return "";
+  return now.startsWith(sent) ? now.slice(sent.length).trimStart() : now;
+};
+
 // src/renderer/chrome/src/siteNames.ts
 var siteParts = (text) => {
   const parts = [];
@@ -390,6 +396,7 @@ export {
   finishedWhen,
   followUpHistory,
   isUuid,
+  leftAfterSend,
   mascotSnapshot,
   mascotsFromSharedRows,
   oneAtATime,

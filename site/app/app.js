@@ -1,4 +1,4 @@
-import { mascotsFromSharedRows, oneAtATime, runnerLinkDue } from "../shared.js";
+import { Latest, mascotsFromSharedRows, oneAtATime, runnerLinkDue } from "../shared.js";
 import * as api from "./api.js";
 import { refreshAsk } from "./ask.js";
 import { mountHome } from "./home.js";
@@ -26,13 +26,17 @@ const POLL_MS = 3_000;
 // now and then.
 let linkCheckedAt = null;
 
+// Only the newest read counts: a poll still out when a refresh comes back newer never draws over it.
+const reads = new Latest();
 const load = async () => {
   const asked = api.accountTurn();
+  const read = reads.next();
+  const current = () => asked.current && read.current;
   try {
     const askLink = state.linked === null || runnerLinkDue(linkCheckedAt, Date.now());
     const [jobs, shared, linked] = await Promise.all([api.jobs(), api.mascots(), askLink ? api.runner() : Promise.resolve(undefined)]);
-    // Someone signed out or in while it was asking, so none of this is theirs.
-    if (!asked.current) return;
+    // Someone signed out or in while it was asking, so none of this is theirs, or a newer read has started since.
+    if (!current()) return;
     // A new question takes the place of whatever was said about the last one.
     const asking = jobs.flatMap((job) => (job.ask ? [job.ask.approval_id] : []));
     if (asking.some((id) => !(state.jobs ?? []).some((known) => known.ask?.approval_id === id))) state.said = null;
@@ -49,7 +53,7 @@ const load = async () => {
     }
     state.problem = null;
   } catch (error) {
-    if (asked.current) state.problem = problemWords(error);
+    if (current()) state.problem = problemWords(error);
   }
 };
 

@@ -7,7 +7,8 @@ import { useAddMenu } from "./useAddMenu";
 import { useAttachments, type Attached, type JobPlace } from "../useAttachments";
 import { BERRY } from "@shared/mascots";
 import { Composer } from "./Composer";
-import { leftAfterSend, useSendOnce } from "./promptSend";
+import { leftAfterSend } from "@shared/draft";
+import { useSendOnce } from "./promptSend";
 
 // A composer that sends on Enter, for both chats.
 export const ChatComposer: React.FC<{

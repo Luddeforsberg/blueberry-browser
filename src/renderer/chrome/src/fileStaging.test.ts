@@ -84,15 +84,19 @@ describe("the files in a prompt box", () => {
     expect(staging.files.filter(({ problem }) => problem === ATTACHMENT_WORDS.tooMany)).toHaveLength(1);
   });
 
-  it("lets go of what an add brings back after the box has gone", async () => {
+  it("lets go of what an add brings back after its box has gone, even with the box there again, and never starts one queued", async () => {
     const server = main();
     const staging = new FileStaging(server.calls, () => {});
     const choosing = staging.choose();
+    const queued = staging.choose();
     await settle();
     staging.close();
+    staging.start();
     server.answers.shift()?.();
     await choosing;
+    await queued;
 
+    expect(server.answers).toHaveLength(0);
     expect(staging.files).toEqual([]);
     expect(server.kept.size).toBe(0);
     expect(server.calls.discard.mock.calls.map(([id]) => id)).toEqual(["f1", "f2", "f3"]);

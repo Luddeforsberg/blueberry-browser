@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import type { TabInfo, Visit } from "@shared/ipc";
 import type { MascotProfile, NeedsYouItem, Suggestion } from "@shared/library";
@@ -32,6 +32,7 @@ import { setGalleryView } from "../galleryView";
 import { galleryParam } from "@shared/galleryPlaces";
 import { openSettings } from "../openSettings";
 import { useMascotSwitch } from "./useMascotSwitch";
+import { leftAfterSend } from "@shared/draft";
 import { useSendOnce } from "../components/promptSend";
 import { useFromMain } from "@common/lib/latest";
 
@@ -158,6 +159,8 @@ const WaitingRow: React.FC<{ item: NeedsYouItem }> = ({ item }) => {
 
 export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
   const [text, setText] = useState("");
+  const typed = useRef(text);
+  typed.current = text;
   // Saved cards, at once. New ones arrive when they're written, and the page never waits for them.
   const [suggestions, setSuggestions] = useFromMain<Suggestion[]>(
     [],
@@ -247,9 +250,10 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     }
   };
 
-  // One at a time, so Enter twice starts one chat.
+  // One at a time, so Enter twice starts one chat. The chat opens in a tab of its own, and this one closes unless something
+  // was written or added here while it was on its way.
   const sendOnce = useSendOnce();
-  const ask = (message: string) => {
+  const ask = (message: string, written: string) => {
     const inBox = box.contents();
     sendOnce(async () => {
       if (filled?.suggestionId) void window.chromeAPI.suggestions.used(filled.suggestionId);
@@ -261,9 +265,12 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         ...box.sendable(),
       });
       if (!chat) return;
+      const left = leftAfterSend(typed.current, written);
+      const added = box.contents().some((id) => !inBox.includes(id));
+      setText(left);
       box.letGo(inBox);
       await browser.openPage("chat", { param: chat.id, title: chat.title });
-      await browser.closeTab(tab.id);
+      if (!left && !added) await browser.closeTab(tab.id);
     });
   };
 
@@ -272,7 +279,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
   const submit = (alwaysAsk: boolean) => {
     const message = text.trim();
     if (!message) return;
-    if (alwaysAsk || !box.empty || !looksLikeUrl(message)) ask(message);
+    if (alwaysAsk || !box.empty || !looksLikeUrl(message)) ask(message, text);
     else void browser.navigateTab(tab.id, toUrl(message));
   };
 

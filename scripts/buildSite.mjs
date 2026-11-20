@@ -37,8 +37,9 @@ const shared = await build({
       `export { conversationsOf, mascotsFromSharedRows, followUpHistory, mascotSnapshot } from "./src/shared/phone";`,
       // How it calls the server: a deadline on every call, one poll at a time, and how often to ask about the link.
       `export { fetchWithin, oneAtATime, runnerLinkDue } from "./src/shared/phoneCalls";`,
-      // Work that finishes later: whose answer still counts, and one at a time.
+      // Work that finishes later: whose answer still counts, one at a time, and what stays in a box once it has sent.
       `export { Latest, OneAtATime } from "./src/shared/lateWork";`,
+      `export { leftAfterSend } from "./src/shared/draft";`,
       `export { asContinuation, withSiteNames } from "./src/renderer/chrome/src/siteNames";`,
       // Times written the one way the app writes them.
       `export { finishedWhen, rowTime } from "./src/renderer/chrome/src/shortWords";`,
