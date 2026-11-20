@@ -958,6 +958,23 @@ A mascot on the edge of the screen while you're in other apps: it shows what the
 - **What it can't do:** it doesn't read the screen, the clipboard, selected text or anything in another app, and needs no Screen Recording or Accessibility permission. A job from here is exactly a new chat with no page, and an answer here is exactly the answer on Needs you.
 - **Needing Blueberry open:** the jobs live in the window. Closing it stops what's running, so the drop and the shortcut go with it. Hide Blueberry hides only the window while this is on.
 
+### The public site
+
+`site/index.html`, the front page, for people who don't have Blueberry yet, often arriving from a mascot's link. It's a web page, not the window: one column on `ground`, at most 1080px, with 16px gutters on a phone and 32px from 720px, Geist and Geist Mono served from the site, and light or dark from the system, as `site/theme.js` does.
+
+- **What it says in one screen:** an AI browser where mascots do jobs for you, in tabs behind yours, showing every step and asking before anything that matters. And, truthfully, that it isn't out for download yet, as a pill on `tray`, since `sheet-2` vanishes on the ground.
+- **Type.** The headline is the one size past the window's scale: 48px medium, tight (−0.025em), and 32px on a phone. The lede is 17px in `ink-2`, a section's title 22px semibold, a part's title 17px semibold, and body 15px or 14.5px. Mono only for what a mascot is doing, times and counts, as everywhere.
+- **The product, then three parts.** Under the words, one picture of the window: the sidebar's Tabs with a job's group and its tab behind a dotted line, the dock, the toolbar, and a chat on its sheet with the working line, its steps, a line in Berry's voice and the prompt box. Then three parts of the app, each a picture on a sheet with `rim` and a title and two lines under it: real work as Chats lists it (Needs you, Working, Done), a mascot for each kind of work as the menu that chooses one shows them, and the approval card. Then Berry and five starters, one of each berry, then Getting it.
+- **Real work, in examples from the Gallery.** The jobs and mascots are the starters' own: replying to email, a brief before a call, what competitors changed, people for a role. Their descriptions are the catalogue's, and what each may do is `permissionsInWords`'s, word for word.
+- **Pictures of the app, never mockups.** Every picture is made of the window's own parts, and its words come from the app: steps as main writes them, a card's sentence as `approvalWords` writes it, its reason from `REASON_WORDS`. Nothing is pictured that the app doesn't do or this document doesn't draw.
+- **A picture is never a control.** It's built `inert` and `aria-hidden`, takes no pointer, and has no hover or focus. The words beside it say what it shows, and the window's has a caption saying it's a picture of the app. A button in a picture is drawn, not made.
+- **Nothing loops.** The pips in a picture hold one frame, a third of the way in, since no work is happening. The mascots don't move.
+- **A part sits on what it sits on in the window.** What lives on the ground in the app, such as the sidebar's rows, is pictured on `ground` with `rim`, so an active row's sheet still stands out. What lives on a sheet is on `sheet`.
+- **On a phone** the window's picture keeps only the chat on its sheet, without the sidebar or toolbar, and the three parts stack.
+- **What it loads:** only the site's own files, as modules and stylesheets, with no inline script or style. Its content security policy is `default-src 'none'` with `script-src`, `style-src` and `font-src 'self'`. The mascots come from `site/homePoses.js`, which `pnpm run site:build` writes with only the poses the page draws, since every pose carries every berry's body.
+
+The mascot pages at `site/m/` still have the old look, from `site/style.css`, and are to be redrawn on these rules.
+
 ## 11. Not redrawn yet
 
 These aren't drawn. Until one is, it works as it does today, which [the old document](./docs/design/DESIGN-bloom.md) describes under the same headings. When it's redrawn, anything about it may change, not only its look.
@@ -969,7 +986,7 @@ These aren't drawn. Until one is, it works as it does today, which [the old docu
 - The cloud tab
 - A chat on the runner
 - Site permissions
-- The public site
+- A mascot's public page, at `site/m/`
 
 **To redraw one:** design what would be best, from the parts in sections 3 to 9, look at it in the running app in light and dark, write its section here in the same PR, and delete it from the old document. Don't copy the old look or the old flow to match its neighbours.
 

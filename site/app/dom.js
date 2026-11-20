@@ -1,25 +1,12 @@
+import { drawPose, el, pips } from "../draw.js";
 import { POSES } from "./poses.js";
 import { STEP_PIPS } from "./pips.js";
 
-// Building the page. Everything from the server goes in as text: the one piece of markup is our own drawing of a
-// mascot, from poses.js, chosen by keys checked against the poses we have.
+// Building the page, with ../draw.js. The mascots are drawn from poses.js, every accessory in every mood the page shows.
+
+export { el, pips };
 
 const SVG = "http://www.w3.org/2000/svg";
-
-export const el = (tag, props = {}, ...children) => {
-  const node = document.createElement(tag);
-  for (const [key, value] of Object.entries(props)) {
-    if (value === undefined || value === null) continue;
-    if (key.startsWith("aria") || key.startsWith("data"))
-      node.setAttribute(
-        key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`),
-        value,
-      );
-    else node[key] = value;
-  }
-  node.append(...children.flat().filter((child) => child !== null && child !== false && child !== undefined));
-  return node;
-};
 
 const svg = (tag, attrs = {}, ...children) => {
   const node = document.createElementNS(SVG, tag);
@@ -68,30 +55,8 @@ export const icon = (name, className = "") =>
 // The square inside Stop.
 export const stopSquare = () => el("i", { className: "stop-square", ariaHidden: "true" });
 
-const MOOD_WORDS = { rest: "at rest", fetching: "working", asking: "waiting for you", delivered: "finished", oops: "something went wrong" };
-
-let drawn = 0;
-// A mascot in one mood, always the whole drawing, at one of the sizes app.css has. Each gets gradient ids of its own, so
-// one hidden drawing can't take the others' colour. `named` is false where its name is written beside it already.
-export const drawMascot = (mascot, mood, size, { named = true } = {}) => {
-  const poses = POSES[mascot.look.accessory] ?? POSES.none;
-  const holder = el("span", { className: `mascot s${size}` });
-  const own = `b${++drawn}`;
-  holder.innerHTML = (poses[mood] ?? poses.rest).replace(/«[^»]*»/g, (id) => `${own}${id.length}`);
-  const drawing = holder.querySelector("svg");
-  drawing.dataset.mascot = mascot.look.palette;
-  if (named) drawing.setAttribute("aria-label", `${mascot.name}, ${MOOD_WORDS[mood] ?? "at rest"}`);
-  else {
-    drawing.removeAttribute("role");
-    drawing.removeAttribute("aria-label");
-    drawing.setAttribute("aria-hidden", "true");
-  }
-  return holder;
-};
-
-// The pips (DESIGN.md section 6), from pips.css, which comes from the app's own. Always beside words that say the same.
-export const pips = (pattern, className = "") =>
-  el("span", { className: `pips ${className}`.trim(), dataPips: pattern, ariaHidden: "true" }, ...Array.from({ length: 9 }, () => el("i")));
+// A mascot in one mood, at one of the sizes app.css has.
+export const drawMascot = (mascot, mood, size, options) => drawPose(POSES, mascot, mood, size, options);
 
 // Which pips a step has. Its kind comes from the server, so anything but a kind there is takes the plain ones.
 export const stepPips = (step) => STEP_PIPS[typeof step?.kind === "string" && Object.hasOwn(STEP_PIPS, step.kind) ? step.kind : "plain"];

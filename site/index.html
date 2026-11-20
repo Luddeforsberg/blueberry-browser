@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src https:; base-uri 'none'; form-action 'none'"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src https:; base-uri 'none'; form-action 'none'"
     />
     <meta name="referrer" content="no-referrer" />
     <title>Blueberry</title>
@@ -22,50 +22,77 @@
     <meta name="twitter:title" content="Blueberry" />
     <meta name="twitter:description" content="An AI browser that works on your behalf, with a mascot for each job you repeat." />
     <meta name="twitter:image" content="https://blueberry-browser.netlify.app/share.png" />
+    <link rel="preload" href="./fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="./tokens.css" />
     <link rel="stylesheet" href="./mascots.css" />
-    <link rel="stylesheet" href="./style.css" />
+    <link rel="stylesheet" href="./app/pips.css" />
+    <link rel="stylesheet" href="./picture.css" />
+    <link rel="stylesheet" href="./home.css" />
     <script type="module" src="./home.js"></script>
   </head>
   <body>
-    <header class="top"><a class="wordmark" href="/">Blueberry</a></header>
+    <header class="top">
+      <a class="wordmark" href="/"><span id="mark"></span>Blueberry</a>
+    </header>
     <main>
-      <div class="intro">
-        <h1>An AI browser that works on your behalf</h1>
-        <p class="lede">Gather mascots for the jobs you repeat. Blueberry notices what you do and offers to take it over.</p>
-      </div>
-      <ul class="mascots" id="mascots" aria-label="Some of the mascots"></ul>
-      <ul class="points">
+      <section class="hero">
+        <h1>An AI browser with mascots that do the jobs for you</h1>
+        <p class="lede">
+          Ask in plain words. A mascot works in tabs behind yours, shows you every step, and asks before anything that matters.
+        </p>
+        <p class="soon">
+          <span class="pill">Not out for download yet</span>Sent a mascot’s link? It shows what that mascot is told, word for word.
+        </p>
+      </section>
+
+      <figure class="shot">
+        <div id="window"></div>
+        <figcaption>Berry replying to an email for you, in a tab of its own. A picture of the app.</figcaption>
+      </figure>
+
+      <ul class="parts">
         <li>
-          <strong>Make a mascot.</strong>
-          <span
-            >Give it a name, a look, its own instructions, and limits on which sites it may visit and whether it may click or type.</span
-          >
+          <div class="part-pic" id="work"></div>
+          <h2>It does real work for you</h2>
+          <p>
+            Reply to the emails waiting on you, get briefed before a call, or hear what competitors changed. Hand over the job and come back
+            to it done.
+          </p>
         </li>
         <li>
-          <strong>It asks first.</strong>
-          <span
-            >Anything that would change something waits on a card that says exactly what will happen, and nothing goes until you say
-            yes.</span
-          >
+          <div class="part-pic" id="specialists"></div>
+          <h2>A specialist for each kind of work</h2>
+          <p>
+            Make a mascot for a job you repeat, with its own instructions and limits on what it may do. Or start from ones made for sales,
+            recruiting and research.
+          </p>
         </li>
         <li>
-          <strong>It works behind you.</strong>
-          <span>The tabs a mascot opens stay behind yours. Watch it work, or click in and take over.</span>
-        </li>
-        <li>
-          <strong>Share a mascot.</strong>
-          <span
-            >Publish one to the Gallery and send its link. Anyone can read what it’s told, word for word, before adding their own
-            copy.</span
-          >
+          <div class="part-pic" id="asks"></div>
+          <h2>It asks before anything goes out</h2>
+          <p>
+            It writes the reply, then stops before Send on a card with the exact words. Nothing is sent, paid for or deleted until you allow
+            it.
+          </p>
         </li>
       </ul>
-      <section>
+
+      <section class="team">
+        <div class="say">
+          <h2>Berry, and mascots made for real work</h2>
+          <p>
+            Each has its own instructions, and limits on which sites it visits and whether it may click or type, which only ever take away.
+            Start from these, or make your own.
+          </p>
+        </div>
+        <ul class="mascots" id="mascots" aria-label="Berry and some of the mascots that come with Blueberry"></ul>
+      </section>
+
+      <section class="getting">
         <h2>Getting it</h2>
-        <p class="muted">
+        <p>
           Blueberry isn’t out for download yet. If someone sent you a mascot’s link, that page shows everything it would be told and allowed
-          to do.
+          to do, word for word.
         </p>
       </section>
     </main>
