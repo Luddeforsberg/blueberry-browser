@@ -49,16 +49,20 @@ export const RecordingPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
           ? watching && "Nothing yet. Scrolling and looking around don’t leave steps."
           : `${steps.length === 1 ? "One step" : `${steps.length} steps`} on ${[...new Set(steps.map(({ site }) => site))].join(", ")}. None of it has left this computer, and none of it is saved.`}
       </PageHeader>
-      <RecordingNotice inPage className="mx-3 mb-6" />
+      <RecordingNotice inPage className="mx-3 mt-4" />
       {cut && (
-        <p className="mx-3 mb-4 text-14 text-ask">
+        <p className="mx-3 mt-4 text-14 text-ask">
           {cut === "full"
             ? "That’s as much as can be kept in one go, so recording stopped there."
             : "It’s been half an hour, so recording stopped by itself."}
         </p>
       )}
 
-      {!empty && <TrailNotes steps={steps} onRemove={status === "review" ? (id) => void api().removeStep(id) : undefined} />}
+      {!empty && (
+        <div className="mt-6">
+          <TrailNotes steps={steps} onRemove={status === "review" ? (id) => void api().removeStep(id) : undefined} />
+        </div>
+      )}
       {(failed || error) && (
         <div className="mx-3 mt-4">
           <ChatError message={failed || error || ""} />

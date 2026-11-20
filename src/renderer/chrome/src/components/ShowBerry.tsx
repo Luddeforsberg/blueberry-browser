@@ -9,6 +9,7 @@ import { cn } from "@common/lib/utils";
 import { useShell } from "../contexts/useShell";
 import { useAssistantName } from "./useAssistantName";
 import { Favicon } from "./Favicon";
+import { siteIcon } from "./siteIcon";
 import { Tooltip } from "@common/components/Tooltip";
 import { NARROW_PAGE, useRecording } from "./useRecording";
 
@@ -142,7 +143,7 @@ export const TrailNotes: React.FC<{ steps: TrailStep[]; onRemove?: ((id: string)
       {groups.map(({ site, steps: notes }, group) => (
         <section key={group} aria-label={`On ${site}`} className="mt-6 first:mt-0">
           <h2 className="mb-1.5 px-2 flex items-center gap-2 text-13 font-medium">
-            <Favicon site={site} />
+            <Favicon src={siteIcon(`https://${site}`)} site={site} />
             <span className="min-w-0 truncate">{site}</span>
           </h2>
           <ol className="flex flex-col">
