@@ -8,6 +8,7 @@ import { NavigationLimits } from "./NavigationLimits";
 import { TabPage } from "./TabPage";
 import { WebPage } from "./WebPage";
 import { WorkingStyle } from "./WorkingStyle";
+import { drawnWhereParked } from "../tools/pageScripts";
 
 export { TAB_WEB_PREFERENCES } from "./WebPage";
 
@@ -22,8 +23,8 @@ export interface TabEvents {
   onDetails: () => void;
   // The tab has a view for the window to place.
   onView: (tab: Tab) => void;
-  // It's no longer drawn behind the user, so it needs placing again.
-  onStoppedLeaving: () => void;
+  // It's drawn behind the user's, or no longer is, so it needs placing again.
+  onPlacingChanged: () => void;
   // The user clicked or typed in the page, or went back or forward in it. Berry's own input doesn't count.
   onUserInput: () => void;
   // What the mascot on this page looks like and may do, read each time so a setting reaches it straight away.
@@ -47,6 +48,9 @@ export class Tab implements PageTarget {
   readonly actor: PageActor;
   private _pictureScale: number | null = null;
   private leavingTimer: NodeJS.Timeout | null = null;
+  // Pictures on their way of a tab behind the user's, which is drawn for them, out of sight under the chrome.
+  private picturing = 0;
+  private closed = false;
   private readonly limits: NavigationLimits;
   private readonly style: WorkingStyle;
   private readonly page: TabPage;
@@ -225,7 +229,7 @@ export class Tab implements PageTarget {
       if (this._pictureScale !== null && !this._isVisible) {
         this.leavingTimer = setTimeout(() => {
           this.leavingTimer = null;
-          this.events.onStoppedLeaving();
+          this.events.onPlacingChanged();
         }, LEAVING_MS);
       }
     }
@@ -271,7 +275,7 @@ export class Tab implements PageTarget {
     const view = this.web.existingView;
     if (!view || !this.canBePictured) return null;
     const { sinceHeld } = this.page;
-    const image = await this.page.fromPage(() => view.webContents.capturePage()).catch(() => null);
+    const image = await this.drawnFor(() => this.page.fromPage(() => view.webContents.capturePage())).catch(() => null);
     if (!image || image.isEmpty() || !this.canBePictured || !sinceHeld.current) return null;
     const size = image.getSize();
     const top = cut
@@ -285,15 +289,30 @@ export class Tab implements PageTarget {
     return top.resize({ width, quality: "good" }).toJPEG(PICTURE_QUALITY);
   }
 
+  // A tab behind the user's that isn't drawn already is parked for the capture, and captured once the page has drawn
+  // there. Nothing moves the view while the capture is on its way: on a Mac, hiding or moving a view then can empty it.
+  private async drawnFor<T>(capture: () => Promise<T>): Promise<T> {
+    if (this._isVisible || this.isParked) return capture();
+    this.picturing++;
+    try {
+      this.events.onPlacingChanged();
+      await this.page.runInPage(drawnWhereParked());
+      return await capture();
+    } finally {
+      this.picturing--;
+      if (!this.isParked && !this.closed) this.events.onPlacingChanged();
+    }
+  }
+
   private get canBePictured(): boolean {
     return !this.page.heldForUser && !this.mayShowCode && !this.web.trouble && !this.web.loadError && !this.web.unloaded;
   }
 
   // A view that's never been shown has no width, and a hidden one doesn't draw, so pages hide their content from
-  // Berry and a screenshot comes back empty. A tab Berry is working in behind the user's stays drawn, nearly all
-  // outside the window, where it can't cover anything.
+  // Berry and a screenshot comes back empty. A tab Berry is working in behind the user's, or one being pictured, stays
+  // drawn, nearly all outside the window, where it can't cover anything.
   get isParked(): boolean {
-    return (this._berryWorking || this.isLeaving) && !this._isVisible;
+    return (this._berryWorking || this.isLeaving || this.picturing > 0) && !this._isVisible;
   }
 
   // The job has ended here, and a picture of the tab is still showing the mascot on its way out.
@@ -320,6 +339,7 @@ export class Tab implements PageTarget {
   }
 
   destroy(): void {
+    this.closed = true;
     if (this.leavingTimer) clearTimeout(this.leavingTimer);
     this.leavingTimer = null;
     this.web.close();

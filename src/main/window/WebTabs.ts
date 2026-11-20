@@ -25,7 +25,7 @@ export class WebTabs {
         // The title at this point is still the last page's, so the new page's arrives through `onDetails`.
         onNavigate: (address) => this.w.tabs.saveVisit(tabId, () => this.stores.history.record(address, "", null)),
         onUserInput: () => this.w.chats.releaseTab(tabId),
-        onStoppedLeaving: () => {
+        onPlacingChanged: () => {
           if (this.w.baseWindow.isDestroyed()) return;
           if (tab) this.w.panels.placeTab(tab, this.w.panels.layout);
           this.w.workViews.sync();

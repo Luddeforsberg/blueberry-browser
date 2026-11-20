@@ -300,9 +300,8 @@ export class TabStrip {
     this.w.tooltip.hide();
     this.w.previews.hide();
     this.w.menus.closeMenu();
-    // How the page looked as the user left it, for its card. Started before it's hidden, and not waited for.
     const leaving = this.activeTab;
-    if (leaving && tabId !== this.activeTabId) void this.w.previews.keep(leaving);
+    const left = leaving && tabId !== this.activeTabId;
     // Opening anything from Chats or a card is done with it, even the tab already in front.
     this.w.panels.closePopover(false);
     this.activeTabId = tabId;
@@ -318,6 +317,8 @@ export class TabStrip {
     this.notifyTabs();
     this.w.panels.updateAllBounds();
     this.w.desktopBerry.sync();
+    // How the page looked as the user left it, for its card, taken once it's out of sight and not waited for.
+    if (left) void this.w.previews.keep(leaving);
 
     return true;
   }
