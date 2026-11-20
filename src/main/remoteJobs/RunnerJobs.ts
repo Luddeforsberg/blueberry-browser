@@ -29,7 +29,7 @@ const NOT_SET_UP = "This copy of Blueberry has no account server, so it can't se
 const SIGN_IN = "Sign in to your Blueberry account in Settings to send jobs to the cloud.";
 const NOT_TAKEN = "The cloud didn't take the job. Try again in a moment.";
 const UNSURE =
-  "You signed in to another account before the cloud said whether it took this. If it did, it shows here once you're back on that account.";
+  "You signed out or changed accounts before the cloud said whether it took this. If it did, it shows here once you're back on that account.";
 const TOO_MANY = "Five jobs are already waiting or going in the cloud. Try again when one is done.";
 const BUSY = "This chat already has a job going in the cloud, maybe sent from your phone. Send this again once it's done.";
 const NO_SUCH_RUNNER =

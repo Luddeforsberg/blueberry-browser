@@ -7,8 +7,9 @@
 -- --- Starts sent again ---
 
 -- As before, with `p_id`, the id the sender made for this message. A job with that id already is the caller's, and is
--- given back before anything else is checked, since it was checked when it was made. Someone else's is refused. Without
--- `p_id`, as from the phone page, the server makes the id.
+-- given back before anything else is checked, since it was checked when it was made. Someone else's is refused, and so
+-- is an id that's already a conversation's, since a new conversation takes its first job's id and that would join it
+-- without its checks. Without `p_id`, as from the phone page, the server makes the id.
 drop function if exists public.start_cloud_job(text, jsonb, jsonb, text, text, uuid, uuid);
 drop function if exists public.start_cloud_job(text, jsonb, jsonb, text, text, uuid, uuid, uuid);
 create function public.start_cloud_job(
@@ -32,6 +33,9 @@ begin
     select j.owner into earlier_owner from public.cloud_jobs j where j.id = p_id;
     if earlier_owner = me then return p_id; end if;
     if earlier_owner is not null then raise exception 'Not a job of yours' using errcode = '42501'; end if;
+    if exists (select 1 from public.cloud_jobs j where j.conversation_id = p_id) then
+      raise exception 'That id is a conversation''s' using errcode = '42501';
+    end if;
   end if;
   if not exists (select 1 from public.cloud_runner_links l where l.owner = me and l.accepted) then
     raise exception 'No runner has accepted a link to this account' using errcode = 'P0001';

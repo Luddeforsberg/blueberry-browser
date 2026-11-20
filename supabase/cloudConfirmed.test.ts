@@ -82,6 +82,9 @@ describe("what the cloud only takes from an answer", () => {
     const bob = await newUser();
     await link(bob, await newUser());
     await expect(start(bob, id, randomUUID())).rejects.toThrow(/Not a job of yours/);
+    // Nor join her conversation by starting one under its id.
+    const joining = `select public.start_cloud_job('Mine now', '[]', ${MASCOT}, 'risky', null, null, null, '${conversation}')`;
+    await expect(as(bob, joining)).rejects.toThrow(/a conversation's/);
     expect(await jobs(bob)).toBe(0);
   });
 
