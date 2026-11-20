@@ -1,4 +1,4 @@
-// The import rules AGENTS.md states, as checks. Each rule says which files it holds for (`in`, minus `except`), which
+// Who may import or call what, as checks. Each rule says which files it holds for (`in`, minus `except`), which
 // imports it refuses there, and why. `types: true` refuses `import type` too, for a module whose type alone means
 // something was handed it. A regex is matched against what the import says. Static imports, `export … from` and
 // `import()` all count. Every place named here must exist, so a rename can't quietly turn a rule off.
@@ -30,7 +30,7 @@ const ELECTRON_ADAPTERS = main(
   "settings/sessionHandlers.ts",
 );
 
-// Files AGENTS.md calls pure: what they decide is plain data in, plain data out.
+// Pure files: what they decide is plain data in, plain data out, so it can be tested alone and run anywhere.
 const PURE = main(
   "remoteJobs/cloudJobs.ts",
   "desktop/desktopBerryState.ts",
@@ -41,7 +41,7 @@ const INPUT_OUTPUT =
   `${ELECTRON}|^(node:)?(fs|fs/promises|net|http|https|http2|tls|dgram|dns|child_process|worker_threads|cluster|sqlite)$` +
   "|^(dotenv|express|playwright-core|langchain)(/|$)|^@langchain/|^@modelcontextprotocol/";
 
-// `onlyFrom` guards a module AGENTS.md says nothing else may reach: it's refused everywhere in the app's main process
+// `onlyFrom` guards a module nothing else may reach: it's refused everywhere in the app's main process
 // and the runner but in the files and folders named. A guarded folder's own files reach each other with `./`, which the
 // folder's pattern doesn't see, so the folder is named among its importers to say so.
 const onlyFrom = (what, imports, allowed, says) => ({
@@ -75,7 +75,7 @@ const rules = [
   {
     in: ["src/preload"],
     imports: "^(?!electron$)",
-    message: "A sandboxed preload loads nothing but electron, so it may only `import type` from anything else (AGENTS.md Traps).",
+    message: "A sandboxed preload loads only electron, so a shared runtime import leaves the chrome with no API: `import type` only.",
   },
   {
     in: ["src/renderer"],
@@ -94,7 +94,7 @@ const rules = [
   {
     in: PURE,
     imports: INPUT_OUTPUT,
-    message: "AGENTS.md calls this file pure: no Electron, files, network, processes, databases or models.",
+    message: "This file is pure, plain data in and out: no Electron, files, network, processes, databases or models.",
   },
   {
     in: main("tools/pageTarget.ts"),
@@ -106,14 +106,14 @@ const rules = [
     in: ["src/shared/ipc.ts", "src/shared/ipc"],
     syntax:
       'Program > :not(ImportDeclaration[importKind="type"], ExportNamedDeclaration[exportKind="type"], TSInterfaceDeclaration, TSTypeAliasDeclaration)',
-    message: "The IPC contract is types only, since the sandboxed preload can't load shared runtime code (AGENTS.md Traps).",
+    message: "The IPC contract is types only, since the sandboxed preload can't load shared runtime code.",
   },
   {
     in: main("mcp"),
     except: main("mcp/mcpPages.ts"),
     imports: folder("tools"),
     types: true,
-    message: "MCP reads a page only through Berry's own tool in mcpPages.ts, on a tab that's open already (AGENTS.md).",
+    message: "MCP reads a page only through mcpPages.ts, on a tab already open: opening an address can send data, so it's a job's.",
   },
   onlyFrom(
     "the cookie code",

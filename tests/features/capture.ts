@@ -3,7 +3,7 @@ import pixelmatch from "pixelmatch";
 import { PNG } from "pngjs";
 import { defined } from "../../src/shared/testing";
 
-// A window is a stack of views (AGENTS.md, src/main), and Playwright only sees one at a time, so a picture of the
+// A window is a stack of views (docs/ARCHITECTURE.md), and Playwright only sees one at a time, so a picture of the
 // window is each visible view captured by Electron and laid over the ones beneath it, in the window's own order.
 
 // Something painted over before comparing, because it changes by itself: an element in the view whose address has

@@ -164,7 +164,7 @@ export default tseslint.config(
       "no-restricted-syntax": ["error", { selector: "ImportExpression", message: "Code that runs in a page imports nothing at run time." }],
     },
   },
-  // Who may import what: the rules AGENTS.md states, and page code only through src/main/tools/pageCode.ts.
+  // Who may import or call what, and page code only through src/main/tools/pageCode.ts.
   ...boundaries,
   // Risky things written in one place each: fetch, timers in renderers, raw controls and double casts.
   ...fenceBlocks,

@@ -40,7 +40,7 @@ const reached = Object.entries(metafile.inputs).flatMap(([file, { imports }]) =>
 if (reached.length) {
   console.error(
     `The cloud runner reaches Electron, which it can't load. Take the import out of what the runner uses, or keep it behind\n` +
-      `an adapter in window/, menus/, tabs/ or desktop/ that the runner never imports (AGENTS.md, eslint.boundaries.mjs):\n\n` +
+      `an adapter in window/, menus/, tabs/ or desktop/ that the runner never imports (eslint.boundaries.mjs):\n\n` +
       reached.map((line) => `  ${line}`).join("\n\n"),
   );
   process.exit(1);
