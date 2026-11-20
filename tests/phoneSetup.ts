@@ -1,6 +1,8 @@
-import { expect } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
+import { mkdirSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { homedir } from "node:os";
 import { extname, join } from "node:path";
 import { normalize } from "node:path/posix";
 import type { MascotProfile } from "../src/shared/library";
@@ -34,6 +36,20 @@ export const SHOP = `<!doctype html><title>Shop</title><style>body{font:16px sys
 
 // Chrome on a Mac, and on Windows Edge, which comes with it.
 export const BROWSER = process.platform === "win32" ? { channel: "msedge" } : { executablePath: CHROME };
+
+// Where the phone page's pictures go, light and dark, for looking at by eye.
+export const SHOTS = process.env.BLUEBERRY_SHOTS ?? join(homedir(), "blueberry-audit", "shots-phone");
+export const shooter = () => {
+  mkdirSync(SHOTS, { recursive: true });
+  return async (target: Page, name: string) => {
+    await target.waitForTimeout(200);
+    await target.screenshot({ path: join(SHOTS, `${name}-light.png`), fullPage: true });
+    await target.emulateMedia({ colorScheme: "dark" });
+    await target.waitForTimeout(200);
+    await target.screenshot({ path: join(SHOTS, `${name}-dark.png`), fullPage: true });
+    await target.emulateMedia({ colorScheme: "light" });
+  };
+};
 
 // The site as deployed, pointed at the fake server, which is plain http on 127.0.0.1.
 export const serveSite = async (base: string, publicKey: string) => {

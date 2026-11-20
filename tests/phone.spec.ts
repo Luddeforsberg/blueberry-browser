@@ -1,19 +1,17 @@
-import { chromium, expect, test, type Page } from "@playwright/test";
-import { existsSync, mkdirSync } from "node:fs";
+import { chromium, expect, test } from "@playwright/test";
+import { existsSync } from "node:fs";
 import type { AddressInfo } from "node:net";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import webpush from "web-push";
 import { mascotFromSnapshot, mascotSnapshot } from "../src/main/remoteJobs/cloudJobs";
 import { sharedMascotRows, followUpHistory, type ConversationJob } from "../src/shared/phone";
 import { FAKE_KEY, startFakeSupabase } from "./fakeSupabase";
-import { BROWSER, CHROME, PENNY, SCOUT, SHOP, restApi, serveSite } from "./phoneSetup";
+import { BROWSER, CHROME, PENNY, SCOUT, SHOP, SHOTS, restApi, serveSite, shooter } from "./phoneSetup";
 import { defined } from "../src/shared/testing";
 
 // The phone page, served from site/ as Netlify would, in Chrome at a phone's size, against the real migrations in
 // Postgres under the fake REST layer. The runner's side is played by its own REST calls as its own user, so every rule
 // on the way is the real one. Only the live view's page is a stand-in, since it's Browserbase's.
-const SHOTS = process.env.BLUEBERRY_SHOTS ?? join(homedir(), "blueberry-audit", "shots-phone");
 const FIRST_PROMPT = "Find the cheapest USB-C cable on shop.example and put it in my cart";
 const FIRST_REPLY = "The cheapest is a 1 m cable for 49 kr. It's in your cart.";
 const FOLLOW_UP = "Is there a 2 m one under 80 kr?";
@@ -57,15 +55,9 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
   });
   page.on("pageerror", (error) => problems.push(error.message));
 
-  mkdirSync(SHOTS, { recursive: true });
-  const shoot = async (target: Page, name: string) => {
-    await target.waitForTimeout(200);
-    await target.screenshot({ path: join(SHOTS, `${name}-light.png`), fullPage: true });
-    await target.emulateMedia({ colorScheme: "dark" });
-    await target.waitForTimeout(200);
-    await target.screenshot({ path: join(SHOTS, `${name}-dark.png`), fullPage: true });
-    await target.emulateMedia({ colorScheme: "light" });
-  };
+  const shoot = shooter();
+  // Kept with the test's results, which CI saves when it fails: this browser isn't the one Playwright traces itself.
+  await context.tracing.start({ screenshots: true, snapshots: true });
 
   try {
     // Set up as the app leaves it: the runner linked and accepted, and the mascots shared, with mascot fields only.
@@ -203,14 +195,15 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     await page.getByLabel("Follow up").fill(FOLLOW_UP);
     await shoot(page, "follow-up");
     await page.getByRole("button", { name: "Send", exact: true }).click();
+    // Sent, and then shown, so a failure says which.
+    const sentRows = () =>
+      supabase.cloudRows(`select id, conversation_id, history, mascot, status from public.cloud_jobs where prompt = '${FOLLOW_UP}'`);
+    await expect.poll(sentRows).toHaveLength(1);
     await expect(page.locator(".bubble")).toHaveText([FIRST_PROMPT, FOLLOW_UP]);
     const [before] = await supabase.cloudRows(
       `select id, conversation_id, created_at::text, history, prompt, reply, steps from public.cloud_jobs where id = '${first}'`,
     );
-    const [second] = await supabase.cloudRows(
-      `select id, conversation_id, history, mascot, status from public.cloud_jobs where prompt = '${FOLLOW_UP}'`,
-    );
-    if (!second) throw new Error("The follow-up wasn't sent");
+    const second = defined((await sentRows())[0]);
     expect(second).toMatchObject({ conversation_id: first, status: "queued" });
     expect(second.history).toEqual(followUpHistory(before as unknown as ConversationJob));
     expect(second.history).toEqual([
@@ -393,6 +386,7 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     expect(supabase.received.filter(({ body, path }) => body.includes(CODE) || path.includes(CODE))).toEqual([]);
     expect(problems).toEqual([]);
   } finally {
+    await context.tracing.stop({ path: test.info().outputPath("phone-trace.zip") });
     await browser.close();
     site.close();
     supabase.close();
