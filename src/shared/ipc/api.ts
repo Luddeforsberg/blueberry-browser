@@ -238,7 +238,7 @@ interface MemoryAPI {
 interface AiKeyAPI {
   state: () => Promise<AiKeyState>;
   tryKey: (service: AiService, key: string) => Promise<{ outcome: AiKeyTried; state: AiKeyState }>;
-  remove: () => Promise<AiKeyState>;
+  remove: () => Promise<{ removed: boolean; state: AiKeyState }>;
   find: (service: AiService) => Promise<void>;
   paste: (service: AiService) => Promise<string | null>;
   onUpdated: (callback: (state: AiKeyState) => void) => Unsubscribe;

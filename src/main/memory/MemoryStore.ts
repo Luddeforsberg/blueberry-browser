@@ -1,14 +1,14 @@
 import { randomUUID } from "crypto";
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
-import { dirname } from "path";
 import type { MemoryFact, MemoryOffer, MemoryResult, MemoryState } from "../../shared/library";
 import { normaliseSite } from "../../shared/mascots";
 import { factProblem, MAX_FACTS_PER_MASCOT } from "../../shared/memory";
 import { cleanLine } from "../../shared/publishing";
+import { readJsonFile, savedEntries, saveFile, type Saved } from "../library/savedFile";
 import { MEMORY_PROMPT, parseProposals, proposalData, covers, type KnownFact, type JobToRemember } from "./mascotMemory";
 
 // Waiting offers are only worth so much, and a new one matters more than an old one nobody answered.
 const MAX_OFFERS = 20;
+const NOT_SAVED = "This couldn't be saved. Check that there's space on your disk and try again.";
 
 export interface MemorySources {
   onChanged: () => void;
@@ -50,16 +50,9 @@ export class MemoryStore {
     private readonly file: string,
     private readonly sources: MemorySources,
   ) {
-    try {
-      const raw: unknown = JSON.parse(readFileSync(file, "utf8"));
-      if (Array.isArray(raw)) {
-        for (const item of raw) {
-          const fact = parseStored(item);
-          if (fact && this.factsOf(fact.mascotId).length < MAX_FACTS_PER_MASCOT) this.facts.push(fact);
-        }
-      }
-    } catch {
-      // A missing or unreadable file means nothing is remembered yet, like settings.
+    // A missing or unreadable file means nothing is remembered yet, like settings.
+    for (const fact of savedEntries(file, readJsonFile(file), parseStored)) {
+      if (this.factsOf(fact.mascotId).length < MAX_FACTS_PER_MASCOT) this.facts.push(fact);
     }
   }
 
@@ -109,8 +102,10 @@ export class MemoryStore {
       return { ok: false, error: `This mascot already remembers ${MAX_FACTS_PER_MASCOT} things. Forget one on its page first.` };
     }
     const { text, site, mascotId } = offer;
-    if (!this.factsOf(mascotId).some((fact) => covers(fact, text, site))) {
-      this.write([...this.facts, { id: randomUUID(), mascotId, text, site, savedAt: Date.now() }]);
+    const known = this.factsOf(mascotId).some((fact) => covers(fact, text, site));
+    // The offer stays, so the user can say yes again.
+    if (!known && !this.write([...this.facts, { id: randomUUID(), mascotId, text, site, savedAt: Date.now() }])) {
+      return { ok: false, error: NOT_SAVED };
     }
     this.dropOffer(offerId);
     return { ok: true };
@@ -135,30 +130,33 @@ export class MemoryStore {
     const text = cleanLine(input);
     const problem = factProblem(text, fact.site);
     if (problem) return { ok: false, error: problem };
-    this.write(this.facts.map((one) => (one.id === factId ? { ...one, text } : one)));
-    return { ok: true };
+    return this.write(this.facts.map((one) => (one.id === factId ? { ...one, text } : one)))
+      ? { ok: true }
+      : { ok: false, error: NOT_SAVED };
   }
 
+  // False if there was nothing to forget, or it couldn't be saved, so it's still remembered.
   forget(factId: string): boolean {
     if (!this.facts.some(({ id }) => id === factId)) return false;
-    this.write(this.facts.filter(({ id }) => id !== factId));
-    return true;
+    return this.write(this.facts.filter(({ id }) => id !== factId));
   }
 
-  // Everything about one mascot, waiting offers too. Also what deleting that mascot does.
-  clear(mascotId: string): void {
+  // Everything about one mascot, waiting offers too. Also what deleting that mascot does. False if its facts couldn't be
+  // saved as gone, so they're still remembered.
+  clear(mascotId: string): boolean {
     this.cleared.set(mascotId, (this.cleared.get(mascotId) ?? 0) + 1);
     this.offers = this.offers.filter((offer) => offer.mascotId !== mascotId);
     this.declined.delete(mascotId);
-    this.write(this.facts.filter((fact) => fact.mascotId !== mascotId));
+    return this.write(this.facts.filter((fact) => fact.mascotId !== mascotId));
   }
 
-  private write(facts: MemoryFact[]): void {
-    mkdirSync(dirname(this.file), { recursive: true });
-    const temp = `${this.file}.tmp`;
-    writeFileSync(temp, JSON.stringify(facts, null, 2));
-    renameSync(temp, this.file);
-    this.facts = facts;
-    this.sources.onChanged();
+  // Only what was saved is remembered.
+  private write(facts: MemoryFact[]): Saved {
+    const saved = saveFile(this.file, JSON.stringify(facts, null, 2));
+    if (saved) {
+      this.facts = facts;
+      this.sources.onChanged();
+    }
+    return saved;
   }
 }

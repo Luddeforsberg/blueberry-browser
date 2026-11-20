@@ -92,8 +92,7 @@ export class WindowMenus {
   async confirmClearMemory(mascotId: string): Promise<boolean> {
     const count = this.w.memory.factsOf(mascotId).length;
     if (count === 0 || !(await this.w.menus.ask(clearMemoryWords(this.w.library.mascotName(mascotId), count)))) return false;
-    this.w.memory.clear(mascotId);
-    return true;
+    return this.w.memory.clear(mascotId);
   }
 
   showBerryMenu(anchor: unknown): void {

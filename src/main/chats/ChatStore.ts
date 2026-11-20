@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import type { ChatThreadMessage, ChatThreadSummary } from "../../shared/library";
 import type { FileKind } from "../../shared/attachments";
 import type { PreparedFile } from "./Attachments";
-import { migrate, rowOf, rowsOf } from "../library/database";
+import { inTransaction, migrate, rowOf, rowsOf } from "../library/database";
 
 export interface StoredChat extends ChatThreadSummary {
   messages: ChatThreadMessage[];
@@ -158,8 +158,7 @@ export class ChatStore {
 
   // `files` are kept with the message, in the same step, and only `filesOf` reads them back.
   addMessage(chatId: string, message: ChatThreadMessage, files: readonly StoredFile[] = []): void {
-    this.db.exec("BEGIN");
-    try {
+    inTransaction(this.db, () => {
       const { lastInsertRowid: messageId } = this.db
         .prepare("INSERT INTO messages (chat_id, role, content, steps, memory, pages, attached, work) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
         .run(
@@ -179,11 +178,7 @@ export class ChatStore {
       );
       files.forEach((file) => insert.run(chatId, messageId, file.kind, file.name, file.fact, file.mime, file.data, file.text));
       this.db.prepare("UPDATE chats SET updated_at = ? WHERE id = ?").run(Date.now(), chatId);
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
+    });
   }
 
   // The files that went with each of a chat's messages, in the order of its messages, for the model and nothing else.

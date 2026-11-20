@@ -1,5 +1,4 @@
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "fs";
-import { dirname } from "path";
+import { readJsonFile, removeFile, saveFile } from "../library/savedFile";
 import type { InternalPage } from "../../shared/ipc";
 
 export interface SavedEntry {
@@ -120,11 +119,7 @@ export class SessionStore {
   constructor(private readonly file: string) {}
 
   load(): Session | null {
-    try {
-      return sanitizeSession(JSON.parse(readFileSync(this.file, "utf8")));
-    } catch {
-      return null;
-    }
+    return sanitizeSession(readJsonFile(this.file));
   }
 
   // Null from `read` means there's nothing to keep, so the file goes.
@@ -133,25 +128,20 @@ export class SessionStore {
     this.timer ??= setTimeout(() => this.flush(), WRITE_DELAY_MS);
   }
 
-  flush(): void {
+  // False if what's open couldn't be kept, which only means the next launch opens what was kept before.
+  flush(): boolean {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
     const read = this.read;
     this.read = null;
-    if (!read) return;
+    if (!read) return true;
+    let session: Session | null;
     try {
-      const session = read();
-      if (!session) {
-        rmSync(this.file, { force: true });
-        return;
-      }
-      mkdirSync(dirname(this.file), { recursive: true });
-      // Writing beside the file and renaming means a crash never leaves half a file.
-      const temp = `${this.file}.tmp`;
-      writeFileSync(temp, JSON.stringify(session));
-      renameSync(temp, this.file);
+      session = read();
     } catch (error) {
-      console.error("Failed to save the open tabs:", error);
+      console.error("Failed to read the open tabs:", error);
+      return false;
     }
+    return session ? saveFile(this.file, JSON.stringify(session)) : removeFile(this.file);
   }
 }

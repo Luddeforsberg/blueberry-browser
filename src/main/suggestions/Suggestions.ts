@@ -1,7 +1,4 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
-import { dirname } from "path";
 import type { MascotProfile, Routine, RoutineRun, Suggestion, SuggestionKind } from "../../shared/library";
-import { parseMascotDraft } from "../../shared/mascots";
 import { buildDigest, type Digest, type DigestChat, type Feedback } from "./suggestionDigest";
 import { findPatterns, topPatterns, type Pattern, type PatternChat, type PatternVisit } from "./suggestionPatterns";
 import {
@@ -13,6 +10,8 @@ import {
   type Existing,
   type Proposal,
 } from "./suggestionProposals";
+import { NOTHING_SAVED, readSuggestions, type SavedSuggestions } from "./suggestionsFile";
+import { saveFile } from "../library/savedFile";
 
 const HOUR_MS = 3_600_000;
 // A failed call doesn't count, but being offline mustn't mean a model call on every new tab.
@@ -20,18 +19,6 @@ const RETRY_MS = 300_000;
 const SHOWN = 3;
 const KIND_ORDER: SuggestionKind[] = ["prompt", "routine", "mascot"];
 const MAX_FEEDBACK = 40;
-
-interface SavedSuggestions {
-  // What the model proposed last, as checked by code.
-  proposals: Proposal[];
-  // Ruled out for the old rules, as `site:host` or `chat:id`.
-  dismissed: string[];
-  // Cards they dismissed or used, which the model reads as "not this again" and "more like this".
-  feedback: Feedback[];
-  // When the model last answered, and the newest visit, chat or run it had then.
-  askedAt: number;
-  seen: number;
-}
 
 type SuggestionChat = PatternChat & { outcome: DigestChat["outcome"] };
 
@@ -58,20 +45,11 @@ const pickShown = (cards: Suggestion[]): Suggestion[] => {
   return [...shown].sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
 };
 
-const asList = <T>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
-
-// A mascot card is read again, since one saved by an older version has its look under a palette's old id.
-const savedProposal = (proposal: Proposal): Proposal[] => {
-  if (proposal.card.kind !== "mascot") return [proposal];
-  const parsed = parseMascotDraft(proposal.card.draft);
-  return "error" in parsed ? [] : [{ ...proposal, card: { ...proposal.card, draft: parsed.draft } }];
-};
-
 // What the new tab page offers. The model reads a digest of what the user did and proposes jobs, each citing the
 // digest's ids, and code checks every one. Without a model, or with nothing that checks out, the old rules find what's
 // repeated and code words it. A new tab never waits for a model or pays for one: what was checked is saved and reused.
 export class Suggestions {
-  private saved: SavedSuggestions = { proposals: [], dismissed: [], feedback: [], askedAt: 0, seen: 0 };
+  private saved: SavedSuggestions = NOTHING_SAVED;
   private asking = false;
   // Only in memory, so a relaunch can try again straight away.
   private triedAt = 0;
@@ -81,20 +59,8 @@ export class Suggestions {
     private readonly file: string,
     private readonly sources: SuggestionSources,
   ) {
-    try {
-      const raw = JSON.parse(readFileSync(file, "utf8")) as Partial<SavedSuggestions>;
-      this.saved = {
-        proposals: asList<Proposal>(raw.proposals)
-          .filter((proposal) => proposal?.card && Array.isArray(proposal.sources) && Array.isArray(proposal.sites))
-          .flatMap(savedProposal),
-        dismissed: asList<string>(raw.dismissed),
-        feedback: asList<Feedback>(raw.feedback),
-        askedAt: typeof raw.askedAt === "number" ? raw.askedAt : 0,
-        seen: typeof raw.seen === "number" ? raw.seen : 0,
-      };
-    } catch {
-      // A missing or unreadable file only means asking again.
-    }
+    // A missing or unreadable file only means asking again.
+    this.saved = readSuggestions(file);
   }
 
   private get now(): number {
@@ -256,15 +222,10 @@ export class Suggestions {
     }
   }
 
-  private save(next: SavedSuggestions): void {
+  // What the cards are now, kept or not. Not kept only means they're as they were after a restart, and the model may be
+  // asked again sooner.
+  private save(next: SavedSuggestions): boolean {
     this.saved = next;
-    try {
-      mkdirSync(dirname(this.file), { recursive: true });
-      const temp = `${this.file}.tmp`;
-      writeFileSync(temp, JSON.stringify(next, null, 2));
-      renameSync(temp, this.file);
-    } catch (error) {
-      console.error("Failed to save suggestions:", error);
-    }
+    return saveFile(this.file, JSON.stringify(next, null, 2));
   }
 }

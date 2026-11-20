@@ -262,7 +262,7 @@ export interface InvokeChannels {
   "ai-key:state": { region: "chrome"; args: []; result: AiKeyState };
   // The key goes this way only, and is kept only if the service answers with it. Nothing gives it back.
   "ai-key:try": { region: "chrome"; args: [service: AiService, key: string]; result: { outcome: AiKeyTried; state: AiKeyState } };
-  "ai-key:remove": { region: "chrome"; args: []; result: AiKeyState };
+  "ai-key:remove": { region: "chrome"; args: []; result: { removed: boolean; state: AiKeyState } };
   // Opens the service's own page for making a key.
   "ai-key:find": { region: "chrome"; args: [service: AiService]; result: void };
   // What's on the clipboard, for the key field's Paste, only if it has the shape of that service's key. Null otherwise,

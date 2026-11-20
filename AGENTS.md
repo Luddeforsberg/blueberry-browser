@@ -63,7 +63,7 @@ Each line is a section of [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md), in the
 
 ## Rules no check holds
 
-Most rules are checks, and each says why when it fails: `eslint.boundaries.mjs` who may import what, `eslint.calls.mjs` who may use a few members, `eslint.fences.mjs` where `fetch`, renderer timers, raw controls and `as unknown as` may go, `eslint.limits.mjs` the size limits, `scripts/oldNames.mjs` the old names and `scripts/runnerElectron.mjs` the runner without Electron. These are the ones they can't hold:
+Most rules are checks, and each says why when it fails: `eslint.boundaries.mjs` who may import what, `eslint.calls.mjs` who may use a few members, `eslint.fences.mjs` where `fetch`, renderer timers, raw controls, `as unknown as` and writing files may go, `eslint.saved.mjs` that nothing drops whether a file was saved, `eslint.limits.mjs` the size limits, `scripts/oldNames.mjs` the old names and `scripts/runnerElectron.mjs` the runner without Electron. These are the ones they can't hold:
 
 - Only `Layout.ts`, with `floatingPlaces.ts` and `desktopPlaces.ts`, decides where regions go. Don't hard-code a size anywhere else.
 - Limits only narrow. A mascot's tools and sites, a routine's sites, and the sites, tools and ask level a job arrives with can take away, never add. A deleted or missing mascot never falls back to Berry.

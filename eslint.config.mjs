@@ -6,6 +6,7 @@ import eslintPluginReactRefresh from "eslint-plugin-react-refresh";
 import { boundaries } from "./eslint.boundaries.mjs";
 import { callBlocks } from "./eslint.calls.mjs";
 import { fenceBlocks } from "./eslint.fences.mjs";
+import { savedBlocks } from "./eslint.saved.mjs";
 import { complexityOver, linesOver, paramsOver } from "./eslint.limits.mjs";
 
 export default tseslint.config(
@@ -171,6 +172,8 @@ export default tseslint.config(
   ...callBlocks,
   // Risky things written in one place each: fetch, timers in renderers, raw controls and double casts.
   ...fenceBlocks,
+  // Whether a file was saved is never dropped.
+  ...savedBlocks,
   ...Object.entries(linesOver).map(([file, max]) => ({ files: [file], rules: { "max-lines": ["error", max] } })),
   ...Object.entries(complexityOver).map(([file, max]) => ({ files: [file], rules: { complexity: ["error", max] } })),
   ...Object.entries(paramsOver).map(([file, max]) => ({ files: [file], rules: { "max-params": ["error", max] } })),

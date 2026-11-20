@@ -44,7 +44,7 @@ export const createCloud = (w: WindowParts): CloudTabs => {
 
 // Sites to offer in Settings > Cloud > Signed in to, from history and bookmarks. Names only.
 export const cloudLoginSuggestions = (stores: WindowStores, cloud: CloudTabs): string[] => {
-  const urls = [...stores.history.recent(500), ...stores.bookmarkStore.get(), ...stores.pinnedStore.get()].map(({ url }) => url);
+  const urls = [...stores.history.recent(500), ...stores.bookmarkStore.bookmarks, ...stores.bookmarkStore.pinned].map(({ url }) => url);
   return suggestLoginSites(
     urls,
     cloud.state.logins.map(({ site }) => site),

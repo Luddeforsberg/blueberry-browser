@@ -177,6 +177,8 @@ const rules = [
         "library/database.test.ts",
         "library/browserHistory.test.ts",
         "chats/ChatStore.test.ts",
+        // Makes a run's write fail, as a full disk would.
+        "routines/Routines.runs.test.ts",
       ],
       "A database belongs to the store that opens it, and its rows are read with rowOf and rowsOf in library/database.ts.",
     ),

@@ -1,4 +1,4 @@
-import { mkdtempSync } from "fs";
+import { mkdirSync, mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { describe, expect, it, vi } from "vitest";
@@ -14,9 +14,9 @@ vi.mock("electron", () => ({
   },
 }));
 
-const connector = () =>
+const connector = (file = join(mkdtempSync(join(tmpdir(), "mcp-")), "mcp.json")) =>
   new McpConnector(
-    join(mkdtempSync(join(tmpdir(), "mcp-")), "mcp.json"),
+    file,
     () => [],
     () => {},
     true,
@@ -40,5 +40,32 @@ describe("McpConnector", () => {
     expect((await fetch(url!, { method: "POST", body: "{}" })).status).toBe(503);
     await mcp.setOn(false);
     await expect(fetch(url!, { method: "POST", body: "{}" })).rejects.toThrow();
+  });
+
+  it("goes off when a new token can't be saved, and says the old one comes back after a restart", async () => {
+    const file = join(mkdtempSync(join(tmpdir(), "mcp-")), "mcp.json");
+    const mcp = connector(file);
+    const { url } = await mcp.setOn(true);
+    // The write goes beside the file first, so a folder in that place makes it fail.
+    mkdirSync(`${file}.tmp`);
+
+    expect(mcp.revoke()).toMatchObject({ on: false, url: null, problem: expect.stringContaining("old token is still saved") });
+    await expect(fetch(url!, { method: "POST", body: "{}" })).rejects.toThrow();
+    // What the next launch does, as it said.
+    const next = connector(file);
+    next.start();
+    expect(next.state.on).toBe(true);
+    next.close();
+
+    // Turning it off can't be saved either, so it says it will be on again.
+    const again = connector(file);
+    again.start();
+    expect(await again.setOn(false)).toMatchObject({ on: false, problem: expect.stringContaining("on again after a restart") });
+
+    rmSync(`${file}.tmp`, { recursive: true });
+    expect(await again.setOn(false)).toMatchObject({ on: false, problem: null });
+    const after = connector(file);
+    after.start();
+    expect(after.state.on).toBe(false);
   });
 });

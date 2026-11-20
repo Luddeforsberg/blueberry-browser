@@ -1,6 +1,4 @@
 import { createHash, randomUUID } from "crypto";
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
-import { dirname } from "path";
 import type { MascotSaveResult } from "../../shared/ipc";
 import type { GalleryLinked, GalleryListing, GalleryMascot, PublishedMascot, PublishResult } from "../../shared/library";
 import { OneAtATime } from "../../shared/lateWork";
@@ -9,12 +7,18 @@ import type { Account } from "../account/Account";
 import { GalleryServer, publicPageLink, ServerError, Unreachable } from "../account/galleryServer";
 import { starterMascots } from "./mascotCatalog";
 import type { MascotStore } from "./MascotStore";
+import { fieldsOf } from "../../shared/fields";
+import { readJsonFile, saveFile } from "../library/savedFile";
 
 const NO_SERVER = "Publishing isn’t set up in this copy of Blueberry.";
 const CANT_PUBLISH = "This mascot can’t be published.";
 type PublicRow = ReturnType<typeof publicRow>;
 const CANT_REACH = "Couldn’t reach the Gallery, so nothing changed. Try again in a moment.";
 const SIGN_IN_FIRST = "Sign in to publish.";
+const NOT_KEPT =
+  "It’s in the Gallery, but this computer couldn’t note that it’s published, so publishing again would make a second copy. Check that there’s space on your disk, then unpublish it from the Gallery.";
+const NOT_FORGOTTEN =
+  "It’s out of the Gallery, but this computer couldn’t note that, so it may still show as published here. Check that there’s space on your disk.";
 // Every version of an entry the page has been sent, so each review can be added as it was shown. Past this the oldest go.
 const MOST_SHOWN = 2000;
 
@@ -167,10 +171,12 @@ export class Gallery {
       let id = mascot.publishedId ?? null;
       if (!id || !(await this.server.updateMascot(token, id, row))) id = await this.server.insertMascot(token, row);
       if (!id) return { ok: false, error: "The Gallery didn’t say whether that worked. Look for it in the Gallery." };
-      this.mascots.setPublished(mascot.id, id);
+      const kept = this.mascots.setPublished(mascot.id, id);
       this.saved = { ...this.saved, author };
       this.save();
       this.onChange();
+      // Publishing again would then make a second public copy, rather than change this one.
+      if (!kept) return { ok: false, error: NOT_KEPT };
       return { ok: true, id, link: publicPageLink(this.site, id) };
     } catch (error) {
       return { ok: false, error: failure(error) };
@@ -190,9 +196,10 @@ export class Gallery {
           ok: false,
           error: "That didn’t remove anything. It may be on another account, so sign in with the one that published it.",
         };
-      this.forgetPublished(id);
+      const kept = this.forgetPublished(id);
       for (const [key, entry] of this.shown) if (entry.id === id) this.shown.delete(key);
       this.onChange();
+      if (!kept) return { ok: false, error: NOT_FORGOTTEN };
       return { ok: true, id, link: null };
     } catch (error) {
       return { ok: false, error: failure(error) };
@@ -228,15 +235,18 @@ export class Gallery {
     }
   }
 
-  private forgetPublished(id: string): void {
-    for (const mascot of this.mascots.all()) {
-      if (mascot.publishedId === id) this.mascots.setPublished(mascot.id, null);
-    }
+  // False if a mascot couldn't be saved as no longer published.
+  private forgetPublished(id: string): boolean {
+    return this.mascots
+      .all()
+      .filter((mascot) => mascot.publishedId === id)
+      .map((mascot) => this.mascots.setPublished(mascot.id, null))
+      .every(Boolean);
   }
 
   private load(): Saved {
     try {
-      const { install, author } = JSON.parse(readFileSync(this.file, "utf8")) as Record<string, unknown>;
+      const { install, author } = fieldsOf(readJsonFile(this.file));
       if (typeof install === "string") return { install, author: typeof author === "string" ? author : "" };
     } catch {
       // A new one follows. It only means this install could count once more.
@@ -247,14 +257,8 @@ export class Gallery {
     return fresh;
   }
 
-  private save(): void {
-    try {
-      mkdirSync(dirname(this.file), { recursive: true });
-      const temp = `${this.file}.tmp`;
-      writeFileSync(temp, JSON.stringify(this.saved));
-      renameSync(temp, this.file);
-    } catch {
-      console.error("Couldn't save the Gallery's settings.");
-    }
+  // False if they couldn't be kept, which only means this install could count once more, and the author is asked again.
+  private save(): boolean {
+    return saveFile(this.file, JSON.stringify(this.saved));
   }
 }

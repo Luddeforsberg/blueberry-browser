@@ -65,8 +65,8 @@ import type { EventChannels, Settings, ThemeState } from "../../shared/ipc";
 export interface WindowStores {
   settingsStore: SettingsStore;
   chatStore: ChatStore;
+  // Pinned sites and bookmarks, both.
   bookmarkStore: BookmarkStore;
-  pinnedStore: BookmarkStore;
   mascotStore: MascotStore;
   history: HistoryStore;
   sessionStore: SessionStore;
@@ -127,7 +127,7 @@ export class WindowParts {
     downloads: Downloads,
     sitePermissions: SitePermissions,
   ) {
-    const { settingsStore, bookmarkStore, pinnedStore, mascotStore, sessionStore } = stores;
+    const { settingsStore, mascotStore, sessionStore } = stores;
     this.tabs = new TabStrip(this, stores);
     this.webTabs = new WebTabs(this, stores);
     this.panels = new Panels(this, stores);
@@ -139,12 +139,6 @@ export class WindowParts {
     this.settingsChanges = new SettingsChanges(this, stores);
     this.pageCommands = new PageCommands(this);
     nativeTheme.themeSource = settingsStore.get().appearance;
-    // Before a site could only be in one list, it could be saved both ways. It stays on top.
-    try {
-      for (const pin of pinnedStore.get()) bookmarkStore.removeUrl(pin.url);
-    } catch (error) {
-      console.error("Failed to tidy saved sites:", error);
-    }
     const restored = settingsStore.get().onStartup === "restore" ? sessionStore.load() : null;
 
     this.baseWindow = createBaseWindow(restored, this.settings.layoutMode, this.glassSupported);

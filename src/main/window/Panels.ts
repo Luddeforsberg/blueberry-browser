@@ -125,7 +125,7 @@ export class Panels {
         sidebarWidth: this.w.settings.sidebarWidth,
         chatWidth: this.w.settings.chatWidth,
         platform: process.platform,
-        savedSites: this.stores.pinnedStore.get().length + this.stores.bookmarkStore.get().length > 0,
+        savedSites: this.stores.bookmarkStore.pinned.length + this.stores.bookmarkStore.bookmarks.length > 0,
       },
     );
   }

@@ -1,11 +1,37 @@
+import { mkdtempSync } from "fs";
+import { DatabaseSync } from "node:sqlite";
+import { tmpdir } from "os";
+import { join } from "path";
 import { describe, expect, it, vi } from "vitest";
 import { RoutineStore } from "./RoutineStore";
-import { daily, flush, MINUTE, NOW, save, setup, started, runOnFakeClock } from "./routinesTesting";
+import { daily, DAY, flush, MINUTE, NOW, save, setup, started, runOnFakeClock } from "./routinesTesting";
 import { defined } from "../../shared/testing";
 
 runOnFakeClock();
 
 describe("a run", () => {
+  it("keeps its occurrence due when the run can't be saved, so it runs once it can", async () => {
+    const file = join(mkdtempSync(join(tmpdir(), "blueberry-routines-")), "routines.db");
+    const { routines, store, started: runs } = setup(new RoutineStore(file));
+    const id = save(routines, daily("13:00"));
+    // A second connection, as a full disk would, refuses every new run.
+    const db = new DatabaseSync(file);
+    db.exec("CREATE TRIGGER no_room BEFORE INSERT ON runs BEGIN SELECT RAISE(ABORT, 'database or disk is full'); END;");
+    started(routines);
+
+    await vi.advanceTimersByTimeAsync(60 * MINUTE);
+    expect(runs).toHaveLength(0);
+    expect(store.latestRun(id)).toBeNull();
+    expect(store.routine(id)?.nextRunAt).toBe(NOW + 60 * MINUTE);
+
+    db.exec("DROP TRIGGER no_room;");
+    db.close();
+    await vi.advanceTimersByTimeAsync(MINUTE);
+    expect(runs).toHaveLength(1);
+    expect(store.latestRun(id)).toMatchObject({ status: "running", lateFor: null });
+    expect(store.routine(id)?.nextRunAt).toBe(NOW + 60 * MINUTE + DAY);
+  });
+
   it("shows what it's doing, and how it ended", async () => {
     const { routines, store, started: runs, events } = setup();
     const id = save(routines, daily());

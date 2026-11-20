@@ -52,14 +52,18 @@ let cloud: CloudTabs | null = null;
 // Said once, after the window it sits on is open.
 let storeNotices: string[] = [];
 
-const storeNotice =
-  (what: string, isAre: "is" | "are") =>
-  ({ movedTo }: StoreProblem) =>
-    storeNotices.push(
-      movedTo
-        ? `${what} ${isAre === "is" ? "was" : "were"} damaged and couldn't be read, so Blueberry started empty. The old file is at ${movedTo}.`
-        : `${what} couldn't be opened. The file wasn't changed, but anything new won't be kept after you quit.`,
-    );
+const NOT_KEPT = "anything new won't be kept after you quit";
+const storeWords = (what: string, was: string, problem: StoreProblem): string => {
+  if (problem.kind === "untouched") return `${what} couldn't be opened. The file wasn't changed, but ${NOT_KEPT}.`;
+  if (problem.kind === "split") {
+    return `${what} ${was} damaged and couldn't be read, so Blueberry started empty. Moving the file aside stopped partway, so some of it is at ${problem.movedTo} and the rest is where it was, and ${NOT_KEPT}.`;
+  }
+  const started = `${what} ${was} damaged and couldn't be read, so Blueberry started empty. The old file is at ${problem.movedTo}`;
+  return problem.replaced ? `${started}.` : `${started}, and a new one couldn't be made, so ${NOT_KEPT}.`;
+};
+
+const storeNotice = (what: string, isAre: "is" | "are") => (problem: StoreProblem) =>
+  storeNotices.push(storeWords(what, isAre === "is" ? "was" : "were", problem));
 
 // Our own card with only OK, once the window's chrome has drawn.
 const showStoreNotices = (window: Window): void => {
@@ -76,8 +80,7 @@ const createWindow = (): Window => {
     (file) => new HistoryStore(file),
     storeNotice("Your browsing history", "is"),
   );
-  const bookmarks = new BookmarkStore(join(app.getPath("userData"), "bookmarks.json"));
-  const pinned = new BookmarkStore(join(app.getPath("userData"), "pinned.json"));
+  const bookmarks = new BookmarkStore(app.getPath("userData"));
   routineStore ??= openStore(
     join(app.getPath("userData"), "routines.db"),
     (file, recovered) => new RoutineStore(file, recovered),
@@ -108,7 +111,6 @@ const createWindow = (): Window => {
       settingsStore: settings,
       chatStore,
       bookmarkStore: bookmarks,
-      pinnedStore: pinned,
       mascotStore,
       history: historyStore,
       sessionStore,

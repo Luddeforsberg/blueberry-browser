@@ -2,11 +2,28 @@ import { copyFileSync, existsSync, mkdtempSync, readdirSync, readFileSync, write
 import { tmpdir } from "os";
 import { join } from "path";
 import { DatabaseSync } from "node:sqlite";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ChatStore } from "../chats/ChatStore";
 import { openStore, type StoreProblem } from "./database";
 import { HistoryStore } from "./HistoryStore";
-import { defined } from "../../shared/testing";
+
+// A rename this says no to fails as a busy or locked file would.
+const refuse = vi.hoisted<{ rename: (from: string, to: string) => boolean }>(() => ({ rename: () => false }));
+vi.mock("fs", async (importOriginal) => {
+  const fs = await importOriginal<typeof import("fs")>();
+  return {
+    ...fs,
+    renameSync: (from: string, to: string) => {
+      if (refuse.rename(from, to)) throw Object.assign(new Error("EBUSY: resource busy or locked"), { code: "EBUSY" });
+      fs.renameSync(from, to);
+    },
+  };
+});
+afterEach(() => {
+  refuse.rename = () => false;
+});
+
+const movedTo = (problem: StoreProblem | undefined): string => (problem && problem.kind !== "untouched" ? problem.movedTo : "nowhere");
 
 const tempFile = (name = "chats.db") => join(mkdtempSync(join(tmpdir(), "blueberry-db-")), name);
 
@@ -51,10 +68,9 @@ describe("openStore", () => {
 
     const { store, problems } = open(file);
     expect(store.summaries()).toEqual([]);
-    expect(problems).toHaveLength(1);
-    const movedTo = defined(problems[0]).movedTo!;
-    expect(readFileSync(movedTo, "utf8")).toContain("not a database");
-    expect(readFileSync(`${movedTo}-wal`, "utf8")).toBe("an old log");
+    expect(problems).toEqual([{ kind: "moved", movedTo: expect.stringContaining(".corrupt-"), replaced: true }]);
+    expect(readFileSync(movedTo(problems[0]), "utf8")).toContain("not a database");
+    expect(readFileSync(`${movedTo(problems[0])}-wal`, "utf8")).toBe("an old log");
 
     store.createChat("A new start");
     expect(open(file).problems).toEqual([]);
@@ -68,8 +84,7 @@ describe("openStore", () => {
     writeFileSync(file, Buffer.concat([bytes.subarray(0, 4096), Buffer.alloc(bytes.length - 4096, 0xff)]));
 
     const { store, problems } = open(file);
-    expect(problems).toHaveLength(1);
-    expect(defined(problems[0]).movedTo).not.toBeNull();
+    expect(problems).toEqual([{ kind: "moved", movedTo: expect.stringContaining(".corrupt-"), replaced: true }]);
     expect(store.summaries()).toEqual([]);
   });
 
@@ -82,6 +97,49 @@ describe("openStore", () => {
     const { store: opened, problems } = open(file);
     expect(problems).toEqual([]);
     expect(opened.summaries().map((chat) => chat.title)).toEqual(["Only in the log"]);
+  });
+
+  it("says where a damaged file went even when no new one could take its place", () => {
+    const file = tempFile();
+    writeFileSync(file, "this is not a database, not even a little".repeat(100));
+
+    const problems: StoreProblem[] = [];
+    const store = openStore(
+      file,
+      (path, recovered) => {
+        if (recovered && path !== ":memory:") throw new Error("ENOSPC: no space left on device");
+        return new ChatStore(path);
+      },
+      (problem) => problems.push(problem),
+    );
+
+    expect(problems).toEqual([{ kind: "moved", movedTo: expect.stringContaining(".corrupt-"), replaced: false }]);
+    expect(readFileSync(movedTo(problems[0]), "utf8")).toContain("not a database");
+    expect(store.summaries()).toEqual([]);
+  });
+
+  it("puts back what it moved when the file itself won't move, and says it's untouched", () => {
+    const file = tempFile();
+    writeFileSync(file, "this is not a database, not even a little".repeat(100));
+    writeFileSync(`${file}-wal`, "an old log");
+    refuse.rename = (from) => from === file;
+
+    expect(open(file).problems).toEqual([{ kind: "untouched" }]);
+    expect(readFileSync(`${file}-wal`, "utf8")).toBe("an old log");
+    expect(readFileSync(file, "utf8")).toContain("not a database");
+    expect(readdirSync(join(file, "..")).filter((name) => name.includes("corrupt"))).toEqual([]);
+  });
+
+  it("says a file is in two places when moving it stopped partway and couldn't be undone", () => {
+    const file = tempFile();
+    writeFileSync(file, "this is not a database, not even a little".repeat(100));
+    writeFileSync(`${file}-wal`, "an old log");
+    refuse.rename = (from, to) => from === file || to === `${file}-wal`;
+
+    const { problems } = open(file);
+    expect(problems).toEqual([{ kind: "split", movedTo: expect.stringContaining(".corrupt-") }]);
+    expect(readFileSync(`${movedTo(problems[0])}-wal`, "utf8")).toBe("an old log");
+    expect(readFileSync(file, "utf8")).toContain("not a database");
   });
 
   it("treats an empty file as a new database", () => {
@@ -105,7 +163,7 @@ describe("openStore", () => {
       (problem) => problems.push(problem),
     );
 
-    expect(problems).toEqual([{ movedTo: null }]);
+    expect(problems).toEqual([{ kind: "untouched" }]);
     expect(store.summaries()).toEqual([]);
     // Reading a database can leave SQLite's empty helper files beside it, so this only looks for the file moving.
     expect(readdirSync(join(file, "..")).filter((name) => name.includes("corrupt"))).toEqual([]);
@@ -144,8 +202,8 @@ describe("openStore", () => {
       (problem) => problems.push(problem),
     );
 
-    expect(defined(problems[0]).movedTo).toContain("history.db.corrupt-");
-    expect(existsSync(defined(problems[0]).movedTo!)).toBe(true);
+    expect(movedTo(problems[0])).toContain("history.db.corrupt-");
+    expect(existsSync(movedTo(problems[0]))).toBe(true);
     store.record("https://a.example/", "A", null, 1);
     expect(store.recent()).toHaveLength(1);
   });

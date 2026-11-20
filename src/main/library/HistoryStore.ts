@@ -2,7 +2,7 @@ import { mkdirSync } from "fs";
 import { dirname } from "path";
 import { DatabaseSync } from "node:sqlite";
 import type { HistoryCursor, HistoryEntry, HistoryPage, Visit, VisitedPage } from "../../shared/ipc";
-import { migrate, rowOf, rowsOf } from "./database";
+import { inTransaction, migrate, rowOf, rowsOf } from "./database";
 
 const MIGRATIONS = [
   `CREATE TABLE visits (
@@ -168,18 +168,13 @@ export class HistoryStore {
   // time. Returns how many were added.
   importVisits(visits: Visit[]): number {
     const insert = this.db.prepare("INSERT OR IGNORE INTO visits (url, title, favicon, visited_at) VALUES (?, ?, ?, ?)");
-    let added = 0;
-    this.db.exec("BEGIN");
-    try {
+    return inTransaction(this.db, () => {
+      let added = 0;
       for (const { url, title, favicon, visitedAt } of visits) {
         if (!isWeb(url) || !Number.isFinite(visitedAt)) continue;
         added += Number(insert.run(url, title || url, favicon, Math.trunc(visitedAt)).changes);
       }
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-    return added;
+      return added;
+    });
   }
 }

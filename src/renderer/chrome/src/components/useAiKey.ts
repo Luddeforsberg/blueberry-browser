@@ -16,7 +16,7 @@ export const useAiKey = () => {
 
 export const aiServiceName = (service: AiService) => SERVICES[service].name;
 
-export type Said = AiKeyTried | "trying" | "nothing-to-paste" | null;
+export type Said = AiKeyTried | "trying" | "nothing-to-paste" | "not-removed" | null;
 
 // The chosen service, what's in the field, and how the last try went. `works` is true once a key is kept, whether it was
 // just tried or saved before. A try or a paste answers only for the service and the field it was asked for: choosing
@@ -63,6 +63,13 @@ export const useKeyTry = () => {
     },
     said,
     tryKey,
+    // The saved key shows until main has really removed it, and says so when it couldn't.
+    remove: async () => {
+      const turn = asks.next();
+      const { removed } = await window.chromeAPI.aiKey.remove();
+      if (!turn.current) return;
+      setSaid(removed ? null : "not-removed");
+    },
     paste: async () => {
       const turn = asks.next();
       const pasted = await window.chromeAPI.aiKey.paste(service);

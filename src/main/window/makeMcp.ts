@@ -42,7 +42,7 @@ export const createMcp = (w: WindowParts, stores: WindowStores): McpConnector =>
       },
       searchHistory: (query, limit) => stores.history.search({ query, limit }).entries,
       recentHistory: (limit) => stores.history.recent(limit),
-      bookmarks: () => ({ bookmarks: stores.bookmarkStore.get(), pinned: stores.pinnedStore.get() }),
+      bookmarks: () => ({ bookmarks: stores.bookmarkStore.bookmarks, pinned: stores.bookmarkStore.pinned }),
       facts: () => stores.mascotStore.all().flatMap(({ id }) => w.memory.factsOf(id)),
       clean: (text) => w.chats.withoutCodes(text),
     }));

@@ -62,8 +62,8 @@ export class LibraryUpdates {
 
   get librarySnapshot(): LibrarySnapshot {
     return {
-      pinned: this.stores.pinnedStore.get(),
-      bookmarks: this.stores.bookmarkStore.get(),
+      pinned: this.stores.bookmarkStore.pinned,
+      bookmarks: this.stores.bookmarkStore.bookmarks,
       chats: this.stores.chatStore
         .summaries()
         .map((chat) => ({ ...chat, running: this.w.chats.isRunning(chat.id), cloud: this.w.chats.inCloud(chat.id) })),
