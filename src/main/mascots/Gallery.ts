@@ -12,6 +12,7 @@ import type { MascotStore } from "./MascotStore";
 
 const NO_SERVER = "Publishing isn’t set up in this copy of Blueberry.";
 const CANT_PUBLISH = "This mascot can’t be published.";
+type PublicRow = ReturnType<typeof publicRow>;
 const CANT_REACH = "Couldn’t reach the Gallery, so nothing changed. Try again in a moment.";
 const SIGN_IN_FIRST = "Sign in to publish.";
 // Every version of an entry the page has been sent, so each review can be added as it was shown. Past this the oldest go.
@@ -134,24 +135,32 @@ export class Gallery {
       .catch(() => console.error("Couldn't count an add."));
   }
 
-  // As whoever is signed in when it's pressed. One that waits behind another publishes nothing if they've changed since.
+  // What it publishes is read when it's pressed, as whoever is signed in then. One that waits behind another publishes
+  // nothing if they've changed since, and then reads whether that one published it, so it updates the row rather than
+  // making another.
   publish(mascotId: unknown, choices: unknown): Promise<PublishResult> {
-    if (typeof mascotId !== "string") return Promise.resolve({ ok: false, error: CANT_PUBLISH });
+    const ready = this.publishable(mascotId, choices);
+    if ("error" in ready) return Promise.resolve({ ok: false, error: ready.error });
     const { email } = this.account.state;
-    return this.publishing.run(() => this.publishNow(mascotId, choices, email), mascotId);
+    return this.publishing.run(() => this.send(ready.id, ready.row, ready.author, email), ready.id);
   }
 
-  private async publishNow(mascotId: string, choices: unknown, email: string | null): Promise<PublishResult> {
-    if (!this.server) return { ok: false, error: NO_SERVER };
-    if (this.account.state.email !== email) return { ok: false, error: "The account changed meanwhile, so nothing was published." };
-    const mascot = this.mascots.find(mascotId);
-    if (!mascot || mascot.deletedAt !== null || mascot.id === "berry") return { ok: false, error: CANT_PUBLISH };
-    if (mascot.galleryId) return { ok: false, error: "This is a copy from the Gallery, so it’s not yours to publish." };
+  private publishable(mascotId: unknown, choices: unknown): { id: string; row: PublicRow; author: string } | { error: string } {
+    if (!this.server) return { error: NO_SERVER };
+    const mascot = typeof mascotId === "string" ? this.mascots.find(mascotId) : null;
+    if (!mascot || mascot.deletedAt !== null || mascot.id === "berry") return { error: CANT_PUBLISH };
+    if (mascot.galleryId) return { error: "This is a copy from the Gallery, so it’s not yours to publish." };
     const draft = parsePublicDraft(mascot);
-    if ("error" in draft) return { ok: false, error: draft.error };
+    if ("error" in draft) return draft;
     const parsed = parsePublishChoices(choices);
-    if ("error" in parsed) return { ok: false, error: parsed.error };
-    const row = publicRow(draft.draft, parsed.choices);
+    if ("error" in parsed) return parsed;
+    return { id: mascot.id, row: publicRow(draft.draft, parsed.choices), author: parsed.choices.author };
+  }
+
+  private async send(mascotId: string, row: PublicRow, author: string, email: string | null): Promise<PublishResult> {
+    const mascot = this.mascots.find(mascotId);
+    if (!this.server || !mascot || mascot.deletedAt !== null) return { ok: false, error: CANT_PUBLISH };
+    if (this.account.state.email !== email) return { ok: false, error: "The account changed meanwhile, so nothing was published." };
     try {
       const token = await this.account.accessToken();
       if (!token) return { ok: false, error: SIGN_IN_FIRST };
@@ -159,7 +168,7 @@ export class Gallery {
       if (!id || !(await this.server.updateMascot(token, id, row))) id = await this.server.insertMascot(token, row);
       if (!id) return { ok: false, error: "The Gallery didn’t say whether that worked. Look for it in the Gallery." };
       this.mascots.setPublished(mascot.id, id);
-      this.saved = { ...this.saved, author: parsed.choices.author };
+      this.saved = { ...this.saved, author };
       this.save();
       this.onChange();
       return { ok: true, id, link: publicPageLink(this.site, id) };

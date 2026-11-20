@@ -340,5 +340,12 @@ describe("the scheduler", () => {
     defined(answers.get("Check fares"))("Flight fare check");
     await flush();
     expect(store.routine(id)).toMatchObject({ name: "Flight fare check", nameSettled: true });
+
+    // Saved again with the name it showed, its first words, and new instructions: the answer for the old ones is dropped.
+    const other = save(routines, { ...daily(), name: "", instructions: "Read DN" });
+    save(routines, { ...daily(), name: "Read DN", instructions: "Read SvD" }, other);
+    defined(answers.get("Read DN"))("DN digest");
+    await flush();
+    expect(store.routine(other)?.name).toBe("Read DN");
   });
 });

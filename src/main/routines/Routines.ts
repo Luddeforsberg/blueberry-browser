@@ -294,8 +294,14 @@ export class Routines {
     }
     this.events.onChanged();
     this.tick();
-    if (toWrite) void this.writeName(savedId, draft.instructions);
+    this.named(savedId, existing?.instructions, draft.instructions, toWrite);
     return { ok: true, id: savedId };
+  }
+
+  // A name still being written for words it no longer has never lands, even when no new one is asked for.
+  private named(id: string, before: string | undefined, instructions: string, write: boolean): void {
+    if (before !== undefined && before !== instructions) this.naming.end(id);
+    if (write) void this.writeName(id, instructions);
   }
 
   // Never rejects: it keeps the name from its first words until this works. Only the answer for what it does now counts,

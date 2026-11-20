@@ -89,6 +89,19 @@ describe("Gallery.publish", () => {
     await slow;
     expect(await queued).toMatchObject({ ok: false, error: expect.stringContaining("account changed") });
     expect(tokens).toHaveLength(3);
+
+    // One waiting sends what was reviewed when it was pressed, not an edit made while it waited.
+    account.state.email = "ana@example.com";
+    const ahead = gallery.publish(saved.id, choices);
+    const behind = gallery.publish(saved.id, choices);
+    mascots.save(saved.id, { name: "Scout", look: { palette: "lingon", accessory: "cap" }, instructions: "Edited.", sites: [], tools: [] });
+    await vi.waitFor(() => expect(tokens).toHaveLength(4));
+    defined(tokens[3])();
+    await ahead;
+    await vi.waitFor(() => expect(tokens).toHaveLength(5));
+    defined(tokens[4])();
+    await behind;
+    expect(updateMascot.mock.calls.at(-1)).toEqual([expect.anything(), ID, expect.objectContaining({ instructions: "Read." })]);
   });
 });
 

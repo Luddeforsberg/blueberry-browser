@@ -32,8 +32,13 @@ export const useKeyTry = () => {
   const [key, setKey] = useState("");
   const [said, setSaid] = useState<Said>(null);
   const asks = useLatest();
-  // The service can change without a choice, when another window saves a key, and an answer for the one before is stale.
-  useEffect(() => asks.end(), [asks, service]);
+  // The service can change without a choice, when another window saves a key. What's in the field and any answer still
+  // on its way were for the one before, so they go, as they do on a choice.
+  useEffect(() => {
+    asks.end();
+    setKey("");
+    setSaid(null);
+  }, [asks, service]);
   const tryKey = async () => {
     if (!key.trim() || said === "trying") return;
     const turn = asks.next();
