@@ -131,7 +131,20 @@ export async function launchApp(
   app.process().stderr?.on("data", (data) => console.log(`[app stderr] ${data}`));
   const close = app.close.bind(app);
   app.close = () => closeWithin(close, () => killApp(app));
+  await windowOpened(app).catch(async (error: unknown) => {
+    await app.close();
+    throw error;
+  });
   return app;
+}
+
+// The app is up a moment before its window is, and every test starts from the window.
+async function windowOpened(app: ElectronApplication) {
+  const deadline = Date.now() + VIEW_TIMEOUT_MS;
+  while (!(await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows().length > 0))) {
+    if (Date.now() > deadline) throw new Error(`No window after ${VIEW_TIMEOUT_MS}ms`);
+    await new Promise((resolve) => setTimeout(resolve, VIEW_POLL_MS));
+  }
 }
 
 // Our menus and Asking first are drawn in the menu view, over the window (DESIGN.md section 8). Tests press in it as a
