@@ -2,7 +2,7 @@ import { describe, type Described } from "../lib/assess";
 import { copyOf, isSelect } from "../lib/dom";
 import { allElements, isPlain, looksClickable, SELECTOR, visible } from "../lib/list";
 import { clip, isSecret, isTransparent, nameOf, optionLabels, roleOf } from "../lib/names";
-import { state, withElement } from "../lib/state";
+import { forgetDetached, refFor, withElement } from "../lib/state";
 
 const MAX_ADDRESS_LENGTH = 500;
 const MAX_OPTIONS = 50;
@@ -33,6 +33,7 @@ interface ListArgs {
 }
 
 export const listElements = ({ query, limit, everything, descend }: ListArgs): { total: number; elements: Listed[] } => {
+  forgetDetached();
   const named = (el: Element): boolean => nameOf(el).toLowerCase().includes(query);
   const seen = allElements(document, descend).filter((el) => visible(el));
   const active = seen.filter((el) => (el.matches(SELECTOR) || looksClickable(el)) && named(el));
@@ -42,12 +43,7 @@ export const listElements = ({ query, limit, everything, descend }: ListArgs): {
       : [];
   const found = [...active, ...plain];
   const elements = found.slice(0, limit).map((el): Listed => {
-    let ref = state.refs.get(el);
-    if (!ref) {
-      ref = "e" + state.next++;
-      state.refs.set(el, ref);
-      state.byRef.set(ref, el);
-    }
+    const ref = refFor(el);
     const dropdown = isSelect(el);
     return {
       ref,

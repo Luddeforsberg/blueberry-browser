@@ -1,7 +1,7 @@
 import { expectPressOn, hitAt, pointOn, reaches } from "../lib/aim";
 import type { Point } from "../lib/dom";
 import { nameOf } from "../lib/names";
-import { state, withElement } from "../lib/state";
+import { elementOf, state, withElement } from "../lib/state";
 
 export interface Aim {
   // "scrolled" means it wasn't in the open and now should be, so give the page a moment and aim again.
@@ -129,8 +129,8 @@ export interface DragPlan {
 // which is also how the page hears of it. Anything else listens to the mouse, so it gets a real one.
 export const planDrag = ({ ref, toRef }: { ref: string; toRef: string }): DragPlan | null =>
   withElement(ref, (el): DragPlan | null => {
-    const to = state.byRef.get(toRef);
-    if (!to || !to.isConnected) return null;
+    const to = elementOf(toRef);
+    if (!to) return null;
     if (el.matches(":disabled")) return { status: "disabled" };
     const source = el.closest?.("[draggable=true]") ?? (el.draggable ? el : null);
     if (source) {

@@ -1,4 +1,4 @@
-import { state } from "../lib/state";
+import { elementOf } from "../lib/state";
 import type { Core } from "./core";
 import type { Line } from "./line";
 import type { Motion } from "./motion";
@@ -30,8 +30,7 @@ export const makeMoves = (a: Actor, kit: Kit) => {
     if (!begin()) return false;
     a.anchor = null;
     const to = { x, y };
-    const el = ref ? state.byRef.get(ref) : null;
-    a.target = el?.isConnected ? el : null;
+    a.target = ref ? elementOf(ref) : null;
     setWords(words);
     if (quietMotion()) {
       setPose(then);

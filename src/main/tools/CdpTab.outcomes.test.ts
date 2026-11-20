@@ -31,6 +31,17 @@ const PAGES: Record<string, string> = {
   notes.addEventListener("keydown", (event) => { if (event.key === "Enter") globalThis.enters++; });
   notes.addEventListener("input", () => { if (!notes.innerText.startsWith("Old note")) notes.innerText = "Old note " + notes.innerText; });
 </script>`,
+  "/rows": `<!doctype html><title>Feed</title><button>Keep</button><div id="feed"></div>
+<script>
+  globalThis.fill = (from) => {
+    document.getElementById("feed").replaceChildren(...Array.from({ length: 5 }, (_, i) => {
+      const row = document.createElement("button");
+      row.textContent = "Row " + (from + i);
+      return row;
+    }));
+  };
+  fill(1);
+</script>`,
 };
 
 describe.skipIf(!findChrome())("what Berry knows of what it did, over CDP", () => {
@@ -99,6 +110,18 @@ describe.skipIf(!findChrome())("what Berry knows of what it did, over CDP", () =
     expect(await tool("type_text").run({ ref, text: "New note", submit: true })).toMatch(/holds something other than that text/);
     expect(await tool("type_text").run({ ref, text: "" })).toMatch(/holds something other than that text/);
     expect(await tab.page.evaluate("globalThis.enters")).toBe(0);
+  });
+
+  it("lets go of rows the page threw away, and keeps a ref for one that's still there", async () => {
+    await goTo("/rows");
+    const keep = await refOf("Keep");
+    const before = await listed();
+    await tab.page.evaluate("fill(6)");
+    const after = await listed();
+    expect(await refOf("Keep")).toBe(keep);
+    const held = await tab.runInPage<string[]>("[...globalThis.__berry.byRef.keys()]");
+    expect(held.sort()).toEqual(after.map(({ ref }) => ref).sort());
+    expect(held).not.toContain(before.find(({ name }) => name === "Row 1")!.ref);
   });
 
   it("says it didn't go back when the browser turned it down", async () => {
