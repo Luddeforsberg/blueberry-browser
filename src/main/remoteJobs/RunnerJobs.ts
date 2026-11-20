@@ -9,6 +9,7 @@ import { CloudSharing } from "./CloudSharing";
 import { RunnerDiscovery } from "./RunnerDiscovery";
 import { loadRunnerJobs, MAX_FORGOTTEN, saveRunnerJobs } from "./runnerJobsFile";
 import { RunnerPolls } from "./RunnerPolls";
+import { startUntilAnswered, UNANSWERED } from "./startUntilAnswered";
 import { fresh, type Entry, type RunnerJobsHooks, type RunnerParts } from "./runnerTypes";
 
 export type { RunnerJobsHooks } from "./runnerTypes";
@@ -27,6 +28,8 @@ const DISCOVER_MS = 10_000;
 const NOT_SET_UP = "This copy of Blueberry has no account server, so it can't send jobs to the cloud.";
 const SIGN_IN = "Sign in to your Blueberry account in Settings to send jobs to the cloud.";
 const NOT_TAKEN = "The cloud didn't take the job. Try again in a moment.";
+const UNSURE =
+  "You signed in to another account before the cloud said whether it took this. If it did, it shows here once you're back on that account.";
 const TOO_MANY = "Five jobs are already waiting or going in the cloud. Try again when one is done.";
 const BUSY = "This chat already has a job going in the cloud, maybe sent from your phone. Send this again once it's done.";
 const NO_SUCH_RUNNER =
@@ -234,19 +237,27 @@ export class RunnerJobs implements ChatRunner {
       const token = await this.tokenFor(account);
       if (token === SWITCHED_ACCOUNT) return fail(SWITCHED);
       if (!token) return fail(SIGN_IN);
-      // Built on the newest job this chat has, which the server checks is the conversation's newest.
+      // Built on the newest job this chat has, which the server checks is the conversation's newest. Under one id for this
+      // message, so sending it again can't make a second job.
       const server = this.server;
-      const send = () =>
-        server.startCloudJob(token, {
-          prompt,
-          history: historyFromRow(earlier()),
-          mascot: mascotSnapshot(mascot),
-          actionApproval,
-          contextId: this.hooks.contextId(),
-          conversationId: entry.conversationId,
-          afterJobId: entry.jobIds.at(-1) ?? null,
-        });
-      let jobId: string | null;
+      const id = randomUUID();
+      const sendOnce = async () => {
+        const now = await this.tokenFor(account);
+        return typeof now === "string"
+          ? server.startCloudJob(now, {
+              id,
+              prompt,
+              history: historyFromRow(earlier()),
+              mascot: mascotSnapshot(mascot),
+              actionApproval,
+              contextId: this.hooks.contextId(),
+              conversationId: entry.conversationId,
+              afterJobId: entry.jobIds.at(-1) ?? null,
+            })
+          : null;
+      };
+      const send = () => startUntilAnswered(sendOnce, { going: () => !this.destroyed && this.signedIn === account, waitMs: this.pollMs });
+      let jobId: string | typeof UNANSWERED;
       try {
         jobId = await send();
       } catch (error) {
@@ -255,7 +266,7 @@ export class RunnerJobs implements ChatRunner {
         if (!(error instanceof ServerError && error.status === 409) || !(await this.discovery.catchUp(account, chatId, entry))) throw error;
         jobId = await send();
       }
-      if (!jobId) return fail(NOT_TAKEN);
+      if (jobId === UNANSWERED) return fail(UNSURE);
       entry.jobId = jobId;
       entry.jobIds.push(jobId);
       if (entry.cancel === "forget") {

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AccountState } from "../../shared/ipc";
 import { BERRY } from "../../shared/mascots";
-import { ServerError, type GalleryServer } from "../account/galleryServer";
+import { ServerError, Unreachable, type GalleryServer } from "../account/galleryServer";
 import { vi } from "vitest";
 import { RunnerJobs } from "./RunnerJobs";
 
@@ -22,13 +22,22 @@ export const setUp = () => {
   // Whether the runner is still linked, as the server would say.
   const link = { accepted: true };
   const jobs = new Map<string, { owner: string; row: Record<string, unknown> }>();
+  // The job each start's id made, so a start sent again gets that one back, as the server does.
+  const started = new Map<string, string>();
+  // How many starts are made and then lose their answer on the way back.
+  const lost = { answers: 0 };
   let made = 0;
   const account = { state: { status: "signed-in", email: ANA, problem: null } as AccountState };
   const tokenOf = () => account.state.email ?? "";
   const server = {
     startCloudJob: vi.fn(
-      async (token: string, job: { prompt: string; history: unknown[]; conversationId: string; afterJobId: string | null }) => {
+      async (token: string, job: { id: string; prompt: string; history: unknown[]; conversationId: string; afterJobId: string | null }) => {
         await answering;
+        const before = started.get(job.id);
+        if (before) {
+          if (lost.answers-- > 0) throw new Unreachable();
+          return before;
+        }
         if (!link.accepted) throw new ServerError(400, "");
         const conversation = [...jobs.values()].filter(({ row }) => row.conversation_id === job.conversationId).map(({ row }) => row);
         if (conversation.some((row) => !["done", "failed", "stopped"].includes(String(row.status)))) throw new ServerError(409, "");
@@ -52,6 +61,8 @@ export const setUp = () => {
             approval_text: "Click Place order",
           },
         });
+        started.set(job.id, id);
+        if (lost.answers-- > 0) throw new Unreachable();
         return id;
       },
     ),
@@ -172,6 +183,7 @@ export const setUp = () => {
     holdTokens,
     holdAnswers,
     link,
+    lost,
     fromPhone,
     adopt,
     followedUp,

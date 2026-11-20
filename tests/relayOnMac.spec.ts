@@ -54,6 +54,8 @@ test("a relay job runs as a chat on this Mac only while the switch is on, and it
     await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.cloud.runnerState())).status).toBe("linked");
     // The grant the relay's sign-in page makes, as the owner, once.
     const secret = await rpcAs(EMAIL, PASSWORD, "create_relay_grant", {});
+    // Taken up, as when ChatGPT or Claude exchanges its code.
+    await rpcAs(RUNNER_EMAIL, RUNNER_PASSWORD, "relay_activate_grant", { p_secret: secret });
     const startJob = (where: string) =>
       rpcAs(RUNNER_EMAIL, RUNNER_PASSWORD, "relay_start_job", {
         p_secret: secret,

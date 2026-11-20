@@ -44,7 +44,19 @@ describe("the relay's grants", () => {
     await as(owner, `select public.link_cloud_runner('${emailOf(runner)}')`);
     await as(runner, `select public.accept_cloud_runner_link('${emailOf(owner)}')`);
   };
-  const grant = async (owner: string) => String(await one(owner, "select public.create_relay_grant()"));
+  // Made at sign-in, waiting until the app that signed in exchanges its code, which the owner's runner takes up.
+  const pending = async (owner: string) => String(await one(owner, "select public.create_relay_grant()"));
+  const runnerOf = async (owner: string) =>
+    String(
+      defined((await db.query<{ runner: string }>("select runner from public.cloud_runner_links where owner = $1", [owner])).rows[0])
+        .runner,
+    );
+  const takeUp = async (owner: string, secret: string) => one(await runnerOf(owner), `select public.relay_activate_grant('${secret}')`);
+  const grant = async (owner: string) => {
+    const secret = await pending(owner);
+    await takeUp(owner, secret);
+    return secret;
+  };
   // Every relay function, as `uid` with `secret`, each either answering or refused.
   const everyCall = (secret: string, job = "00000000-0000-4000-8000-000000000000") => [
     `select * from public.relay_mascots('${secret}')`,
@@ -158,6 +170,7 @@ describe("the relay's grants", () => {
       )
     ).rows;
     expect(functions.map(({ proname }) => proname).sort()).toEqual([
+      "relay_activate_grant",
       "relay_flock",
       "relay_grant",
       "relay_jobs",
@@ -186,6 +199,44 @@ describe("the relay's grants", () => {
     await db.query("update public.cloud_relay_grants set revoked_at = null where owner = $1", [ALICE]);
     await expect(as(RUNNER, `select public.relay_start_job('${secret}', 'Go', ${MASCOT})`)).rejects.toThrow(/A runner can't start jobs/);
     expect((await db.query("select count(*)::int as n from public.cloud_jobs where owner = $1", [ALICE])).rows).toEqual([{ n: 0 }]);
+  });
+
+  it("works for nothing until its code is exchanged, which only its runner can do, once and soon", async () => {
+    const secret = await pending(ALICE);
+    await refusesAll(RUNNER, secret);
+    await expect(as(BOBS_RUNNER, `select public.relay_activate_grant('${secret}')`)).rejects.toThrow(/Not a grant waiting/);
+    await expect(as(ALICE, `select public.relay_activate_grant('${secret}')`)).rejects.toThrow(/Not a grant waiting/);
+    expect(await takeUp(ALICE, secret)).toBe(true);
+    await expect(takeUp(ALICE, secret)).rejects.toThrow(/Not a grant waiting/);
+    expect(await as(RUNNER, `select id from public.relay_mascots('${secret}')`)).toEqual([]);
+
+    const late = await pending(ALICE);
+    await db.query(
+      "update public.cloud_relay_grants set created_at = now() - interval '10 minutes 1 second' where revoked_at is null and activated_at is null",
+    );
+    await expect(takeUp(ALICE, late)).rejects.toThrow(/Not a grant waiting/);
+  });
+
+  it("keeps a connection that works however many sign-ins are left at the redirect", async () => {
+    const working = await grant(ALICE);
+    for (let n = 0; n < 30; n++) await pending(ALICE);
+    expect(await as(RUNNER, `select id from public.relay_mascots('${working}')`)).toEqual([]);
+    const waiting = await db.query<{ n: number }>(
+      "select count(*)::int as n from public.cloud_relay_grants where owner = $1 and revoked_at is null and activated_at is null",
+      [ALICE],
+    );
+    expect(waiting.rows).toEqual([{ n: 5 }]);
+    // And one waiting too long goes when the next is made.
+    await db.query(
+      "update public.cloud_relay_grants set created_at = now() - interval '11 minutes' where owner = $1 and activated_at is null",
+      [ALICE],
+    );
+    await pending(ALICE);
+    const after = await db.query<{ n: number }>(
+      "select count(*)::int as n from public.cloud_relay_grants where owner = $1 and revoked_at is null and activated_at is null",
+      [ALICE],
+    );
+    expect(after.rows).toEqual([{ n: 1 }]);
   });
 
   it("keeps a few grants per owner at a time", async () => {

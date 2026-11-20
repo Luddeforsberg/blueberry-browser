@@ -38,6 +38,7 @@ const CLOUD_FUNCTIONS = new Set([
   "relay_start_job",
   "relay_jobs",
   "relay_stop_job",
+  "relay_activate_grant",
   "relay_revoke_grant",
   "mac_presence",
   "mac_claim_job",
