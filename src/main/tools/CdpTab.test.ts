@@ -72,7 +72,7 @@ describe.skipIf(!findChrome())("a page in a browser over CDP", () => {
       onUse: () => {},
       limits: { name: "Scout", sites: ["127.0.0.1"], tools: ["click", "type", "visit"] },
     });
-  }, 30_000);
+  }, 90_000);
 
   afterAll(async () => {
     await cloud?.end();

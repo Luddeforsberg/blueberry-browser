@@ -7,7 +7,8 @@ import { connectOverCdp, type CloudBrowser, type CloudSession } from "./cloudBro
 // A Chrome on this computer standing in for the cloud, for tests and development: launched headless with a throwaway
 // profile, or one already running with `--remote-debugging-port`. There's no live view, so the window shows pictures.
 
-const LAUNCH_MS = 15_000;
+// A fresh profile on a cold machine, such as a Windows CI runner, often takes more than 15 seconds.
+const LAUNCH_MS = 60_000;
 
 const CHROME_PATHS: Partial<Record<NodeJS.Platform, string[]>> = {
   darwin: ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/Applications/Chromium.app/Contents/MacOS/Chromium"],
@@ -38,6 +39,12 @@ const launch = (executable: string): Promise<{ endpoint: string; process: ChildP
       `--user-data-dir=${profile}`,
       "--no-first-run",
       "--no-default-browser-check",
+      // Nothing a stand-in needs, and each is work a fresh profile does at startup.
+      "--disable-background-networking",
+      "--disable-component-update",
+      "--disable-default-apps",
+      "--disable-sync",
+      "--disable-breakpad",
       "--window-size=1280,800",
       "about:blank",
     ],
