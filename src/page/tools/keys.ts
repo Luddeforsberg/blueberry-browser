@@ -1,5 +1,5 @@
 import { expectKey } from "../lib/aim";
-import { activeNear, isFrame, type AnyElement } from "../lib/dom";
+import { activeNear, isFrame, type AnyElement, type PageElement } from "../lib/dom";
 import { nameOf, roleOf } from "../lib/names";
 import { state, withElement } from "../lib/state";
 
@@ -15,10 +15,16 @@ export interface FocusInfo {
 const focusInside = (el: AnyElement | null): Element | null | undefined =>
   el?.shadowRoot?.activeElement || (el && isFrame(el) ? el.contentDocument?.activeElement : null);
 
-// Where a key would go, and set up to notice that it did.
-export const aimKey = (): FocusInfo => {
+// Where a real key would go now.
+const focused = (): AnyElement | null => {
   let at: AnyElement | null = document.activeElement;
   for (let inner = focusInside(at); inner; inner = focusInside(at)) at = inner;
+  return at;
+};
+
+// Where a key would go, and set up to notice that it did.
+export const aimKey = (): FocusInfo => {
+  const at = focused();
   if (isFrame(at)) return { role: null, name: null, foreignFrame: true };
   expectKey(at?.ownerDocument.defaultView ?? window);
   if (!at || at === at.ownerDocument.body || at === at.ownerDocument.documentElement)
@@ -26,11 +32,44 @@ export const aimKey = (): FocusInfo => {
   return { role: roleOf(at), name: nameOf(at), foreignFrame: false };
 };
 
-// False until the key `aimKey` set up for arrives, then true. A new page has no record, so null means the key took
-// the page somewhere.
-export const keyLanded = (): boolean | null => state.keyed ?? null;
+// Set up for a key that goes only to this element, if the focus is on it. Anywhere else, a real key wouldn't reach it.
+export const aimKeyAt = ({ ref }: { ref: string }): boolean | null =>
+  withElement(ref, (el) => {
+    if (focused() !== el) return false;
+    expectKey(el.ownerDocument.defaultView ?? window, el);
+    return true;
+  });
+
+// False until the key `aimKey` or `aimKeyAt` set up for arrives, then true, or "missed" if it was stopped on its way
+// somewhere else. A new page has no record, so null means the key took the page somewhere.
+export const keyLanded = (): boolean | "missed" | null => state.keyed ?? null;
+
+export const endKeyWatch = (): void => state.stopKeyWatch?.();
 
 const NOT_A_FIELD: (string | undefined)[] = ["checkbox", "radio", "button", "submit", "reset", "image", "file"];
+
+// Text as a rich editor shows it: a space may come back as one that doesn't break, and an empty line held open by a
+// character with no width.
+const asShown = (text: string): string =>
+  text
+    .replace(/\r\n?/g, "\n")
+    .replace(/\u00a0/g, " ")
+    .replace(/[\u200b\ufeff]/g, "");
+
+// Whether the field holds exactly what was typed, and nothing it had before. A rich editor may end with a line break of
+// its own, and each new line may come back as a block, which reads as one line break or two, but never fewer.
+const holds = (el: PageElement, text: string): boolean => {
+  if (!el.isContentEditable) return el.value === text;
+  const typed = asShown(text).split(/(\n+)/);
+  const shown = asShown(el.innerText).replace(/\n$/, "").split(/(\n+)/);
+  return (
+    typed.length === shown.length &&
+    typed.every((part, at) => {
+      const there = shown[at] ?? "";
+      return at % 2 ? there.length >= part.length && there.length <= part.length * 2 : there === part;
+    })
+  );
+};
 
 export const typeIntoElement = ({ ref, text }: { ref: string; text: string }): string | null =>
   withElement(ref, (el) => {
@@ -54,7 +93,7 @@ export const typeIntoElement = ({ ref, text }: { ref: string; text: string }): s
       el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
     }
     el.dispatchEvent(new Event("change", { bubbles: true }));
-    if (el.isContentEditable ? !el.innerText.includes(text) : el.value !== text) return "not-kept";
+    if (!holds(el, text)) return "not-kept";
     return "done";
   });
 
@@ -84,11 +123,10 @@ export const typeChunk = ({ ref, chunk }: { ref: string; chunk: string }): boole
 
 export const finishTyping = ({ ref, text }: { ref: string; text: string }): "again" | "done" | null =>
   withElement(ref, (el) => {
-    const isThere = (): boolean => (el.isContentEditable ? el.innerText.includes(text) : el.value === text);
-    if (!isThere()) return "again";
+    if (!holds(el, text)) return "again";
     el.dispatchEvent(new Event("change", { bubbles: true }));
     // A page's own listener can change it, and what comes next mustn't go ahead on something else.
-    return isThere() ? "done" : "again";
+    return holds(el, text) ? "done" : "again";
   });
 
 // A real key goes wherever the focus is, and a page can move that after typing.

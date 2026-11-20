@@ -40,6 +40,8 @@ const FIRST_ONLY =
 const UNCHECKED = "The page couldn't be checked, so nothing was clicked.";
 const DISABLED = "That element is disabled, so nothing happened.";
 const NOT_DRAGGED = "The press didn't land on that element, so nothing was dragged.";
+const NOT_HOVERED =
+  "The pointer went to it, but it isn't over it now, so the page may have moved it or reacted already. Look again before trying again.";
 const MAY_HAVE_DRAGGED =
   "The drag went, but nothing showed that its press arrived, so it may or may not have happened. Look at the page before trying again.";
 
@@ -215,9 +217,12 @@ export const pointerTools = <T extends PageTarget>(context: ToolContext<T>) => {
                 aim = await tab.runInPage<Aim | null>(aimHover(ref, false));
                 if (aim === null) return STALE_ELEMENT;
               }
-              if (aim.status === "aimed") await moveTo(tab, { x: aim.x!, y: aim.y! });
+              const moved = aim.status === "aimed";
+              if (moved) await moveTo(tab, { x: aim.x!, y: aim.y! });
               const over = await tab.runInPage<boolean | null>(isHovered(ref));
               if (over) return "The pointer is over it now. Look again to see what appeared.";
+              // It may have got there and run what the page does on hover, which a scripted one would run again.
+              if (moved) return NOT_HOVERED;
             }
           }
           if (frameOf(tab, ref) && !(await flyToRef(tab, ref, (name) => `Pointing at ${name}`, "look"))) return leftOff(tab);

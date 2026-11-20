@@ -109,18 +109,51 @@ export const pressKey = async (tab: Pick<PageTarget, "sendAgentInput">, key: str
   await pause(STEP_MS);
 };
 
+// How a real action went, as the page showed it: "landed" it arrived, "missed" it reached nothing it was meant for,
+// "cut" it reached it and the rest went elsewhere, "lost" nothing came back in time to say.
 export type Arrival = "landed" | "missed" | "cut" | "lost";
 
+// What Berry knows of any action on a page, and so what may follow it. Every tool that acts goes by this:
+// - "confirmed": it happened. Done.
+// - "refused": it's known not to have happened. It was never sent, the browser turned it down, or nothing it was meant
+//   for received it. Only then may another try go for the same thing, real or scripted, since it can't do it twice.
+// - "unknown": it went and nothing says whether it counted. Nothing more goes for it, only words, because a second try
+//   would do it twice if the first arrived.
+// A guard is an action too: nothing acts behind one that isn't confirmed.
+export type Outcome = "confirmed" | "refused" | "unknown";
+
+export const outcomeOf = (arrival: Arrival): Outcome => (arrival === "landed" ? "confirmed" : arrival === "missed" ? "refused" : "unknown");
+
+const LATE = Symbol("late");
+
+// `work`, or LATE once `ms` is up, whichever comes first.
+const within = async <T>(work: Promise<T>, ms: number): Promise<T | typeof LATE> => {
+  let timer: NodeJS.Timeout | undefined;
+  const late = new Promise<typeof LATE>((resolve) => {
+    timer = setTimeout(() => resolve(LATE), ms);
+  });
+  try {
+    return await Promise.race([work, late]);
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
 // "landed" once the page has reported it, or answers null, which only a new document does, so the input took the page
-// somewhere. A page that can't answer, as while a new one replaces it, is asked again, and no answer at all is "lost".
-// "ended" means the watch ended before it could say, so nobody knows.
+// somewhere. A page that can't answer, as while a new one replaces it, is asked again, and no answer in time is "lost".
+// "ended" means the watch ended before it could say, so nobody knows. The time is the clock's, so a page that's slow to
+// answer each question doesn't get longer: a question still out when it's up counts as no answer.
 export const landed = async (ask: () => Promise<boolean | "missed" | "cut" | "ended" | null>): Promise<Arrival> => {
-  for (let waited = 0; waited < LANDED_MS; waited += LANDED_POLL_MS) {
-    const answer = await ask().catch(() => false as const);
-    if (answer === "ended") return "lost";
+  const deadline = Date.now() + LANDED_MS;
+  for (let left = LANDED_MS; left > 0; left = deadline - Date.now()) {
+    const answer = await within(
+      ask().catch(() => false as const),
+      left,
+    );
+    if (answer === LATE || answer === "ended") return "lost";
     if (answer === "missed" || answer === "cut") return answer;
     if (answer !== false) return "landed";
-    await pause(LANDED_POLL_MS);
+    await pause(Math.min(LANDED_POLL_MS, Math.max(0, deadline - Date.now())));
   }
   return "lost";
 };

@@ -3,6 +3,7 @@ import type { Layout, TabLoadError, TabTrouble } from "../../shared/ipc";
 import { PageActor, type ActorOptions } from "../tools/PageActor";
 import type { SavedWebTab } from "./Session";
 import type { PageTarget } from "../tools/pageTarget";
+import type { Outcome } from "../tools/pageInput";
 import { NavigationLimits } from "./NavigationLimits";
 import { TabPage } from "./TabPage";
 import { WebPage } from "./WebPage";
@@ -123,8 +124,15 @@ export class Tab implements PageTarget {
   get backUrl(): string | null {
     return this.web.backUrl;
   }
-  goBack(byAgent = false): void {
-    this.web.goBack(byAgent);
+  // The user going back, from the toolbar or a menu.
+  goBack(): void {
+    this.web.goBack(false);
+  }
+  // The window's history goes back at once or not at all, so there's nothing to wait for.
+  async agentGoBack(): Promise<Outcome> {
+    if (!this.canGoBack) return "refused";
+    this.web.goBack(true);
+    return "confirmed";
   }
   goForward(): void {
     this.web.goForward();

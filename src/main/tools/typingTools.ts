@@ -1,7 +1,9 @@
 import { z } from "zod";
 import {
   aimKey,
+  aimKeyAt,
   beginTyping,
+  endKeyWatch,
   finishTyping,
   hasFocus,
   keyLanded,
@@ -11,7 +13,7 @@ import {
   typeIntoElement,
   type FocusInfo,
 } from "./pageScripts";
-import { isHarmlessKey, isKnownKey, KEY_NAMES, landed, pause, pressKey } from "./pageInput";
+import { isHarmlessKey, isKnownKey, KEY_NAMES, landed, outcomeOf, pause, pressKey, type Outcome } from "./pageInput";
 import { typingChunks, typingPauseMs, type Spot } from "./PageActor";
 import type { PageTarget } from "./pageTarget";
 import { pageTool, tabId } from "./pageTool";
@@ -26,16 +28,20 @@ export const typingTools = <T extends PageTarget>(context: ToolContext<T>) => {
     context;
 
   // A real Enter where it can reach, which also submits a form the way a person's does. Only into the field the card
-  // named: if the focus has moved, this goes to that field by script instead.
-  const pressEnter = async (tab: T, ref: string) => {
-    if (!frameOf(tab, ref) && (await tab.runInPage<boolean | null>(hasFocus(ref)))) {
-      const focus = await tab.runInPage<FocusInfo>(aimKey);
-      if (!focus.foreignFrame) {
+  // named: if the focus isn't on it, this goes to that field by script instead. Once a real one has gone, nothing follows
+  // it: one the page sent somewhere else on its way is stopped there, but a listener of the page's may have heard it
+  // first, so it's "stray", not a reason to press again.
+  const pressEnter = async (tab: T, ref: string): Promise<Exclude<Outcome, "refused"> | "stray" | "gone"> => {
+    if (!frameOf(tab, ref) && (await tab.runInPage<boolean | null>(aimKeyAt(ref)))) {
+      try {
         await pressKey(tab, "Enter", false);
-        if ((await landed(() => tab.runInPage<boolean | null>(keyLanded))) === "landed") return;
+        const outcome = outcomeOf(await landed(() => tab.runInPage<boolean | "missed" | null>(keyLanded)));
+        return outcome === "refused" ? "stray" : outcome;
+      } finally {
+        await tab.runInPage(endKeyWatch).catch(() => {});
       }
     }
-    await onRef<string>(tab, ref, scriptedEnter);
+    return (await onRef<string>(tab, ref, scriptedEnter)) === null ? "gone" : "confirmed";
   };
 
   // Fields the user has stepped in on in this reply, which it doesn't type in again.
@@ -106,8 +112,8 @@ export const typingTools = <T extends PageTarget>(context: ToolContext<T>) => {
           await actorOn(tab)?.hop("Pressing a key");
           if (!carryOn(tab)) return leftOff(tab);
           await pressKey(tab, key, shift);
-          if ((await landed(() => tab.runInPage<boolean | null>(keyLanded))) === "lost")
-            return "The page didn't receive that key, so it may not have done anything.";
+          if (outcomeOf(await landed(() => tab.runInPage<boolean | null>(keyLanded))) === "unknown")
+            return "Nothing showed that the page received that key, so it may or may not have done anything. Look at the page before pressing it again.";
           return whereNow(tab);
         }),
     }),
@@ -152,7 +158,15 @@ export const typingTools = <T extends PageTarget>(context: ToolContext<T>) => {
               usersFields.add(`${tab.id}/${ref}`);
               return USER_IN_FIELD;
             }
-            await pressEnter(tab, ref);
+            const entered = await pressEnter(tab, ref);
+            if (entered === "unknown") {
+              const where = (await whereNow(tab)).replace(/^Done\. /, "");
+              return `It's typed in, and Enter went, but nothing showed that it arrived, so it may or may not have been submitted. Look at the page before trying again. ${where}`;
+            }
+            if (entered === "stray") {
+              return "It's typed in, but the page moved the focus away before Enter arrived, so Enter was stopped there and the field wasn't submitted. Look at the page before trying again.";
+            }
+            if (entered === "gone") return "It's typed in, but the field had gone before Enter could reach it, so nothing was submitted.";
           }
           return whereNow(tab);
         }),

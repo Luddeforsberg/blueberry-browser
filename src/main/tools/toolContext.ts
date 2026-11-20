@@ -274,8 +274,21 @@ export const toolContext = <T extends PageTarget>({
   };
 
   // A page can't take the tab off-limits while this runs. If it got there anyway, what came back is the other site's.
+  // A limit the browser didn't take means nothing runs at all.
   const limitedRun = async (tab: T, act: () => Promise<string>): Promise<string> => {
-    const { result, refused } = await tab.withNavigationLimit(allowed, act);
+    let acted = false;
+    const limited = await tab
+      .withNavigationLimit(allowed, () => {
+        acted = true;
+        return act();
+      })
+      .catch((error: unknown) => {
+        if (acted) throw error;
+        console.error("A page's navigation limit couldn't be put on:", error);
+        return null;
+      });
+    if (!limited) return `Nothing was done, because the limit on where ${limits?.name} may go couldn't be put on tab ${tab.id}.`;
+    const { result, refused } = limited;
     if (!allowed(tab.url)) return `${offLimits(tab.url).message} The tab went there by itself. Don't use it again.`;
     // A picture can't carry words, and it shows where the tab stayed anyway.
     const [firstRefused] = refused;

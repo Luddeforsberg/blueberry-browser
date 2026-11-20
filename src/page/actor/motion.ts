@@ -1,5 +1,5 @@
 import type { Point } from "../lib/dom";
-import { state } from "../lib/state";
+import { elementOf } from "../lib/state";
 import type { Core } from "./core";
 import type { Line } from "./line";
 import { div, type Actor } from "./stage";
@@ -72,8 +72,8 @@ export const makeMotion = (a: Actor, { quietMotion, size, place, now, rectOf }: 
   };
 
   const anchorTo = (ref: string | undefined): void => {
-    const el = ref ? state.byRef.get(ref) : null;
-    const rect = el?.isConnected ? rectOf(el) : null;
+    const el = ref ? elementOf(ref) : null;
+    const rect = el ? rectOf(el) : null;
     a.anchor = el && rect && a.spot ? { el, dx: a.spot.x - rect.left, dy: a.spot.y - rect.top } : null;
   };
 

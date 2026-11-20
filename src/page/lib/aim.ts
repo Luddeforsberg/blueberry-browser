@@ -56,16 +56,31 @@ export const reaches = (hit: Element | null, el: AnyElement): boolean => {
   return isInside(hit, el) || isInside(el, hit) || [...(el.labels ?? [])].some((label) => isInside(hit, label));
 };
 
-// A real key is checked by whether it arrives, because nothing says when it goes astray.
-export const expectKey = (win: Window): void => {
+// A real key is checked by whether it arrives, because nothing says when it goes astray. Aimed at one element, as Enter
+// for a field is, a key that reaches anything else is stopped before the page's listeners, as a press is, and is
+// "missed". It watches for one key, and ends then, when `endKeyWatch` says, or at the backstop.
+export const expectKey = (win: Window, on: AnyElement | null = null): void => {
+  state.stopKeyWatch?.();
   state.keyed = false;
-  win.addEventListener(
-    "keydown",
-    () => {
+  const watch = (event: Event): void => {
+    if (!event.isTrusted) return;
+    state.stopKeyWatch?.();
+    const first = event.composedPath()[0];
+    if (!on || (isElement(first) && isInside(first, on))) {
       state.keyed = true;
-    },
-    { capture: true, once: true },
-  );
+      return;
+    }
+    state.keyed = "missed";
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  };
+  const timer = setTimeout(() => state.stopKeyWatch?.(), WATCH_BACKSTOP_MS);
+  state.stopKeyWatch = () => {
+    clearTimeout(timer);
+    win.removeEventListener("keydown", watch, true);
+    state.stopKeyWatch = null;
+  };
+  win.addEventListener("keydown", watch, true);
 };
 
 // A page can move between aiming and pressing, or put something new under the pointer once pressed, and the card
