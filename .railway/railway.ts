@@ -39,8 +39,9 @@ const KEPT = [
 export default defineRailway((context, project) => {
   if (!context.projectName) throw new Error("Link this folder to the runner's Railway project first, with `railway link`.");
   // Where RELAY_STATE_FILE keeps the relay's connections, so ChatGPT and Claude stay signed in across deploys. A volume
-  // left out of this file would be taken off the service.
-  const data = volume("runner-volume");
+  // left out of this file would be taken off the service, and a setting left out would be cleared, so its region and size
+  // are the ones it has.
+  const data = volume("runner-volume", { region: "europe-west4-drams3a", sizeMB: 5000 });
   const runner = service("runner", {
     build: { builder: "DOCKERFILE", dockerfilePath: "runner/Dockerfile" },
     deploy: { numReplicas: 1, restartPolicyType: "ON_FAILURE", restartPolicyMaxRetries: 10 },
