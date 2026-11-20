@@ -121,10 +121,10 @@ export class TabPage {
       if (this.mayShowCode) throw new Error("This page may show a code");
     };
     mayCapture();
-    const { holdsStarted } = this;
+    const { sinceHeld } = this;
     const image = await this.fromPage(() => this.tab.actor.whileHidden(() => this.tab.view.webContents.capturePage()));
     mayCapture();
-    if (holdsStarted !== this.holdsStarted) throw new Error("The user had this tab");
+    if (!sinceHeld.current) throw new Error("The user had this tab");
     return image;
   }
 
