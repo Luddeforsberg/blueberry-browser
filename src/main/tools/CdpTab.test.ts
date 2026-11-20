@@ -206,6 +206,10 @@ describe.skipIf(!findChrome())("a page in a browser over CDP", () => {
       const { top, ms } = await page.runInPage<{ top: number; ms: number }>(
         `${first}(async (started) => ({ ...(await ${scrollPage(direction, true)}), ms: performance.now() - started }))(performance.now())`,
       );
+      const env = await page.runInPage<string>(
+        "JSON.stringify({ vis: document.visibilityState, focus: document.hasFocus(), reduce: matchMedia('(prefers-reduced-motion: reduce)').matches })",
+      );
+      console.error("PROBE scroll", direction, top, Math.round(ms), env);
       return { top, settled: await page.runInPage<number>("Math.round(scrollY)"), quick: ms < 100 };
     };
     // Busy for 200ms just after the call, as a page still loading can be, so the scroll hasn't started 120ms in.
