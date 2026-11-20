@@ -34,6 +34,47 @@ const fences = [
     message:
       "Each service is called from one file: Supabase from account/galleryServer.ts (runner/src/db.ts on the runner, shared/phoneCalls.ts on the phone page), Browserbase from cloud/browserbase.ts, Telegram from phone/TelegramChannel.ts, Firecrawl from tools/webFetch.ts and tools/webSearch.ts, and a model provider's key from settings/aiKeyTry.ts. Call that file, or give a new service a file of its own, allowed in eslint.fences.mjs.",
   },
+  {
+    // Main's timers stay where they are: they're the scheduler's and the pollers' own logic.
+    name: "timers",
+    in: ["src/renderer/**/*.{ts,tsx}"],
+    allowed: { "src/renderer/common/lib/timers.ts": "useNow and useForAMoment." },
+    heldBack: {
+      "src/renderer/chrome/src/DesktopApp.tsx":
+        "Its own useNow pauses on null and takes the time again when it restarts, which the shared one doesn't.",
+      "src/renderer/chrome/src/MenuApp.tsx": "The rest on a row before its submenu opens, started again on every row.",
+      "src/renderer/chrome/src/OverlayApp.tsx": "Hides the floating sidebar once it has slid out, unless it slides back in first.",
+      "src/renderer/chrome/src/TabPreviewApp.tsx": "The old face stays while the new one slides over it.",
+      "src/renderer/chrome/src/main.tsx": "A timer per scrolled element for its scroll thumb, outside React.",
+      "src/renderer/chrome/src/components/ChatMessage.tsx":
+        "Copied waits from the first copy, not the last, so useForAMoment would change it.",
+      "src/renderer/chrome/src/components/RunnerView.tsx":
+        "Asks for the live view at once and again every few seconds, ignoring an answer that comes too late.",
+      "src/renderer/chrome/src/components/TabPreview.tsx": "The rest and grace timers of the preview's state machine.",
+      "src/renderer/chrome/src/components/useAddressSuggestions.ts":
+        "Waits for typing to pause, and drops an answer that comes after the next key.",
+      "src/renderer/chrome/src/components/useSiteDrag.ts": "Swallows the click that ends a drag, for one turn of the event loop.",
+      "src/renderer/chrome/src/components/useTabDrag.ts": "Lets a dropped tab settle before it moves.",
+      "src/renderer/chrome/src/pages/CloudPage.tsx": "Fits the cloud tab once a resize has settled.",
+      "src/renderer/chrome/src/pages/HistoryPage.tsx": "Searches once typing pauses, or at once with nothing typed.",
+      "src/renderer/chrome/src/pages/NeedsYouPage.tsx":
+        "Keeps an answer's words for a moment: a value, not the yes or no useForAMoment holds.",
+      "src/renderer/chrome/src/pages/useMascotSwitch.ts": "Two timers for the steps of a mascot arriving.",
+      "src/renderer/common/components/PermissionCard.tsx": "Arms its buttons a moment after it shows.",
+      "src/renderer/common/components/Tooltip.tsx":
+        "The rest and grace timers of the tooltip's state machine, and the old words crossing over.",
+      "src/renderer/common/components/motion.ts": "The motion hooks: a menu leaving, rows folding and opening, and a loop's frames.",
+      "src/renderer/common/components/useMascotReaction.ts": "Ends a mascot's reaction, stopped together with its animation.",
+    },
+    rules: {
+      "no-restricted-globals": ["setTimeout", "setInterval"],
+      "no-restricted-properties": ["globalThis", "window", "self"].flatMap((object) =>
+        ["setTimeout", "setInterval"].map((property) => ({ object, property })),
+      ),
+    },
+    message:
+      "In a renderer, wait and repeat with useNow or useForAMoment from @common/lib/timers, which clear their timer when the component goes. If neither fits, add a hook there rather than a timer here (eslint.fences.mjs).",
+  },
 ];
 
 const RULES = {

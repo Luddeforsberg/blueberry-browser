@@ -4,6 +4,7 @@ import type { TabInfo } from "@shared/ipc";
 import type { NeedsYouItem } from "@shared/library";
 import { ApprovalCard, CardInShell, WhyLine } from "@common/components/ApprovalCard";
 import { Button } from "@common/components/Button";
+import { useNow } from "@common/lib/timers";
 import { cn } from "@common/lib/utils";
 import { useMascots, useLibrary } from "../contexts/useLibrary";
 import { useShell } from "../contexts/useShell";
@@ -30,15 +31,6 @@ const LINK = cn("rounded-row text-13 text-ink underline decoration-line underlin
 
 // Whatever answers says so at once, because the card keeps those words for a moment.
 type OnAnswered = (said: string) => void;
-
-const useNow = () => {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(timer);
-  }, []);
-  return now;
-};
 
 const openJob = (item: NeedsYouItem) => {
   if (item.routineId) openRoutines({ page: "routine", id: item.routineId });
@@ -250,7 +242,7 @@ const PhoneLine: React.FC = () => {
 // Everything the mascots are waiting on, from every chat and routine, answered here one at a time.
 export const NeedsYouPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
   const { needsYou } = useLibrary();
-  const now = useNow();
+  const now = useNow(30_000);
   // Answered on this visit, for the tally, and the one whose card still says what happened.
   const [answeredIds, setAnsweredIds] = useState<string[]>([]);
   const [justAnswered, setJustAnswered] = useState<{ item: NeedsYouItem; said: string } | null>(null);

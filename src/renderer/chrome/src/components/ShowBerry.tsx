@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Lock } from "lucide-react";
 import type { RecordingState, TrailKind, TrailStep } from "@shared/library";
 import { Button } from "@common/components/Button";
 import { Pips } from "@common/components/Pips";
 import type { PipMark } from "@common/components/pipPatterns";
+import { useNow } from "@common/lib/timers";
 import { cn } from "@common/lib/utils";
 import { useShell } from "../contexts/useShell";
 import { useAssistantName } from "./useAssistantName";
@@ -19,11 +20,7 @@ const clock = (ms: number) => {
 };
 
 const Elapsed: React.FC<{ since: number }> = ({ since }) => {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+  const now = useNow(1000);
   // A status is read out when it changes, and nobody wants this read out every second.
   return (
     <span aria-hidden className="font-mono text-11.5 text-ink-3 tabular-nums">

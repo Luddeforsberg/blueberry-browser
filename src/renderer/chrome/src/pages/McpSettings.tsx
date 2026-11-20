@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from "react";
+import React from "react";
 import type { McpActivity, McpSnippet } from "@shared/ipc";
 import { Button } from "@common/components/Button";
 import { Switch } from "@common/components/Controls";
+import { useForAMoment } from "@common/lib/timers";
 import { SettingsGroup, SettingsRow } from "../components/SettingsRow";
 import { useMcp } from "./useMcp";
 
@@ -11,15 +12,11 @@ const timeOf = (at: number) => new Date(at).toLocaleTimeString("en-GB", { hour: 
 
 // The snippet shows the key hidden. Copying puts the real one on the clipboard from main, so it never reaches this page.
 const Snippet: React.FC<{ snippet: McpSnippet }> = ({ snippet }) => {
-  const [copied, setCopied] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(() => () => clearTimeout(timer.current), []);
+  const [copied, sayCopied] = useForAMoment(SAID_FOR_MS);
   const id = `setting-mcp-${snippet.app.toLowerCase().replace(/\W+/g, "-")}`;
   const copy = async () => {
     if (!(await window.chromeAPI.mcp.copy(snippet.app))) return;
-    setCopied(true);
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => setCopied(false), SAID_FOR_MS);
+    sayCopied();
   };
   return (
     <SettingsRow
