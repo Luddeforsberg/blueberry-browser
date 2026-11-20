@@ -83,6 +83,23 @@ const fences = [
       "In a renderer, wait and repeat with useNow or useForAMoment from @common/lib/timers, which clear their timer when the component goes. If neither fits, add a hook there rather than a timer here (eslint.fences.mjs).",
   },
   {
+    // `as unknown as` says a value is a type it may not be, past every check. Rows from SQLite are read through
+    // rowOf and rowsOf instead, and test doubles stay free. src/main/tools/pageActorArt.ts is generated and not linted.
+    name: "casts",
+    in: ["src/**/*.{ts,tsx}", "runner/src/**/*.ts"],
+    heldBack: {
+      "src/main/chats/agent.ts":
+        "LangGraph's updates carry an __interrupt__ key the agent's types don't show, so reading it needs a parser of its own.",
+    },
+    rules: {
+      "no-restricted-syntax": [
+        ':matches(TSAsExpression, TSTypeAssertion)[expression.type=/^(TSAsExpression|TSTypeAssertion)$/][expression.typeAnnotation.type="TSUnknownKeyword"]',
+      ],
+    },
+    message:
+      "No `as unknown as` in app code: check the value where it enters, or read SQLite rows with rowOf or rowsOf from src/main/library/database.ts (eslint.fences.mjs).",
+  },
+  {
     name: "kit",
     in: ["src/renderer/**/*.tsx"],
     allowed: { "src/renderer/common/components": "The kit itself." },
