@@ -5,6 +5,8 @@ import { DESKTOP_BOX, DESKTOP_SHADOW } from "@shared/desktopSizes";
 import { SwitchSheet } from "@common/components/Controls";
 import { TIP_KEY, Tooltip } from "@common/components/Tooltip";
 import { cn } from "@common/lib/utils";
+import { sendOnEnter } from "@common/lib/keys";
+import { leftAfterSend, useSendOnce } from "./components/promptSend";
 import { DropFace, DropShape } from "./DesktopDrop";
 import { EASE, dropAt, restingSize, sideEdge } from "./desktopShape";
 import { desktop, FOCUS } from "./desktopPanelParts";
@@ -85,12 +87,12 @@ const WhereSwitch: React.FC<{ on: boolean; mac: boolean; onToggle: () => void }>
 
 // The prompt box: the drop, grown. Each opening starts at the drop's own size and place, over the drop in its window
 // beneath, and grows from there, and closing shrinks it back before the window hides, so the two read as one shape.
-export const GrownBox: React.FC<{ state: DesktopPanelState; mac: boolean; draft: string; setDraft: (draft: string) => void }> = ({
-  state,
-  mac,
-  draft,
-  setDraft,
-}) => {
+export const GrownBox: React.FC<{
+  state: DesktopPanelState;
+  mac: boolean;
+  draft: string;
+  setDraft: React.Dispatch<React.SetStateAction<string>>;
+}> = ({ state, mac, draft, setDraft }) => {
   const { box, edge, anchor, still, closing, opened, showBerry } = state;
   const room = useRoom();
   const [grown, setGrown] = useState(false);
@@ -156,8 +158,13 @@ export const GrownBox: React.FC<{ state: DesktopPanelState; mac: boolean; draft:
   const words = draft.trim();
   const others = box.mascots.length > 1;
 
-  const send = async () => {
-    if (words && (await desktop().send(words, inCloud))) setDraft("");
+  const sendOnce = useSendOnce();
+  const send = () => {
+    if (!words) return;
+    const written = draft;
+    sendOnce(async () => {
+      if (await desktop().send(words, inCloud)) setDraft((now) => leftAfterSend(now, written));
+    });
   };
   const next = (by: number) => {
     const at = box.mascots.findIndex(({ id }) => id === box.chosen.id);
@@ -266,10 +273,8 @@ export const GrownBox: React.FC<{ state: DesktopPanelState; mac: boolean; draft:
             placeholder={`Give ${name} a job`}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                void send();
-              } else if (event.key === "Tab" && others) {
+              if (sendOnEnter(event, send)) return;
+              if (event.key === "Tab" && others) {
                 event.preventDefault();
                 next(event.shiftKey ? -1 : 1);
               }
@@ -282,7 +287,7 @@ export const GrownBox: React.FC<{ state: DesktopPanelState; mac: boolean; draft:
               type="button"
               aria-label="Send"
               disabled={!words}
-              onClick={() => void send()}
+              onClick={send}
               className={cn(
                 "press size-[34px] shrink-0 rounded-full grid place-items-center",
                 words ? "bg-tip-ink text-tip" : "bg-tip-ink/[.14] text-tip-ink/55",

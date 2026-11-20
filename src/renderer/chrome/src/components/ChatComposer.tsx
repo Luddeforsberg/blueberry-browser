@@ -7,6 +7,7 @@ import { useAddMenu } from "./useAddMenu";
 import { useAttachments, type Attached, type JobPlace } from "../useAttachments";
 import { BERRY } from "@shared/mascots";
 import { Composer } from "./Composer";
+import { leftAfterSend, useSendOnce } from "./promptSend";
 
 // A composer that sends on Enter, for both chats.
 export const ChatComposer: React.FC<{
@@ -72,16 +73,18 @@ export const ChatComposer: React.FC<{
   }, [answering]);
 
   // What was typed and attached stays in the box until main has taken it, so a refused message can be sent again.
-  const sending = useRef(false);
-  const send = async () => {
+  const sendOnce = useSendOnce();
+  const send = () => {
     const message = value.trim();
-    if (!message || disabled || sending.current) return;
+    if (!message || disabled) return;
     if (answering && performance.now() - answeringSince.current < ARM_MS) return;
-    sending.current = true;
-    const sent = await onSend(message, box.sendable()).finally(() => (sending.current = false));
-    if (!sent) return;
-    setValue("");
-    box.clear();
+    const written = value;
+    const inBox = box.contents();
+    sendOnce(async () => {
+      if (!(await onSend(message, box.sendable()))) return;
+      setValue((now) => leftAfterSend(now, written));
+      box.letGo(inBox);
+    });
   };
 
   return (
@@ -92,18 +95,11 @@ export const ChatComposer: React.FC<{
       onChange={setValue}
       autoFocus={autoFocus}
       focusKey={focusKey}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" && !event.shiftKey) {
-          event.preventDefault();
-          // A key held down never sends, so it can't answer a question that arrives while it's held.
-          if (!event.repeat) void send();
-        }
-      }}
       attachment={box.empty && !attachment ? undefined : <BoxChips box={box} before={attachment} />}
       add={attach ? add : undefined}
       onFiles={attach && attach.place !== "runner" ? (files) => void box.addFiles(files) : undefined}
       canSend={!disabled && value.trim().length > 0}
-      onSend={() => void send()}
+      onSend={send}
       onStop={answering && value.trim() ? undefined : onStop}
       mascot={mascot}
       onChooseMascot={onChooseMascot}

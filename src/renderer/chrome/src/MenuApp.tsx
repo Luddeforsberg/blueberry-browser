@@ -30,6 +30,7 @@ import { Mascot } from "@common/components/Mascot";
 import { cn } from "@common/lib/utils";
 import { MenuRule, MenuSheet } from "./components/MenuSheet";
 import { leadsWithGlyph, menuRowClass } from "./components/menuRows";
+import { useFromMain, useLatest } from "@common/lib/latest";
 
 const api = () => window.chromeAPI.menu;
 
@@ -130,15 +131,19 @@ const OwnMenu: React.FC<{ menu: MenuShown }> = ({ menu }) => {
   const rest = useRef<number>(undefined);
   const all = sheetsOf(menu.entries);
 
-  // Measured once, for the menu main sent.
+  // Measured once, for the menu main sent, and placed as main answers for the newest of it.
+  const placing = useLatest();
   useLayoutEffect(() => {
     const sizes = sheetsOf(menu.entries).map(({ path }) => {
       const sheet = sheets.current.get(path);
       const row = path === "" ? null : sheets.current.get(parentOf(path))?.querySelector<HTMLElement>(`[data-path="${path}"]`);
       return { path, width: sheet?.offsetWidth ?? 0, height: sheet?.offsetHeight ?? 0, rowTop: row?.offsetTop ?? 0 };
     });
-    void api().place(menu.id, sizes).then(setPlaced);
-  }, [menu]);
+    const turn = placing.next();
+    void api()
+      .place(menu.id, sizes)
+      .then((placed) => turn.current && setPlaced(placed));
+  }, [menu, placing]);
 
   useEffect(() => () => window.clearTimeout(rest.current), []);
 
@@ -309,15 +314,12 @@ export const AskSheet: React.FC<{ ask: AskCard; onAnswer: (yes: boolean) => void
 
 // The menu view: one of our menus, or Asking first, as main says, over everything else.
 export const MenuApp: React.FC = () => {
-  const [state, setState] = useState<MenuViewState>(null);
+  const [state] = useFromMain<MenuViewState>(null, api().current, api().onShown);
 
+  const [theme] = useFromMain<ThemeState | null>(null, window.chromeAPI.theme.getTheme, window.chromeAPI.theme.onThemeUpdated);
   useEffect(() => {
-    const apply = ({ isDark }: ThemeState) => document.documentElement.classList.toggle("dark", isDark);
-    void window.chromeAPI.theme.getTheme().then(apply);
-    void api().current().then(setState);
-    const unsubscribe = [window.chromeAPI.theme.onThemeUpdated(apply), api().onShown(setState)];
-    return () => unsubscribe.forEach((off) => off());
-  }, []);
+    document.documentElement.classList.toggle("dark", theme?.isDark ?? false);
+  }, [theme?.isDark]);
 
   if (!state) return null;
   return state.kind === "menu" ? <OwnMenu key={state.menu.id} menu={state.menu} /> : <Ask key={state.ask.id} ask={state.ask} />;

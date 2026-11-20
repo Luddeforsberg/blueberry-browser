@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, X } from "lucide-react";
 import type { FindResult } from "@shared/ipc";
 import { cn } from "@common/lib/utils";
 import { ToolBarButton } from "./ToolBarButton";
+import { isEnter } from "@common/lib/keys";
 
 const countText = (value: string, result: FindResult | null): string => {
   if (!value || !result) return "";
@@ -39,7 +40,7 @@ export const FindBarCard: React.FC<{
         value={value}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={(event) => {
-          if (event.key === "Enter") {
+          if (isEnter(event)) {
             event.preventDefault();
             onStep(!event.shiftKey);
           }

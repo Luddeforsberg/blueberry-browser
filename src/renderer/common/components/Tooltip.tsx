@@ -6,6 +6,7 @@ import { cn } from "../lib/utils";
 import motion from "../motion.json";
 import { GRACE_MS, IDLE, REST_MS, placeTip, slidesFrom, stepTip, type Box, type TipEvent, type TipState } from "./tooltipState";
 import { missing } from "@shared/missing";
+import { isEnter } from "../lib/keys";
 
 // DESIGN.md section 8, A tooltip: one near-black pill for the whole view, which waits for the pointer to rest, then
 // follows it along a row of controls. The system's own tooltip isn't used anywhere in the chrome, and a lint rule
@@ -285,7 +286,7 @@ export const Tooltip: React.FC<{
       onBlur={() => api.send({ type: "leave", id, now: true })}
       onPointerDown={() => api.send({ type: "press", id })}
       onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => {
-        if (event.key === "Enter" || event.key === " ") api.send({ type: "press", id });
+        if (isEnter(event) || event.key === " ") api.send({ type: "press", id });
       }}
     >
       {children}

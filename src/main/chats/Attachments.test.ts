@@ -84,6 +84,24 @@ describe("Attachments", () => {
     expect(chips[0]).toMatchObject({ fact: ATTACHMENT_WORDS.cutShort, factInFull: ATTACHMENT_WORDS.cutShortInFull });
   });
 
+  it("prepares and reads nothing past the room, while a refused file takes none", async () => {
+    let prepared = 0;
+    const counting: PreparePicture = (bytes) => (prepared++, fakePicture(bytes));
+    const picture = { name: "p.png", bytes: new Uint8Array(PNG) };
+    const program = { name: "a.exe", bytes: new Uint8Array(Buffer.from("MZ\u0090\u0000\u0003\u0000")) };
+    const dropped = new Attachments(async () => [], counting).addFiles([program, ...Array.from({ length: 6 }, () => picture)], []);
+    expect(dropped.map(({ problem }) => problem)).toEqual([ATTACHMENT_WORDS.notAKind, ...Array(5).fill(null), ATTACHMENT_WORDS.tooMany]);
+    expect(prepared).toBe(MAX_FILES);
+
+    const folder = mkdtempSync(join(tmpdir(), "attachments-"));
+    const paths = [1, 2, 3, 4, 5, 6].map((n) => join(folder, `${n}.png`));
+    paths.forEach((path) => writeFileSync(path, PNG));
+    prepared = 0;
+    const chosen = await new Attachments(async () => paths, counting).chooseFiles([]);
+    expect(chosen.at(-1)).toMatchObject({ name: "6.png", problem: ATTACHMENT_WORDS.tooMany });
+    expect(prepared).toBe(MAX_FILES);
+  });
+
   it("lets go of a file nobody sent after a while", () => {
     let now = 0;
     const attachments = make([], () => now);

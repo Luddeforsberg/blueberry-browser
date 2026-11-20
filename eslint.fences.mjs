@@ -111,10 +111,27 @@ const fences = [
         "VariableDeclarator > UpdateExpression.init",
         // A count of requests by the name every one of them had.
         "Identifier[name=/generation/i]",
+        // An answer put straight into a component's state from an effect, which lands even after a newer one.
+        "CallExpression[callee.name=/^use(Layout)?Effect$/] CallExpression[callee.property.name='then'][arguments.0.name=/^set[A-Z]/]",
       ],
     },
     message:
-      "Use Latest from src/shared/lateWork.ts for work that finishes later: take a turn with next(), check its current before applying the answer, and end() when the owner goes. In a renderer, useLatest from @common/lib/latest. For one at a time, use OneAtATime (eslint.fences.mjs).",
+      "Use Latest from src/shared/lateWork.ts for work that finishes later: take a turn with next(), check its current before applying the answer, and end() when the owner goes. In a renderer, useLatest from @common/lib/latest, or useFromMain for something main keeps and pushes. For one at a time, use OneAtATime (eslint.fences.mjs).",
+  },
+  {
+    // An input method uses Enter to choose its words, as for Japanese or Chinese, and a field's own check of the key
+    // read that as the user pressing it, which sent a message they were still writing.
+    name: "enter",
+    in: ["src/renderer/**/*.{ts,tsx}"],
+    allowed: { "src/renderer/common/lib/keys.ts": "isEnter and sendOnEnter." },
+    rules: {
+      "no-restricted-syntax": [
+        'BinaryExpression[left.property.name="key"][right.value="Enter"]',
+        'BinaryExpression[right.property.name="key"][left.value="Enter"]',
+      ],
+    },
+    message:
+      "Read Enter with isEnter from @common/lib/keys, which leaves an input method's Enter to the text, or sendOnEnter in a prompt box (eslint.fences.mjs).",
   },
   {
     name: "kit",

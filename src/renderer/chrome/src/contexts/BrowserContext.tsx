@@ -1,22 +1,15 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useCallback } from "react";
 import type { TabInfo } from "@shared/ipc";
 import { BrowserContext, type BrowserContextType } from "./useBrowser";
+import { useFromMain } from "@common/lib/latest";
 
 const browser = () => window.chromeAPI.browser;
 
 export const BrowserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [tabs, setTabs] = useState<TabInfo[]>([]);
+  // Main pushes every change, so the list only needs fetching once.
+  const [tabs] = useFromMain<TabInfo[]>([], browser().getTabs, browser().onTabsUpdated);
 
   const activeTab = tabs.find((tab) => tab.isActive) || null;
-
-  // Main pushes every change, so the list only needs fetching once.
-  useEffect(() => {
-    browser()
-      .getTabs()
-      .then(setTabs)
-      .catch((error) => console.error("Failed to load tabs:", error));
-    return browser().onTabsUpdated(setTabs);
-  }, []);
 
   const run = useCallback(async (label: string, action: () => Promise<unknown>) => {
     try {

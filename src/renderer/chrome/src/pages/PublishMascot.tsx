@@ -12,6 +12,7 @@ import {
 import { Button } from "@common/components/Button";
 import { QuietChoice } from "@common/components/Controls";
 import { cn } from "@common/lib/utils";
+import { useLatest } from "@common/lib/latest";
 import { AccountForm } from "../components/AccountForm";
 import { Berry } from "../components/Berry";
 import { CopyLink } from "../components/CopyLink";
@@ -125,12 +126,17 @@ export const PublishMascot: React.FC<{
   const choices = "choices" in parsed ? parsed.choices : typed;
   const warnings = mascot ? publishWarnings(mascot, choices) : [];
 
+  // The latest pick wins, removing the example included, and lands on the form as it is then, so nothing typed while
+  // the chat was read goes back.
+  const picking = useLatest();
   const pickChat = async (chatId: string | null) => {
     setError(null);
+    const turn = picking.next();
     if (chatId === null) return set({ exampleChatId: null, prompt: "", answer: "", checked: false });
     const exchange = lastExchange((await window.chromeAPI.library.getChat(chatId)) ?? { messages: [] });
+    if (!turn.current) return;
     if (!exchange) return setError("That chat has no finished answer yet.");
-    return set({ exampleChatId: chatId, ...exchange, checked: false });
+    return onChange({ ...latest.current, exampleChatId: chatId, ...exchange, checked: false });
   };
 
   const publish = async () => {

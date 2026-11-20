@@ -67,9 +67,19 @@ export const useTabDrag = (tabIds: string[], axis: "x" | "y", onMove: (tabId: st
   const order = tabIds.join();
   const [stored, setStored] = useState<Drag | null>(null);
   const drag = stored?.order === order ? stored : null;
-  const stopListening = useRef<() => void>(undefined);
+  // How to end each gesture under way: its listeners, and the move waiting for its dropped tab to settle.
+  const gestures = useRef(new Set<() => void>());
 
-  useEffect(() => () => stopListening.current?.(), []);
+  // A new order, or the list going, ends any drag, which was measured against the old one, so a release or a settled
+  // drop can't move a tab to a place in a list that has changed.
+  useEffect(
+    () => () => {
+      gestures.current.forEach((stop) => stop());
+      gestures.current.clear();
+      setStored(null);
+    },
+    [order],
+  );
 
   const start = (event: ReactPointerEvent<HTMLElement>, tabId: string) => {
     const item = event.currentTarget;
@@ -109,16 +119,23 @@ export const useTabDrag = (tabIds: string[], axis: "x" | "y", onMove: (tabId: st
       setStored(current);
     };
 
+    let settling: number | undefined;
+    const stopListening = () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerCancel);
+    };
     const finish = (drop: boolean) => {
-      stopListening.current?.();
-      if (!current) return;
-      const { to, slots } = current;
-      if (!drop) {
-        setStored(null);
+      stopListening();
+      if (!current || !drop) {
+        gestures.current.delete(stop);
+        if (current) setStored(null);
         return;
       }
+      const { to, slots } = current;
       setStored({ ...current, offset: settledOffset(from, to, slots), settling: true });
-      window.setTimeout(() => {
+      settling = window.setTimeout(() => {
+        gestures.current.delete(stop);
         if (to === from) setStored(null);
         else void onMove(tabId, to).finally(() => setStored(null));
       }, SETTLE_MS);
@@ -126,14 +143,14 @@ export const useTabDrag = (tabIds: string[], axis: "x" | "y", onMove: (tabId: st
     const onPointerUp = () => finish(true);
     const onPointerCancel = () => finish(false);
 
+    const stop = () => {
+      stopListening();
+      window.clearTimeout(settling);
+    };
+    gestures.current.add(stop);
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp);
     window.addEventListener("pointercancel", onPointerCancel);
-    stopListening.current = () => {
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerUp);
-      window.removeEventListener("pointercancel", onPointerCancel);
-    };
   };
 
   const offsetOf = (index: number): number => {

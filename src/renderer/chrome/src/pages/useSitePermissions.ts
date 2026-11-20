@@ -1,12 +1,8 @@
-import { useEffect, useState } from "react";
 import type { SavedSitePermission } from "@shared/ipc";
+import { useFromMain } from "@common/lib/latest";
 
 // Every answer a site has saved, kept up to date.
 export const useSitePermissions = () => {
-  const [saved, setSaved] = useState<SavedSitePermission[]>([]);
-  useEffect(() => {
-    void window.chromeAPI.permissions.saved().then(setSaved);
-    return window.chromeAPI.permissions.onSavedUpdated(setSaved);
-  }, []);
+  const [saved] = useFromMain<SavedSitePermission[]>([], window.chromeAPI.permissions.saved, window.chromeAPI.permissions.onSavedUpdated);
   return saved;
 };

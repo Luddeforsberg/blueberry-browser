@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Cloud, Plug, Smartphone, Brain } from "lucide-react";
 import type { Appearance, ImportSource, LayoutMode, StartupChoice, TabInfo } from "@shared/ipc";
 import { SETTINGS_SECTIONS, settingsPlace, type SettingsPage as StepInPage, type SettingsSection } from "@shared/settingsPlaces";
@@ -28,6 +28,7 @@ import { CloudSettings } from "./CloudSettings";
 import { AccountSettings } from "./AccountSettings";
 import { WhatLeaves } from "./WhatLeaves";
 import { Mascots } from "./MascotSettings";
+import { useFromMain } from "@common/lib/latest";
 
 // DESIGN.md section 10, Settings: one column on the page, five sections along the top, and pages one step in. Where it
 // is lives in the tab's param, so the toolbar's Back steps out of a page and another page can open it anywhere.
@@ -165,10 +166,7 @@ const General: React.FC = () => {
 
 const Privacy: React.FC = () => {
   const sites = new Set(useSitePermissions().map(({ origin }) => origin)).size;
-  const [sources, setSources] = useState<ImportSource[] | null>(null);
-  useEffect(() => {
-    void window.chromeAPI.browser.importSources().then(setSources);
-  }, []);
+  const [sources] = useFromMain<ImportSource[] | null>(null, window.chromeAPI.browser.importSources);
   return (
     <>
       <SettingsGroup>

@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import type { ChatApproval, ChatThread } from "@shared/library";
 import type { Attached } from "../useAttachments";
 import type { Transcript } from "../chatTranscript";
+import { useLatest } from "@common/lib/latest";
 
 export interface ChatContextType {
   transcript: Transcript;
@@ -30,22 +31,28 @@ export interface ChatContextType {
 // One saved chat, kept current while its reply streams.
 export const useChatThread = (chatId: string | null): ChatThread | null => {
   const [thread, setThread] = useState<ChatThread | null>(null);
+  // The read counts only while nothing newer about the chat has come: a pushed update, or another chat chosen.
+  const reading = useLatest();
 
   useEffect(() => {
     if (!chatId) return undefined;
     const { chat, library } = window.chromeAPI;
     const unsubscribeThread = chat.onChatUpdated((updated) => {
-      if (updated.id === chatId) setThread(updated);
+      if (updated.id !== chatId) return;
+      reading.end();
+      setThread(updated);
     });
     const unsubscribeChunks = chat.onChatChunk(({ chatId: id, content }) => {
       if (id === chatId) setThread((current) => current && { ...current, partial: (current.partial ?? "") + content });
     });
-    void library.getChat(chatId).then(setThread);
+    const turn = reading.next();
+    void library.getChat(chatId).then((read) => turn.current && setThread(read));
     return () => {
+      reading.end();
       unsubscribeThread();
       unsubscribeChunks();
     };
-  }, [chatId]);
+  }, [chatId, reading]);
 
   return thread?.id === chatId ? thread : null;
 };

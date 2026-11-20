@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { useLatest } from "@common/lib/latest";
 import { ChevronDown, X } from "lucide-react";
 import type { HistoryCursor, HistoryEntry } from "@shared/ipc";
 import { Button } from "@common/components/Button";
@@ -107,25 +108,32 @@ export const HistoryPage: React.FC = () => {
   const [next, setNext] = useState<HistoryCursor | null>(null);
   const [failed, setFailed] = useState(false);
 
+  // Only the newest read counts: a search for words since changed, or Show more pressed again, never lands.
+  const reading = useLatest();
   const load = useCallback(
     async (text: string, before: HistoryCursor | null) => {
+      const turn = reading.next();
       try {
         const page = await browser.searchHistory({ query: text, before: before ?? undefined });
+        if (!turn.current) return;
         setEntries((shown) => (before ? [...(shown ?? []), ...page.entries] : page.entries));
         setNext(page.next);
         setFailed(false);
       } catch (error) {
+        if (!turn.current) return;
         console.error("Failed to load history:", error);
         setFailed(true);
       }
     },
-    [browser],
+    [browser, reading],
   );
 
   useEffect(() => {
+    // What was asked for the words before is stale from the first key, not only once the pause is over.
+    reading.end();
     const timer = setTimeout(() => void load(query, null), query ? SEARCH_DELAY_MS : 0);
     return () => clearTimeout(timer);
-  }, [load, query]);
+  }, [load, query, reading]);
 
   const remove = async (id: number) => {
     await browser.deleteHistoryEntry(id);

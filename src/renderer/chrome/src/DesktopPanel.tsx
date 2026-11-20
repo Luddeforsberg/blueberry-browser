@@ -5,19 +5,15 @@ import { useDesktopTheme } from "./useDesktopTheme";
 import { desktop } from "./desktopPanelParts";
 import { GrownBox } from "./DesktopBox";
 import { Sheets } from "./DesktopSheets";
+import { useFromMain } from "@common/lib/latest";
 
 // The window beside the drop that can take the keyboard without bringing Blueberry forward: the prompt box, or the tray
 // and the ask. A click anywhere in it that isn't on them, or Esc, closes it, and what was typed is kept.
 export const DesktopPanelApp: React.FC = () => {
-  const [state, setState] = useState<DesktopPanelState | null>(null);
+  const [state] = useFromMain<DesktopPanelState | null>(null, desktop().panelState, desktop().onPanelState);
   const [draft, setDraft] = useState("");
   const theme = useDesktopTheme();
   const mac = theme?.platform === "mac";
-
-  useEffect(() => {
-    void desktop().panelState().then(setState);
-    return desktop().onPanelState(setState);
-  }, []);
 
   const sheets = state?.open === "sheets";
   useEffect(() => {

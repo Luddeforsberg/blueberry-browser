@@ -1,26 +1,15 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import type { Layout, Settings, ThemeState } from "@shared/ipc";
 import { StillContext } from "@common/components/motion";
 import { ShellContext, type ShellContextType } from "./useShell";
+import { useFromMain } from "@common/lib/latest";
 
 // Layout, theme and settings all come from main, which owns the window.
 export const ShellProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [layout, setLayout] = useState<Layout | null>(null);
-  const [theme, setTheme] = useState<ThemeState | null>(null);
-  const [settings, setSettings] = useState<Settings | null>(null);
-
-  useEffect(() => {
-    const api = window.chromeAPI;
-    void api.layout.getLayout().then(setLayout);
-    void api.theme.getTheme().then(setTheme);
-    void api.settings.getSettings().then(setSettings);
-    const unsubscribe = [
-      api.layout.onLayoutUpdated(setLayout),
-      api.theme.onThemeUpdated(setTheme),
-      api.settings.onSettingsUpdated(setSettings),
-    ];
-    return () => unsubscribe.forEach((off) => off());
-  }, []);
+  const api = window.chromeAPI;
+  const [layout] = useFromMain<Layout | null>(null, api.layout.getLayout, api.layout.onLayoutUpdated);
+  const [theme] = useFromMain<ThemeState | null>(null, api.theme.getTheme, api.theme.onThemeUpdated);
+  const [settings] = useFromMain<Settings | null>(null, api.settings.getSettings, api.settings.onSettingsUpdated);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme?.isDark ?? false);

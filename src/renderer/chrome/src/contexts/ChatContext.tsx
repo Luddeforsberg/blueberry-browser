@@ -2,17 +2,14 @@ import React, { useEffect, useState, useCallback } from "react";
 import type { Attached } from "../useAttachments";
 import { transcriptOf } from "../chatTranscript";
 import { ChatContext, useChatThread, type ChatContextType } from "./useChat";
+import { useFromMain } from "@common/lib/latest";
 
 // The chat panel's conversation. New chat leaves this one in the sidebar and starts another.
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [chatId, setChatId] = useState<string | null>(null);
   const thread = useChatThread(chatId);
-  const [pageAccess, setPageAccessState] = useState(true);
+  const [pageAccess, setPageAccessState] = useFromMain(true, window.chromeAPI.chat.getPageAccess);
   const [draft, setDraft] = useState<string | null>(null);
-
-  useEffect(() => {
-    void window.chromeAPI.chat.getPageAccess().then(setPageAccessState);
-  }, []);
 
   // A panel chat has no tab, so main is told which one the panel has. A reply that ends in the open panel is then seen.
   useEffect(() => {
@@ -21,10 +18,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => window.chromeAPI.chat.onDraft(setDraft), []);
 
-  const setPageAccess = useCallback((enabled: boolean) => {
-    setPageAccessState(enabled);
-    void window.chromeAPI.chat.setPageAccess(enabled).then(setPageAccessState);
-  }, []);
+  const setPageAccess = useCallback(
+    (enabled: boolean) => {
+      setPageAccessState(enabled);
+      void window.chromeAPI.chat.setPageAccess(enabled).then(setPageAccessState);
+    },
+    [setPageAccessState],
+  );
 
   const sendMessage = useCallback(
     async (content: string, mascotId: string, attached?: Attached) => {

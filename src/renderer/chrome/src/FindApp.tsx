@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { FindResult, ThemeState } from "@shared/ipc";
 import { FindBarCard } from "./components/FindBarCard";
+import { useFromMain } from "@common/lib/latest";
 
 // The find bar, floating over the page in its own view. Main shows the view and says when.
 export const FindApp: React.FC = () => {
-  const [theme, setTheme] = useState<ThemeState | null>(null);
+  const [theme] = useFromMain<ThemeState | null>(null, window.chromeAPI.theme.getTheme, window.chromeAPI.theme.onThemeUpdated);
   const [value, setValue] = useState("");
   const [result, setResult] = useState<FindResult | null>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -13,9 +14,7 @@ export const FindApp: React.FC = () => {
 
   useEffect(() => {
     const api = window.chromeAPI;
-    void api.theme.getTheme().then(setTheme);
     const unsubscribe = [
-      api.theme.onThemeUpdated(setTheme),
       api.find.onResult(setResult),
       // The last search is still there to search again or type over, on whichever page this is now.
       api.find.onOpened(() => {

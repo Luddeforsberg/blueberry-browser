@@ -14,6 +14,7 @@ import { rowTime } from "../shortWords";
 import { Tooltip } from "@common/components/Tooltip";
 import { FOCUS, ROW, LEAD, ICON, CURRENT, useTick, openChat, openRoutine } from "./sidebarRows";
 import { Label, LabelButton } from "./SidebarLabels";
+import { isEnter } from "@common/lib/keys";
 
 // --- Chats ----------------------------------------------------------------------------------------------------------
 
@@ -63,7 +64,7 @@ export const ChatRow: React.FC<{
           onFocus={(event) => event.target.select()}
           onBlur={(event) => finish(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === "Enter") finish(event.currentTarget.value);
+            if (isEnter(event)) finish(event.currentTarget.value);
             if (event.key === "Escape") finish(null);
           }}
           className={cn(ROW, CURRENT)}

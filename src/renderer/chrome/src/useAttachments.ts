@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ATTACHMENT_WORDS, MAX_FILE_BYTES, type FileChip, type TabChoice } from "@shared/attachments";
+import { ATTACHMENT_WORDS, type FileChip, type TabChoice } from "@shared/attachments";
 import { useBrowser } from "./contexts/useBrowser";
+import { FileStaging } from "./fileStaging";
 
 // What a prompt box has been given to read. Main decides what each file is and whether it may go, and decides again as
 // the message goes: this only keeps the chips and says, for the place the job will run, what can't go along.
@@ -13,13 +14,12 @@ export interface Attached {
   tabs: string[];
 }
 
-let localIds = 0;
-
 export const useAttachments = (place: JobPlace) => {
   const [files, setFiles] = useState<FileChip[]>([]);
+  const [staging] = useState(() => new FileStaging(window.chromeAPI.attachments, setFiles));
   const [tabs, setTabs] = useState<TabChoice[]>([]);
-  const filesRef = useRef(files);
-  filesRef.current = files;
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
   const { tabs: open } = useBrowser();
 
   // A tab that closed simply goes from the box.
@@ -30,65 +30,40 @@ export const useAttachments = (place: JobPlace) => {
     });
   }, [open]);
 
-  // Files main is keeping for this box. Anything left when the box goes is let go of there too.
-  const kept = () => filesRef.current.filter((file) => !file.problem).map((file) => file.id);
-  useEffect(
-    () => () => {
-      kept().forEach((id) => void window.chromeAPI.attachments.discard(id));
-    },
-    [],
-  );
+  // Anything main keeps for this box is let go of there when the box goes, including what an add still out brings.
+  useEffect(() => {
+    staging.start();
+    return () => staging.close();
+  }, [staging]);
 
-  const chooseFiles = useCallback(async () => {
-    const chips = await window.chromeAPI.attachments.chooseFiles(kept());
-    if (chips.length > 0) setFiles((current) => [...current, ...chips]);
-  }, []);
-
-  // A drop or a paste. Only the bytes go, never a path, and no more of a file than it takes to say it's too big.
-  const addFiles = useCallback(async (list: File[]) => {
-    if (list.length === 0) return;
-    const read = await Promise.all(
-      list.map(async (file) => {
-        try {
-          return { name: file.name, bytes: new Uint8Array(await file.slice(0, MAX_FILE_BYTES + 1).arrayBuffer()) };
-        } catch {
-          // A folder, or a file that went while it was read.
-          return { name: file.name, bytes: null };
-        }
-      }),
-    );
-    const readable = read.flatMap(({ name, bytes }) => (bytes ? [{ name, bytes }] : []));
-    const unread: FileChip[] = read
-      .filter((file) => file.bytes === null)
-      .map((file) => ({
-        id: `unread-${++localIds}`,
-        kind: null,
-        name: file.name,
-        fact: null,
-        factInFull: null,
-        thumbnail: null,
-        problem: ATTACHMENT_WORDS.unreadable,
-      }));
-    const chips = readable.length > 0 ? await window.chromeAPI.attachments.addFiles(readable, kept()) : [];
-    setFiles((current) => [...current, ...chips, ...unread]);
-  }, []);
+  const chooseFiles = useCallback(() => staging.choose(), [staging]);
+  // A drop or a paste.
+  const addFiles = useCallback((list: File[]) => staging.drop(list), [staging]);
 
   const addTab = useCallback((tab: TabChoice) => {
     setTabs((current) => (current.some(({ id }) => id === tab.id) ? current : [...current, tab]));
   }, []);
 
-  const remove = useCallback((id: string) => {
-    setTabs((current) => current.filter((tab) => tab.id !== id));
-    setFiles((current) => current.filter((file) => file.id !== id));
-    void window.chromeAPI.attachments.discard(id);
-  }, []);
+  const remove = useCallback(
+    (id: string) => {
+      setTabs((current) => current.filter((tab) => tab.id !== id));
+      staging.remove(id);
+    },
+    [staging],
+  );
 
-  // Main has let go of what went. Anything that didn't go is let go of with it, as its chip is.
-  const clear = useCallback(() => {
-    kept().forEach((id) => void window.chromeAPI.attachments.discard(id));
-    setFiles([]);
-    setTabs([]);
-  }, []);
+  // Everything in the box now, to let go of once main has taken the message it's sent with.
+  const contents = useCallback((): string[] => [...staging.files.map(({ id }) => id), ...tabsRef.current.map(({ id }) => id)], [staging]);
+
+  // Main has taken the message these were in the box for. What went is main's, what didn't go goes with it, as its
+  // chip does, and anything added since stays.
+  const letGo = useCallback(
+    (ids: readonly string[]) => {
+      setTabs((current) => current.filter((tab) => !ids.includes(tab.id)));
+      staging.letGo(ids);
+    },
+    [staging],
+  );
 
   // The tab chips again, for a mascot chosen since: one it may not have says why.
   const recheckTabs = useCallback((choices: TabChoice[], missing: (tab: TabChoice) => string | null) => {
@@ -116,7 +91,8 @@ export const useAttachments = (place: JobPlace) => {
     addFiles,
     addTab,
     remove,
-    clear,
+    contents,
+    letGo,
     recheckTabs,
     fileProblem,
     tabProblem,

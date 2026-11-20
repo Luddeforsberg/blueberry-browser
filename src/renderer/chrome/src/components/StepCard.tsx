@@ -10,6 +10,7 @@ import { LABEL } from "@common/components/StatusPill";
 import { cn } from "@common/lib/utils";
 import { BerrySpot } from "./Berry";
 import { Tooltip } from "@common/components/Tooltip";
+import { isEnter } from "@common/lib/keys";
 
 // DESIGN.md section 10, Your mascots and Routines: making one is questions asked one at a time, each a card set into a
 // shell like the prompt box, with the mascot standing on it. Changing one part later is the same card, alone. Making a
@@ -195,7 +196,7 @@ export const SiteChips: React.FC<{ sites: string[]; onChange: (sites: string[]) 
                 setBad(null);
               }}
               onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === ",") {
+                if (isEnter(event) || event.key === ",") {
                   event.preventDefault();
                   if (add(adding) && event.key === ",") setAdding("");
                 } else if (event.key === "Escape") {

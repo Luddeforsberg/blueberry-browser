@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import type { PublishedMascot } from "@shared/library";
 import { ACCOUNT_NAME_MAX } from "@shared/accountName";
 import { Button } from "@common/components/Button";
@@ -11,6 +11,7 @@ import { SettingsGroup, SettingsRow } from "../components/SettingsRow";
 import { useShell } from "../contexts/useShell";
 import { useLibrary } from "../contexts/useLibrary";
 import { useAccount } from "../useAccount";
+import { useFromMain } from "@common/lib/latest";
 
 // Settings > Account. The name is the user's own, kept in Settings on this computer: nothing sends, prompts or publishes it.
 
@@ -19,12 +20,9 @@ const NEEDED_FOR = "publishing a mascot and keeping cloud jobs going with your M
 // Your published mascots, read from the server, so this still works for one whose copy here is gone.
 const PublishedList: React.FC = () => {
   const { mascots } = useLibrary();
-  const [list, setList] = useState<PublishedMascot[] | null | undefined>(undefined);
-  const [problem, setProblem] = useState<string | null>(null);
   const own = mascots.map((mascot) => mascot.publishedId ?? "").join();
-  useEffect(() => {
-    void window.chromeAPI.mascots.published().then(setList);
-  }, [own]);
+  const [list, setList] = useFromMain<PublishedMascot[] | null | undefined>(undefined, window.chromeAPI.mascots.published, undefined, own);
+  const [problem, setProblem] = useState<string | null>(null);
 
   const unpublish = async (id: string) => {
     const result = await window.chromeAPI.mascots.unpublish(id);

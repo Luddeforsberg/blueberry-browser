@@ -11,6 +11,7 @@ import { BETWEEN } from "../components/pageRows";
 import { FIELD, SiteChips } from "../components/StepCard";
 import type { MascotFormValues } from "../mascotsView";
 import { api, blocked, type Set } from "./mascotStepRules";
+import { isEnter } from "@common/lib/keys";
 
 // Part of making a mascot (MascotSteps.tsx): the answer to each step's question.
 
@@ -73,7 +74,7 @@ const NameAnswer: React.FC<{ values: MascotFormValues; set: Set; onEnter: () => 
     value={values.name}
     onChange={(event) => set({ name: event.target.value })}
     onKeyDown={(event) => {
-      if (event.key === "Enter") onEnter();
+      if (isEnter(event)) onEnter();
     }}
     className={cn(FIELD, "h-[60px] px-4 text-center text-30 font-medium")}
   />
