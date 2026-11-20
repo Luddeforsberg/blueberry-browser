@@ -1,27 +1,10 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import type { ChatApproval, ChatStep, ChatThread, SaidOnTheWay, UsedPage } from "@shared/library";
-import type { SentAttachment } from "@shared/attachments";
+import type { ChatApproval, ChatThread } from "@shared/library";
 import type { Attached } from "../useAttachments";
-
-export interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  steps?: ChatStep[];
-  said?: SaidOnTheWay[];
-  startedAt?: number | undefined;
-  took?: number;
-  memoryIds?: string[];
-  pages?: UsedPage[];
-  attached?: SentAttachment[];
-  isStreaming?: boolean;
-  statusLine?: string | null;
-}
+import type { Transcript } from "../chatTranscript";
 
 export interface ChatContextType {
-  messages: Message[];
-  isLoading: boolean;
-  error: string | null;
+  transcript: Transcript;
   chatId: string | null;
   // The open chat's name, once it has one.
   title: string | null;

@@ -21,7 +21,7 @@ export const createDesktopBerry = (w: WindowParts, stores: WindowStores): Deskto
     theme: () => w.theme,
     ended: (chatId) => {
       const chat = w.chats.thread(chatId);
-      if (!chat || w.chats.work(chatId)?.outcome === "stopped") return null;
+      if (!chat || w.chats.outcome(chatId) === "stopped") return null;
       const last = chat.messages.at(-1);
       return {
         mascotId: chat.mascotId ?? BERRY.id,

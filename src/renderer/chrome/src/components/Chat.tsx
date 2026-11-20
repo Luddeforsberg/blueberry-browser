@@ -1,10 +1,10 @@
 import React from "react";
 import { useBrowser } from "../contexts/useBrowser";
-import { useChat, type Message } from "../contexts/useChat";
+import { useChat } from "../contexts/useChat";
 import { useMascots, useLibrary } from "../contexts/useLibrary";
 import { BerrySpot } from "./Berry";
 import { useAssistantName } from "./useAssistantName";
-import { AssistantMessage, ChatApprovalCard, ThinkingMessage, UserMessage, WentWrong, type ReplyActions } from "./ChatMessage";
+import { AssistantMessage, ChatApprovalCard, UserMessage, WentWrong, type ReplyActions } from "./ChatMessage";
 import { didWork } from "./didWork";
 import { useFollowReply } from "./useFollowReply";
 import { chatRoutine } from "../routinesView";
@@ -25,9 +25,7 @@ const hostOf = (url: string) => {
 // The chat panel's conversation: the same messages, steps, cards and prompt box as the main chat, beside a page.
 export const Chat: React.FC = () => {
   const {
-    messages,
-    isLoading,
-    error,
+    transcript: { entries, running, error },
     chatId,
     title,
     approval,
@@ -45,10 +43,12 @@ export const Chat: React.FC = () => {
   const library = useLibrary();
   // An offer to remember arrives after the reply has ended, and has to be followed down like a step.
   const offers = library.memory.offers.filter((offer) => offer.sourceId === chatId).length;
+  const messages = entries.map(({ message }) => message);
+  const last = messages.at(-1);
   const scrollerRef = useFollowReply(
     messages.filter((message) => message.role === "user").length,
-    messages[messages.length - 1]?.content,
-    (messages[messages.length - 1]?.steps?.length ?? 0) + (approval ? 1 : 0) + offers,
+    last?.content,
+    (last?.steps?.length ?? 0) + (approval ? 1 : 0) + offers,
   );
   const name = useAssistantName(mascot);
   const { activeTab } = useBrowser();
@@ -58,10 +58,6 @@ export const Chat: React.FC = () => {
 
   // While a question waits, the prompt box is where it's answered.
   const question = approval?.question ? approval : null;
-  const last = messages.at(-1);
-  // Before the reply has anything to show, there's no message for it yet.
-  const thinking = isLoading && last?.role === "user";
-  const failedReply = error && last?.role === "assistant" ? last : null;
   const actions: ReplyActions = {
     onSay: (words) => void sendMessage(words, mascot.id),
     routineFromChat: chatId && didWork(messages) ? () => chatRoutine(title ?? "", messages, mascotId) : undefined,
@@ -70,42 +66,41 @@ export const Chat: React.FC = () => {
   return (
     <div className="flex flex-col h-full">
       <div ref={scrollerRef} className="flex-1 min-h-0 overflow-y-auto">
-        {messages.length === 0 ? (
+        {entries.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center gap-3 px-6 text-center animate-fade-in">
             <BerrySpot size={40} mascot={mascot} />
             <p className="text-14 text-ink-2">Ask about this page, or anything else.</p>
           </div>
         ) : (
           <div className="px-3.5 pt-2 pb-4 flex flex-col gap-6">
-            {messages.map((message: Message, index) =>
+            {entries.map(({ key, message, streaming, error: failed }, index) =>
               message.role === "user" ? (
-                <UserMessage key={message.id} content={message.content} attached={message.attached} />
+                <UserMessage key={key} content={message.content} attached={message.attached} />
               ) : (
                 <AssistantMessage
-                  key={message.id}
+                  key={key}
                   content={message.content}
                   steps={message.steps}
                   said={message.said}
                   startedAt={message.startedAt}
                   took={message.took}
-                  isStreaming={message.isStreaming}
+                  isStreaming={streaming}
                   waiting={approval !== null}
                   mascot={mascot}
-                  error={message === failedReply && error ? error : undefined}
+                  error={failed ?? undefined}
                   memoryIds={message.memoryIds}
                   pages={message.pages}
-                  actions={!isLoading && index === messages.length - 1 ? actions : undefined}
+                  actions={!running && index === entries.length - 1 ? actions : undefined}
                 />
               ),
             )}
-            {thinking && <ThinkingMessage mascot={mascot} waiting={approval !== null} />}
             {chatId && approval && (
               <div className="-mt-2">
                 <ChatApprovalCard chatId={chatId} approval={approval} mascot={mascot} />
               </div>
             )}
-            {error && !isLoading && !failedReply && <WentWrong message={error} mascot={mascot} actions={actions} />}
-            {!isLoading && <MemoryOffers key={chatId} sourceId={chatId} mascot={mascot} />}
+            {error && <WentWrong message={error} mascot={mascot} actions={actions} />}
+            {!running && <MemoryOffers key={chatId} sourceId={chatId} mascot={mascot} />}
           </div>
         )}
       </div>
@@ -120,8 +115,8 @@ export const Chat: React.FC = () => {
           onChooseMascot={chatId ? undefined : choose}
           draft={draft}
           onDraftTaken={takeDraft}
-          disabled={isLoading && !question}
-          onStop={isLoading ? stop : undefined}
+          disabled={running && !question}
+          onStop={running ? stop : undefined}
           placeholder={
             question
               ? question.answers?.length
@@ -129,7 +124,7 @@ export const Chat: React.FC = () => {
                 : `Answer ${name}`
               : name === "Assistant"
                 ? "Write a message"
-                : isLoading
+                : running
                   ? `Tell ${name} something while it works`
                   : `Tell ${name} something`
           }

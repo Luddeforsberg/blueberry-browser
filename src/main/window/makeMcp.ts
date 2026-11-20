@@ -18,7 +18,7 @@ export const createMcp = (w: WindowParts, stores: WindowStores): McpConnector =>
       chat: (id) => w.chats.thread(id),
       chatsFromApps: () => stores.chatStore.summaries().filter((chat) => chat.from),
       isRunning: (id) => w.chats.isRunning(id),
-      outcome: (id) => w.chats.work(id)?.outcome ?? null,
+      outcome: (id) => w.chats.outcome(id),
       stop: (id) => w.chats.stop(id),
       waiting: () => w.chats.waiting(),
       answer: (id, approvalId, answer) => w.chats.decide(id, approvalId, true, answer, { fromApp: true }),

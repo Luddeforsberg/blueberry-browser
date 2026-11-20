@@ -15,7 +15,7 @@ const ICON_BUTTON =
 // A second sheet beside the page, under the toolbar (DESIGN.md section 2). Its header is the mascot, the chat's name, and
 // a close ×, with New chat beside it once there's a chat to leave.
 export const ChatPanel: React.FC = () => {
-  const { clearChat, messages, chatId, title, mascotId, approval } = useChat();
+  const { clearChat, transcript, chatId, title, mascotId, approval } = useChat();
   const { toggleChat } = useShell();
   const { find, chosen } = useMascots();
   const mascot = chatId ? find(mascotId) : chosen;
@@ -27,7 +27,13 @@ export const ChatPanel: React.FC = () => {
         <Berry mood={approval ? "asking" : "rest"} size={20} mascot={mascot} still />
         <h2 className="min-w-0 flex-1 truncate text-14 font-medium text-ink">{title || name}</h2>
         <Tooltip words="New chat">
-          <button type="button" aria-label="New chat" disabled={messages.length === 0} onClick={clearChat} className={ICON_BUTTON}>
+          <button
+            type="button"
+            aria-label="New chat"
+            disabled={transcript.entries.length === 0}
+            onClick={clearChat}
+            className={ICON_BUTTON}
+          >
             <SquarePen className="size-4" strokeWidth={1.75} />
           </button>
         </Tooltip>

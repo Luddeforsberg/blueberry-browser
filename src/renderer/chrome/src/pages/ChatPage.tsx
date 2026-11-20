@@ -13,6 +13,7 @@ import { WorkingStrip, WorkingView } from "../components/WorkingView";
 import { useWorkView } from "../components/useWorkView";
 import { RunnerView } from "../components/RunnerView";
 import { answerInBox } from "../components/answerInBox";
+import { transcriptOf } from "../chatTranscript";
 
 // DESIGN.md section 2: the working view is 420px, with 18px either side of the picture, and goes beside the conversation
 // only while that keeps room to read.
@@ -32,7 +33,9 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
   // A chat stays with the mascot it started with.
   const mascot = find(thread?.mascotId ?? null);
   const name = useAssistantName(mascot);
-  const partial = thread?.partial;
+  const { entries, running, error } = transcriptOf(thread);
+  const messages = entries.map(({ message }) => message);
+  const last = messages.at(-1);
   const pageRef = useRef<HTMLDivElement>(null);
   const askingRef = useRef<HTMLDivElement>(null);
   const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
@@ -52,16 +55,15 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
   const roomBeside = pageSize.width >= ROOM_FOR_WORK;
   // Nothing is captured while the view is hidden or has no room.
   const { view: work, frames } = useWorkView(chatId, roomBeside && !workHidden ? PICTURE_WIDTH : 0);
-  const running = partial != null;
   const library = useLibrary();
   // An offer to remember arrives after the reply has ended, and has to be followed down like a step.
   const offers = library.memory.offers.filter((offer) => offer.sourceId === chatId).length;
   // Only the library's list says whether a chat's jobs go to a cloud tab, not the thread.
   const inCloud = library.chats.some((chat) => chat.id === chatId && chat.cloud);
   const scrollerRef = useFollowReply(
-    thread?.messages.filter((message) => message.role === "user").length ?? 0,
-    partial,
-    (thread?.steps.length ?? 0) + (thread?.approval ? 1 : 0) + offers,
+    messages.filter((message) => message.role === "user").length,
+    last?.content,
+    (last?.steps?.length ?? 0) + (thread?.approval ? 1 : 0) + offers,
   );
 
   // Chats begin on the new tab page, so this is only ever a moment while the chat loads, or one just deleted.
@@ -85,22 +87,6 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         ? { words: `from ${thread.from}`, cloud: false }
         : undefined;
 
-  // The reply being written holds the place it's saved in, so it stays the same element when it ends.
-  const messages = running
-    ? [
-        ...thread.messages,
-        {
-          role: "assistant" as const,
-          content: partial,
-          steps: thread.steps,
-          said: thread.said,
-          startedAt: thread.startedAt ?? undefined,
-          memoryIds: thread.memoryIds,
-        },
-      ]
-    : thread.messages;
-  const last = messages.at(-1);
-  const failedReply = thread.error && last?.role === "assistant" ? last : null;
   const firstReply = messages.findIndex((message) => message.role === "assistant");
 
   return (
@@ -108,28 +94,26 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
       <div className="flex-1 min-w-0 h-full flex flex-col">
         <div ref={scrollerRef} className="flex-1 min-h-0 overflow-y-auto">
           <div className={`${COLUMN} pt-6 pb-4 flex flex-col gap-6`}>
-            {messages.map((message, index) =>
+            {entries.map(({ key, message, streaming, error: failed }, index) =>
               message.role === "user" ? (
-                <UserMessage key={index} content={message.content} attached={message.attached} />
+                <UserMessage key={key} content={message.content} attached={message.attached} />
               ) : (
                 <AssistantMessage
-                  key={index}
+                  key={key}
                   content={message.content}
                   steps={message.steps}
                   said={message.said}
-                  isStreaming={running && index === messages.length - 1}
+                  isStreaming={streaming}
                   waiting={thread.approval !== null}
                   mascot={mascot}
-                  error={message === failedReply && thread.error ? thread.error : undefined}
+                  error={failed ?? undefined}
                   memoryIds={message.memoryIds}
                   pages={message.pages}
                   startedAt={message.startedAt}
                   took={message.took}
-                  actions={!running && index === messages.length - 1 ? actions : undefined}
+                  actions={!running && index === entries.length - 1 ? actions : undefined}
                   origin={index === firstReply ? origin : undefined}
-                  onShowWork={
-                    running && index === messages.length - 1 && work && roomBeside && workHidden ? () => setWorkHidden(false) : undefined
-                  }
+                  onShowWork={streaming && work && roomBeside && workHidden ? () => setWorkHidden(false) : undefined}
                   gutter
                 />
               ),
@@ -143,7 +127,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             {thread.runner && running && !roomBeside && thread.approval?.handoff && (
               <RunnerView chatId={chatId} steps={thread.steps} approval={thread.approval} />
             )}
-            {thread.error && !running && !failedReply && <WentWrong message={thread.error} mascot={mascot} actions={actions} gutter />}
+            {error && <WentWrong message={error} mascot={mascot} actions={actions} gutter />}
             {!running && <MemoryOffers key={chatId} sourceId={chatId} mascot={mascot} />}
           </div>
         </div>

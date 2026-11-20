@@ -1,9 +1,19 @@
 import { join } from "node:path";
 import { habitProposals, habitVisits, writeBrowserHistory } from "../history";
+import type { Drive } from "../driver";
 import type { Feature } from "../map";
 import { seen, heading, createTab, startChat, approvalCard, someChats } from "./ways";
 
 // The new tab page and the chats.
+
+// Asks in the chat panel beside a page on shop.example.
+const askInPanel = async (drive: Drive, text: string) => {
+  await createTab(drive, drive.site.url("shop.example"));
+  await drive.chrome.evaluate(() => window.chromeAPI.layout.toggleChat());
+  const box = drive.chrome.getByRole("textbox", { name: /ask|Message/i }).first();
+  await box.fill(text);
+  await box.press("Enter");
+};
 export const chatFeatures: Feature[] = [
   {
     name: "new-tab",
@@ -63,6 +73,22 @@ export const chatFeatures: Feature[] = [
           drive.model.replyWith("The cheapest is the **1 m cable** for 49 kr.\n\n- 1 m, 49 kr\n- 2 m, 79 kr\n- 3 m braided, 129 kr");
           await startChat(drive, "Find the cheapest USB-C cable", { title: "Cheapest cable" });
           await seen(drive.chrome, "3 m braided, 129 kr");
+        },
+      },
+      streaming: {
+        open: async (drive) => {
+          drive.model.replyWith("The cheapest is the **1 m cable** ", "for 49 kr.");
+          drive.model.holdAfterFirstToken();
+          await startChat(drive, "Find the cheapest USB-C cable");
+          await seen(drive.chrome, "1 m cable");
+        },
+      },
+      // The service turned the key down, so there's no reply to say so on.
+      error: {
+        open: async (drive) => {
+          drive.model.refuseKey("test-key");
+          await startChat(drive, "Find the cheapest USB-C cable");
+          await seen(drive.chrome, "The AI service turned down the key");
         },
       },
       working: {
@@ -135,6 +161,28 @@ export const chatFeatures: Feature[] = [
           await box.fill("What's the cheapest here?");
           await box.press("Enter");
           await seen(drive.chrome, "The cheapest is 1 m for 49 kr.");
+        },
+      },
+      thinking: {
+        open: async (drive) => {
+          drive.model.holdBeforeFirstToken();
+          await askInPanel(drive, "What's the cheapest here?");
+          await drive.chrome.getByRole("status").first().waitFor();
+        },
+      },
+      streaming: {
+        open: async (drive) => {
+          drive.model.replyWith("This page sells USB-C cables. ", "The cheapest is 1 m for 49 kr.");
+          drive.model.holdAfterFirstToken();
+          await askInPanel(drive, "What's the cheapest here?");
+          await seen(drive.chrome, "This page sells USB-C cables.");
+        },
+      },
+      error: {
+        open: async (drive) => {
+          drive.model.refuseKey("test-key");
+          await askInPanel(drive, "What's the cheapest here?");
+          await seen(drive.chrome, "The AI service turned down the key");
         },
       },
     },

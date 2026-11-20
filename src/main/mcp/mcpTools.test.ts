@@ -62,7 +62,7 @@ const setup = (stream: StreamReply, extra: Partial<McpHost> = {}) => {
     chat: (id) => chats.thread(id),
     chatsFromApps: () => store.summaries().filter((chat) => chat.from),
     isRunning: (id) => chats.isRunning(id),
-    outcome: (id) => chats.work(id)?.outcome ?? null,
+    outcome: (id) => chats.outcome(id),
     stop: (id) => chats.stop(id),
     waiting: () => chats.waiting(),
     answer: (id, approvalId, answer) => {
