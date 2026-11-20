@@ -75,6 +75,7 @@ export const pointerTools = <T extends PageTarget>(context: ToolContext<T>) => {
       return tab.runInPage<Aim | null>(aimClick(ref, false, arm));
     };
     let aim = await tab.runInPage<Aim | null>(aimClick(ref, true, arm));
+    console.error("PROBE first aim", JSON.stringify(aim), arm);
     if (aim?.status === "scrolled") aim = await aimAgain();
     if (aim === null) return STALE_ELEMENT;
     if (aim.status === "disabled") return finish("disabled");
@@ -89,6 +90,7 @@ export const pointerTools = <T extends PageTarget>(context: ToolContext<T>) => {
       if (!carryOn(tab)) return leftOff(tab);
       if (!(await clickAt(tab, { x: aim.x!, y: aim.y! }, clicks, () => carryOn(tab)))) return leftOff(tab);
       const arrived = await landed(() => tab.runInPage<boolean | "missed" | null>(inputLanded));
+      console.error("PROBE click", tries, JSON.stringify(aim), arrived, await tab.runInPage("JSON.stringify({w: innerWidth, h: innerHeight, dpr: devicePixelRatio, sy: scrollY})"));
       if (arrived === "landed") return finish("done");
       if (arrived === "lost") return carryOn(tab) ? finish(await scripted(), SCRIPTED) : leftOff(tab);
       await pause(SCROLL_SETTLE_MS);
