@@ -51,6 +51,13 @@ const onlyFrom = (what, imports, allowed, says) => ({
   types: true,
   message: `${says} Only ${allowed.join(", ")} may import ${what}.`,
 });
+// The same for calls to a method, by its name, in the app's main process and the runner.
+const calledOnlyFrom = (method, allowed, says) => ({
+  in: ["src/main", "runner/src"],
+  except: main(...allowed),
+  syntax: `CallExpression[callee.property.name="${method}"]`,
+  message: `${says} Only ${allowed.join(", ")} may use ${method}.`,
+});
 
 const rules = [
   {
@@ -322,6 +329,18 @@ const rules = [
     file("cloudFile"),
     ["cloud/CloudTabs.ts"],
     "The cloud's key and live view go to the chrome only, never to a tool or a chat.",
+  ),
+  // Calls no import rule sees: who may take a page's pixels, or get past a tab held for the user.
+  calledOnlyFrom("capturePage", ["tabs/Tab.ts", "tabs/TabPage.ts"], "A page's pixels are taken in Tab alone."),
+  calledOnlyFrom(
+    "picture",
+    ["window/WorkViews.ts", "tabs/TabPreviews.ts"],
+    "Tab.picture keeps the mascot in, so it goes to the working view and tab previews alone, never a tool, a chat or the disk.",
+  ),
+  calledOnlyFrom(
+    "sendInputWhileHeld",
+    ["tabs", "phone/codeEntry.ts"],
+    "Nothing gets past the hold on a tab handed to the user but a code from the phone, typed by codeEntry.ts.",
   ),
   onlyFrom(
     "the parts of RunnerJobs",
