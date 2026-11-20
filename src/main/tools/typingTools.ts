@@ -28,20 +28,20 @@ export const typingTools = <T extends PageTarget>(context: ToolContext<T>) => {
     context;
 
   // A real Enter where it can reach, which also submits a form the way a person's does. Only into the field the card
-  // named: if the focus isn't on it, this goes to that field by script instead, and a real one the page sends somewhere
-  // else on its way is stopped there. The script never follows a real Enter that may have arrived, which would submit
-  // twice.
-  const pressEnter = async (tab: T, ref: string): Promise<Outcome> => {
+  // named: if the focus isn't on it, this goes to that field by script instead. Once a real one has gone, nothing follows
+  // it: one the page sent somewhere else on its way is stopped there, but a listener of the page's may have heard it
+  // first, so it's "stray", not a reason to press again.
+  const pressEnter = async (tab: T, ref: string): Promise<Exclude<Outcome, "refused"> | "stray" | "gone"> => {
     if (!frameOf(tab, ref) && (await tab.runInPage<boolean | null>(aimKeyAt(ref)))) {
       try {
         await pressKey(tab, "Enter", false);
         const outcome = outcomeOf(await landed(() => tab.runInPage<boolean | "missed" | null>(keyLanded)));
-        if (outcome !== "refused") return outcome;
+        return outcome === "refused" ? "stray" : outcome;
       } finally {
         await tab.runInPage(endKeyWatch).catch(() => {});
       }
     }
-    return (await onRef<string>(tab, ref, scriptedEnter)) === null ? "refused" : "confirmed";
+    return (await onRef<string>(tab, ref, scriptedEnter)) === null ? "gone" : "confirmed";
   };
 
   // Fields the user has stepped in on in this reply, which it doesn't type in again.
@@ -163,8 +163,10 @@ export const typingTools = <T extends PageTarget>(context: ToolContext<T>) => {
               const where = (await whereNow(tab)).replace(/^Done\. /, "");
               return `It's typed in, and Enter went, but nothing showed that it arrived, so it may or may not have been submitted. Look at the page before trying again. ${where}`;
             }
-            if (entered === "refused")
-              return "It's typed in, but the field had gone before Enter could reach it, so nothing was submitted.";
+            if (entered === "stray") {
+              return "It's typed in, but the page moved the focus away before Enter arrived, so Enter was stopped there and the field wasn't submitted. Look at the page before trying again.";
+            }
+            if (entered === "gone") return "It's typed in, but the field had gone before Enter could reach it, so nothing was submitted.";
           }
           return whereNow(tab);
         }),

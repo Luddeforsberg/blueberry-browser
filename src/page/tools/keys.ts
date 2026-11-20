@@ -48,23 +48,27 @@ export const endKeyWatch = (): void => state.stopKeyWatch?.();
 
 const NOT_A_FIELD: (string | undefined)[] = ["checkbox", "radio", "button", "submit", "reset", "image", "file"];
 
-// Text as a rich editor shows it: a space may come back as one that doesn't break, an empty line held open by a
-// character with no width, and the end with a line break or two.
+// Text as a rich editor shows it: a space may come back as one that doesn't break, and an empty line held open by a
+// character with no width.
 const asShown = (text: string): string =>
   text
     .replace(/\r\n?/g, "\n")
     .replace(/\u00a0/g, " ")
-    .replace(/[\u200b\ufeff]/g, "")
-    .replace(/\n+$/, "");
+    .replace(/[\u200b\ufeff]/g, "");
 
-// Whether the field holds exactly what was typed, and nothing it had before. In a rich editor each new line may come
-// back as a block, which reads as one line break or two, but never fewer.
+// Whether the field holds exactly what was typed, and nothing it had before. A rich editor may end with a line break of
+// its own, and each new line may come back as a block, which reads as one line break or two, but never fewer.
 const holds = (el: PageElement, text: string): boolean => {
   if (!el.isContentEditable) return el.value === text;
-  const lines = asShown(text)
-    .split("\n")
-    .map((line) => line.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  return new RegExp(`^${lines.join("\n\n?")}$`).test(asShown(el.innerText));
+  const typed = asShown(text).split(/(\n+)/);
+  const shown = asShown(el.innerText).replace(/\n$/, "").split(/(\n+)/);
+  return (
+    typed.length === shown.length &&
+    typed.every((part, at) => {
+      const there = shown[at] ?? "";
+      return at % 2 ? there.length >= part.length && there.length <= part.length * 2 : there === part;
+    })
+  );
 };
 
 export const typeIntoElement = ({ ref, text }: { ref: string; text: string }): string | null =>

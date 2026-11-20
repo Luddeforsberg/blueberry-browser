@@ -123,7 +123,7 @@ describe.skipIf(!findChrome())("what Berry knows of what it did, over CDP", () =
     expect(await tab.runInPage("document.querySelector('input').value")).toBe("berries");
   }, 10_000);
 
-  it("stops a real Enter the page sends to another form on its way, and presses the named field's instead", async () => {
+  it("stops a real Enter the page sends to another form on its way, and presses nothing after it", async () => {
     await goTo("/forms");
     const ref = await refOf("Query");
     const send = tab.sendAgentInput.bind(tab);
@@ -132,11 +132,11 @@ describe.skipIf(!findChrome())("what Berry knows of what it did, over CDP", () =
       return send(event);
     });
     try {
-      expect(await tool("type_text").run({ ref, text: "berries", submit: true })).toMatch(/^Done\./);
+      expect(await tool("type_text").run({ ref, text: "berries", submit: true })).toMatch(/moved the focus away before Enter arrived/);
     } finally {
       spy.mockRestore();
     }
-    expect(await tab.page.evaluate("globalThis.sent")).toEqual({ search: 1, other: 0 });
+    expect(await tab.page.evaluate("globalThis.sent")).toEqual({ search: 0, other: 0 });
   }, 10_000);
 
   it("says a field didn't take it when the editor keeps what it had, and submits nothing", async () => {
@@ -146,7 +146,10 @@ describe.skipIf(!findChrome())("what Berry knows of what it did, over CDP", () =
     expect(await tool("type_text").run({ ref, text: "" })).toMatch(/holds something other than that text/);
     expect(await tab.page.evaluate("globalThis.enters")).toBe(0);
     const twoParagraphs = "First\n\nSecond";
-    expect(await tool("type_text").run({ ref: await refOf("Tight"), text: twoParagraphs })).toMatch(/holds something other/);
+    const tight = await refOf("Tight");
+    expect(await tool("type_text").run({ ref: tight, text: twoParagraphs })).toMatch(/holds something other/);
+    expect(await tool("type_text").run({ ref: tight, text: "Ends here\n\n" })).toMatch(/holds something other/);
+    expect(await tool("type_text").run({ ref: tight, text: `A${"\n".repeat(30)}B` })).toMatch(/holds something other/);
     expect(await tool("type_text").run({ ref: await refOf("Plain"), text: twoParagraphs })).toMatch(/^Done\./);
     expect(await tool("type_text").run({ ref: await refOf("Plain"), text: "One\nTwo" })).toMatch(/^Done\./);
   });
