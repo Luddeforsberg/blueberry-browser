@@ -114,7 +114,7 @@ This is the `foundations` audit of the preview branch at `581637f`. The full rep
     - **The UI kit:** a raw `<button>`, `<input>` or `<textarea>` outside `src/renderer/common/components` is refused, with the 61 screens that draw their own held back, since moving them onto the kit would change how they look. The kit has no field yet, and the message says a new one starts there.
     - **`as unknown as`:** refused in `src` and `runner/src`, in either form, with `chats/agent.ts` held back for LangGraph's `__interrupt__` key.
 22. End-to-end tests in CI, and protect `main` (medium).
-23. AGENTS.md down to about 60 lines (low).
+23. AGENTS.md down to about 60 lines (low). Done at 99 lines, from 126 lines and 10,058 words to 2,184 words: the commands table, How we build and the Traps are kept whole, and the walkthrough is in `docs/ARCHITECTURE.md`. Four rules that were only prose are now checks: `eslint.calls.mjs` refuses any reference to `Tab.picture`, `capturePage`, `sendInputWhileHeld` and `sendInputEvent` outside their files, and to `clipboard`, `desktopCapturer` and `getDisplayMedia` in the desktop mascot's files, and a test in `mascotLimits.test.ts` fails if a tool is missing from `TOOL_NEEDS`. The member checks don't see a name held in a variable or a method copied under a type of its own, and the docs say so. To get nearer 60, merge the generator and deploy rows of the commands table (about 4 lines) and move the desktop Traps into ARCHITECTURE.md (5 more). Both are the user's call.
 
 ## Found on the way, each its own PR
 - **Done:** the phone page showed what it had just sent a poll later, because `oneAtATime` handed a fresh load the poll already out (`e0d2ee5`).
