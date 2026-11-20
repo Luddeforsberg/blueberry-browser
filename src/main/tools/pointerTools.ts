@@ -37,13 +37,20 @@ const CUT_SHORT =
   "The press reached it, but the rest of the click went to something else and was stopped, so it may not have counted. Look at the page before trying again.";
 const FIRST_ONLY =
   "Only the first of the two clicks is known to have reached it, so it may have counted as a single click. Look at the page before trying again.";
-const PAGE_CHANGED = "The page changed just before the click, so nothing was clicked.";
+const UNCHECKED = "The page couldn't be checked, so nothing was clicked.";
 const DISABLED = "That element is disabled, so nothing happened.";
+const NOT_DRAGGED = "The press didn't land on that element, so nothing was dragged.";
+const MAY_HAVE_DRAGGED =
+  "The drag went, but nothing showed that its press arrived, so it may or may not have happened. Look at the page before trying again.";
+
+// How one real press went, or why it wasn't sent: the job stopped, the page couldn't be checked, the element has gone
+// or is disabled, or something else is at the point now.
+type Press = Arrival | "stopped" | "unchecked" | "gone" | "disabled" | "moved";
 
 // How the real presses of a click ended. `landed` counts those known to have reached the element, and "again" means
 // nothing reached the page, so it can be aimed at again.
 interface Pressing {
-  end: "done" | "again" | "stopped" | "gone" | "changed" | "disabled" | "moved" | Exclude<Arrival, "landed">;
+  end: "done" | "again" | Exclude<Press, "landed">;
   landed: number;
 }
 
@@ -74,32 +81,33 @@ export const pointerTools = <T extends PageTarget>(context: ToolContext<T>) => {
     clickedLabel,
   } = context;
 
-  // The watch on a press lasts until the tool is done with it, however that ends.
-  const watching = async <R>(tab: T, act: () => Promise<R>): Promise<R> => {
+  // One real press, with the pointer already there, checked and watched by the `watchPress` script given. It goes only
+  // if the point still reaches the element and the job carries on, and it's watched until what happened has been read.
+  // Only the watch it set is ended, so it never ends another's, and nothing is ended where none was set.
+  const watchedPress = async (tab: T, watching: string, send: () => Promise<void>): Promise<Press> => {
+    const check = await tab.runInPage<Aim | null>(watching).catch(() => undefined);
     try {
-      return await act();
+      if (!carryOn(tab)) return "stopped";
+      if (check === undefined) return "unchecked";
+      if (check === null) return "gone";
+      if (check.status !== "aimed") return check.status === "disabled" ? "disabled" : "moved";
+      await send();
+      return await landed(() => tab.runInPage<boolean | "missed" | "cut" | null>(inputLanded));
     } finally {
-      await tab.runInPage(endWatch).catch(() => {});
+      if (check?.watch) await tab.runInPage(endWatch(check.watch)).catch(() => {});
     }
   };
 
-  // Each press is checked and watched just before it goes, and what happened is read before the next, so a
-  // double-click whose first press went astray goes no further.
+  // What happened is read after each press before the next, so a double-click whose first press went astray, or
+  // can't be known to have landed, goes no further.
   const pressOn = async (tab: T, ref: string, point: Point, clicks: 1 | 2): Promise<Pressing> => {
     const ended = (end: Pressing["end"], before: number): Pressing => ({
       end: !before && (end === "missed" || end === "moved") ? "again" : end,
       landed: before,
     });
     for (let count = 1; count <= clicks; count++) {
-      const before = count - 1;
-      const check = await tab.runInPage<Aim | null>(watchPress(ref, point)).catch(() => undefined);
-      if (!carryOn(tab)) return ended("stopped", before);
-      if (check === undefined) return ended("changed", before);
-      if (check === null) return ended("gone", before);
-      if (check.status !== "aimed") return ended(check.status === "disabled" ? "disabled" : "moved", before);
-      await pressAt(tab, point, count);
-      const arrived = await landed(() => tab.runInPage<boolean | "missed" | "cut" | null>(inputLanded));
-      if (arrived !== "landed") return ended(arrived, before);
+      const arrived = await watchedPress(tab, watchPress(ref, point), () => pressAt(tab, point, count));
+      if (arrived !== "landed") return ended(arrived, count - 1);
     }
     return ended("done", clicks);
   };
@@ -109,7 +117,7 @@ export const pointerTools = <T extends PageTarget>(context: ToolContext<T>) => {
     if (end === "stopped") return leftOff(tab);
     if (!reached && end === "gone") return STALE_ELEMENT;
     if (!reached && end === "disabled") return DISABLED;
-    const note = reached ? FIRST_ONLY : end === "changed" ? PAGE_CHANGED : end === "cut" ? CUT_SHORT : MAY_NOT_HAVE_ARRIVED;
+    const note = reached ? FIRST_ONLY : end === "unchecked" ? UNCHECKED : end === "cut" ? CUT_SHORT : MAY_NOT_HAVE_ARRIVED;
     return `${note} ${(await whereNow(tab)).replace(/^Done\. /, "")}`;
   };
 
@@ -169,7 +177,7 @@ export const pointerTools = <T extends PageTarget>(context: ToolContext<T>) => {
       describe: ({ tabId: id, ref }) => describeOn(id, ref, ({ role, name }) => `Click the ${role} “${name}”`),
       whileAsking: standOnRef,
       whyRisky: async ({ tabId: id, ref }) => (await element(id, ref))?.clickRisk ?? null,
-      run: ({ tabId: id, ref }) => withTab(id, (tab) => watching(tab, () => clickRef(tab, ref, 1))),
+      run: ({ tabId: id, ref }) => withTab(id, (tab) => clickRef(tab, ref, 1)),
     }),
     double_click: pageTool({
       name: "double_click",
@@ -182,7 +190,7 @@ export const pointerTools = <T extends PageTarget>(context: ToolContext<T>) => {
       describe: ({ tabId: id, ref }) => describeOn(id, ref, ({ role, name }) => `Double-click the ${role} “${name}”`),
       whileAsking: standOnRef,
       whyRisky: async ({ tabId: id, ref }) => (await element(id, ref))?.clickRisk ?? null,
-      run: ({ tabId: id, ref }) => withTab(id, (tab) => watching(tab, () => clickRef(tab, ref, 2))),
+      run: ({ tabId: id, ref }) => withTab(id, (tab) => clickRef(tab, ref, 2)),
     }),
     hover: pageTool({
       name: "hover",
@@ -233,41 +241,44 @@ export const pointerTools = <T extends PageTarget>(context: ToolContext<T>) => {
         return `Drag the ${from.role} “${from.name}” onto the ${to.role} “${to.name}”${placeOf(from)} ${tab.url}`;
       },
       run: ({ tabId: id, ref, toRef }) =>
-        withTab(id, (tab) =>
-          watching(tab, async () => {
-            const frame = frameOf(tab, ref);
-            if (frame !== frameOf(tab, toRef)) return "Those two aren't in the same frame, so nothing was dragged.";
-            const inner = frame ? toRef.slice(toRef.indexOf(".") + 1) : toRef;
-            const dragging = (name: string | undefined) => `Dragging ${unnamed(name, "something")}`;
-            let words = "Dragging something";
-            // Asked before it moves anything, because a page's own drag-and-drop is played as events in one go.
-            if (!(await flyToRef(tab, ref, (name) => (words = dragging(name)), "land"))) return leftOff(tab);
-            const end = actorOn(tab) && !frame ? await tab.runInPage<Spot | null>(spotOf(toRef)).catch(() => null) : null;
-            let plan = await onRef<DragPlan>(tab, ref, (from) => planDrag(from, inner));
-            // It may have just scrolled them into view, so where they are now is what counts.
-            if (plan?.status === "aimed") {
-              await pause(SCROLL_SETTLE_MS);
-              plan = await onRef<DragPlan>(tab, ref, (from) => planDrag(from, inner));
-            }
-            if (plan === null) return STALE_ELEMENT;
-            if (plan.status === "disabled") return "That element is disabled, so nothing happened.";
-            if (plan.status === "covered") return "Something else is on top of one of those, so nothing was dragged. Clear it first.";
-            if (plan.status === "out-of-view")
-              return "Those two don't fit on screen together, or one is in a frame real input can't reach, so nothing was dragged.";
-            const check = "Nothing confirms that the page accepted it, so look at the page before saying it worked.";
-            if (plan.status === "aimed") {
-              // A frame's page writes its own answers, so it never gets to choose where the real mouse goes.
-              if (frame) return "That needs a real mouse, which can't reach a frame from another site, so nothing was dragged.";
-              if (end) actorOn(tab)?.carry(plan.to!, words, DRAG_MS);
-              await dragBetween(tab, plan.from!, plan.to!);
-              if ((await landed(() => tab.runInPage<boolean | "missed" | "cut" | null>(inputLanded))) !== "landed") {
-                return "The press didn't land on that element, so nothing was dragged.";
-              }
-            }
-            if (plan.status === "native" && end) actorOn(tab)?.carry({ x: end.x, y: end.y }, words);
-            return `${await whereNow(tab)} ${check}`;
-          }),
-        ),
+        withTab(id, async (tab) => {
+          const frame = frameOf(tab, ref);
+          if (frame !== frameOf(tab, toRef)) return "Those two aren't in the same frame, so nothing was dragged.";
+          const inner = frame ? toRef.slice(toRef.indexOf(".") + 1) : toRef;
+          const dragging = (name: string | undefined) => `Dragging ${unnamed(name, "something")}`;
+          let words = "Dragging something";
+          // Asked before it moves anything, because a page's own drag-and-drop is played as events in one go.
+          if (!(await flyToRef(tab, ref, (name) => (words = dragging(name)), "land"))) return leftOff(tab);
+          const end = actorOn(tab) && !frame ? await tab.runInPage<Spot | null>(spotOf(toRef)).catch(() => null) : null;
+          let plan = await onRef<DragPlan>(tab, ref, (from) => planDrag(from, inner));
+          // It may have just scrolled them into view, so where they are now is what counts.
+          if (plan?.status === "aimed") {
+            await pause(SCROLL_SETTLE_MS);
+            plan = await onRef<DragPlan>(tab, ref, (from) => planDrag(from, inner));
+          }
+          if (plan === null) return STALE_ELEMENT;
+          if (plan.status === "disabled") return "That element is disabled, so nothing happened.";
+          if (plan.status === "covered") return "Something else is on top of one of those, so nothing was dragged. Clear it first.";
+          if (plan.status === "out-of-view")
+            return "Those two don't fit on screen together, or one is in a frame real input can't reach, so nothing was dragged.";
+          const check = "Nothing confirms that the page accepted it, so look at the page before saying it worked.";
+          if (plan.status === "aimed") {
+            // A frame's page writes its own answers, so it never gets to choose where the real mouse goes.
+            if (frame) return "That needs a real mouse, which can't reach a frame from another site, so nothing was dragged.";
+            const { from, to } = { from: plan.from!, to: plan.to! };
+            await moveTo(tab, from);
+            const pressed = await watchedPress(tab, watchPress(ref, from, true), async () => {
+              if (end) actorOn(tab)?.carry(to, words, DRAG_MS);
+              await dragBetween(tab, from, to);
+            });
+            if (pressed === "stopped") return leftOff(tab);
+            if (pressed === "gone") return STALE_ELEMENT;
+            if (pressed === "lost") return MAY_HAVE_DRAGGED;
+            if (pressed !== "landed") return NOT_DRAGGED;
+          }
+          if (plan.status === "native" && end) actorOn(tab)?.carry({ x: end.x, y: end.y }, words);
+          return `${await whereNow(tab)} ${check}`;
+        }),
     }),
     choose_option: pageTool({
       name: "choose_option",

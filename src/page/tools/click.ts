@@ -10,6 +10,8 @@ export interface Aim {
   y?: number;
   // What's in the way, when something is.
   by?: string;
+  // The watch `watchPress` set, to end once what happened has been read.
+  watch?: string;
 }
 
 // Scrolled to it and ready for a real click. A dropdown opens a native menu and a file field the Mac's file
@@ -33,27 +35,23 @@ export const aimClick = ({ ref, mayScroll }: { ref: string; mayScroll: boolean }
   });
 
 // Just before each press: whether a press at the point would still land on the element, and only then a watch for
-// it, which lasts until main ends it. Anything else is reported and nothing should be pressed.
-export const watchPress = ({ ref, x, y }: { ref: string } & Point): Aim | null =>
+// it, which lasts until main ends it by its id. Anything else is reported and nothing should be pressed.
+export const watchPress = ({ ref, x, y, pressOnly }: { ref: string; pressOnly: boolean } & Point): Aim | null =>
   withElement(ref, (el): Aim => {
     if (el.matches(":disabled")) return { status: "disabled" };
     const hit = hitAt({ x, y });
     if (!reaches(hit, el)) return { status: "covered", by: (hit && nameOf(hit)) || hit?.tagName.toLowerCase() || "nothing" };
-    expectPressOn(el);
-    return { status: "aimed", x, y };
+    return { status: "aimed", x, y, watch: expectPressOn(el, { pressOnly }) };
   });
 
 // False until the input arrives, then true, "missed" for a press that was stopped, or "cut" for one that reached the
 // element before the rest of the click was stopped. A new page has no record, so null means the input took the page
 // somewhere.
-export const inputLanded = (): boolean | "missed" | "cut" | null => {
-  if (state.landed !== false) state.stopWatching?.();
-  return state.landed ?? null;
-};
+export const inputLanded = (): boolean | "missed" | "cut" | null => state.landed ?? null;
 
-// Main is done with the press, however it went.
-export const endWatch = (): void => {
-  state.stopWatching?.();
+// Main is done with the press, however it went. Only the watch it set, so it never ends one set since.
+export const endWatch = ({ id }: { id: string }): void => {
+  if (state.watch === id) state.stopWatching?.();
 };
 
 // For a frame from another origin, and when real input can't get there. Pages can tell this from a person.
@@ -152,6 +150,5 @@ export const planDrag = ({ ref, toRef }: { ref: string; toRef: string }): DragPl
     const onto = pointOn(to);
     if (!from || !onto) return { status: "out-of-view" };
     if (!reaches(hitAt(from), el) || !reaches(hitAt(onto), to)) return { status: "covered" };
-    expectPressOn(el, { pressOnly: true });
     return { status: "aimed", from, to: onto };
   });

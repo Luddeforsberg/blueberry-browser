@@ -51,8 +51,8 @@ export const pressAt = async (tab: PageTarget, point: Point, count: number): Pro
   await pause(STEP_MS);
 };
 
+// With the pointer already at `from`.
 export const dragBetween = async (tab: PageTarget, from: Point, to: Point): Promise<void> => {
-  await moveTo(tab, from);
   const start = inView(tab, from);
   const end = inView(tab, to);
   await press(tab, start, 1);
@@ -111,10 +111,11 @@ export const pressKey = async (tab: Pick<PageTarget, "sendAgentInput">, key: str
 
 export type Arrival = "landed" | "missed" | "cut" | "lost";
 
-// "landed" once the page has reported it, or if `ask` can't answer, which means the input took it to a new page.
+// "landed" once the page has reported it, or answers null, which only a new document does, so the input took the page
+// somewhere. A page that can't answer, as while a new one replaces it, is asked again, and no answer at all is "lost".
 export const landed = async (ask: () => Promise<boolean | "missed" | "cut" | null>): Promise<Arrival> => {
   for (let waited = 0; waited < LANDED_MS; waited += LANDED_POLL_MS) {
-    const answer = await ask().catch(() => null);
+    const answer = await ask().catch(() => false as const);
     if (answer === "missed" || answer === "cut") return answer;
     if (answer !== false) return "landed";
     await pause(LANDED_POLL_MS);

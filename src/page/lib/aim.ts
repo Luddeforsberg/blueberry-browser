@@ -4,7 +4,8 @@ import { state } from "./state";
 
 // Main ends the watch once it knows what happened, however slowly the input arrives. This only ends one a job left behind,
 // so it can't keep stopping the user's own clicks.
-const WATCH_BACKSTOP_MS = 15_000;
+const WATCH_BACKSTOP_MS = 60_000;
+const PRESSES = new Set(["pointerdown", "mousedown"]);
 
 // Where real input should go for this element, in the top page's pixels, or null if it can't go there: it's off
 // screen, or inside a frame from another origin, where the top page can't measure it and real input doesn't reach.
@@ -70,16 +71,21 @@ export const expect = (win: Window, type: string): void => {
 // A page can move between aiming and pressing, or put something new under the pointer once pressed, and the card
 // named this element and nothing else. So whatever arrives on anything else is stopped before the page's own
 // listeners, for the whole click. A drag only guards its press, because it's meant to let go somewhere else.
-export const expectPressOn = (el: AnyElement, { pressOnly = false } = {}): void => {
+// Returns the watch's id, which is the only way to end it.
+export const expectPressOn = (el: AnyElement, { pressOnly = false } = {}): string => {
   state.stopWatching?.();
   state.landed = false;
+  const id = Math.random().toString(36).slice(2);
   const targets = new Set([window, el.ownerDocument.defaultView ?? window]);
   const types = ["pointerdown", "mousedown", "pointerup", "mouseup", "click", "dblclick"];
   const watch = (event: Event): void => {
     if (!event.isTrusted) return;
     const first = event.composedPath()[0];
     const onIt = reaches(isElement(first) ? first : null, el);
-    if (state.landed === false) state.landed = onIt ? true : "missed";
+    // A press that reaches it counts whatever came before, since the user may have pressed somewhere else meanwhile,
+    // so "missed" only ever means that no press reached it.
+    if (onIt && PRESSES.has(event.type) && state.landed !== "cut") state.landed = true;
+    else if (state.landed === false) state.landed = onIt ? true : "missed";
     // The press reached it but the rest of the click is about to be stopped, so it may or may not have counted.
     else if (state.landed === true && !onIt && !pressOnly) state.landed = "cut";
     if (onIt || (pressOnly && state.landed === true)) return;
@@ -87,10 +93,13 @@ export const expectPressOn = (el: AnyElement, { pressOnly = false } = {}): void 
     event.stopImmediatePropagation();
   };
   const timer = setTimeout(() => state.stopWatching?.(), WATCH_BACKSTOP_MS);
+  state.watch = id;
   state.stopWatching = () => {
     clearTimeout(timer);
     targets.forEach((win) => types.forEach((type) => win.removeEventListener(type, watch, true)));
     state.stopWatching = null;
+    state.watch = null;
   };
   targets.forEach((win) => types.forEach((type) => win.addEventListener(type, watch, true)));
+  return id;
 };

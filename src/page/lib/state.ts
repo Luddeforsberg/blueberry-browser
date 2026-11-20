@@ -10,6 +10,8 @@ export interface ToolState {
   // the element before the rest of the click was stopped.
   landed?: boolean | "missed" | "cut";
   stopWatching?: (() => void) | null;
+  // The id of the watch on, which whoever set it ends with.
+  watch?: string | null;
 }
 
 declare global {
