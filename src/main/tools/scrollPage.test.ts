@@ -9,19 +9,22 @@ import { scrollPage } from "./pageScripts";
 const VIEW = 700;
 
 // `staleEnd` is the end of a slide before this one, which the browser tells only after that one answered at its limit.
-// `shrinksTo` is a page that gets shorter while it slides, so the slide stops at the new bottom.
+// `shrinksTo` is a page that gets shorter while it slides, so the slide stops at the new bottom. `zoomedView` is the
+// visual viewport's height under pinch zoom, shorter than the layout viewport, which is what scrolls.
 const pageWith = ({
   height,
   top = 0,
   slideMs = null,
   staleEnd = false,
   shrinksTo,
+  zoomedView = VIEW,
 }: {
   height: number;
   top?: number;
   slideMs?: number | null;
   staleEnd?: boolean;
   shrinksTo?: number;
+  zoomedView?: number;
 }) => {
   const root = { scrollHeight: height };
   const scrollEnd = new Set<() => void>();
@@ -50,7 +53,7 @@ const pageWith = ({
   return createContext({
     window,
     innerHeight: VIEW,
-    visualViewport: { height: VIEW },
+    visualViewport: { height: zoomedView },
     document: { documentElement: root },
     addEventListener: (type: string, listener: () => void) => type === "scrollend" && scrollEnd.add(listener),
     removeEventListener: (type: string, listener: () => void) => type === "scrollend" && scrollEnd.delete(listener),
@@ -97,6 +100,11 @@ describe("a smooth scroll", () => {
   it("answers where a page that got shorter on the way stopped it", async () => {
     const page = pageWith({ height: 5_000, top: 4_000, slideMs: 300, shrinksTo: 4_500 });
     expect(await answerOf(page, "down", true)).toEqual({ top: 3_800, ms: 300 });
+  });
+
+  it("answers where the slide stops at the bottom while the page is pinch-zoomed", async () => {
+    const page = pageWith({ height: 5_000, top: 4_000, slideMs: 300, zoomedView: 350 });
+    expect(await answerOf(page, "down", true)).toEqual({ top: 4_300, ms: 300 });
   });
 
   it("stops waiting for a slide that never says it ended, and answers where the page is", async () => {

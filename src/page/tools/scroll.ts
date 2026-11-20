@@ -13,16 +13,18 @@ export const scrollPage = async ({
 }): Promise<{ top: number; height: number }> => {
   const before = window.scrollY;
   // The visual viewport's height leaves out a horizontal scrollbar, which innerHeight counts.
-  const roomFrom = (top: number) =>
-    direction === "up" ? top : document.documentElement.scrollHeight - (visualViewport?.height ?? innerHeight) - top;
-  const room = roomFrom(before);
+  const room = direction === "up" ? before : document.documentElement.scrollHeight - (visualViewport?.height ?? innerHeight) - before;
   const by = Math.min(room, window.innerHeight * 0.9);
   const to = direction === "up" ? before - by : before + by;
   window.scrollBy({ top: (direction === "up" ? -1 : 1) * window.innerHeight * 0.9, behavior: smooth ? "smooth" : "instant" });
+  // What scrolls is the layout viewport, innerHeight, which pinch zoom leaves alone while it shortens the visual one. It
+  // counts a horizontal scrollbar too, so this can say the bottom a scrollbar early, which only answers sooner.
+  const atEdge = () =>
+    direction === "up" ? window.scrollY <= 1 : document.documentElement.scrollHeight - innerHeight - window.scrollY <= 1;
   if (smooth && room > 1) {
     await new Promise<void>((resolve) => {
       const ended = () => {
-        if (Math.abs(window.scrollY - to) > 1 && roomFrom(window.scrollY) > 1) return;
+        if (Math.abs(window.scrollY - to) > 1 && !atEdge()) return;
         removeEventListener("scrollend", ended);
         resolve();
       };
