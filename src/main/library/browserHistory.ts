@@ -3,6 +3,7 @@ import { DatabaseSync } from "node:sqlite";
 import { tmpdir } from "os";
 import { join } from "path";
 import type { ImportSource, Visit } from "../../shared/ipc";
+import { rowsOf } from "./database";
 
 const DAY_MS = 86_400_000;
 const WINDOW_DAYS = 90;
@@ -154,10 +155,11 @@ const readProfile = async (file: string, now: number, tempRoot: string): Promise
     const db = new DatabaseSync(copy, { readOnly: true });
     try {
       const inChromiumTime = (ms: number) => (BigInt(ms) + CHROMIUM_EPOCH_MS) * 1000n;
-      const rows = db.prepare(VISITS_QUERY).all(inChromiumTime(now - WINDOW_DAYS * DAY_MS), inChromiumTime(now)) as unknown as Omit<
-        Visit,
-        "favicon"
-      >[];
+      const rows = rowsOf<Omit<Visit, "favicon">>(
+        db.prepare(VISITS_QUERY),
+        inChromiumTime(now - WINDOW_DAYS * DAY_MS),
+        inChromiumTime(now),
+      );
       return rows.map((row) => ({ ...row, favicon: null }));
     } finally {
       db.close();

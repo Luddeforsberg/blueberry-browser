@@ -2,7 +2,7 @@ import { mkdirSync } from "fs";
 import { dirname } from "path";
 import { DatabaseSync } from "node:sqlite";
 import type { HistoryCursor, HistoryEntry, HistoryPage, Visit, VisitedPage } from "../../shared/ipc";
-import { migrate } from "./database";
+import { migrate, rowOf, rowsOf } from "./database";
 
 const MIGRATIONS = [
   `CREATE TABLE visits (
@@ -42,9 +42,10 @@ export class HistoryStore {
   }
 
   private newestFor(url: string): HistoryEntry | undefined {
-    return this.db
-      .prepare(`SELECT ${ENTRY_COLUMNS} FROM visits WHERE url = ? ORDER BY visited_at DESC, id DESC LIMIT 1`)
-      .get(url) as unknown as HistoryEntry | undefined;
+    return rowOf<HistoryEntry>(
+      this.db.prepare(`SELECT ${ENTRY_COLUMNS} FROM visits WHERE url = ? ORDER BY visited_at DESC, id DESC LIMIT 1`),
+      url,
+    );
   }
 
   record(url: string, title: string, favicon: string | null, now = Date.now()): void {
@@ -72,21 +73,24 @@ export class HistoryStore {
 
   // The newest visit to each page.
   recent(limit = RECENT_LIMIT): Visit[] {
-    return this.db
-      .prepare(
+    return rowsOf<Visit>(
+      this.db.prepare(
         `SELECT url, title, favicon, MAX(visited_at) AS visitedAt FROM visits
          GROUP BY url ORDER BY visitedAt DESC LIMIT ?`,
-      )
-      .all(limit) as unknown as Visit[];
+      ),
+      limit,
+    );
   }
 
   // Every visit since then, newest first, up to a limit.
   since(time: number, limit: number): Visit[] {
-    return this.db
-      .prepare(
+    return rowsOf<Visit>(
+      this.db.prepare(
         "SELECT url, title, favicon, visited_at AS visitedAt FROM visits WHERE visited_at >= ? ORDER BY visited_at DESC, id DESC LIMIT ?",
-      )
-      .all(time, limit) as unknown as Visit[];
+      ),
+      time,
+      limit,
+    );
   }
 
   // Newest first. Pass the last page's `next` as `before` to go on from it.
@@ -97,22 +101,21 @@ export class HistoryStore {
   }: { query?: string; before?: HistoryCursor | undefined; limit?: number } = {}): HistoryPage {
     const size = Math.max(1, Math.min(limit, MAX_PAGE_SIZE));
     const pattern = `%${query.trim().replace(/[\\%_]/g, "\\$&")}%`;
-    const rows = this.db
-      .prepare(
+    const rows = rowsOf<HistoryEntry>(
+      this.db.prepare(
         `SELECT ${ENTRY_COLUMNS} FROM visits
          WHERE (title LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\')
            AND (? IS NULL OR visited_at < ? OR (visited_at = ? AND id < ?))
          ORDER BY visited_at DESC, id DESC LIMIT ?`,
-      )
-      .all(
-        pattern,
-        pattern,
-        before?.visitedAt ?? null,
-        before?.visitedAt ?? null,
-        before?.visitedAt ?? null,
-        before?.id ?? null,
-        size + 1,
-      ) as unknown as HistoryEntry[];
+      ),
+      pattern,
+      pattern,
+      before?.visitedAt ?? null,
+      before?.visitedAt ?? null,
+      before?.visitedAt ?? null,
+      before?.id ?? null,
+      size + 1,
+    );
     const entries = rows.slice(0, size);
     const last = entries.at(-1);
     return {
@@ -132,16 +135,21 @@ export class HistoryStore {
     const escaped = word.replace(/[\\%_]/g, "\\$&");
     const anywhere = `%${escaped}%`;
     const hosts = ["https://", "https://www.", "http://", "http://www."].map((scheme) => `${scheme}${escaped}%`);
-    return this.db
-      .prepare(
+    return rowsOf<VisitedPage>(
+      this.db.prepare(
         `SELECT url, title, favicon, MAX(visited_at) AS lastVisit, COUNT(*) AS visits
          FROM (SELECT url, title, favicon, visited_at FROM visits ORDER BY visited_at DESC LIMIT ?)
          WHERE title LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\'
          GROUP BY url
          ORDER BY (url LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\') DESC, lastVisit DESC
          LIMIT ?`,
-      )
-      .all(SUGGEST_VISITS, anywhere, anywhere, ...hosts, Math.max(1, Math.min(limit, SUGGEST_LIMIT))) as unknown as VisitedPage[];
+      ),
+      SUGGEST_VISITS,
+      anywhere,
+      anywhere,
+      ...hosts,
+      Math.max(1, Math.min(limit, SUGGEST_LIMIT)),
+    );
   }
 
   // The address that was removed, so anything else holding it can forget it too.
