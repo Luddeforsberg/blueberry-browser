@@ -217,14 +217,17 @@ ${content}` : content
 });
 var bytes = (text) => new TextEncoder().encode(text).length;
 var fitHistory = (input) => {
-  const messages = (Array.isArray(input) ? input : []).filter(
-    (message) => (message?.role === "user" || message?.role === "assistant") && typeof message.content === "string"
-  ).slice(-MAX_HISTORY).map(({ role, content }) => ({ role, content: content.slice(0, MAX_HISTORY_TEXT) }));
+  const messages = (Array.isArray(input) ? input : []).filter((message) => {
+    const { role, content } = message ?? {};
+    return (role === "user" || role === "assistant") && typeof content === "string";
+  }).slice(-MAX_HISTORY).map(({ role, content }) => ({ role, content: content.slice(0, MAX_HISTORY_TEXT) }));
   while (messages.length > 0 && bytes(JSON.stringify(messages)) > MAX_HISTORY_BYTES) messages.shift();
   return messages;
 };
 var followUpHistory = (last) => {
-  const steps = (Array.isArray(last.steps) ? last.steps : []).filter((step) => typeof step?.text === "string");
+  const steps = (Array.isArray(last.steps) ? last.steps : []).filter(
+    (step) => typeof (step ?? {}).text === "string"
+  );
   const reply = typeof last.reply === "string" ? last.reply : "";
   return fitHistory([
     ...fitHistory(last.history),
