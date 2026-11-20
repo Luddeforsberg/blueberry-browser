@@ -2,16 +2,17 @@ import { test } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULT_LOOK, driveFeature } from "./driver";
-import { FEATURES, featureNamed, layoutsOf, type Feature, type Look } from "./map";
+import { FEATURES, featureNamed, layoutsOf, statesOf, type Feature, type Look } from "./map";
 import { ENTRIES, readRequest, shotFile, type Entry } from "./shots";
-import { defined } from "../../src/shared/testing";
 
 // What scripts/drive.mjs asked for: one feature in one state and look, or every one of them for a baseline.
 const request = readRequest();
 
 const shotsFor = (feature: Feature): Array<{ state: string; look: Look }> => {
   if (request.feature) {
-    const state = request.state ?? defined(Object.keys(feature.states)[0]);
+    const state = request.state ?? statesOf(feature)[0];
+    if (!statesOf(feature).includes(state))
+      throw new Error(`${feature.name} has no state "${state}" here. It has: ${statesOf(feature).join(", ")}`);
     return [
       {
         state,
@@ -23,7 +24,7 @@ const shotsFor = (feature: Feature): Array<{ state: string; look: Look }> => {
       },
     ];
   }
-  return Object.keys(feature.states).flatMap((state) =>
+  return statesOf(feature).flatMap((state) =>
     (["light", "dark"] as const).flatMap((theme) =>
       layoutsOf(feature).map((layout) => ({ state, look: { theme, layout, width: DEFAULT_LOOK.width } })),
     ),
