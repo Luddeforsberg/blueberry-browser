@@ -5,7 +5,7 @@ import { createPageTools, type PageTool } from "./browserTools";
 import type { CdpTab } from "./CdpTab";
 import { CloudSessions } from "../cloud/cloudBrowser";
 import { findChrome, localChrome } from "../cloud/localChrome";
-import { pressLanded } from "./pageScripts";
+import { aimKey, pressLanded } from "./pageScripts";
 import { STOPPED } from "./toolMessages";
 
 // Clicks with real input that's slow to arrive, as on a slow machine or over the network to a cloud browser, on a page
@@ -146,6 +146,29 @@ describe.skipIf(!findChrome())("clicking when real input is slow", () => {
     expect(await clicksOn("Pressed elsewhere")).toBe(1);
     expect(pressesSent()).toBe(1);
     expect(result).toMatch(/^Done\./);
+  }, 10_000);
+
+  it("never takes a key that arrives meanwhile as the click's press", async () => {
+    const ref = await addButton("Not a key");
+    // A key Berry was set to press earlier, still waiting for its keydown.
+    await tab.runInPage(aimKey);
+    const send = tab.sendAgentInput.bind(tab);
+    sent = [];
+    // The page covers the button just as the press goes, and a key arrives before the release.
+    const spy = vi.spyOn(tab, "sendAgentInput").mockImplementation(async (event) => {
+      sent.push(event.type);
+      if (event.type === "mouseDown" && pressesSent() === 1) await tab.runInPage(cover("Not a key"));
+      if (event.type === "mouseUp" && pressesSent() === 1) {
+        await send({ type: "keyDown", keyCode: "a", modifiers: [] });
+        await send({ type: "keyUp", keyCode: "a", modifiers: [] });
+      }
+      return send(event);
+    });
+    const result = await clickWhileHeld(spy, ref);
+    // The press reached only the cover and was stopped, so the click goes to the button as a scripted one.
+    expect(await clicksOn("cover")).toBe(0);
+    expect(await clicksOn("Not a key")).toBe(1);
+    expect(result).toMatch(/scripted/);
   }, 10_000);
 
   // This documents the gap that's left, not a guarantee: the check just before the press only sees what's there then.

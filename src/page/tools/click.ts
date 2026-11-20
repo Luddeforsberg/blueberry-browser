@@ -44,11 +44,6 @@ export const watchPress = ({ ref, x, y, pressOnly }: { ref: string; pressOnly: b
     return { status: "aimed", x, y, watch: expectPressOn(el, { pressOnly }) };
   });
 
-// False until the input arrives, then true, "missed" for a press that was stopped, or "cut" for one that reached the
-// element before the rest of the click was stopped. A new page has no record, so null means the input took the page
-// somewhere.
-export const inputLanded = (): boolean | "missed" | "cut" | null => state.landed ?? null;
-
 // What became of the press the watch `id` was set for, ending the watch as soon as it's known, so it never stops one of
 // the user's own clicks after Berry's. "ended" if that watch is no longer on, ended by its backstop or by another
 // watch, so the answer here isn't its. A new page has no record, so null means the input took the page somewhere.

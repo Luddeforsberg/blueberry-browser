@@ -4,7 +4,7 @@ import {
   beginTyping,
   finishTyping,
   hasFocus,
-  inputLanded,
+  keyLanded,
   scriptedEnter,
   spotOf,
   typeChunk,
@@ -32,7 +32,7 @@ export const typingTools = <T extends PageTarget>(context: ToolContext<T>) => {
       const focus = await tab.runInPage<FocusInfo>(aimKey);
       if (!focus.foreignFrame) {
         await pressKey(tab, "Enter", false);
-        if ((await landed(() => tab.runInPage<boolean | null>(inputLanded))) === "landed") return;
+        if ((await landed(() => tab.runInPage<boolean | null>(keyLanded))) === "landed") return;
       }
     }
     await onRef<string>(tab, ref, scriptedEnter);
@@ -106,7 +106,7 @@ export const typingTools = <T extends PageTarget>(context: ToolContext<T>) => {
           await actorOn(tab)?.hop("Pressing a key");
           if (!carryOn(tab)) return leftOff(tab);
           await pressKey(tab, key, shift);
-          if ((await landed(() => tab.runInPage<boolean | null>(inputLanded))) === "lost")
+          if ((await landed(() => tab.runInPage<boolean | null>(keyLanded))) === "lost")
             return "The page didn't receive that key, so it may not have done anything.";
           return whereNow(tab);
         }),

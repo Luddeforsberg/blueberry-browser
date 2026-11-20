@@ -1,7 +1,7 @@
-import { expect } from "../lib/aim";
+import { expectKey } from "../lib/aim";
 import { activeNear, isFrame, type AnyElement } from "../lib/dom";
 import { nameOf, roleOf } from "../lib/names";
-import { withElement } from "../lib/state";
+import { state, withElement } from "../lib/state";
 
 export interface FocusInfo {
   // Null when the focus is on the page itself.
@@ -20,11 +20,15 @@ export const aimKey = (): FocusInfo => {
   let at: AnyElement | null = document.activeElement;
   for (let inner = focusInside(at); inner; inner = focusInside(at)) at = inner;
   if (isFrame(at)) return { role: null, name: null, foreignFrame: true };
-  expect(at?.ownerDocument.defaultView ?? window, "keydown");
+  expectKey(at?.ownerDocument.defaultView ?? window);
   if (!at || at === at.ownerDocument.body || at === at.ownerDocument.documentElement)
     return { role: null, name: null, foreignFrame: false };
   return { role: roleOf(at), name: nameOf(at), foreignFrame: false };
 };
+
+// False until the key `aimKey` set up for arrives, then true. A new page has no record, so null means the key took
+// the page somewhere.
+export const keyLanded = (): boolean | null => state.keyed ?? null;
 
 const NOT_A_FIELD: (string | undefined)[] = ["checkbox", "radio", "button", "submit", "reset", "image", "file"];
 

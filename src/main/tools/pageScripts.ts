@@ -36,9 +36,9 @@ export const watchPress = (ref: string, { x, y }: { x: number; y: number }, pres
 // Ends the watch `watchPress` set, however the press went, and no other.
 export const endWatch = (id: string): string => inPage(page.endWatch, { id });
 
-// False until the input arrives, then true, "missed" for a press that was stopped, or "cut" for one that reached the
-// element before the rest of the click was stopped. A new page has no record, so null means the input took the page somewhere.
-export const inputLanded = inPage(page.inputLanded, undefined);
+// False until the key `aimKey` set up for arrives, then true. A new page has no record, so null means the key took the
+// page somewhere.
+export const keyLanded = inPage(page.keyLanded, undefined);
 
 // What became of the press the watch `id` was set for, ending that watch once it's known, or "ended" if it ended first.
 export const pressLanded = (id: string): string => inPage(page.pressLanded, { id });

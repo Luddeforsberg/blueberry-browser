@@ -56,13 +56,13 @@ export const reaches = (hit: Element | null, el: AnyElement): boolean => {
   return isInside(hit, el) || isInside(el, hit) || [...(el.labels ?? [])].some((label) => isInside(hit, label));
 };
 
-// Real input is checked by whether it arrives, because nothing says when it goes astray.
-export const expect = (win: Window, type: string): void => {
-  state.landed = false;
+// A real key is checked by whether it arrives, because nothing says when it goes astray.
+export const expectKey = (win: Window): void => {
+  state.keyed = false;
   win.addEventListener(
-    type,
+    "keydown",
     () => {
-      state.landed = true;
+      state.keyed = true;
     },
     { capture: true, once: true },
   );
