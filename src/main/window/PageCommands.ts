@@ -60,8 +60,8 @@ export class PageCommands {
     this.w.tooltip.show(request, { width, height });
   }
 
-  pickAddressSuggestion(index: unknown): void {
-    const row = this.w.addressSuggestions.pick(index);
+  pickAddressSuggestion(listId: unknown, index: unknown): void {
+    const row = this.w.addressSuggestions.pick(listId, index);
     if (!row) return;
     this.w.chromeView.view.webContents.focus();
     sendToRenderer(this.w.chromeView.view.webContents, "address:picked", row);

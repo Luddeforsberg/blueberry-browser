@@ -46,6 +46,39 @@ describe("Gallery.unpublish", () => {
   });
 });
 
+describe("Gallery.publish", () => {
+  it("publishes one mascot once, however many times it's asked at once, and updates it after", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "blueberry-gallery-"));
+    const mascots = new MascotStore(join(dir, "mascots.json"));
+    const saved = mascots.save(null, {
+      name: "Scout",
+      look: { palette: "lingon", accessory: "cap" },
+      instructions: "Read.",
+      sites: [],
+      tools: [],
+    });
+    if (!saved.ok) throw new Error(saved.error);
+    const tokens: (() => void)[] = [];
+    // The token is slow, as a refresh is, so both publishes are past their checks before either has one.
+    const account = { accessToken: () => new Promise<string>((resolve) => tokens.push(() => resolve("token"))) } as unknown as Account;
+    const insertMascot = vi.fn(async () => ID);
+    const updateMascot = vi.fn(async () => true);
+    const server = { insertMascot, updateMascot } as unknown as GalleryServer;
+    const gallery = new Gallery(server, account, mascots, join(dir, "gallery.json"), undefined, () => {});
+    const choices = { author: "Ana", description: "Reads pages.", category: "Work", example: null };
+    const first = gallery.publish(saved.id, choices);
+    const second = gallery.publish(saved.id, choices);
+    await vi.waitFor(() => expect(tokens.length).toBeGreaterThan(0));
+    tokens.forEach((give) => give());
+    expect(await first).toMatchObject({ ok: true, id: ID });
+    await vi.waitFor(() => expect(tokens).toHaveLength(2));
+    defined(tokens[1])();
+    expect(await second).toMatchObject({ ok: true, id: ID });
+    expect(insertMascot).toHaveBeenCalledOnce();
+    expect(updateMascot).toHaveBeenCalledOnce();
+  });
+});
+
 describe("Gallery.linked", () => {
   const row = {
     id: ID,

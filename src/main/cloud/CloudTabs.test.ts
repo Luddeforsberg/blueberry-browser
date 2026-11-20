@@ -79,6 +79,28 @@ describe("CloudTabs", () => {
     vi.restoreAllMocks();
   });
 
+  it("never starts a tab's picture once the user has moved past it to another", async () => {
+    const releases: (() => void)[] = [];
+    const pages = new Map(
+      ["tab-a", "tab-b", "tab-c"].map((id) => [
+        id,
+        { id, watch: vi.fn((onFrame: unknown) => (onFrame ? Promise.resolve() : new Promise<void>((resolve) => releases.push(resolve)))) },
+      ]),
+    );
+    vi.spyOn(CloudSessions.prototype, "page").mockImplementation((id) => (pages.get(id) ?? null) as unknown as CdpTab);
+    const tabs = makeTabs();
+    tabs.start();
+    await tabs.watch("tab-a");
+    // A to B waits for A's picture to stop, and the user is on C before it has.
+    const toB = tabs.watch("tab-b");
+    const toC = tabs.watch("tab-c");
+    releases.forEach((release) => release());
+    await Promise.all([toB, toC]);
+    expect(pages.get("tab-b")?.watch.mock.calls.filter(([onFrame]) => onFrame)).toEqual([]);
+    expect(pages.get("tab-c")?.watch).toHaveBeenLastCalledWith(expect.any(Function));
+    vi.restoreAllMocks();
+  });
+
   it("lets the session wind down only once the last tab the user has there closes", async () => {
     let opened = 0;
     vi.spyOn(CloudSessions.prototype, "openForUser").mockImplementation(async (id) => ({ id, url: "https://example.com/" }) as CdpTab);

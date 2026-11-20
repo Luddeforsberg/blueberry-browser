@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { CloudLogin, CloudLoginStatus } from "../../shared/ipc";
+import { Latest } from "../../shared/lateWork";
 
 // Sites the user has brought into the cloud browser, signed in. Plain Node, so a runner without a window can use it.
 // Cookie values pass through here on their way into the cloud browser and are never kept: the list on disk has each
@@ -182,8 +183,10 @@ const NOT_TAKEN = "The cloud browser didn't take that. Try again.";
 export class CloudLogins {
   private list: CloudLogin[] = [];
   private busy = false;
-  // Goes up whenever the cloud browser ends or is replaced, so a copy still waiting on the user never lands in it.
-  private generation = 0;
+  // The cloud browser as it is now. It ends or is replaced with a new one, so a copy still waiting on the user never lands
+  // in it.
+  private readonly browsers = new Latest();
+  private browser = this.browsers.next();
 
   constructor(
     private readonly file: string,
@@ -202,7 +205,7 @@ export class CloudLogins {
 
   // The cloud browser ended, or its key was forgotten or changed. Anything still waiting copies nothing.
   cancelPending(): void {
-    this.generation++;
+    this.browser = this.browsers.next();
   }
 
   // Says what went wrong, or null once it's in.
@@ -212,7 +215,7 @@ export class CloudLogins {
     // Every site on the list needs its Remove, so a full list takes no more until one comes off.
     if (this.list.length >= MAX_SITES && !this.list.some((login) => login.site === site))
       return `There are already ${MAX_SITES} sites in the cloud browser. Remove one first.`;
-    const generation = this.generation;
+    const { browser } = this;
     return this.oneAtATime(async () => {
       if (!(await this.hooks.confirm(site))) return "Nothing was brought along, because it wasn't confirmed.";
       const stored = await this.hooks.readCookies(site).catch(() => null);
@@ -221,7 +224,7 @@ export class CloudLogins {
       if (cookies.length === 0)
         return `Blueberry isn't signed in to ${site}, so there's nothing to bring along. Sign in there in a tab first.`;
       // The user took a while to confirm, and the browser it was for may have gone meanwhile.
-      if (generation !== this.generation || this.hooks.jar() !== jar)
+      if (!browser.current || this.hooks.jar() !== jar)
         return "Nothing was brought along, because the cloud browser ended or its key changed meanwhile.";
       try {
         await jar.withContext((context) => context.addCookies(cookies));

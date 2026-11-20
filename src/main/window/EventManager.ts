@@ -104,7 +104,7 @@ export class EventManager {
 
     this.handle("address:close", () => this.mainWindow.addressSuggestions.close());
 
-    this.handle("address:pick", (index) => this.mainWindow.pickAddressSuggestion(index));
+    this.handle("address:pick", (listId, index) => this.mainWindow.pickAddressSuggestion(listId, index));
     this.handle("tooltip:show", (request) => this.mainWindow.showTooltip(request));
     this.handle("tooltip:hide", () => this.mainWindow.tooltip.hide());
     this.handle("preview:show", (request) => this.mainWindow.previews.show(request));

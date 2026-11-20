@@ -3,12 +3,14 @@ import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "fs";
 import { dirname } from "path";
 import { isAiService, looksLikeAiKey, type AiKeyState, type AiKeyTried } from "../../shared/aiKey";
 import type { SavedKey } from "../chats/agent";
+import { Latest } from "../../shared/lateWork";
 import { tryAiKey, type TryOutcome } from "./aiKeyTry";
 
 // The user's own AI key, kept as the cloud's key is: encrypted with `safeStorage` in its own file, and never sent back to
 // a renderer. Renderers get `state`, the service and the last four characters, and only `agent.ts` reads the key itself,
 // through `inUse`. A key is only kept once the service has answered with it. Where this computer can't encrypt, it isn't
-// kept at all, as with the cloud's key.
+// kept at all, as with the cloud's key. There's one for the app, made with the stores, and each window listens to it, so a
+// try started in a window that has closed since still loses to anything newer in the next one.
 
 // Where each service makes keys.
 export const KEY_PAGES: Record<SavedKey["service"], string> = {
@@ -18,12 +20,12 @@ export const KEY_PAGES: Record<SavedKey["service"], string> = {
 
 export class AiKey {
   private saved: SavedKey | null;
-  // Counts every try and removal, so only the newest try may save, and never one a removal overtook.
-  private generation = 0;
+  // Only the newest try may save, and never one a removal overtook.
+  private readonly tries = new Latest();
+  private readonly listeners = new Set<() => void>();
 
   constructor(
     private readonly file: string,
-    private readonly onChange: () => void,
     // A packaged app only ever tries a key at the service's own address.
     private readonly tryKey: (service: SavedKey["service"], key: string) => Promise<TryOutcome> = (service, key) =>
       tryAiKey(service, key, { ownAddressOnly: app.isPackaged }),
@@ -39,29 +41,40 @@ export class AiKey {
     return this.saved;
   }
 
+  // Hears every change to the saved key, until the function it gives back is called.
+  onChange(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private changed(): void {
+    this.listeners.forEach((listener) => listener());
+  }
+
   async try(service: unknown, key: unknown): Promise<{ outcome: AiKeyTried; state: AiKeyState }> {
     const text = typeof key === "string" ? key.trim() : "";
     const answer = (outcome: AiKeyTried) => ({ outcome, state: this.state });
     if (!isAiService(service) || !looksLikeAiKey(service, text)) return answer("not-a-key");
     if (!safeStorage.isEncryptionAvailable()) return answer("not-safe");
-    const generation = ++this.generation;
+    const turn = this.tries.next();
     const outcome = await this.tryKey(service, text);
-    if (outcome !== "works" || generation !== this.generation) return answer(outcome);
+    if (!turn.current) return answer("overtaken");
+    if (outcome !== "works") return answer(outcome);
     if (!this.save({ service, key: text })) return answer("not-saved");
     this.saved = { service, key: text };
-    this.onChange();
+    this.changed();
     return answer("works");
   }
 
   remove(): AiKeyState {
-    this.generation++;
+    this.tries.end();
     this.saved = null;
     try {
       rmSync(this.file, { force: true });
     } catch {
       console.error("Couldn't remove the saved AI key.");
     }
-    this.onChange();
+    this.changed();
     return this.state;
   }
 

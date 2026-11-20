@@ -11,9 +11,10 @@ export interface AiKeyState {
   last4: string | null;
 }
 
-// How trying a key went. Only "works" is saved. "refused" is the service saying no, and "unreachable" is not getting an
-// answer from it at all.
-export type AiKeyTried = "works" | "refused" | "unreachable" | "not-a-key" | "not-safe" | "not-saved";
+// How trying a key went. Only "works" is saved. "refused" is the service saying no, "unreachable" is not getting an
+// answer from it at all, and "overtaken" is another try or a removal starting before the answer came, so it says nothing
+// about the key and nothing was kept.
+export type AiKeyTried = "works" | "refused" | "unreachable" | "not-a-key" | "not-safe" | "not-saved" | "overtaken";
 
 // A key is its service's prefix, then letters, digits, dashes and underscores. The longest real ones are a little over
 // 200. Anthropic's start with OpenAI's prefix too, so OpenAI's shape leaves those out. Being this strict is what keeps a

@@ -80,7 +80,7 @@ export interface InvokeChannels {
   "address:show": { region: "chrome"; args: [request: AddressSuggestionsRequest]; result: void };
   "address:close": { region: "chrome"; args: []; result: void };
   // A row pressed in the list, by its place in what's shown. Main hands that row back to the chrome to act on.
-  "address:pick": { region: "suggestions"; args: [index: number]; result: void };
+  "address:pick": { region: "suggestions"; args: [listId: number, index: number]; result: void };
   // A tooltip over the page, in a view of its own that never takes the keyboard. The chrome decides when and where.
   "tooltip:show": { region: "chrome"; args: [request: TooltipRequest]; result: void };
   "tooltip:hide": { region: "chrome" | "tooltip"; args: []; result: void };

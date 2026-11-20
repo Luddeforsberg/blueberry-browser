@@ -326,4 +326,19 @@ describe("the scheduler", () => {
     expect(store.routine(save(routines, { ...daily(), name: "", instructions: "Look around" }))?.name).toBe("Look around");
     await flush();
   });
+
+  it("names an edited routine from what it does now, whichever answer comes first", async () => {
+    const answers = new Map<string, (name: string | null) => void>();
+    const { store, routines } = setup(undefined, {
+      writeName: (instructions) => new Promise<string | null>((resolve) => answers.set(instructions, resolve)),
+    });
+    const id = save(routines, { ...daily(), name: "", instructions: "Read SVT" });
+    save(routines, { ...daily(), name: "", instructions: "Check fares" }, id);
+    defined(answers.get("Read SVT"))("SVT news summary");
+    await flush();
+    expect(store.routine(id)).toMatchObject({ name: "Check fares", nameSettled: false });
+    defined(answers.get("Check fares"))("Flight fare check");
+    await flush();
+    expect(store.routine(id)).toMatchObject({ name: "Flight fare check", nameSettled: true });
+  });
 });

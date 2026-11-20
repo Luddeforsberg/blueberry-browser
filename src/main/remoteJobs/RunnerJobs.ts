@@ -344,8 +344,8 @@ export class RunnerJobs implements ChatRunner {
     this.linkTimer = null;
   }
 
-  // A token for that account only. A refresh can end after someone else signs in and hand back their token, so who is
-  // signed in is checked again once it's here, and nothing is sent with it otherwise.
+  // A token for that account only. The token is whoever is signed in when it's asked for, which may be someone this hasn't
+  // heard of yet, so who is signed in is checked again once it's here, and nothing is sent with it otherwise.
   private async tokenFor(account: string): Promise<string | null | typeof SWITCHED_ACCOUNT> {
     const token = await this.account.accessToken();
     // A token that is the word "switched" counted as a switch when that word was the answer, and still does.

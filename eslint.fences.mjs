@@ -100,6 +100,23 @@ const fences = [
       "No `as unknown as` in app code: check the value where it enters, or read SQLite rows with rowOf or rowsOf from src/main/library/database.ts (eslint.fences.mjs).",
   },
   {
+    // Work that finishes later checks a Turn from src/shared/lateWork.ts before it applies anything. A counter of its own,
+    // bumped and then compared after a wait, is how each place used to do it, and each guarded only itself.
+    name: "late",
+    in: ["src/**/*.{ts,tsx}", "runner/src/**/*.ts"],
+    allowed: { "src/shared/lateWork.ts": "Latest itself." },
+    rules: {
+      "no-restricted-syntax": [
+        // `const mine = ++this.count`, to compare with `this.count` once the answer is here.
+        "VariableDeclarator > UpdateExpression.init",
+        // A count of requests by the name every one of them had.
+        "Identifier[name=/generation/i]",
+      ],
+    },
+    message:
+      "Use Latest from src/shared/lateWork.ts for work that finishes later: take a turn with next(), check its current before applying the answer, and end() when the owner goes. In a renderer, useLatest from @common/lib/latest. For one at a time, use OneAtATime (eslint.fences.mjs).",
+  },
+  {
     name: "kit",
     in: ["src/renderer/**/*.tsx"],
     allowed: { "src/renderer/common/components": "The kit itself." },

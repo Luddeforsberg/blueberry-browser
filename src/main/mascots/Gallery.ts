@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { dirname } from "path";
 import type { MascotSaveResult } from "../../shared/ipc";
 import type { GalleryLinked, GalleryListing, GalleryMascot, PublishedMascot, PublishResult } from "../../shared/library";
+import { OneAtATime } from "../../shared/lateWork";
 import { isUuid, parsePublicDraft, parsePublishChoices, parsePublishedRow, publicRow } from "../../shared/publishing";
 import type { Account } from "../account/Account";
 import { GalleryServer, publicPageLink, ServerError, Unreachable } from "../account/galleryServer";
@@ -10,6 +11,7 @@ import { starterMascots } from "./mascotCatalog";
 import type { MascotStore } from "./MascotStore";
 
 const NO_SERVER = "Publishing isn’t set up in this copy of Blueberry.";
+const CANT_PUBLISH = "This mascot can’t be published.";
 const CANT_REACH = "Couldn’t reach the Gallery, so nothing changed. Try again in a moment.";
 const SIGN_IN_FIRST = "Sign in to publish.";
 // Every version of an entry the page has been sent, so each review can be added as it was shown. Past this the oldest go.
@@ -45,6 +47,9 @@ export class Gallery {
   // Every version the page was sent, by id and version, so a copy is exactly what the user reviewed, even if its author
   // has changed it since or another fetch of the same entry came back in between.
   private shown = new Map<string, GalleryMascot>();
+  // A second publish of one mascot waits for the first, and then reads whether it's published, so it updates that row
+  // rather than making another.
+  private readonly publishing = new OneAtATime<string>();
   private saved: Saved;
 
   constructor(
@@ -129,10 +134,15 @@ export class Gallery {
       .catch(() => console.error("Couldn't count an add."));
   }
 
-  async publish(mascotId: unknown, choices: unknown): Promise<PublishResult> {
+  publish(mascotId: unknown, choices: unknown): Promise<PublishResult> {
+    if (typeof mascotId !== "string") return Promise.resolve({ ok: false, error: CANT_PUBLISH });
+    return this.publishing.run(() => this.publishNow(mascotId, choices), mascotId);
+  }
+
+  private async publishNow(mascotId: string, choices: unknown): Promise<PublishResult> {
     if (!this.server) return { ok: false, error: NO_SERVER };
-    const mascot = typeof mascotId === "string" ? this.mascots.find(mascotId) : null;
-    if (!mascot || mascot.deletedAt !== null || mascot.id === "berry") return { ok: false, error: "This mascot can’t be published." };
+    const mascot = this.mascots.find(mascotId);
+    if (!mascot || mascot.deletedAt !== null || mascot.id === "berry") return { ok: false, error: CANT_PUBLISH };
     if (mascot.galleryId) return { ok: false, error: "This is a copy from the Gallery, so it’s not yours to publish." };
     const draft = parsePublicDraft(mascot);
     if ("error" in draft) return { ok: false, error: draft.error };
