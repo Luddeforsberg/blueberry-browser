@@ -1,6 +1,6 @@
 # Screenshots
 
-What each feature in the [README](../../README.md) looks like in the app, in the same order. Most of them come from test runs, so the sites and names in them are made up (shop.example, 127.0.0.1, Scout).
+More views of the features in the [README](../../README.md). Some show an earlier design and use test sites and names.
 
 ## Jobs that keep going when you leave
 
@@ -35,7 +35,7 @@ What each feature in the [README](../../README.md) looks like in the app, in the
 
 <table>
 <tr>
-<td width="50%"><img src="../images/show-berry-how.jpg" alt="The notes Berry took while watching a job, before it becomes a routine"><br>The notes from one recorded job, which you can read and trim.</td>
+<td width="50%"><img src="../images/show-berry-how.webp" alt="The notes Berry took while watching a job, before it becomes a routine"><br>The notes from one recorded job, which you can read and trim.</td>
 <td width="50%"><img src="show-berry-how/routine-from-recording.jpg" alt="A new routine with numbered steps, a value under What might change, and its sites"><br>The routine it writes: numbered steps, what might change next time, and only the sites you used.</td>
 </tr>
 </table>
@@ -52,17 +52,15 @@ What each feature in the [README](../../README.md) looks like in the app, in the
 
 ## Suggestions that keep coming
 
-<img src="../images/new-tab.jpg" alt="The new tab page with three suggestions: a prompt, a routine and a new mascot">
+<img src="../images/new-tab.webp" alt="The new tab page with suggestions based on pricing research and Hacker News visits">
 
-Three suggestions on the new tab page, each from something you did, with the reason under it.
+The new tab page suggests jobs based on recent activity.
 
 ## The rest
 
 <table>
 <tr>
-<td width="50%"><img src="../images/approval.jpg" alt="An approval card with the exact text Berry would type"><br>An approval card says exactly what will happen before anything does.</td>
-<td width="50%"><img src="../images/mascots.jpg" alt="Your mascots, with Berry and four more"><br>Your mascots: Berry and the ones you made, each with its own limits.</td>
+<td width="50%"><img src="../images/approval.webp" alt="An approval card with the full address Berry wants to open"><br>An approval card says exactly what will happen before anything does.</td>
+<td width="50%"><img src="../images/your-mascots.webp" alt="Your mascots, with Berry and four more"><br>Berry and the four starters that can be added from the Gallery.</td>
 </tr>
 </table>
-
-Berry on the desktop is easiest to understand moving, so it's in the video only.
