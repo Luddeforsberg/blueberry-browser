@@ -1,22 +1,28 @@
-import { isUuid, mascotSnapshot, permissionsInWords } from "../shared.js";
+import { isUuid, leftAfterSend, mascotSnapshot, permissionsInWords } from "../shared.js";
 import * as api from "./api.js";
-import { drawMascot, el, grow, icon } from "./dom.js";
-import { closeSheet, openSheet } from "./sheet.js";
+import { drawMascot, el, grow, icon, submitsOnce } from "./dom.js";
+import { closeSheet, openSheet, sheetKind } from "./sheet.js";
 import { choose, chosen, contextOf, hooks, NOT_SET_UP, problemWords, state } from "./state.js";
 
 // Starting a job has no page of its own: the box rises as a sheet over home, with who goes and what that mascot may
 // do, in the app's own words. Putting it away keeps what was typed.
 
-// A new conversation, under the job's own id, as `mascot`, as the phone has it now.
-export const startJob = async (prompt, mascot) => {
-  const id = await api.rpc("start_cloud_job", {
-    p_prompt: prompt,
+// A new conversation, under the job's own id, as `mascot`, as the phone has it now. `written` is the box as it was sent,
+// so whatever was typed on after it stays for the next job.
+export const startJob = async (written, mascot) => {
+  const as = api.asAccount();
+  const id = await as.rpc("start_cloud_job", {
+    p_prompt: written.trim(),
     p_history: [],
     p_mascot: mascotSnapshot(mascot),
     p_action_approval: "risky",
     p_context_id: contextOf(),
   });
+  const left = leftAfterSend(state.drafts.get("") ?? "", written);
+  if (left) state.drafts.set("", left);
+  else state.drafts.delete("");
   await hooks.load();
+  if (!as.still()) throw new api.AccountGone();
   location.hash = isUuid(String(id)) ? `#job/${id}` : "";
 };
 
@@ -82,32 +88,24 @@ export const openStart = () => {
     state.drafts.set("", box.value);
     send.classList.toggle("off", !box.value.trim() || state.linked === false);
   });
-  const form = el(
-    "form",
-    {
-      className: "shell",
-      onsubmit: async (event) => {
-        event.preventDefault();
-        const prompt = box.value.trim();
-        if (!prompt) return box.focus();
-        if (state.linked === false) {
-          problem.replaceChildren(el("p", { className: "problem", role: "alert", textContent: NOT_SET_UP }));
-          return;
-        }
-        send.disabled = true;
-        problem.replaceChildren();
-        try {
-          await startJob(prompt, chosen());
-          state.drafts.delete("");
-          closeSheet({ instant: true });
-        } catch (error) {
-          problem.replaceChildren(el("p", { className: "problem", role: "alert", textContent: problemWords(error) }));
-          send.disabled = false;
-        }
-      },
-    },
-    el("div", { className: "box tall" }, box, send),
-  );
+  const form = submitsOnce(el("form", { className: "shell" }, el("div", { className: "box tall" }, box, send)), async () => {
+    const written = box.value;
+    if (!written.trim()) return box.focus();
+    if (state.linked === false) {
+      problem.replaceChildren(el("p", { className: "problem", role: "alert", textContent: NOT_SET_UP }));
+      return;
+    }
+    send.disabled = true;
+    problem.replaceChildren();
+    try {
+      await startJob(written, chosen());
+      if (sheetKind() === "start") closeSheet({ instant: true });
+    } catch (error) {
+      if (error instanceof api.AccountGone) return;
+      problem.replaceChildren(el("p", { className: "problem", role: "alert", textContent: problemWords(error) }));
+      send.disabled = false;
+    }
+  });
   box.addEventListener("keydown", (event) => {
     // Enter sends on a computer's keyboard; a phone's return key makes a new line.
     if (event.key === "Enter" && !event.shiftKey && !event.isComposing && matchMedia("(pointer: fine)").matches) {

@@ -2,6 +2,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ArrowUp, Lock, Plus } from "lucide-react";
 import type { MascotProfile } from "@shared/library";
 import { cn } from "@common/lib/utils";
+import { sendOnEnter } from "@common/lib/keys";
 import { SHELL } from "@common/components/cardShell";
 import { AddMenu, type AddMenuOptions } from "./AddMenu";
 import { Tooltip } from "@common/components/Tooltip";
@@ -18,7 +19,6 @@ export const Composer: React.FC<{
   placeholder: string;
   value: string;
   onChange: (value: string) => void;
-  onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   rows?: number;
   autoFocus?: boolean | undefined;
   // Moves the keyboard here each time this changes.
@@ -35,7 +35,8 @@ export const Composer: React.FC<{
   // With no box of its own, because the window it's in is the box.
   bare?: boolean;
   canSend: boolean;
-  onSend: () => void;
+  // Send, or Enter. `ask` is ⌘ or Ctrl held with Enter.
+  onSend: (ask: boolean) => void;
   // While a reply is running, Send stops it.
   onStop?: (() => void) | undefined;
   // Who this goes to. With `onChooseMascot`, pressing it opens the menu. Without, it just says who.
@@ -55,7 +56,6 @@ export const Composer: React.FC<{
   placeholder,
   value,
   onChange,
-  onKeyDown,
   rows = 1,
   autoFocus,
   focusKey,
@@ -171,7 +171,7 @@ export const Composer: React.FC<{
       <button
         type="button"
         aria-label={sendLabel}
-        onClick={onStop ?? onSend}
+        onClick={onStop ?? (() => onSend(false))}
         disabled={!onStop && !canSend}
         className={cn(
           "shrink-0 rounded-full flex items-center justify-center transition-[background-color,color,transform] duration-move ease-crisp active:scale-[.96]",
@@ -202,7 +202,11 @@ export const Composer: React.FC<{
       autoFocus={autoFocus}
       spellCheck={spellCheck}
       onChange={(event) => onChange(event.target.value)}
-      onKeyDown={onKeyDown}
+      onKeyDown={(event) =>
+        sendOnEnter(event, (ask) => {
+          if (canSend) onSend(ask);
+        })
+      }
       onPaste={(event) => {
         // A picture or a file pasted is added, as A file adds it. Words pasted are typing, whatever else came with them.
         const files = [...event.clipboardData.files];

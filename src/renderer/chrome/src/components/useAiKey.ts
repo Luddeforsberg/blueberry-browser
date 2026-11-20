@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { AiKeyState, AiKeyTried, AiService } from "@shared/aiKey";
-import { useLatest } from "@common/lib/latest";
+import { useFromMain, useLatest } from "@common/lib/latest";
 
 export const SERVICES: Record<AiService, { name: string; models: string }> = {
   openai: { name: "OpenAI", models: "GPT models" },
@@ -10,11 +10,7 @@ export const SERVICES: Record<AiService, { name: string; models: string }> = {
 const NONE: AiKeyState = { service: null, last4: null };
 
 export const useAiKey = () => {
-  const [state, setState] = useState(NONE);
-  useEffect(() => {
-    void window.chromeAPI.aiKey.state().then(setState);
-    return window.chromeAPI.aiKey.onUpdated(setState);
-  }, []);
+  const [state] = useFromMain(NONE, window.chromeAPI.aiKey.state, window.chromeAPI.aiKey.onUpdated);
   return state;
 };
 

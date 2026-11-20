@@ -1,13 +1,9 @@
-import { useEffect, useState } from "react";
+import { useFromMain } from "@common/lib/latest";
 import type { PhoneState } from "@shared/ipc";
 
 const OFF: PhoneState = { status: "off", botName: null, pairLink: null, problem: null };
 
 export const usePhone = () => {
-  const [state, setState] = useState(OFF);
-  useEffect(() => {
-    void window.chromeAPI.phone.state().then(setState);
-    return window.chromeAPI.phone.onUpdated(setState);
-  }, []);
+  const [state, setState] = useFromMain(OFF, window.chromeAPI.phone.state, window.chromeAPI.phone.onUpdated);
   return [state, setState] as const;
 };

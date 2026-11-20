@@ -7,6 +7,8 @@ import { useShell } from "../contexts/useShell";
 import { addressSuggestions } from "../addressSuggestions";
 import { useAssistantName } from "./useAssistantName";
 import { missing } from "@shared/missing";
+import { useLatest } from "@common/lib/latest";
+import { isEnter } from "@common/lib/keys";
 
 // The list under the address field while it's being edited (DESIGN.md, Toolbar and the address field). The rows come
 // from this computer only: open tabs, saved sites and the history. Main draws them in a view over the page, and the
@@ -45,6 +47,8 @@ export const useAddressSuggestions = ({ editing, value, setValue, field, input, 
   const latest = useRef(sources);
   latest.current = sources;
 
+  // The history's answer counts only for the newest ask, and not once the list has been put away since.
+  const asking = useLatest();
   const reset = () => {
     setTyped(null);
     setRows([]);
@@ -58,10 +62,11 @@ export const useAddressSuggestions = ({ editing, value, setValue, field, input, 
 
   // Going somewhere else, in this tab or another, is done with the list.
   useEffect(() => {
+    asking.end();
     setRows([]);
     setSelected(null);
     setCompletion(null);
-  }, [activeTab?.id, activeTab?.url]);
+  }, [activeTab?.id, activeTab?.url, asking]);
 
   // Asked again after a pause in typing. An answer for text that's since changed is dropped.
   useEffect(() => {
@@ -70,10 +75,10 @@ export const useAddressSuggestions = ({ editing, value, setValue, field, input, 
       setCompletion(null);
       return;
     }
-    let live = true;
+    const turn = asking.next();
     const suggest = async () => {
       const history = await window.chromeAPI.address.suggestHistory(typed);
-      if (!live) return;
+      if (!turn.current) return;
       const { tabs, saved, ask } = latest.current;
       const found = addressSuggestions({ text: typed, tabs, saved, history, ask, complete: mayComplete.current, now: Date.now() });
       setRows(found.rows);
@@ -83,10 +88,10 @@ export const useAddressSuggestions = ({ editing, value, setValue, field, input, 
     };
     const timer = window.setTimeout(() => void suggest(), DEBOUNCE_MS);
     return () => {
-      live = false;
+      asking.end();
       window.clearTimeout(timer);
     };
-  }, [editing, typed, setValue]);
+  }, [editing, typed, setValue, asking]);
 
   // A completion is selected text after what was typed, so the next key replaces it.
   useLayoutEffect(() => {
@@ -167,13 +172,14 @@ export const useAddressSuggestions = ({ editing, value, setValue, field, input, 
     if (event.key === "Escape") {
       event.preventDefault();
       if (completion && typed !== null) setValue(typed);
+      asking.end();
       setRows([]);
       setSelected(null);
       setCompletion(null);
       return true;
     }
     // Ctrl or ⌘ Enter asks, as it does in the new tab's box.
-    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+    if (isEnter(event) && (event.metaKey || event.ctrlKey)) {
       const ask = rows.find((row) => row.kind === "ask");
       if (!ask) return false;
       event.preventDefault();

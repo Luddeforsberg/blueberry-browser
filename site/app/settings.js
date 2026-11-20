@@ -1,4 +1,3 @@
-import { mascotsFromSharedRows } from "../shared.js";
 import { appearance, setAppearance } from "../theme.js";
 import * as api from "./api.js";
 import { el, icon } from "./dom.js";
@@ -124,16 +123,7 @@ const cloud = () => {
 const signOut = async () => {
   await turnOff().catch(() => {});
   await api.signOut();
-  Object.assign(state, {
-    jobs: null,
-    mascots: mascotsFromSharedRows([]),
-    mascotsShared: null,
-    linked: null,
-    problem: null,
-    said: null,
-    push: await pushState(),
-  });
-  for (const kept of [state.taken, state.answered, state.seen, state.unfolded, state.drafts]) kept.clear();
+  state.push = await pushState();
   closeSheet({ instant: true });
   location.hash = "";
   hooks.show(true);

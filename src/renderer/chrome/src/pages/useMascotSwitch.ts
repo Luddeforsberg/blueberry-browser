@@ -25,14 +25,15 @@ export const useMascotSwitch = (chosen: MascotProfile) => {
   }, [chosen]);
 
   useEffect(() => {
-    if (chosen.id === showing.current) return;
     const arrive = () => {
       showing.current = latest.current.id;
       setShown(latest.current);
       setArrival((count) => count + 1);
     };
-    if (keepBerryStill) {
-      arrive();
+    // Chosen back before the next one arrived, or held still: whatever was under way is over, so the face opens.
+    if (chosen.id === showing.current || keepBerryStill) {
+      if (chosen.id !== showing.current) arrive();
+      setPhase("rest");
       return;
     }
     setPhase("shut");

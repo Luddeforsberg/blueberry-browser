@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import type { ActionApproval } from "@shared/ipc";
 import { shortcutWords, SHORTCUTS } from "@shared/shortcuts";
 import { Choice, Switch } from "@common/components/Controls";
 import { useShell } from "../contexts/useShell";
 import { SettingsGroup, SettingsRow } from "../components/SettingsRow";
+import { useFromMain } from "@common/lib/latest";
 
 // Part of Settings (SettingsPage.tsx): the Mascots section.
 
@@ -36,13 +37,9 @@ const LOOK_SETTINGS: Record<Look, { showBerry: boolean; keepBerryStill?: boolean
 
 export const Mascots: React.FC = () => {
   const { settings, updateSettings, theme } = useShell();
-  const [shortcutTaken, setShortcutTaken] = useState(false);
+  const [shortcutTaken] = useFromMain(false, window.chromeAPI.desktop.shortcutTaken, undefined, settings.desktopBerry);
   const shortcut = shortcutWords(SHORTCUTS.desktop, theme.platform === "mac");
   const look: Look = !settings.showBerry ? "hidden" : settings.keepBerryStill ? "still" : "moving";
-
-  useEffect(() => {
-    void window.chromeAPI.desktop.shortcutTaken().then(setShortcutTaken);
-  }, [settings.desktopBerry]);
 
   return (
     <>

@@ -1,4 +1,5 @@
 import { asContinuation, BERRY_ID, conversationsOf, finishedWhen, mascotsFromSharedRows, rowTime, withSiteNames } from "../shared.js";
+import { onAccountChange } from "./api.js";
 
 // What the page knows, and the words it says about it. Everything here was read as the signed-in user only.
 
@@ -17,11 +18,33 @@ export const state = {
   seen: new Set(),
   // Finished jobs whose steps are open.
   unfolded: new Set(),
+  // Jobs going whose earlier steps are showing.
+  allSteps: new Set(),
   // What's being typed, by conversation, and "" for a new job, so drawing again never loses it.
   drafts: new Map(),
   // What just happened, said for a few seconds.
   said: null,
 };
+
+// Who the box talks to, kept for this visit. A page from before the mascots were called mascots kept it under the old
+// key, which moves to the new one the first time it's read.
+const CHOSEN = "blueberry.mascot";
+const OLD_CHOSEN = "blueberry.bird";
+
+// All of the above but `push`, which is this phone's, belongs to the account signed in, and so does the mascot chosen. Whenever that changes, by signing
+// out, by the session running out, or by someone else signing in, it's forgotten at once, so nothing of one account is
+// ever drawn for the next, and nothing typed for one is sent as the other.
+const forgetAccount = () => {
+  Object.assign(state, { jobs: null, mascots: mascotsFromSharedRows([]), mascotsShared: null, linked: null, problem: null, said: null });
+  for (const kept of [state.taken, state.answered, state.seen, state.unfolded, state.allSteps, state.drafts]) kept.clear();
+  try {
+    sessionStorage.removeItem(CHOSEN);
+    sessionStorage.removeItem(OLD_CHOSEN);
+  } catch {
+    // Private windows can refuse it, and then nothing was kept.
+  }
+};
+onAccountChange(forgetAccount);
 
 // Set by app.js: draw what's shown again; read everything again and draw it; read everything again without drawing.
 export const hooks = { show: () => {}, load: async () => {}, refresh: async () => {} };
@@ -43,10 +66,6 @@ export const senderOf = (job) => {
   return id === BERRY_ID ? state.mascots[0] : (state.mascots.find((mascot) => mascot.id === id) ?? null);
 };
 
-// Who the box talks to, kept for this visit. A page from before the mascots were called mascots kept it under the old
-// key, which moves to the new one the first time it's read.
-const CHOSEN = "blueberry.mascot";
-const OLD_CHOSEN = "blueberry.bird";
 export const chosen = () => {
   let id = null;
   try {

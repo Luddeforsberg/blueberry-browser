@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import type { CloudLogin, CloudState } from "@shared/ipc";
 import { Button } from "@common/components/Button";
@@ -6,6 +6,7 @@ import { cn } from "@common/lib/utils";
 import { LINE_BETWEEN, ROW } from "../components/pageRows";
 import { SettingsGroup, SettingsRow } from "../components/SettingsRow";
 import { FIELD } from "./cloudField";
+import { useFromMain } from "@common/lib/latest";
 
 // Part of Settings > Cloud (CloudSettings.tsx): the sites signed in to there.
 
@@ -22,15 +23,11 @@ const loginStatus = (login: CloudLogin): string => {
 export const SignedInTo: React.FC<{ cloud: CloudState }> = ({ cloud }) => {
   const api = window.chromeAPI.cloud;
   const [site, setSite] = useState("");
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const sites = cloud.logins.map((login) => login.site).join(" ");
+  const [suggestions] = useFromMain<string[]>([], api.loginSuggestions, undefined, sites);
   const [working, setWorking] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const field = useRef<HTMLInputElement>(null);
-  const sites = cloud.logins.map((login) => login.site).join(" ");
-
-  useEffect(() => {
-    void api.loginSuggestions().then(setSuggestions);
-  }, [api, sites]);
 
   const run = async (what: string, act: () => Promise<string | null>) => {
     setWorking(what);

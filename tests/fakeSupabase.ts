@@ -87,17 +87,25 @@ const cloudDatabase = async () => {
     queue = run.catch(() => {});
     return run;
   };
-  // A select in PostgREST's shape, for the few it's asked: columns, `eq.` or `not.is.null` on a few columns, an order,
-  // a limit and an offset.
+  // A select in PostgREST's shape, for the few it's asked: columns, `eq.`, `in.()` or `not.is.null` on a few columns, an
+  // order, a limit and an offset.
   const select = (uid: string | null, table: string, params: URLSearchParams) => {
     const run = queue.then(async () => {
       const columns = params.get("select") ?? "*";
       if (!/^[a-z_,*]+$/.test(columns)) throw Object.assign(new Error("Bad select"), { code: "PGRST100" });
       const values: string[] = [];
-      const filters = ["owner", "id", "conversation_id", "target"].flatMap((column) => {
+      const filters = ["owner", "id", "conversation_id", "target", "status"].flatMap((column) => {
         const filter = params.get(column);
         if (filter === null) return [];
         if (filter === "not.is.null") return [`${column} is not null`];
+        const among = /^in\.\(([a-z_,]+)\)$/.exec(filter)?.[1];
+        if (among)
+          return [
+            `${column}::text in (${among
+              .split(",")
+              .map((value) => `$${values.push(value)}`)
+              .join(", ")})`,
+          ];
         if (!filter.startsWith("eq.")) throw Object.assign(new Error("Bad filter"), { code: "PGRST100" });
         values.push(filter.slice(3));
         return [`${column}::text = $${values.length}`];

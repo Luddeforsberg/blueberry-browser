@@ -1,25 +1,20 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef } from "react";
 import type { PermissionPrompt, ThemeState } from "@shared/ipc";
 import { PermissionCard } from "@common/components/PermissionCard";
+import { useFromMain } from "@common/lib/latest";
 
 const permissions = () => window.chromeAPI.permissions;
 
 // The view over the page that asks about a site's request. It's as tall as the card, so the rest of the page
 // keeps its clicks.
 export const PromptApp: React.FC = () => {
-  const [prompt, setPrompt] = useState<PermissionPrompt | null>(null);
+  const [prompt] = useFromMain<PermissionPrompt | null>(null, permissions().current, permissions().onPrompt);
   const content = useRef<HTMLDivElement>(null);
 
+  const [theme] = useFromMain<ThemeState | null>(null, window.chromeAPI.theme.getTheme, window.chromeAPI.theme.onThemeUpdated);
   useEffect(() => {
-    void permissions().current().then(setPrompt);
-    return permissions().onPrompt(setPrompt);
-  }, []);
-
-  useEffect(() => {
-    const apply = ({ isDark }: ThemeState) => document.documentElement.classList.toggle("dark", isDark);
-    void window.chromeAPI.theme.getTheme().then(apply);
-    return window.chromeAPI.theme.onThemeUpdated(apply);
-  }, []);
+    document.documentElement.classList.toggle("dark", theme?.isDark ?? false);
+  }, [theme?.isDark]);
 
   useLayoutEffect(() => {
     const element = content.current;

@@ -208,13 +208,13 @@ const chips = () => {
 };
 
 const send = async (button, problem) => {
-  const prompt = (state.drafts.get("") ?? "").trim();
-  if (!prompt || state.linked === false) return openStart();
+  const written = state.drafts.get("") ?? "";
+  if (!written.trim() || state.linked === false) return openStart();
   button.disabled = true;
   try {
-    await startJob(prompt, chosen());
-    state.drafts.delete("");
+    await startJob(written, chosen());
   } catch (error) {
+    if (error instanceof api.AccountGone) return;
     problem.replaceChildren(el("p", { className: "problem", role: "alert", textContent: problemWords(error) }));
     button.disabled = false;
   }

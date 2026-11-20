@@ -1,6 +1,6 @@
 import { plausibleCode, withSiteNames } from "../shared.js";
 import * as api from "./api.js";
-import { drawMascot, el, grow, typing } from "./dom.js";
+import { drawMascot, el, grow, submitsOnce, typing } from "./dom.js";
 import { liveSlot, placeLive } from "./live.js";
 import { closeSheet, openSheet, sheetBody, sheetKind } from "./sheet.js";
 import { asked, handoffWords, hooks, liveOf, problemWords, state, waiting, wanted } from "./state.js";
@@ -24,11 +24,11 @@ export const decide = async (entry, allow, answer, said) => {
   if (deciding.has(ask.approval_id) || state.answered.has(ask.approval_id)) return null;
   deciding.add(ask.approval_id);
   try {
-    const written = await api.rpc("decide_cloud_approval", { p_approval: ask.approval_id, p_allow: allow, p_answer: answer });
+    const written = await api.asAccount().rpc("decide_cloud_approval", { p_approval: ask.approval_id, p_allow: allow, p_answer: answer });
     state.answered.add(ask.approval_id);
     return { words: written ? said : "That was already answered." };
   } catch (error) {
-    return problemWords(error);
+    return error instanceof api.AccountGone ? null : problemWords(error);
   } finally {
     deciding.delete(ask.approval_id);
   }
@@ -114,29 +114,7 @@ const question = (entry, problem) => {
   );
   const form = el(
     "form",
-    {
-      className: "ask-form",
-      onsubmit: async (event) => {
-        event.preventDefault();
-        const words = box.value.trim();
-        if (!words) return box.focus();
-        // A code only ever goes into the page itself, so nothing shaped like one is sent from here.
-        if (plausibleCode(words)) {
-          box.value = "";
-          problem.replaceChildren(
-            el("p", {
-              className: "problem",
-              role: "alert",
-              textContent: "That looks like a code, so it wasn’t sent. Codes only go into the page itself, never through Blueberry.",
-            }),
-          );
-          return;
-        }
-        const row = form.querySelector(".two");
-        hold(row, true);
-        if (!answered(entry, await decide(entry, true, words, `Answered. ${mascot.name} carries on.`), problem)) hold(row, false);
-      },
-    },
+    { className: "ask-form" },
     box,
     problem,
     buttons(
@@ -144,6 +122,25 @@ const question = (entry, problem) => {
       big("Skip", "raised", answering(entry, problem, false, `Skipped. ${mascot.name} carries on.`)),
     ),
   );
+  submitsOnce(form, async () => {
+    const words = box.value.trim();
+    if (!words) return box.focus();
+    // A code only ever goes into the page itself, so nothing shaped like one is sent from here.
+    if (plausibleCode(words)) {
+      box.value = "";
+      problem.replaceChildren(
+        el("p", {
+          className: "problem",
+          role: "alert",
+          textContent: "That looks like a code, so it wasn’t sent. Codes only go into the page itself, never through Blueberry.",
+        }),
+      );
+      return;
+    }
+    const row = form.querySelector(".two");
+    hold(row, true);
+    if (!answered(entry, await decide(entry, true, words, `Answered. ${mascot.name} carries on.`), problem)) hold(row, false);
+  });
   return [
     el("p", { className: "ask-lead", textContent: `${mascot.name} asks` }),
     el("h2", { className: "ask-title", id: "ask-title", textContent: withSiteNames(ask.approval_text) }),

@@ -1,6 +1,6 @@
 import { mascotsFromSharedRows } from "../shared.js";
 import * as api from "./api.js";
-import { drawMascot, el, icon } from "./dom.js";
+import { drawMascot, el, icon, submitsOnce } from "./dom.js";
 import { pushState } from "./push.js";
 import { hooks, problemWords, state } from "./state.js";
 
@@ -45,39 +45,37 @@ export const mountSignIn = (app) => {
     icon("eye"),
   );
   const submit = el("button", { type: "submit", className: "btn big fill wide", textContent: "Sign in" });
-  const form = el(
-    "form",
-    {
-      className: "form",
-      onsubmit: async (event) => {
-        event.preventDefault();
-        submit.disabled = true;
-        problem.replaceChildren();
-        try {
-          await api.signIn(email.value.trim(), password.value);
-          state.linked = null;
-          state.push = await pushState();
-          location.hash = "";
-          hooks.show(true);
-          void hooks.load();
-        } catch (error) {
-          problem.replaceChildren(
-            el("p", {
-              className: "problem",
-              role: "alert",
-              textContent: error.status === 400 ? "That email and password don’t match an account." : problemWords(error),
-            }),
-          );
-          submit.disabled = false;
-        }
-      },
+  const form = submitsOnce(
+    el(
+      "form",
+      { className: "form" },
+      el("label", { htmlFor: "email", textContent: "Email" }),
+      email,
+      el("label", { htmlFor: "password", textContent: "Password" }),
+      el("div", { className: "field-wrap" }, password, eye),
+      problem,
+      submit,
+    ),
+    async () => {
+      submit.disabled = true;
+      problem.replaceChildren();
+      try {
+        await api.signIn(email.value.trim(), password.value);
+        state.push = await pushState();
+        location.hash = "";
+        hooks.show(true);
+        void hooks.load();
+      } catch (error) {
+        problem.replaceChildren(
+          el("p", {
+            className: "problem",
+            role: "alert",
+            textContent: error.status === 400 ? "That email and password don’t match an account." : problemWords(error),
+          }),
+        );
+        submit.disabled = false;
+      }
     },
-    el("label", { htmlFor: "email", textContent: "Email" }),
-    email,
-    el("label", { htmlFor: "password", textContent: "Password" }),
-    el("div", { className: "field-wrap" }, password, eye),
-    problem,
-    submit,
   );
   app.replaceChildren(
     el(

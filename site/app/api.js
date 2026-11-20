@@ -1,5 +1,5 @@
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "../config.js";
-import { fetchWithin } from "../shared.js";
+import { fetchWithin, Latest } from "../shared.js";
 
 // The phone page's only way to Supabase: the publishable key and the user's own session, as Blueberry's Account does, so
 // row-level security keeps everything to their own. The session is kept in localStorage, the best a phone browser offers.
@@ -27,12 +27,18 @@ const read = () => {
 };
 
 let session = read();
-// Changes whenever someone signs in or out, so an answer to a call made before can be dropped rather than bring the
-// last account back.
-let version = 0;
-export const sessionVersion = () => version;
+// Who the page is for. Each sign-in or sign-out starts a new turn, so an answer to a call made before it is dropped rather
+// than bring the last account back, and whatever is listening forgets what it knew of that account. It's the same
+// transition however the account goes: signing out, a session the server stops taking, or someone else signing in.
+const accounts = new Latest();
+let account = accounts.next();
+export const accountTurn = () => account;
+const accountChanged = new Set();
+export const onAccountChange = (listener) => {
+  accountChanged.add(listener);
+  return () => accountChanged.delete(listener);
+};
 const keep = (next, { same = false } = {}) => {
-  if (!same) version++;
   session = next;
   try {
     if (next) localStorage.setItem(KEPT, JSON.stringify(next));
@@ -40,6 +46,9 @@ const keep = (next, { same = false } = {}) => {
   } catch {
     // A private window: signed in until the page closes.
   }
+  if (same) return;
+  account = accounts.next();
+  for (const listener of accountChanged) listener();
 };
 
 export const signedIn = () => (session ? { email: session.email, userId: session.userId } : null);
@@ -65,10 +74,17 @@ const send = async (path, { method = "GET", body, token } = {}) => {
   try {
     parsed = text ? JSON.parse(text) : null;
   } catch {
-    // An error page. The status says enough.
+    // An error page says enough by its status. A success that can't be read is a failure too, never an empty answer.
+    if (response.ok) throw new ApiError(response.status, "The answer couldn’t be read");
   }
   if (!response.ok) throw new ApiError(response.status, typeof parsed?.message === "string" ? parsed.message : "");
   return parsed;
+};
+
+// A list the server must answer with. Anything else fails as a call does, so it never reads as an empty account.
+const listOf = (answer) => {
+  if (!Array.isArray(answer)) throw new ApiError(200, "The answer wasn’t a list");
+  return answer;
 };
 
 const toSession = (body) => {
@@ -101,17 +117,17 @@ let refreshing = null;
 const token = async () => {
   if (!session) throw new ApiError(401);
   if (session.expiresAt - Date.now() > REFRESH_BEFORE_MS) return session.accessToken;
-  const asked = version;
+  const asked = account;
   refreshing ??= send("/auth/v1/token?grant_type=refresh_token", { method: "POST", body: { refresh_token: session.refreshToken } })
     .then((body) => {
       // Signed out, or in as someone else, while it was out: this one isn't theirs.
-      if (version !== asked) throw new ApiError(401);
+      if (!asked.current) throw new ApiError(401);
       const next = toSession(body);
       if (!next) throw new ApiError(401);
       keep(next, { same: true });
     })
     .catch((error) => {
-      if (version === asked && (error.status === 400 || error.status === 401)) keep(null);
+      if (asked.current && (error.status === 400 || error.status === 401)) keep(null);
       throw error;
     })
     .finally(() => {
@@ -122,12 +138,12 @@ const token = async () => {
 };
 
 const asUser = async (path, options = {}) => {
-  const asked = version;
+  const asked = account;
   try {
     return await send(path, { ...options, token: await token() });
   } catch (error) {
     // A session the server no longer takes, unless it's already been replaced.
-    if (error.status === 401 && version === asked) keep(null);
+    if (error.status === 401 && asked.current) keep(null);
     throw error;
   }
 };
@@ -136,30 +152,57 @@ export const rpc = (name, body = {}) => asUser(`/rest/v1/rpc/${name}`, { method:
 
 const JOB_COLUMNS = "id,conversation_id,prompt,mascot,status,steps,reply,error,live_view_url,context_id,created_at,updated_at";
 
-// The user's newest jobs in the cloud, then what each waiting one is asking. The page puts them together into
-// conversations. One run on the Mac is answered there, so it isn't here.
+// The user's newest jobs in the cloud, and every one still going however old, then what each waiting one is asking. The
+// page puts them together into conversations. One run on the Mac is answered there, so it isn't here.
 export const jobs = async () => {
   const me = encodeURIComponent(session?.userId ?? "");
-  const rows =
-    (await asUser(`/rest/v1/cloud_jobs?select=${JOB_COLUMNS}&owner=eq.${me}&target=eq.cloud&order=created_at.desc&limit=100`)) ?? [];
+  const mine = `/rest/v1/cloud_jobs?select=${JOB_COLUMNS}&owner=eq.${me}&target=eq.cloud&order=created_at.desc`;
+  // The history is cut at a hundred, so a job waiting since before the hundred newest is asked for on its own.
+  const [newest, going] = await Promise.all([
+    asUser(`${mine}&limit=100`).then(listOf),
+    asUser(`${mine}&status=in.(queued,running,waiting)`).then(listOf),
+  ]);
+  const rows = [...newest, ...going.filter((row) => !newest.some((known) => known.id === row.id))];
   const waiting = rows.filter((row) => row.status === "waiting").map((row) => row.id);
-  const asks = waiting.length ? ((await rpc("my_cloud_jobs", { p_ids: waiting })) ?? []) : [];
+  const asks = waiting.length ? listOf(await rpc("my_cloud_jobs", { p_ids: waiting })) : [];
   return rows.map((row) => ({ ...row, ask: asks.find((ask) => ask.id === row.id && typeof ask.approval_id === "string") ?? null }));
 };
 
 // One job with the history it carried, which only a follow-up needs, so the list doesn't fetch it for every job.
 export const jobWithHistory = async (id) => {
   const me = encodeURIComponent(session?.userId ?? "");
-  const [row] =
-    (await asUser(
+  const [row] = listOf(
+    await asUser(
       `/rest/v1/cloud_jobs?select=id,conversation_id,prompt,history,steps,reply,created_at&owner=eq.${me}&id=eq.${encodeURIComponent(id)}&limit=1`,
-    )) ?? [];
+    ),
+  );
   return row ?? null;
 };
 
 export const mascots = async () =>
-  (await asUser(
-    "/rest/v1/cloud_mascots?select=id,name,palette,accessory,instructions,sites,tools,from_gallery,updated_at&order=position",
-  )) ?? [];
+  listOf(
+    await asUser("/rest/v1/cloud_mascots?select=id,name,palette,accessory,instructions,sites,tools,from_gallery,updated_at&order=position"),
+  );
 
-export const runner = async () => ((await rpc("my_cloud_runner")) ?? [])[0] ?? null;
+export const runner = async () => listOf(await rpc("my_cloud_runner"))[0] ?? null;
+
+// Work done for the account signed in now that sends something, or reads and then sends: each call refuses to start once
+// someone else is signed in, or nobody is, and its answer is dropped then too, so nothing read for one account is sent as
+// another, and nothing that comes back for one is kept for the next. What's doing the work stops quietly on `AccountGone`.
+export class AccountGone extends ApiError {
+  constructor() {
+    super(401, "The account changed while it was on its way");
+  }
+}
+export const asAccount = () => {
+  const turn = account;
+  const within =
+    (call) =>
+    async (...args) => {
+      if (!turn.current) throw new AccountGone();
+      const answer = await call(...args);
+      if (!turn.current) throw new AccountGone();
+      return answer;
+    };
+  return { rpc: within(rpc), jobWithHistory: within(jobWithHistory), still: () => turn.current };
+};

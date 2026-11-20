@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Cloud } from "lucide-react";
 import type { ChatApproval, ChatStep } from "@shared/library";
 import { cn } from "@common/lib/utils";
+import { useLatest } from "@common/lib/latest";
 import { liveFrameLock } from "../cloudView";
 
 const LOOK_AGAIN_MS = 2000;
@@ -14,16 +15,20 @@ export const RunnerView: React.FC<{ chatId: string; steps: ChatStep[]; approval:
   const handoff = approval?.handoff;
   // Asked again every few seconds while it's on screen, since the runner writes it after the step that opened the page,
   // and each page has its own.
+  // Only the newest look counts, so a slow answer about the page before never takes the place of the one after it.
+  const looking = useLatest();
   useEffect(() => {
-    let current = true;
-    const look = () => void window.chromeAPI.cloud.runnerView(chatId).then((next) => current && setUrl(next));
+    const look = () => {
+      const turn = looking.next();
+      void window.chromeAPI.cloud.runnerView(chatId).then((next) => turn.current && setUrl(next));
+    };
     look();
     const timer = setInterval(look, LOOK_AGAIN_MS);
     return () => {
-      current = false;
+      looking.end();
       clearInterval(timer);
     };
-  }, [chatId, approval?.id]);
+  }, [chatId, approval?.id, looking]);
   const lock = liveFrameLock(!!handoff);
   const doing = steps.filter((one) => !one.done).at(-1)?.text ?? steps.at(-1)?.text ?? "Waiting to start in the cloud";
 

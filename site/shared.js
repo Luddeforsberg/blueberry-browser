@@ -246,6 +246,24 @@ var conversationsOf = (jobs) => {
 };
 
 // src/shared/lateWork.ts
+var Latest = class {
+  count = 0;
+  newest = /* @__PURE__ */ new Map();
+  next(key) {
+    const id = ++this.count;
+    const { newest } = this;
+    newest.set(key, id);
+    return {
+      id,
+      get current() {
+        return newest.get(key) === id;
+      }
+    };
+  }
+  end(key) {
+    this.newest.delete(key);
+  }
+};
 var OneAtATime = class {
   last = /* @__PURE__ */ new Map();
   busy(key) {
@@ -292,6 +310,12 @@ var oneAtATime = (work) => {
   };
 };
 var runnerLinkDue = (checkedAt, now) => checkedAt === null || now - checkedAt >= RUNNER_LINK_EVERY_MS;
+
+// src/shared/draft.ts
+var leftAfterSend = (now, sent) => {
+  if (now === sent) return "";
+  return now.startsWith(sent) ? now.slice(sent.length).trimStart() : now;
+};
 
 // src/renderer/chrome/src/siteNames.ts
 var siteParts = (text) => {
@@ -364,12 +388,15 @@ var plausibleCode = (text) => {
 };
 export {
   BERRY_ID,
+  Latest,
+  OneAtATime,
   asContinuation,
   conversationsOf,
   fetchWithin,
   finishedWhen,
   followUpHistory,
   isUuid,
+  leftAfterSend,
   mascotSnapshot,
   mascotsFromSharedRows,
   oneAtATime,

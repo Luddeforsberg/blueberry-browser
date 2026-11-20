@@ -45,7 +45,7 @@ export const Chat: React.FC = () => {
   const offers = library.memory.offers.filter((offer) => offer.sourceId === chatId).length;
   const messages = entries.map(({ message }) => message);
   const last = messages.at(-1);
-  const scrollerRef = useFollowReply(
+  const follow = useFollowReply(
     messages.filter((message) => message.role === "user").length,
     // Null once it's over, so ending counts as a change and what comes under the reply is followed too.
     running ? last?.content : null,
@@ -66,7 +66,7 @@ export const Chat: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full">
-      <div ref={scrollerRef} className="flex-1 min-h-0 overflow-y-auto">
+      <div {...follow} className="flex-1 min-h-0 overflow-y-auto">
         {entries.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center gap-3 px-6 text-center animate-fade-in">
             <BerrySpot size={40} mascot={mascot} />

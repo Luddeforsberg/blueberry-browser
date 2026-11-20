@@ -66,6 +66,17 @@ const readUpToLimit = async (path: string): Promise<Buffer | null> => {
 
 const pages = (count: number) => (count === 1 ? "1 page" : `${count} pages`);
 
+// A file that won't go, with why, and an id that names nothing main keeps.
+const refused = (name: unknown, problem: string): FileChip => ({
+  id: randomUUID(),
+  kind: null,
+  name: cleanFileName(name, MAX_FILE_NAME_LENGTH),
+  fact: null,
+  factInFull: null,
+  thumbnail: null,
+  problem,
+});
+
 export class Attachments {
   private readonly staged = new Map<string, Staged>();
 
@@ -108,59 +119,45 @@ export class Attachments {
     return { kind: "picture", name: clean, data: picture.data, mime: picture.mime, text: null, fact: null, thumbnail: picture.thumbnail };
   }
 
-  // Each file chosen in the system's dialog. `kept` is what the box holds already, so the count is main's to keep.
+  // Each file chosen in the system's dialog, read one at a time, and only while there's room. `kept` is what the box
+  // holds already, so the count is main's to keep.
   async chooseFiles(kept: unknown): Promise<FileChip[]> {
     const paths = await this.pickFiles();
-    const read = await Promise.all(paths.map(async (path) => ({ name: basename(path), bytes: await readUpToLimit(path) })));
-    return this.stage(read, kept);
+    const room = this.roomFor(kept);
+    const chips: FileChip[] = [];
+    for (const path of paths) {
+      const name = basename(path);
+      chips.push(room.left > 0 ? this.stageOne(name, await readUpToLimit(path), room) : refused(name, ATTACHMENT_WORDS.tooMany));
+    }
+    return chips;
   }
 
   // Files dropped or pasted onto the box, as their bytes. Never a path.
   addFiles(files: unknown, kept: unknown): FileChip[] {
     if (!Array.isArray(files)) return [];
-    return this.stage(
-      files.map((file) => {
-        const { name, bytes } = (file ?? {}) as { name?: unknown; bytes?: unknown };
-        return { name, bytes: bytes instanceof Uint8Array ? Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength) : null };
-      }),
-      kept,
-    );
+    const room = this.roomFor(kept);
+    return files.map((file) => {
+      const { name, bytes } = (file ?? {}) as { name?: unknown; bytes?: unknown };
+      if (room.left <= 0) return refused(name, ATTACHMENT_WORDS.tooMany);
+      return this.stageOne(name, bytes instanceof Uint8Array ? Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength) : null, room);
+    });
   }
 
-  private stage(files: Array<{ name: unknown; bytes: Buffer | null }>, kept: unknown): FileChip[] {
+  private roomFor(kept: unknown): { left: number } {
     this.letGoOfOld();
     const already = (Array.isArray(kept) ? kept : []).filter((id) => typeof id === "string" && this.staged.has(id));
-    let room = MAX_FILES - new Set(already).size;
-    return files.map(({ name, bytes }) => {
-      const id = randomUUID();
-      const prepared = bytes
-        ? this.prepare(name, bytes)
-        : { name: cleanFileName(name, MAX_FILE_NAME_LENGTH), problem: ATTACHMENT_WORDS.unreadable };
-      if ("problem" in prepared)
-        return { id, kind: null, name: prepared.name, fact: null, factInFull: null, thumbnail: null, problem: prepared.problem };
-      if (room <= 0)
-        return {
-          id,
-          kind: prepared.kind,
-          name: prepared.name,
-          fact: null,
-          factInFull: null,
-          thumbnail: prepared.thumbnail,
-          problem: ATTACHMENT_WORDS.tooMany,
-        };
-      room--;
-      this.staged.set(id, { ...prepared, stagedAt: this.now() });
-      const factInFull = prepared.fact === ATTACHMENT_WORDS.cutShort ? ATTACHMENT_WORDS.cutShortInFull : prepared.fact;
-      return {
-        id,
-        kind: prepared.kind,
-        name: prepared.name,
-        fact: prepared.fact,
-        factInFull,
-        thumbnail: prepared.thumbnail,
-        problem: null,
-      };
-    });
+    return { left: MAX_FILES - new Set(already).size };
+  }
+
+  // One file, judged and kept if it may go. A refused one takes no room, so only one that's kept counts.
+  private stageOne(name: unknown, bytes: Buffer | null, room: { left: number }): FileChip {
+    const id = randomUUID();
+    const prepared = bytes ? this.prepare(name, bytes) : { name, problem: ATTACHMENT_WORDS.unreadable };
+    if ("problem" in prepared) return refused(prepared.name, prepared.problem);
+    room.left--;
+    this.staged.set(id, { ...prepared, stagedAt: this.now() });
+    const factInFull = prepared.fact === ATTACHMENT_WORDS.cutShort ? ATTACHMENT_WORDS.cutShortInFull : prepared.fact;
+    return { id, kind: prepared.kind, name: prepared.name, fact: prepared.fact, factInFull, thumbnail: prepared.thumbnail, problem: null };
   }
 
   discard(id: unknown): void {

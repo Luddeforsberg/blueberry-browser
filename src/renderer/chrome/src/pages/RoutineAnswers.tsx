@@ -16,6 +16,7 @@ import { narrowerLimits } from "../shortWords";
 import { useRunner } from "../useRunner";
 import { howOften, scheduleSentence, TIME_CHIPS, withHowOften, type HowOften, type RoutineFormValues } from "../routinesView";
 import { blocked, type Set } from "./routineStepRules";
+import { isEnter } from "@common/lib/keys";
 
 // Part of making a routine (RoutineSteps.tsx): the answer to each step's question.
 
@@ -316,7 +317,7 @@ const NameAnswer: React.FC<{ values: RoutineFormValues; set: Set; onEnter: () =>
     value={values.name}
     onChange={(event) => set({ name: event.target.value })}
     onKeyDown={(event) => {
-      if (event.key === "Enter") onEnter();
+      if (isEnter(event)) onEnter();
     }}
     className={cn(FIELD, "h-[52px] px-4 text-center text-20 font-medium")}
   />

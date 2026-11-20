@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import type { TabInfo, Visit } from "@shared/ipc";
 import type { MascotProfile, NeedsYouItem, Suggestion } from "@shared/library";
@@ -32,6 +32,9 @@ import { setGalleryView } from "../galleryView";
 import { galleryParam } from "@shared/galleryPlaces";
 import { openSettings } from "../openSettings";
 import { useMascotSwitch } from "./useMascotSwitch";
+import { leftAfterSend } from "@shared/draft";
+import { useSendOnce } from "../components/promptSend";
+import { useFromMain } from "@common/lib/latest";
 
 // DESIGN.md section 10, New tab: no page yet, so no sheet. The well, the greeting, the prompt box, and what's real under it.
 
@@ -156,7 +159,14 @@ const WaitingRow: React.FC<{ item: NeedsYouItem }> = ({ item }) => {
 
 export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
   const [text, setText] = useState("");
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const typed = useRef(text);
+  typed.current = text;
+  // Saved cards, at once. New ones arrive when they're written, and the page never waits for them.
+  const [suggestions, setSuggestions] = useFromMain<Suggestion[]>(
+    [],
+    window.chromeAPI.suggestions.list,
+    window.chromeAPI.suggestions.onUpdated,
+  );
   // What a row put in the box, and which row: moves the keyboard there, and the row looks used while the box still says it.
   // A suggestion's id is told when it's sent.
   const [filled, setFilled] = useState<{ key: string; suggestionId: string | null; prompt: string; times: number } | null>(null);
@@ -200,18 +210,8 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     },
   });
 
-  // Saved cards, at once. New ones arrive when they're written, and the page never waits for them.
-  useEffect(() => {
-    const { list, onUpdated } = window.chromeAPI.suggestions;
-    void list().then(setSuggestions);
-    return onUpdated(setSuggestions);
-  }, []);
-
   // Examples from the starters' real runs, for the mascots to try.
-  const [examples, setExamples] = useState<Record<string, string>>({});
-  useEffect(() => {
-    void window.chromeAPI.mascots.examples().then(setExamples);
-  }, []);
+  const [examples] = useFromMain<Record<string, string>>({}, window.chromeAPI.mascots.examples);
 
   const takeUp = (suggestion: Suggestion) => {
     if (suggestion.kind === "prompt") {
@@ -250,19 +250,28 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     }
   };
 
-  const ask = async (message: string) => {
-    if (filled?.suggestionId) void window.chromeAPI.suggestions.used(filled.suggestionId);
-    const chat = await window.chromeAPI.chat.send(null, message, {
-      seePage: false,
-      mascotId: chosen.id,
-      runner: toRunner,
-      cloud: inCloud && !canUseRunner && canUseCloud,
-      ...box.sendable(),
+  // One at a time, so Enter twice starts one chat. The chat opens in a tab of its own, and this one closes unless something
+  // was written or added here while it was on its way.
+  const sendOnce = useSendOnce();
+  const ask = (message: string, written: string) => {
+    const inBox = box.contents();
+    sendOnce(async () => {
+      if (filled?.suggestionId) void window.chromeAPI.suggestions.used(filled.suggestionId);
+      const chat = await window.chromeAPI.chat.send(null, message, {
+        seePage: false,
+        mascotId: chosen.id,
+        runner: toRunner,
+        cloud: inCloud && !canUseRunner && canUseCloud,
+        ...box.sendable(),
+      });
+      if (!chat) return;
+      const left = leftAfterSend(typed.current, written);
+      const added = box.adding() || box.contents().some((id) => !inBox.includes(id));
+      setText(left);
+      box.letGo(inBox);
+      await browser.openPage("chat", { param: chat.id, title: chat.title });
+      if (!left && !added) await browser.closeTab(tab.id);
     });
-    if (!chat) return;
-    box.clear();
-    await browser.openPage("chat", { param: chat.id, title: chat.title });
-    await browser.closeTab(tab.id);
   };
 
   // Enter opens anything that looks like an address and asks the mascot about everything else. ⌘Enter always asks, and
@@ -270,7 +279,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
   const submit = (alwaysAsk: boolean) => {
     const message = text.trim();
     if (!message) return;
-    if (alwaysAsk || !box.empty || !looksLikeUrl(message)) void ask(message);
+    if (alwaysAsk || !box.empty || !looksLikeUrl(message)) ask(message, text);
     else void browser.navigateTab(tab.id, toUrl(message));
   };
 
@@ -318,16 +327,11 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                 // Emptied, it's no longer that prompt being sent.
                 if (!next.trim()) setFilled(null);
               }}
-              onKeyDown={(event) => {
-                if (event.key !== "Enter" || event.shiftKey) return;
-                event.preventDefault();
-                submit(event.metaKey || event.ctrlKey);
-              }}
               spellCheck={false}
               autoFocus
               focusKey={filled?.times}
               canSend={text.trim().length > 0}
-              onSend={() => submit(false)}
+              onSend={submit}
               mascot={shown}
               chosenId={chosen.id}
               face={face}

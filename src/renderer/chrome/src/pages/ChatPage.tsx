@@ -60,7 +60,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
   const offers = library.memory.offers.filter((offer) => offer.sourceId === chatId).length;
   // Only the library's list says whether a chat's jobs go to a cloud tab, not the thread.
   const inCloud = library.chats.some((chat) => chat.id === chatId && chat.cloud);
-  const scrollerRef = useFollowReply(
+  const follow = useFollowReply(
     messages.filter((message) => message.role === "user").length,
     // Null once it's over, so ending counts as a change and what comes under the reply is followed too.
     running ? last?.content : null,
@@ -93,7 +93,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
   return (
     <div ref={pageRef} className="h-full flex">
       <div className="flex-1 min-w-0 h-full flex flex-col">
-        <div ref={scrollerRef} className="flex-1 min-h-0 overflow-y-auto">
+        <div {...follow} className="flex-1 min-h-0 overflow-y-auto">
           <div className={`${COLUMN} pt-6 pb-4 flex flex-col gap-6`}>
             {entries.map(({ key, message, streaming, error: failed }, index) =>
               message.role === "user" ? (

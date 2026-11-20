@@ -255,15 +255,15 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     // Sent from the computer and over while a follow-up is typed here, with the page still showing the conversation as
     // it was. The server refuses that follow-up as built on an older job, and the page reads the conversation again and
     // sends it once more, carrying the computer's exchange.
-    let frozen: { body: string; headers: Record<string, string> } | null = null;
+    const frozen = new Map<string, { body: string; headers: Record<string, string> }>();
     let freeze = true;
     await page.route(/\/rest\/v1\/cloud_jobs\?select=id,conversation_id,prompt/, async (route) => {
       if (!freeze) return route.continue();
-      if (!frozen) {
+      if (!frozen.has(route.request().url())) {
         const response = await route.fetch();
-        frozen = { body: await response.text(), headers: response.headers() };
+        frozen.set(route.request().url(), { body: await response.text(), headers: response.headers() });
       }
-      await route.fulfill({ status: 200, body: frozen.body, headers: frozen.headers });
+      await route.fulfill({ status: 200, ...defined(frozen.get(route.request().url())) });
     });
     const refused: number[] = [];
     await page.route(/\/rest\/v1\/rpc\/start_cloud_job/, async (route) => {

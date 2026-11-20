@@ -7,6 +7,7 @@ import { Favicon } from "./components/Favicon";
 import { MenuRule } from "./components/MenuSheet";
 import { menuRowClass } from "./components/menuRows";
 import { shownAddress } from "./addressSuggestions";
+import { useFromMain } from "@common/lib/latest";
 
 // The list under the address field, over the page in its own view. Main places it from the layout and says what to
 // draw. The keyboard stays in the field: this only shows the rows, and a press hands one back to main.
@@ -67,15 +68,10 @@ const action = (row: AddressSuggestion) => {
 };
 
 export const SuggestionsApp: React.FC = () => {
-  const [theme, setTheme] = useState<ThemeState | null>(null);
+  const [theme] = useFromMain<ThemeState | null>(null, window.chromeAPI.theme.getTheme, window.chromeAPI.theme.onThemeUpdated);
   const [shown, setShown] = useState<AddressSuggestionsShown | null>(null);
 
-  useEffect(() => {
-    const api = window.chromeAPI;
-    void api.theme.getTheme().then(setTheme);
-    const unsubscribe = [api.theme.onThemeUpdated(setTheme), api.address.onSuggestions(setShown)];
-    return () => unsubscribe.forEach((off) => off());
-  }, []);
+  useEffect(() => window.chromeAPI.address.onSuggestions(setShown), []);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme?.isDark ?? false);

@@ -1,19 +1,16 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { HistoryImportResult, ImportSource } from "@shared/ipc";
+import { useFromMain } from "@common/lib/latest";
 
 const cameAcross = (added: number) =>
   added === 0 ? "Nothing new came across" : `${added.toLocaleString()} ${added === 1 ? "visit came" : "visits came"} across`;
 
 export const useHistoryImport = () => {
-  const [sources, setSources] = useState<ImportSource[] | null>(null);
+  const [sources] = useFromMain<ImportSource[] | null>(null, window.chromeAPI.browser.importSources);
   const [chosenId, setChosenId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<{ result: HistoryImportResult; name: string } | null>(null);
   const source = sources?.find(({ id }) => id === chosenId) ?? sources?.[0] ?? null;
-
-  useEffect(() => {
-    void window.chromeAPI.browser.importSources().then(setSources);
-  }, []);
 
   const choose = (id: string) => {
     // What's coming across is the chosen browser's, so the choice holds until it's in.

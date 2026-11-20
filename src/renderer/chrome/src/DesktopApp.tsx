@@ -9,6 +9,7 @@ import { cn } from "@common/lib/utils";
 import { DropFaces, DropShape } from "./DesktopDrop";
 import { FADES_IN, dropAt, elapsed, restingSize, thickness } from "./desktopShape";
 import { useDesktopTheme } from "./useDesktopTheme";
+import { useFromMain } from "@common/lib/latest";
 
 const desktop = () => window.chromeAPI.desktop;
 
@@ -65,7 +66,7 @@ const PartButton: React.FC<{ part: DesktopDropPart; label: string; className: st
 // The drop on the edge of the screen, in a clear window of its own that lets clicks through everywhere but here. Main
 // decides everything it says, and the window doesn't change size for any of it: the shape grows inside it.
 export const DesktopApp: React.FC = () => {
-  const [state, setState] = useState<DesktopDropState | null>(null);
+  const [state] = useFromMain<DesktopDropState | null>(null, desktop().state, desktop().onState);
   const theme = useDesktopTheme();
   const room = useRoom();
   const row = useRef<HTMLDivElement>(null);
@@ -78,11 +79,6 @@ export const DesktopApp: React.FC = () => {
   const dragging = state?.dragging ?? false;
   // A new row for each thing it says, so its words fade in.
   const rowKey = state === null ? null : dragging ? "held" : state.says.kind;
-
-  useEffect(() => {
-    void desktop().state().then(setState);
-    return desktop().onState(setState);
-  }, []);
 
   // Laid out at its own size, so the shape can grow to it.
   useLayoutEffect(() => {

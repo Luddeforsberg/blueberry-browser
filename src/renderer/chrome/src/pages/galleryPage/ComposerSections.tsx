@@ -25,7 +25,6 @@ export const ComposerSections: React.FC = () => (
             placeholder="Ask Berry, or type an address"
             value=""
             onChange={() => undefined}
-            onKeyDown={() => undefined}
             canSend={false}
             onSend={() => undefined}
             mascot={BERRY}
@@ -40,7 +39,6 @@ export const ComposerSections: React.FC = () => (
             placeholder="Ask Scout"
             value="What happened in Malmö today?"
             onChange={() => undefined}
-            onKeyDown={() => undefined}
             canSend
             onSend={() => undefined}
             mascot={SAMPLE_MASCOT}
@@ -55,7 +53,6 @@ export const ComposerSections: React.FC = () => (
             placeholder="Tell Berry something"
             value=""
             onChange={() => undefined}
-            onKeyDown={() => undefined}
             canSend={false}
             onSend={() => undefined}
             onStop={() => undefined}
@@ -70,7 +67,6 @@ export const ComposerSections: React.FC = () => (
             placeholder="Ask Berry, or type an address"
             value="Is this cheaper than what I booked?"
             onChange={() => undefined}
-            onKeyDown={() => undefined}
             canSend
             onSend={() => undefined}
             mascot={BERRY}

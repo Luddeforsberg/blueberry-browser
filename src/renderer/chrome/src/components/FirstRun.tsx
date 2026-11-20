@@ -15,6 +15,7 @@ import { StepCard, StepNav } from "./StepCard";
 import { LINK, Primary, LinkNav, Under, Says, Field, INPUT } from "./FirstRunParts";
 import { MakeItYours, MiniWindow, WhatICanSee } from "./FirstRunSettings";
 import { missing } from "@shared/missing";
+import { isEnter } from "@common/lib/keys";
 
 // DESIGN.md section 10, First run: Berry and one card in an empty window, a step at a time, in the card that makes a
 // mascot. Every step's answer is real: an account on the server, the look, a key the service has answered with, history
@@ -123,7 +124,7 @@ const Steps: React.FC<{ start: Start }> = ({ start }) => {
   });
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "Enter" || event.isComposing || event.defaultPrevented) return;
+      if (!isEnter(event) || event.defaultPrevented) return;
       // A button, a link or a choice does its own thing with Enter.
       if ((event.target as HTMLElement).closest('button, a, [role="radio"]')) return;
       event.preventDefault();

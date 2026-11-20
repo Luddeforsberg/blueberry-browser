@@ -32,6 +32,7 @@ import {
 import { ChangeRoutinePart, NewRoutine } from "./RoutineSteps";
 import { PART_NAMES } from "./routineParts";
 import { Tooltip } from "@common/components/Tooltip";
+import { useFromMain } from "@common/lib/latest";
 
 // DESIGN.md section 10, Routines: a page in a tab, with the list, each routine's own page, making one in four steps,
 // and changing one part. Where it is lives in the tab's param (routinePlaces.ts).
@@ -245,15 +246,11 @@ const RoutineView: React.FC<{ routine: Routine }> = ({ routine }) => {
   const library = useLibrary();
   const mascot = useMascots().find(routine.mascotId);
   const who = useAssistantName(mascot);
-  const [runs, setRuns] = useState<RoutineRun[]>([]);
+  // Read again whenever the library changes, as it does each time a run takes a step. Each routine has a view of its own.
+  const [runs] = useFromMain<RoutineRun[]>([], () => api().getRuns(routine.id), undefined, library);
   const queued = routine.status === "queued";
   const part = (which: RoutinePart) => () => openRoutines({ page: "part", id: routine.id, part: which });
   const next = routine.paused ? "paused" : routine.nextRunAt !== null ? `next ${nextInWords(routine.nextRunAt)}` : null;
-
-  // The library changes whenever a run takes a step.
-  useEffect(() => {
-    void api().getRuns(routine.id).then(setRuns);
-  }, [routine.id, library]);
 
   const remove = async () => {
     if (await api().delete(routine.id)) openRoutines({ page: "list" });

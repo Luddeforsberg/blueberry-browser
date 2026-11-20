@@ -10,6 +10,7 @@ import { Berry } from "./Berry";
 import { ServiceMark } from "./ServiceMark";
 import { SERVICES, type KeyTry, type Said } from "./useAiKey";
 import { missing } from "@shared/missing";
+import { isEnter } from "@common/lib/keys";
 
 // DESIGN.md section 10, First run, Give me a brain, and Settings > Connections > AI service: the two services as tiles
 // side by side, and one field under them for the chosen one's key. The key is only ever in that field until it's sent to
@@ -168,7 +169,7 @@ export const AiKeyForm: React.FC<{ keyTry: KeyTry; onRemove?: () => void; tryBut
           value={key}
           onChange={(event) => setKey(event.target.value)}
           onKeyDown={(event) => {
-            if (tryButton && event.key === "Enter") {
+            if (tryButton && isEnter(event)) {
               event.preventDefault();
               void tryKey();
             }
