@@ -1,0 +1,507 @@
+/* The front page, direction A: the product first. Built from picture.css's parts and tokens.css only. One column,
+   1080px at most, on the ground. */
+
+:root {
+  --page: 1080px;
+  --gutter: 16px;
+}
+@media (min-width: 720px) {
+  :root {
+    --gutter: 32px;
+  }
+}
+
+.top,
+main {
+  width: 100%;
+  max-width: calc(var(--page) + 2 * var(--gutter));
+  margin: 0 auto;
+  padding-inline: var(--gutter);
+}
+.top {
+  display: flex;
+  align-items: center;
+  height: 64px;
+}
+
+/* --- The words on top. --- */
+.hero {
+  max-width: 720px;
+  padding: 40px 0 40px;
+}
+h1 {
+  font-size: 32px;
+  font-weight: 500;
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+.lede {
+  margin-top: 16px;
+  max-width: 600px;
+  font-size: 17px;
+  line-height: 1.5;
+  color: rgb(var(--ink-2));
+  text-wrap: pretty;
+}
+.soon {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+  font-size: 14px;
+  color: rgb(var(--ink-2));
+}
+@media (min-width: 720px) {
+  .hero {
+    padding: 72px 0 56px;
+  }
+  h1 {
+    font-size: 48px;
+  }
+}
+
+/* --- The window. On a phone it's the chat alone, as the sidebar and toolbar wouldn't fit. --- */
+.shot figcaption {
+  margin-top: 12px;
+}
+.window {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+.side,
+.toolbar {
+  display: none;
+}
+.main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px 16px 16px;
+  border-radius: 16px;
+  background: rgb(var(--sheet));
+  box-shadow: var(--shadow-rim);
+}
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+}
+.prompt {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+}
+.prompt .card {
+  padding: 12px 10px 10px 16px;
+}
+.placeholder {
+  font-size: 15px;
+  color: rgb(var(--faint));
+}
+.tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+.plus-key,
+.send {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: rgb(var(--card-2));
+  color: rgb(var(--ink-2));
+}
+.send {
+  border-radius: 50%;
+  color: rgb(var(--faint));
+}
+.who {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  margin-left: auto;
+  padding: 0 10px 0 7px;
+  border-radius: 999px;
+  background: rgb(var(--sheet));
+  box-shadow: var(--shadow-chip);
+  font-size: 13px;
+  font-weight: 500;
+}
+.who .icon {
+  width: 12px;
+  height: 12px;
+  color: rgb(var(--ink-3));
+}
+
+@media (min-width: 760px) {
+  .window {
+    grid-template-columns: 232px 1fr;
+    border-radius: 16px;
+    background: rgb(var(--ground));
+    box-shadow: var(--shadow-lift);
+    overflow: hidden;
+  }
+  .side {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 10px 10px;
+  }
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 48px;
+    padding: 0 12px 0 4px;
+    color: rgb(var(--ink-3));
+  }
+  .page {
+    flex: 1;
+    min-height: 460px;
+    margin: 0 8px 8px 0;
+    padding: 28px 28px 16px;
+    border-radius: 16px;
+  }
+  .column {
+    flex: 1;
+  }
+}
+
+/* The sidebar (Sidebar in DESIGN.md): the switch between its faces, Tabs, a job's group, and the dock. */
+.faces {
+  display: flex;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgb(var(--tray));
+  font-size: 12.5px;
+  font-weight: 500;
+  color: rgb(var(--ink-2));
+}
+.faces .face {
+  position: relative;
+  flex: 1;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+}
+.faces .on {
+  background: rgb(var(--sheet));
+  box-shadow: var(--shadow-chip);
+  color: rgb(var(--ink));
+}
+.label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  margin-top: 6px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgb(var(--ink-2));
+}
+.label.ask {
+  color: rgb(var(--ask));
+}
+.label .count {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: rgb(var(--ink-3));
+}
+.label.ask .count {
+  color: rgb(var(--ask));
+}
+.label .plus {
+  margin-left: auto;
+  width: 14px;
+  height: 14px;
+  color: rgb(var(--ink-3));
+}
+.rows,
+.group {
+  display: flex;
+  flex-direction: column;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 9px;
+  font-size: 13.5px;
+}
+.row-words {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.row .tile {
+  margin: 0 1px;
+}
+.row.current {
+  background: rgb(var(--sheet));
+  box-shadow: var(--shadow-up);
+}
+.row.raised {
+  background: rgb(var(--sheet));
+  box-shadow: var(--shadow-chip);
+}
+.row.new .row-words {
+  font-weight: 500;
+}
+.group {
+  margin-top: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: rgb(var(--tray));
+}
+.group .row {
+  padding: 0 6px;
+}
+.group .child {
+  position: relative;
+  height: 27px;
+  margin-left: 15px;
+  padding-left: 16px;
+  color: rgb(var(--ink-2));
+}
+/* A job's tabs sit behind a dotted line. */
+.group .child::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: -2px;
+  bottom: 13px;
+  width: 9px;
+  border-left: 1.5px dotted rgb(var(--ink-3) / 0.7);
+  border-bottom: 1.5px dotted rgb(var(--ink-3) / 0.7);
+  border-bottom-left-radius: 4px;
+}
+.dim {
+  font-size: 11.5px;
+}
+.dock {
+  display: flex;
+  gap: 6px;
+  margin-top: auto;
+  padding: 5px 6px;
+  border-radius: 12px;
+  background: rgb(var(--tray));
+}
+.dock .place {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+}
+
+.toolbar .nav {
+  display: flex;
+  gap: 14px;
+  padding-left: 10px;
+}
+.address {
+  flex: 1;
+  max-width: 560px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 32px;
+  border-radius: 10px;
+  background: rgb(var(--tray));
+  font-size: 13.5px;
+  color: rgb(var(--ink));
+}
+.toolbar .panel {
+  color: rgb(var(--ink-2));
+}
+
+/* --- Three parts. --- */
+.parts {
+  display: grid;
+  gap: 40px;
+  margin-top: 64px;
+}
+@media (min-width: 960px) {
+  .parts {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-top: 96px;
+  }
+}
+.part-pic {
+  margin-bottom: 18px;
+}
+.part {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-height: 268px;
+  padding: 20px;
+  border-radius: 16px;
+  background: rgb(var(--sheet));
+  box-shadow: var(--shadow-rim);
+}
+/* What the sidebar shows sits on the ground there, so its rows' sheets still stand out. */
+.part.on-ground {
+  background: rgb(var(--ground));
+}
+.parts h2 {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+.parts p {
+  margin-top: 6px;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: rgb(var(--ink-2));
+}
+.parts .part p,
+.part .label {
+  margin-top: 0;
+}
+
+/* Real work: Needs you, Working, Done, as the sidebar's Chats has them. */
+.ends {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.new-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgb(var(--focus));
+}
+
+/* A specialist for each kind of work: the menu that chooses a mascot (Choosing a mascot in DESIGN.md). */
+.menu {
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  border-radius: 22px;
+  background: rgb(var(--sheet));
+  box-shadow: var(--shadow-lift);
+}
+.menu li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 6px 12px 6px 10px;
+  border-radius: 14px;
+}
+.menu li.chosen {
+  background: rgb(var(--sheet-2));
+}
+.choice-words {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.choice-name {
+  font-size: 14px;
+  font-weight: 500;
+}
+.choice-may {
+  font-size: 13px;
+  line-height: 18px;
+  color: rgb(var(--ink-2));
+}
+.menu .tick {
+  color: rgb(var(--ink));
+}
+
+/* It asks first: the card, with the asking mascot beside it. */
+.asking {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.asking .shell {
+  flex: 1;
+  min-width: 0;
+}
+.asking > .mascot {
+  margin-top: 14px;
+}
+
+/* --- The mascots. --- */
+.team {
+  margin-top: 96px;
+  padding-top: 40px;
+  border-top: 1px solid var(--line);
+}
+.say h2,
+.getting h2 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+.say p,
+.getting p {
+  margin-top: 8px;
+  max-width: 620px;
+  font-size: 15px;
+  color: rgb(var(--ink-2));
+}
+.mascots {
+  display: grid;
+  gap: 20px 24px;
+  margin-top: 32px;
+}
+@media (min-width: 640px) {
+  .mascots {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (min-width: 960px) {
+  .mascots {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.mascots li {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.mascots .name {
+  font-size: 14px;
+  font-weight: 500;
+}
+.mascots .what {
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgb(var(--ink-2));
+}
+
+.getting {
+  margin: 96px 0 80px;
+  padding-top: 40px;
+  border-top: 1px solid var(--line);
+}

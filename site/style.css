@@ -1,4 +1,4 @@
-/* The front page and a mascot's public page. Only tokens from tokens.css. These are web pages, not the window, so there's
+/* A mascot's public page, at site/m/. Only tokens from tokens.css. These are web pages, not the window, so there's
    no frame and no card: the content sits on `canvas`, on one grid with one left edge, and plain lines split by `border`.
    See The public site and the phone page in DESIGN.md. */
 * {
@@ -211,58 +211,6 @@ section > h2 {
   stroke-linejoin: round;
 }
 
-/* The mascots, standing on wires the width of the page, as on the app's Your mascots page: each mascot at the start of its place,
-   its name under it. Every other one turns round, or every third on a wide row. */
-.mascots {
-  display: flex;
-  flex-wrap: wrap;
-  margin-top: 48px;
-}
-.mascots li {
-  width: 50%;
-  padding-bottom: 16px;
-}
-.perch {
-  display: flex;
-  height: calc(96px * 46 / 48);
-  border-bottom: 1.5px solid var(--wire);
-}
-.perch svg {
-  width: 96px;
-  height: 96px;
-}
-.mascots li:nth-child(2n) .perch svg {
-  transform: scaleX(-1);
-}
-.mascots .name,
-.mascots .what {
-  padding-right: 16px;
-}
-.mascots .name {
-  margin-top: 12px;
-  font-size: 14px;
-  font-weight: 600;
-}
-.mascots .what {
-  margin-top: 2px;
-  font-size: 13px;
-  color: rgb(var(--ink-2));
-}
-
-/* What it does: rows split by lines, each with its point first. */
-.points {
-  margin-top: 40px;
-}
-.points li {
-  padding: 20px 0;
-  border-top: 1px solid var(--line);
-}
-.points strong {
-  display: block;
-  margin-bottom: 4px;
-  font-weight: 600;
-}
-
 @media (min-width: 600px) {
   :root {
     --gutter: 32px;
@@ -285,26 +233,10 @@ section > h2 {
     width: 200px;
     height: 200px;
   }
-  .mascots li {
-    width: calc(100% / 3);
-  }
-  .mascots li:nth-child(2n) .perch svg {
-    transform: none;
-  }
-  .mascots li:nth-child(3n) .perch svg {
-    transform: scaleX(-1);
-  }
-  .perch {
-    height: calc(120px * 46 / 48);
-  }
-  .perch svg {
-    width: 120px;
-    height: 120px;
-  }
 }
 
-/* Wide: a larger heading, every mascot on one wire, and every section as a row of the same two columns, its heading
-   on the left and what it says on the right. The second starts a third of the way across, under the third mascot. */
+/* Wide: a larger heading, and every section as a row of the same two columns, its heading on the left and
+   what it says on the right. The second starts a third of the way across, under the mascot. */
 @media (min-width: 960px) {
   :root {
     --gutter: 48px;
@@ -317,9 +249,6 @@ section > h2 {
     font-size: 48px;
     letter-spacing: -0.025em;
   }
-  .intro h1 {
-    max-width: 13em;
-  }
   .lede {
     margin-top: 16px;
     font-size: 20px;
@@ -329,34 +258,9 @@ section > h2 {
   .hero-text .lede {
     color: rgb(var(--ink));
   }
-  .mascots {
-    margin-top: 72px;
-  }
-  .mascots li {
-    width: calc(100% / 6);
-  }
-  .mascots .name {
-    font-size: 16px;
-  }
-  .mascots .what {
-    font-size: 14px;
-  }
-  .points {
-    margin-top: 56px;
-  }
-  .points li,
   section {
     display: grid;
     grid-template-columns: calc(100% / 3) minmax(0, 40em);
-  }
-  .points li {
-    padding: 24px 0;
-  }
-  .points strong {
-    margin: 0;
-    padding-right: 32px;
-  }
-  section {
     padding: 32px 0;
   }
   section > * {
