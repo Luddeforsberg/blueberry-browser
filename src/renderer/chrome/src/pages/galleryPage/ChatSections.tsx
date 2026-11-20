@@ -1,6 +1,6 @@
 import type { RoutineFormValues } from "../../routinesView";
 import React from "react";
-import { AssistantMessage, ChatError, StepTrail, ThinkingMessage, UserMessage, WentWrong } from "../../components/ChatMessage";
+import { AssistantMessage, ChatError, StepTrail, UserMessage, WentWrong } from "../../components/ChatMessage";
 import { ChatComposer } from "../../components/ChatComposer";
 import { PageChip } from "../../components/AttachmentChips";
 import { ChatRow } from "../../components/Sidebar";
@@ -47,7 +47,7 @@ export const ChatSections: React.FC<{
           ]}
         />
         <AssistantMessage content="" isStreaming waiting />
-        <ThinkingMessage />
+        <AssistantMessage content="" isStreaming />
         <AssistantMessage
           content="The cheapest direct flight is **KLM at 07:10**, 1 840 kr return."
           took={48_000}

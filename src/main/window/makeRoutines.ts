@@ -71,7 +71,7 @@ export const createSuggestions = (w: WindowParts, stores: WindowStores): Suggest
     chats: () =>
       stores.chatStore.firstMessages(MAX_SUGGESTION_CHATS).map((chat) => {
         // Failed and stopped are only known for replies since launch.
-        const outcome = w.chats.work(chat.id)?.outcome;
+        const outcome = w.chats.outcome(chat.id);
         return { ...chat, outcome: outcome === "failed" || outcome === "stopped" ? outcome : chat.replied ? "done" : "no reply" };
       }),
     routines: () => w.routines.list(),

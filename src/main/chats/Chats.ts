@@ -3,7 +3,7 @@ import { siteOf } from "../tools/browserTools";
 import type { ActionApproval } from "../../shared/ipc";
 import type { StoredChat } from "./ChatStore";
 import type { Tab } from "../tabs/Tab";
-import type { ChatStep, ChatThread, MascotProfile } from "../../shared/library";
+import type { ChatStep, ChatThread, MascotProfile, WorkOutcome } from "../../shared/library";
 import { BERRY, narrowSites } from "../../shared/mascots";
 import { sentAttachment, type PreparedFile } from "./Attachments";
 import { MAX_FILES, MAX_TABS, type SentAttachment, type TabChoice } from "../../shared/attachments";
@@ -30,6 +30,7 @@ import { JobTools } from "./JobTools";
 import { ModelMessages } from "./modelMessages";
 import { Replies } from "./Replies";
 import { RunnerChats } from "./RunnerChats";
+import { newRun } from "./run";
 import { WorkView } from "./WorkView";
 
 // Callers take these from here, as they always have.
@@ -46,7 +47,7 @@ export class Chats {
   private readonly runs = new Map<string, Run>();
   private readonly errors = new Map<string, string>();
   private pageAccess = true;
-  private readonly finished = new Map<string, { run: Run; endedAt: number }>();
+  private readonly finished: ChatParts["finished"] = new Map();
   // Chats started in the cloud, whose later messages go there too. Memory only, so after a restart a chat works here.
   private readonly cloudChats = new Set<string>();
   private readonly handoffs: Handoffs;
@@ -96,7 +97,7 @@ export class Chats {
     const tools = new JobTools({ ...parts, jobs, handoffs, approvals });
     const reader = new ModelMessages({ ...parts, jobs, handoffs });
     const jobMemory = new JobMemory({ ...parts, jobs, handoffs });
-    this.workView = new WorkView({ ...parts, jobs, handoffs });
+    this.workView = new WorkView({ ...parts, jobs });
     this.runnerChats = new RunnerChats({ ...parts, titles, thread: (id) => this.thread(id) });
     this.replies = new Replies({ ...parts, jobs, handoffs, approvals, tools, reader, jobMemory, titles });
   }
@@ -144,6 +145,11 @@ export class Chats {
 
   work(chatId: string): JobWork | null {
     return this.workView.work(chatId);
+  }
+
+  // How a chat's last reply since launch ended. Null while one runs, and for a chat with none since launch.
+  outcome(chatId: string): WorkOutcome | null {
+    return this.finished.get(chatId)?.outcome ?? null;
   }
 
   thread(id: string): ChatThread | null {
@@ -245,34 +251,11 @@ export class Chats {
     this.store.addMessage(id, { role: "user", content: message, ...(attached.length > 0 ? { attached } : {}) }, files);
     if (tabsNow.length > 0) this.jobs.attach(id, tabsNow);
     this.errors.delete(id);
-    const earlier = this.finished.get(id)?.run;
+    const earlier = this.finished.get(id);
     this.finished.delete(id);
     this.memory?.dropOffers(id);
 
-    const run: Run = {
-      controller: new AbortController(),
-      partial: "",
-      statusLine: null,
-      steps: [],
-      said: [],
-      breakBeforeText: false,
-      approval: null,
-      tabs: new Set(),
-      used: new Set(),
-      sites: new Set(),
-      startedAt: Date.now(),
-      withPage: false,
-      mascot,
-      earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]),
-      memoryIds: [],
-      memoryNote: "",
-      answers: [],
-      handedOver: false,
-      cloud: inCloud,
-      askAtLeast,
-      onEnd,
-      userPresent,
-    };
+    const run = newRun({ mascot, earlierSites: new Set(earlier?.beenTo), cloud: inCloud, askAtLeast, onEnd, userPresent });
     if (inCloud) this.cloudChats.add(id);
     this.runs.set(id, run);
     // A page in this window never goes with a job in the cloud.
