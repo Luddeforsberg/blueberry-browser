@@ -31,15 +31,18 @@ test("the first run brings in another browser's history, and the mascots speak a
 
     await chrome.getByRole("button", { name: "Bring it in" }).click();
     await expect(chrome.getByRole("status")).toHaveText(/^[\d,  ]+ visits came across from Chrome\.$/);
-    await expect(chrome.getByRole("radio", { name: /^Chrome[\d,  ]+ visits came acrossDone$/ })).toBeChecked();
+    await expect(chrome.getByRole("radio", { name: /^Chrome [\d,  ]+ visits came across Done$/ })).toBeChecked();
     await chrome.getByRole("button", { name: "Continue" }).click();
     await chrome.getByRole("button", { name: "Start browsing" }).click();
 
     // First jobs stands where suggestions go, with history already done, until it's hidden.
-    await expect(chrome.getByRole("region", { name: "First jobs" })).toContainText("1 of 4");
-    await chrome.getByRole("button", { name: "Hide" }).click();
+    const firstJobs = chrome.getByRole("region", { name: "First jobs" });
+    await expect(firstJobs).toContainText("1 of 4");
+    await firstJobs.getByRole("button", { name: "Hide" }).click();
     const cards = chrome.getByRole("region", { name: "Suggestions" }).getByRole("listitem");
-    await expect(cards).toHaveCount(3, { timeout: 20_000 });
+    // The three that checked out, then a mascot to try fills the last of the four rows.
+    await expect(cards).toHaveCount(4, { timeout: 20_000 });
+    await expect(cards.last()).toContainText(/Try$/);
     await expect(chrome.getByText(DEMO_LINES.routine)).toBeVisible();
 
     // What the step says goes out is what went out.

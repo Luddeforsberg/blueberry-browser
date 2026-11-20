@@ -44,6 +44,8 @@ interface FeatureState {
   needs?: Needs;
   // The window to picture, by a view it holds, when it isn't the feature's.
   window?: string;
+  // Only off a Mac, such as the ☰ menu: on a Mac the system's menu bar takes its place, and no picture can show that.
+  offMac?: boolean;
 }
 
 interface FeatureBase {
@@ -76,6 +78,14 @@ export type Feature = AppFeature | PhoneFeature;
 export const FEATURES: Feature[] = [...chatFeatures, ...windowFeatures, ...pageFeatures, ...outsideFeatures];
 
 export const featureNamed = (name: string): Feature | undefined => FEATURES.find((feature) => feature.name === name);
+
+// The states this platform has, in order, so the first is the one opened when none is named.
+export const statesOf = (feature: Feature): [string, ...string[]] => {
+  const mac = process.platform === "darwin";
+  const names = Object.entries(feature.states).flatMap(([name, state]) => (mac && "offMac" in state && state.offMac ? [] : [name]));
+  if (!names[0]) throw new Error(`${feature.name} has no state on this platform`);
+  return [names[0], ...names.slice(1)];
+};
 
 // The layouts a feature is pictured in by `baseline`.
 export const layoutsOf = (feature: Feature): [LayoutMode, ...LayoutMode[]] =>

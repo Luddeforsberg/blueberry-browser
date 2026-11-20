@@ -113,16 +113,15 @@ test("a job on the runner keeps going without the app's agent, waits on Needs yo
     model.callTools({ name: "read_page", args: {} });
     model.replyWith("Ordered it");
 
-    // Do this in the cloud, from the new tab page. With a runner linked, that's where it goes.
+    // Cloud, on the new tab page's switch. With a runner linked, that's where it goes.
     const composer = chrome.getByRole("textbox", { name: /Search, enter a URL, or ask/ });
     await composer.fill(`${PROMPT} at ${shop}`);
-    await chrome.getByRole("button", { name: "More options" }).click();
-    await chrome.getByRole("menuitemcheckbox", { name: "Do this in the cloud" }).click();
+    await chrome.getByRole("radio", { name: "Cloud" }).click();
     await expect(chrome.getByRole("button", { name: "Send to the cloud" })).toBeVisible();
     await shoot(chrome, "new-tab-in-the-cloud");
     await composer.press("Meta+Enter");
 
-    await expect(chrome.locator("p.text-right", { hasText: "In the cloud" })).toBeVisible();
+    await expect(chrome.getByText("in the cloud", { exact: true })).toBeVisible();
     await expect(chrome.getByRole("region", { name: "In the cloud" })).toBeVisible();
 
     // The runner asks, and the app shows it in Needs you like any other.
@@ -219,7 +218,7 @@ test("a job on the runner keeps going without the app's agent, waits on Needs yo
     expect(adopted.runner).toBe(true);
     expect(adopted.messages.map(({ role }) => role)).toEqual(["user", "assistant"]);
     await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), adopted.id);
-    await expect(chrome.locator("p.text-right", { hasText: "In the cloud" })).toBeVisible();
+    await expect(chrome.getByText("in the cloud", { exact: true })).toBeVisible();
     await expect(chrome.getByText("Found it from the phone")).toBeVisible();
     await shoot(chrome, "chat-from-phone");
 

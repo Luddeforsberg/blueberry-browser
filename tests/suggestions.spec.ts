@@ -73,7 +73,11 @@ test("only suggestions whose evidence checks out show, a row fills things in, an
     await expect(chrome.getByRole("textbox", { name: "Name" })).toHaveValue("Linus");
     await chrome.getByRole("button", { name: "Continue" }).click();
     await chrome.getByRole("button", { name: "Continue" }).click();
-    await expect(chrome.getByRole("list", { name: "Sites it may use" }).getByRole("listitem")).toHaveText(["github.com", "linear.app"]);
+    await expect(chrome.getByRole("list", { name: "Sites it may use" }).getByRole("listitem")).toHaveText([
+      "github.com",
+      "linear.app",
+      "Add a site",
+    ]);
 
     await chrome.evaluate(() => window.chromeAPI.browser.createTab());
     await chrome.getByRole("button", { name: `Dismiss: ${words}` }).click();

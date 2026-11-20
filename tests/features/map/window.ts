@@ -206,6 +206,7 @@ export const windowFeatures: Feature[] = [
           await drive.chrome.evaluate(() => window.chromeAPI.layout.showAppMenu());
           await menuShows(drive);
         },
+        offMac: true,
       },
       "chat-menu": {
         open: async (drive) => {
