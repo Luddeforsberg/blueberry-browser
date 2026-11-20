@@ -52,6 +52,8 @@ export const useAttachments = (place: JobPlace) => {
     [staging],
   );
 
+  const adding = useCallback(() => staging.adding(), [staging]);
+
   // Everything in the box now, to let go of once main has taken the message it's sent with.
   const contents = useCallback((): string[] => [...staging.files.map(({ id }) => id), ...tabsRef.current.map(({ id }) => id)], [staging]);
 
@@ -91,6 +93,7 @@ export const useAttachments = (place: JobPlace) => {
     addFiles,
     addTab,
     remove,
+    adding,
     contents,
     letGo,
     recheckTabs,

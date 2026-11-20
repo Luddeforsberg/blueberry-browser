@@ -1,4 +1,4 @@
-import { Latest, mascotsFromSharedRows, oneAtATime, runnerLinkDue } from "../shared.js";
+import { mascotsFromSharedRows, oneAtATime, runnerLinkDue } from "../shared.js";
 import * as api from "./api.js";
 import { refreshAsk } from "./ask.js";
 import { mountHome } from "./home.js";
@@ -26,17 +26,21 @@ const POLL_MS = 3_000;
 // now and then.
 let linkCheckedAt = null;
 
-// Only the newest read counts: a poll still out when a refresh comes back newer never draws over it.
-const reads = new Latest();
+// What's shown is never older than what was shown before: a read that lands after a newer one has is dropped. One that
+// a newer read only started after still lands, so a refresh someone waits on, as a follow-up the server refused does,
+// always brings the conversation up to at least when it was asked.
+let readsStarted = 0;
+let readShown = 0;
 const load = async () => {
   const asked = api.accountTurn();
-  const read = reads.next();
-  const current = () => asked.current && read.current;
+  const read = ++readsStarted;
+  const current = () => asked.current && read > readShown;
   try {
     const askLink = state.linked === null || runnerLinkDue(linkCheckedAt, Date.now());
     const [jobs, shared, linked] = await Promise.all([api.jobs(), api.mascots(), askLink ? api.runner() : Promise.resolve(undefined)]);
-    // Someone signed out or in while it was asking, so none of this is theirs, or a newer read has started since.
+    // Someone signed out or in while it was asking, so none of this is theirs, or a newer read has landed already.
     if (!current()) return;
+    readShown = read;
     // A new question takes the place of whatever was said about the last one.
     const asking = jobs.flatMap((job) => (job.ask ? [job.ask.approval_id] : []));
     if (asking.some((id) => !(state.jobs ?? []).some((known) => known.ask?.approval_id === id))) state.said = null;

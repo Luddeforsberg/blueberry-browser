@@ -42,6 +42,11 @@ export class FileStaging {
     return this.chips;
   }
 
+  // A file is on its way into the box, or waiting to be.
+  adding(): boolean {
+    return this.adds.busy();
+  }
+
   // What main keeps for this box.
   kept(): string[] {
     return this.chips.filter((chip) => !chip.problem).map((chip) => chip.id);

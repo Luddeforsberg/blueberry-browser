@@ -266,7 +266,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
       });
       if (!chat) return;
       const left = leftAfterSend(typed.current, written);
-      const added = box.contents().some((id) => !inBox.includes(id));
+      const added = box.adding() || box.contents().some((id) => !inBox.includes(id));
       setText(left);
       box.letGo(inBox);
       await browser.openPage("chat", { param: chat.id, title: chat.title });
