@@ -190,6 +190,8 @@ describe("the relay's grants", () => {
 
   it("keeps a few grants per owner at a time", async () => {
     const first = await grant(ALICE);
+    // The oldest go by the time they were made, and a fast machine can make the next one in the same instant.
+    await new Promise((resolve) => setTimeout(resolve, 5));
     for (let n = 0; n < 20; n++) await grant(ALICE);
     await refusesAll(RUNNER, first);
   });
