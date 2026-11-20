@@ -42,22 +42,17 @@ const release = async (tab: PageTarget, at: Point, clickCount: number) => {
   await tab.sendAgentInput({ type: "mouseUp", button: "left", clickCount, ...at });
 };
 
-// False if `goOn` said no just before a press, so nothing was clicked.
-export const clickAt = async (tab: PageTarget, point: Point, clicks: 1 | 2, goOn: () => boolean = () => true): Promise<boolean> => {
-  await moveTo(tab, point);
+// One press and release, the `count`th of a click, with the pointer already there.
+export const pressAt = async (tab: PageTarget, point: Point, count: number): Promise<void> => {
   const at = inView(tab, point);
-  for (let count = 1; count <= clicks; count++) {
-    if (!goOn()) return false;
-    await press(tab, at, count);
-    await pause(STEP_MS);
-    await release(tab, at, count);
-    await pause(STEP_MS);
-  }
-  return true;
+  await press(tab, at, count);
+  await pause(STEP_MS);
+  await release(tab, at, count);
+  await pause(STEP_MS);
 };
 
+// With the pointer already at `from`.
 export const dragBetween = async (tab: PageTarget, from: Point, to: Point): Promise<void> => {
-  await moveTo(tab, from);
   const start = inView(tab, from);
   const end = inView(tab, to);
   await press(tab, start, 1);
@@ -114,11 +109,16 @@ export const pressKey = async (tab: Pick<PageTarget, "sendAgentInput">, key: str
   await pause(STEP_MS);
 };
 
-// "landed" once the page has reported it, or if `ask` can't answer, which means the input took it to a new page.
-export const landed = async (ask: () => Promise<boolean | "missed" | null>): Promise<"landed" | "missed" | "lost"> => {
+export type Arrival = "landed" | "missed" | "cut" | "lost";
+
+// "landed" once the page has reported it, or answers null, which only a new document does, so the input took the page
+// somewhere. A page that can't answer, as while a new one replaces it, is asked again, and no answer at all is "lost".
+// "ended" means the watch ended before it could say, so nobody knows.
+export const landed = async (ask: () => Promise<boolean | "missed" | "cut" | "ended" | null>): Promise<Arrival> => {
   for (let waited = 0; waited < LANDED_MS; waited += LANDED_POLL_MS) {
-    const answer = await ask().catch(() => null);
-    if (answer === "missed") return "missed";
+    const answer = await ask().catch(() => false as const);
+    if (answer === "ended") return "lost";
+    if (answer === "missed" || answer === "cut") return answer;
     if (answer !== false) return "landed";
     await pause(LANDED_POLL_MS);
   }

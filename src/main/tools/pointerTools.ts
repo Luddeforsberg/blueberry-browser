@@ -4,17 +4,19 @@ import {
   aimHover,
   chooseOption,
   describeOption,
-  inputLanded,
+  endWatch,
   isHovered,
   planDrag,
+  pressLanded,
   scriptedClick,
   scriptedHover,
   selectedOptions,
   spotOf,
+  watchPress,
   type Aim,
   type DragPlan,
 } from "./pageScripts";
-import { clickAt, DRAG_MS, dragBetween, landed, moveTo, pause } from "./pageInput";
+import { DRAG_MS, dragBetween, landed, moveTo, pause, pressAt, type Arrival, type Point } from "./pageInput";
 import type { Spot } from "./PageActor";
 import type { PageTarget } from "./pageTarget";
 import { pageTool, tabId } from "./pageTool";
@@ -26,6 +28,31 @@ import { NO_ACCESS, SCRIPTED, STALE_ELEMENT } from "./toolMessages";
 // How long a page gets to finish moving after being scrolled, before anything is aimed at it.
 const SCROLL_SETTLE_MS = 200;
 const RETRIES_AFTER_MISS = 1;
+
+// Once a real press has gone, a click that may or may not have happened is said in words. A scripted click after it
+// would click a second time if the first did arrive.
+const MAY_NOT_HAVE_ARRIVED =
+  "The click went, but nothing showed that it arrived, so it may or may not have happened. Look at the page before trying again.";
+const CUT_SHORT =
+  "The press reached it, but the rest of the click went to something else and was stopped, so it may not have counted. Look at the page before trying again.";
+const FIRST_ONLY =
+  "Only the first of the two clicks is known to have reached it, so it may have counted as a single click. Look at the page before trying again.";
+const UNCHECKED = "The page couldn't be checked, so nothing was clicked.";
+const DISABLED = "That element is disabled, so nothing happened.";
+const NOT_DRAGGED = "The press didn't land on that element, so nothing was dragged.";
+const MAY_HAVE_DRAGGED =
+  "The drag went, but nothing showed that its press arrived, so it may or may not have happened. Look at the page before trying again.";
+
+// How one real press went, or why it wasn't sent: the job stopped, the page couldn't be checked, the element has gone
+// or is disabled, or something else is at the point now.
+type Press = Arrival | "stopped" | "unchecked" | "gone" | "disabled" | "moved";
+
+// How the real presses of a click ended. `landed` counts those known to have reached the element, and "again" means
+// nothing reached the page, so it can be aimed at again.
+interface Pressing {
+  end: "done" | "again" | Exclude<Press, "landed">;
+  landed: number;
+}
 
 type ChooseResult =
   | { status: "not-a-dropdown" }
@@ -54,6 +81,47 @@ export const pointerTools = <T extends PageTarget>(context: ToolContext<T>) => {
     clickedLabel,
   } = context;
 
+  // One real press, with the pointer already there, checked and watched by the `watchPress` script given. It goes only
+  // if the point still reaches the element and the job carries on, and it's watched until what happened has been read.
+  // Only the watch it set is ended, so it never ends another's, and nothing is ended where none was set.
+  const watchedPress = async (tab: T, watching: string, send: () => Promise<void>): Promise<Press> => {
+    const check = await tab.runInPage<Aim | null>(watching).catch(() => undefined);
+    try {
+      if (!carryOn(tab)) return "stopped";
+      if (check === undefined) return "unchecked";
+      if (check === null) return "gone";
+      const { status, watch } = check;
+      if (status !== "aimed" || !watch) return status === "disabled" ? "disabled" : "moved";
+      await send();
+      return await landed(() => tab.runInPage<boolean | "missed" | "cut" | "ended" | null>(pressLanded(watch)));
+    } finally {
+      if (check?.watch) await tab.runInPage(endWatch(check.watch)).catch(() => {});
+    }
+  };
+
+  // What happened is read after each press before the next, so a double-click whose first press went astray, or
+  // can't be known to have landed, goes no further.
+  const pressOn = async (tab: T, ref: string, point: Point, clicks: 1 | 2): Promise<Pressing> => {
+    const ended = (end: Pressing["end"], before: number): Pressing => ({
+      end: !before && (end === "missed" || end === "moved") ? "again" : end,
+      landed: before,
+    });
+    for (let count = 1; count <= clicks; count++) {
+      const arrived = await watchedPress(tab, watchPress(ref, point), () => pressAt(tab, point, count));
+      if (arrived !== "landed") return ended(arrived, count - 1);
+    }
+    return ended("done", clicks);
+  };
+
+  // A click that didn't happen, may have, or happened only in part.
+  const notClicked = async (tab: T, { end, landed: reached }: Pressing) => {
+    if (end === "stopped") return leftOff(tab);
+    if (!reached && end === "gone") return STALE_ELEMENT;
+    if (!reached && end === "disabled") return DISABLED;
+    const note = reached ? FIRST_ONLY : end === "unchecked" ? UNCHECKED : end === "cut" ? CUT_SHORT : MAY_NOT_HAVE_ARRIVED;
+    return `${note} ${(await whereNow(tab)).replace(/^Done\. /, "")}`;
+  };
+
   // Real input where it can go, and a scripted click where it can't. Either way it's the element the card named:
   // something covering it gets the scripted click sent straight to the element, not the real one.
   const clickRef = async (tab: T, ref: string, clicks: 1 | 2) => {
@@ -61,36 +129,35 @@ export const pointerTools = <T extends PageTarget>(context: ToolContext<T>) => {
     const scripted = () => onRef<string>(tab, ref, (inner) => scriptedClick(inner, clicks));
     const finish = (result: string | null, note = "") => {
       if (result === null) return STALE_ELEMENT;
-      if (result === "disabled") return "That element is disabled, so nothing happened.";
+      if (result === "disabled") return DISABLED;
       return whereNow(tab).then((where) => (note ? `${where} ${note}` : where));
     };
     if (frameOf(tab, ref)) {
       if (!(await flyToRef(tab, ref, (name) => `${doing} in ${name}`, "look"))) return leftOff(tab);
       return finish(await scripted(), SCRIPTED);
     }
-    // With a mascot on the way nothing watches for the press until it lands, because the user may press somewhere meanwhile.
-    const arm = !actorOn(tab);
     const aimAgain = async () => {
       await pause(SCROLL_SETTLE_MS);
-      return tab.runInPage<Aim | null>(aimClick(ref, false, arm));
+      return tab.runInPage<Aim | null>(aimClick(ref, false));
     };
-    let aim = await tab.runInPage<Aim | null>(aimClick(ref, true, arm));
+    let aim = await tab.runInPage<Aim | null>(aimClick(ref, true));
     if (aim?.status === "scrolled") aim = await aimAgain();
     if (aim === null) return STALE_ELEMENT;
     if (aim.status === "disabled") return finish("disabled");
-    if (!arm) {
+    if (actorOn(tab)) {
       if (!(await flyToRef(tab, ref, (name) => `${doing} ${unnamed(name, "something")}`, "land"))) return leftOff(tab);
-      // Where it is now, as the page may have moved while the mascot flew, and now the watch goes on.
+      // Where it is now, as the page may have moved while the mascot flew.
       if (aim.status === "aimed") aim = await tab.runInPage<Aim | null>(aimClick(ref, false));
       if (aim === null) return STALE_ELEMENT;
     }
     for (let tries = 0; aim?.status === "aimed" && tries <= RETRIES_AFTER_MISS; tries++) {
       await actorOn(tab)?.peck(aim.x!, aim.y!, clicks);
       if (!carryOn(tab)) return leftOff(tab);
-      if (!(await clickAt(tab, { x: aim.x!, y: aim.y! }, clicks, () => carryOn(tab)))) return leftOff(tab);
-      const arrived = await landed(() => tab.runInPage<boolean | "missed" | null>(inputLanded));
-      if (arrived === "landed") return finish("done");
-      if (arrived === "lost") return carryOn(tab) ? finish(await scripted(), SCRIPTED) : leftOff(tab);
+      const point = { x: aim.x!, y: aim.y! };
+      await moveTo(tab, point);
+      const pressed = await pressOn(tab, ref, point, clicks);
+      if (pressed.end === "done") return finish("done");
+      if (pressed.end !== "again") return notClicked(tab, pressed);
       await pause(SCROLL_SETTLE_MS);
       aim = await tab.runInPage<Aim | null>(aimClick(ref, false));
     }
@@ -199,11 +266,16 @@ export const pointerTools = <T extends PageTarget>(context: ToolContext<T>) => {
           if (plan.status === "aimed") {
             // A frame's page writes its own answers, so it never gets to choose where the real mouse goes.
             if (frame) return "That needs a real mouse, which can't reach a frame from another site, so nothing was dragged.";
-            if (end) actorOn(tab)?.carry(plan.to!, words, DRAG_MS);
-            await dragBetween(tab, plan.from!, plan.to!);
-            if ((await landed(() => tab.runInPage<boolean | "missed" | null>(inputLanded))) !== "landed") {
-              return "The press didn't land on that element, so nothing was dragged.";
-            }
+            const { from, to } = { from: plan.from!, to: plan.to! };
+            await moveTo(tab, from);
+            const pressed = await watchedPress(tab, watchPress(ref, from, true), async () => {
+              if (end) actorOn(tab)?.carry(to, words, DRAG_MS);
+              await dragBetween(tab, from, to);
+            });
+            if (pressed === "stopped") return leftOff(tab);
+            if (pressed === "gone") return STALE_ELEMENT;
+            if (pressed === "lost") return MAY_HAVE_DRAGGED;
+            if (pressed !== "landed") return NOT_DRAGGED;
           }
           if (plan.status === "native" && end) actorOn(tab)?.carry({ x: end.x, y: end.y }, words);
           return `${await whereNow(tab)} ${check}`;

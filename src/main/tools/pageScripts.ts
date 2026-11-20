@@ -25,12 +25,23 @@ export const listElements = ({ query, limit, everything = false, descend }: List
 
 export const describeElement = (ref: string): string => inPage(page.describeElement, { ref });
 
-// Scrolled to it and ready for a real click. `arm: false` is only for finding out where it is, with no watch set on the page.
-export const aimClick = (ref: string, mayScroll: boolean, arm = true): string => inPage(page.aimClick, { ref, mayScroll, arm });
+// Scrolled to it and ready for a real click. It sets no watch on the page: `watchPress` does, just before the press.
+export const aimClick = (ref: string, mayScroll: boolean): string => inPage(page.aimClick, { ref, mayScroll });
 
-// False until the input arrives, then true, or "missed" for a press that was stopped. A new page has no record, so
-// null means the input took the page somewhere.
-export const inputLanded = inPage(page.inputLanded, undefined);
+// Checks the point still reaches the element and watches for the press, just before it goes. Null if the element has
+// gone. A drag's watch only guards its press.
+export const watchPress = (ref: string, { x, y }: { x: number; y: number }, pressOnly = false): string =>
+  inPage(page.watchPress, { ref, x, y, pressOnly });
+
+// Ends the watch `watchPress` set, however the press went, and no other.
+export const endWatch = (id: string): string => inPage(page.endWatch, { id });
+
+// False until the key `aimKey` set up for arrives, then true. A new page has no record, so null means the key took the
+// page somewhere.
+export const keyLanded = inPage(page.keyLanded, undefined);
+
+// What became of the press the watch `id` was set for, ending that watch once it's known, or "ended" if it ended first.
+export const pressLanded = (id: string): string => inPage(page.pressLanded, { id });
 
 export const scriptedClick = (ref: string, clicks: 1 | 2): string => inPage(page.scriptedClick, { ref, clicks });
 

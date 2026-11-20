@@ -18,7 +18,7 @@
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck:page": "tsc --noEmit -p tsconfig.page.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web && npm run typecheck:page",
-    "test": "vitest run --exclude src/main/tools/CdpTab.test.ts && vitest run src/main/tools/CdpTab.test.ts",
+    "test": "vitest run --exclude \"src/main/tools/CdpTab*.test.ts\" && vitest run src/main/tools/CdpTab",
     "test:e2e": "playwright test",
     "drive": "node scripts/drive.mjs drive",
     "baseline": "node scripts/drive.mjs baseline",
