@@ -246,6 +246,24 @@ var conversationsOf = (jobs) => {
 };
 
 // src/shared/lateWork.ts
+var Latest = class {
+  count = 0;
+  newest = /* @__PURE__ */ new Map();
+  next(key) {
+    const id = ++this.count;
+    const { newest } = this;
+    newest.set(key, id);
+    return {
+      id,
+      get current() {
+        return newest.get(key) === id;
+      }
+    };
+  }
+  end(key) {
+    this.newest.delete(key);
+  }
+};
 var OneAtATime = class {
   last = /* @__PURE__ */ new Map();
   busy(key) {
@@ -364,6 +382,8 @@ var plausibleCode = (text) => {
 };
 export {
   BERRY_ID,
+  Latest,
+  OneAtATime,
   asContinuation,
   conversationsOf,
   fetchWithin,

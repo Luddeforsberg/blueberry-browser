@@ -1,6 +1,6 @@
 import { isUuid, mascotSnapshot, permissionsInWords } from "../shared.js";
 import * as api from "./api.js";
-import { drawMascot, el, grow, icon } from "./dom.js";
+import { drawMascot, el, grow, icon, submitsOnce } from "./dom.js";
 import { closeSheet, openSheet } from "./sheet.js";
 import { choose, chosen, contextOf, hooks, NOT_SET_UP, problemWords, state } from "./state.js";
 
@@ -82,32 +82,24 @@ export const openStart = () => {
     state.drafts.set("", box.value);
     send.classList.toggle("off", !box.value.trim() || state.linked === false);
   });
-  const form = el(
-    "form",
-    {
-      className: "shell",
-      onsubmit: async (event) => {
-        event.preventDefault();
-        const prompt = box.value.trim();
-        if (!prompt) return box.focus();
-        if (state.linked === false) {
-          problem.replaceChildren(el("p", { className: "problem", role: "alert", textContent: NOT_SET_UP }));
-          return;
-        }
-        send.disabled = true;
-        problem.replaceChildren();
-        try {
-          await startJob(prompt, chosen());
-          state.drafts.delete("");
-          closeSheet({ instant: true });
-        } catch (error) {
-          problem.replaceChildren(el("p", { className: "problem", role: "alert", textContent: problemWords(error) }));
-          send.disabled = false;
-        }
-      },
-    },
-    el("div", { className: "box tall" }, box, send),
-  );
+  const form = submitsOnce(el("form", { className: "shell" }, el("div", { className: "box tall" }, box, send)), async () => {
+    const prompt = box.value.trim();
+    if (!prompt) return box.focus();
+    if (state.linked === false) {
+      problem.replaceChildren(el("p", { className: "problem", role: "alert", textContent: NOT_SET_UP }));
+      return;
+    }
+    send.disabled = true;
+    problem.replaceChildren();
+    try {
+      await startJob(prompt, chosen());
+      state.drafts.delete("");
+      closeSheet({ instant: true });
+    } catch (error) {
+      problem.replaceChildren(el("p", { className: "problem", role: "alert", textContent: problemWords(error) }));
+      send.disabled = false;
+    }
+  });
   box.addEventListener("keydown", (event) => {
     // Enter sends on a computer's keyboard; a phone's return key makes a new line.
     if (event.key === "Enter" && !event.shiftKey && !event.isComposing && matchMedia("(pointer: fine)").matches) {

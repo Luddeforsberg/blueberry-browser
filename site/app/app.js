@@ -27,12 +27,12 @@ const POLL_MS = 3_000;
 let linkCheckedAt = null;
 
 const load = async () => {
-  const asked = api.sessionVersion();
+  const asked = api.accountTurn();
   try {
     const askLink = state.linked === null || runnerLinkDue(linkCheckedAt, Date.now());
     const [jobs, shared, linked] = await Promise.all([api.jobs(), api.mascots(), askLink ? api.runner() : Promise.resolve(undefined)]);
     // Someone signed out or in while it was asking, so none of this is theirs.
-    if (api.sessionVersion() !== asked) return;
+    if (!asked.current) return;
     // A new question takes the place of whatever was said about the last one.
     const asking = jobs.flatMap((job) => (job.ask ? [job.ask.approval_id] : []));
     if (asking.some((id) => !(state.jobs ?? []).some((known) => known.ask?.approval_id === id))) state.said = null;
@@ -49,7 +49,7 @@ const load = async () => {
     }
     state.problem = null;
   } catch (error) {
-    if (api.sessionVersion() === asked) state.problem = problemWords(error);
+    if (asked.current) state.problem = problemWords(error);
   }
 };
 

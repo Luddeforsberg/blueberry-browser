@@ -1,4 +1,5 @@
 import { asContinuation, BERRY_ID, conversationsOf, finishedWhen, mascotsFromSharedRows, rowTime, withSiteNames } from "../shared.js";
+import { onAccountChange } from "./api.js";
 
 // What the page knows, and the words it says about it. Everything here was read as the signed-in user only.
 
@@ -22,6 +23,15 @@ export const state = {
   // What just happened, said for a few seconds.
   said: null,
 };
+
+// All of the above but `push`, which is this phone's, belongs to the account signed in. Whenever that changes, by signing
+// out, by the session running out, or by someone else signing in, it's forgotten at once, so nothing of one account is
+// ever drawn for the next, and nothing typed for one is sent as the other.
+const forgetAccount = () => {
+  Object.assign(state, { jobs: null, mascots: mascotsFromSharedRows([]), mascotsShared: null, linked: null, problem: null, said: null });
+  for (const kept of [state.taken, state.answered, state.seen, state.unfolded, state.drafts]) kept.clear();
+};
+onAccountChange(forgetAccount);
 
 // Set by app.js: draw what's shown again; read everything again and draw it; read everything again without drawing.
 export const hooks = { show: () => {}, load: async () => {}, refresh: async () => {} };

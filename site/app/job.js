@@ -1,7 +1,7 @@
 import { followUpHistory, mascotSnapshot } from "../shared.js";
 import * as api from "./api.js";
 import { decide, hold, openAsk } from "./ask.js";
-import { drawMascot, copyButton, el, grow, icon, patch, pips, replyText, stepPips, stopSquare } from "./dom.js";
+import { drawMascot, copyButton, el, grow, icon, patch, pips, replyText, stepPips, stopSquare, submitsOnce } from "./dom.js";
 import { nowStep } from "./home.js";
 import { liveSlot } from "./live.js";
 import { startJob } from "./start.js";
@@ -238,65 +238,62 @@ const followUp = (conversationId, job) => {
   });
   const form = el(
     "form",
-    {
-      className: "shell",
-      onsubmit: async (event) => {
-        event.preventDefault();
-        const prompt = box.value.trim();
-        if (!prompt) return box.focus();
-        problem.replaceChildren();
-        send.disabled = true;
-        // As the conversation is now, not as it was when this was drawn: a poll doesn't draw over what's typed.
-        const attempt = async () => {
-          const latest = conversation(conversationId)?.latest;
-          if (!latest || going(latest)) throw new api.ApiError(409);
-          // Only as a mascot the phone still has, with its limits as they are now.
-          const sender = senderOf(latest);
-          if (!sender) return "gone";
-          const last = await api.jobWithHistory(latest.id);
-          if (!last) throw new api.ApiError(404);
-          await api.rpc("start_cloud_job", {
-            p_prompt: prompt,
-            p_history: followUpHistory(last),
-            p_mascot: mascotSnapshot(sender),
-            p_action_approval: "risky",
-            p_context_id: contextOf(),
-            p_conversation: conversationId,
-            p_after_job: latest.id,
-          });
-        };
-        try {
-          let gone;
-          try {
-            gone = await attempt();
-          } catch (error) {
-            if (error?.status !== 409) throw error;
-            await hooks.refresh();
-            gone = await attempt();
-          }
-          if (gone) {
-            problem.replaceChildren(
-              el("p", {
-                className: "problem",
-                role: "alert",
-                textContent: `${mascot.name} isn’t in your mascots any more, so this can’t go on.`,
-              }),
-            );
-            send.disabled = false;
-            return;
-          }
-          state.drafts.delete(conversationId);
-          box.value = "";
-          box.blur();
-          await hooks.load();
-        } catch (error) {
-          problem.replaceChildren(el("p", { className: "problem", role: "alert", textContent: problemWords(error) }));
-          send.disabled = false;
-        }
-      },
-    },
+    { className: "shell" },
     el("div", { className: "box" }, el("span", { className: "who lone" }, drawMascot(mascot, "rest", 28, { named: false })), box, send),
   );
+  submitsOnce(form, async () => {
+    const prompt = box.value.trim();
+    if (!prompt) return box.focus();
+    problem.replaceChildren();
+    send.disabled = true;
+    // As the conversation is now, not as it was when this was drawn: a poll doesn't draw over what's typed.
+    const attempt = async () => {
+      const latest = conversation(conversationId)?.latest;
+      if (!latest || going(latest)) throw new api.ApiError(409);
+      // Only as a mascot the phone still has, with its limits as they are now.
+      const sender = senderOf(latest);
+      if (!sender) return "gone";
+      const last = await api.jobWithHistory(latest.id);
+      if (!last) throw new api.ApiError(404);
+      await api.rpc("start_cloud_job", {
+        p_prompt: prompt,
+        p_history: followUpHistory(last),
+        p_mascot: mascotSnapshot(sender),
+        p_action_approval: "risky",
+        p_context_id: contextOf(),
+        p_conversation: conversationId,
+        p_after_job: latest.id,
+      });
+    };
+    try {
+      let gone;
+      try {
+        gone = await attempt();
+      } catch (error) {
+        if (error?.status !== 409) throw error;
+        await hooks.refresh();
+        gone = await attempt();
+      }
+      if (gone) {
+        problem.replaceChildren(
+          el("p", {
+            className: "problem",
+            role: "alert",
+            textContent: `${mascot.name} isn’t in your mascots any more, so this can’t go on.`,
+          }),
+        );
+        send.disabled = false;
+        return;
+      }
+      state.drafts.delete(conversationId);
+      box.value = "";
+      box.blur();
+      await hooks.load();
+    } catch (error) {
+      problem.replaceChildren(el("p", { className: "problem", role: "alert", textContent: problemWords(error) }));
+      send.disabled = false;
+    }
+  });
   box.addEventListener("keydown", (event) => {
     if (event.key === "Enter" && !event.shiftKey && !event.isComposing && matchMedia("(pointer: fine)").matches) {
       event.preventDefault();
@@ -312,8 +309,8 @@ const working = (job) => {
     const button = event.currentTarget;
     button.disabled = true;
     try {
-      await api.rpc("stop_cloud_job", { p_job: job.id });
-      saying(`Stopping ${mascot.name}.`);
+      // False when it had already ended, which the read below shows.
+      if ((await api.rpc("stop_cloud_job", { p_job: job.id })) === true) saying(`Stopping ${mascot.name}.`);
     } catch (error) {
       state.problem = problemWords(error);
       button.disabled = false;

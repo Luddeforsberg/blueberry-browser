@@ -1,3 +1,4 @@
+import { OneAtATime } from "../shared.js";
 import { drawPose, el, pips } from "../draw.js";
 import { POSES } from "./poses.js";
 import { STEP_PIPS } from "./pips.js";
@@ -56,6 +57,17 @@ export const icon = (name, className = "") =>
 export const stopSquare = () => el("i", { className: "stop-square", ariaHidden: "true" });
 
 // A mascot in one mood, at one of the sizes app.css has.
+// A form whose submit runs one at a time: another while the first is on its way does nothing. Enter submits through
+// requestSubmit, which doesn't look at whether Send is disabled, so this is what keeps it from starting a second job.
+export const submitsOnce = (form, work) => {
+  const sending = new OneAtATime();
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!sending.busy()) void sending.run(work);
+  });
+  return form;
+};
+
 export const drawMascot = (mascot, mood, size, options) => drawPose(POSES, mascot, mood, size, options);
 
 // Which pips a step has. Its kind comes from the server, so anything but a kind there is takes the plain ones.
