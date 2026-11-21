@@ -31,7 +31,7 @@
     "icon:build": "electron scripts/appIcon.mjs",
     "site:deploy": "npx netlify deploy --prod --dir site",
     "push:keys": "node scripts/pushKeys.mjs",
-    "runner:build": "node scripts/buildPage.mjs --check && esbuild runner/src/index.ts --bundle --platform=node --target=node22 --format=cjs --packages=external --outfile=runner/dist/index.cjs",
+    "runner:build": "node scripts/buildPage.mjs --check && esbuild runner/src/index.ts --bundle --platform=node --target=node24 --format=cjs --packages=external --outfile=runner/dist/index.cjs",
     "runner:start": "node runner/dist/index.cjs",
     "verify": "npm run typecheck && npm run format:check && npm run lint && npm run knip && npm run site:check && npm run test && electron-vite build && npm run test:e2e",
     "start": "electron-vite preview",
@@ -104,11 +104,5 @@
     "typescript": "^5.8.3",
     "vite": "^7.0.5",
     "vitest": "^5.0.5"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "electron",
-      "esbuild"
-    ]
   }
 }
