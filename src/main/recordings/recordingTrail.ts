@@ -51,9 +51,11 @@ const clean = (text: unknown, max: number): string => {
 };
 
 // A site as a person means it, so www.shop.example.co.uk is example.co.uk, but docs.google.com stays as it is. It's what a
-// routine stays on, along with its subdomains, and an address it can't read as a site gets no site at all.
+// routine stays on, along with its subdomains, and an address it can't read as a site gets no site at all. A host written
+// with a trailing dot stays whole, since the suffix list would read it as the undotted name and widen it.
 export const siteOfHost = (hostname: string): string => {
   const host = stripWww(hostname.toLowerCase());
+  if (host.endsWith(".")) return host;
   const whole = registrableSite(host);
   const site = RESOLD_UNDER.test(whole) ? host.replace(/\.$/, "").split(".").slice(-3).join(".") : whole;
   return MANY_PRODUCTS.includes(site) ? host : site;

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createPageTools } from "../tools/browserTools";
 import { draftFromReply, MAX_STEPS, plainDraft, searchIn, siteOfHost, sitesOf, Trail, trailAddress, trailForModel } from "./recordingTrail";
 import type { Tab } from "../tabs/Tab";
-import { narrowSites } from "../../shared/mascots";
+import { narrowSites, siteAllowed } from "../../shared/mascots";
 import { defined } from "../../shared/testing";
 
 const trail = (site = "shop.example") => {
@@ -45,6 +45,14 @@ describe("addresses", () => {
     expect(siteOfHost("alice.co.a1")).toBe("alice.co.a1");
     // Only one "www." is taken off.
     expect(siteOfHost("www.www.localhost")).toBe("www.localhost");
+  });
+
+  it("never widens a host written with a trailing dot", () => {
+    const site = siteOfHost("shop.example.com.");
+    expect(site).toBe("shop.example.com.");
+    expect(narrowSites([], [site])).toEqual([site]);
+    expect(siteAllowed("https://other.example.com/", [site])).toBe(false);
+    expect(siteAllowed("https://example.com/", [site])).toBe(false);
   });
 
   it("keeps the whole host where one company runs many products", () => {
