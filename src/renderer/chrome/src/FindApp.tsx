@@ -34,7 +34,8 @@ export const FindApp: React.FC = () => {
   if (!theme) return null;
 
   return (
-    <div className="p-3">
+    // Room round the card for its shadow, as Layout.ts sizes the view (FIND_BAR).
+    <div className="pt-3 pr-3 pb-10 pl-6">
       <FindBarCard
         inputRef={input}
         value={value}

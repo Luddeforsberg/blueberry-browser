@@ -184,7 +184,7 @@ const Privacy: React.FC = () => {
       </SettingsGroup>
       <SettingsGroup label="History">
         <SettingsLink
-          title="History"
+          title="Pages you’ve visited"
           description="Every web page you visit is saved until you delete it or clear your history."
           value="Open"
           onOpen={() => void window.chromeAPI.browser.openPage("history")}
@@ -209,7 +209,7 @@ const AiService: React.FC = () => {
 };
 
 // Each row's state is a pill, and only what's true: a next step is a raised button beside it, and Set up opens the same
-// page as the row.
+// page as the row. Set up says it isn't set up, so that row has no pill to say it again.
 const Connections: React.FC = () => {
   const aiKey = useAiKey();
   const [phone] = usePhone();
@@ -224,7 +224,6 @@ const Connections: React.FC = () => {
         title="AI service"
         description="What Berry thinks with, using your own key."
         value={aiKey.service && aiKey.last4 ? `${aiServiceName(aiKey.service)} · ${aiKey.last4}` : undefined}
-        state={aiKey.service ? undefined : { words: "Not set up" }}
         action={aiKey.service ? undefined : setUp("ai-service")}
         onOpen={() => openSettings("ai-service")}
       />
@@ -237,11 +236,7 @@ const Connections: React.FC = () => {
         title="Phone"
         description="Answer a waiting job from Telegram."
         state={
-          phone.status === "connected"
-            ? { words: "Connected", tone: "on" }
-            : phone.status === "pairing"
-              ? { words: "Pairing" }
-              : { words: "Not set up" }
+          phone.status === "connected" ? { words: "Connected", tone: "on" } : phone.status === "pairing" ? { words: "Pairing" } : undefined
         }
         action={phone.status === "off" ? setUp("phone") : undefined}
         onOpen={() => openSettings("phone")}
@@ -254,7 +249,7 @@ const Connections: React.FC = () => {
         }
         title="Claude and other apps"
         description="Apps on this computer can give your mascots jobs."
-        state={!mcp.on ? { words: "Not set up" } : mcp.url ? { words: "On", tone: "on" } : { words: "Couldn’t start", tone: "ask" }}
+        state={!mcp.on ? undefined : mcp.url ? { words: "On", tone: "on" } : { words: "Couldn’t start", tone: "ask" }}
         action={mcp.on ? undefined : setUp("claude")}
         onOpen={() => openSettings("claude")}
       />
@@ -270,7 +265,7 @@ const Connections: React.FC = () => {
           cloud.unreleased
             ? { words: "Session still open", tone: "ask" }
             : !cloudSetUp
-              ? { words: "Not set up" }
+              ? undefined
               : cloud.status === "running" || cloud.status === "starting"
                 ? { words: "Session open", tone: "on" }
                 : { words: "Ready", tone: "on" }

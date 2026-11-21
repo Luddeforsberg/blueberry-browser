@@ -29,3 +29,6 @@ export const looksLikeAiKey = (service: AiService, key: string): boolean =>
 export const maskedKey = (service: AiService, last4: string): string => `${PREFIXES[service]}${"•".repeat(16)}${last4}`;
 
 export const NO_KEY = "Berry needs an AI key to answer.";
+export const KEY_REFUSED = "The AI service turned down the key. Check it in Settings, under Connections.";
+// What only a key can fix, so a reply that went wrong this way offers Add a key, never Try again, which can't help.
+export const NEEDS_A_KEY: readonly string[] = [NO_KEY, KEY_REFUSED];

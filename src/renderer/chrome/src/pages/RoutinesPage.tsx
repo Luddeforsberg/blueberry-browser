@@ -11,7 +11,7 @@ import { useMascots, useLibrary } from "../contexts/useLibrary";
 import { Berry } from "../components/Berry";
 import { useAssistantName } from "../components/useAssistantName";
 import { ChatError } from "../components/ChatMessage";
-import { EmptyPage, PageFrame, PageHeader } from "../components/PageFrame";
+import { EmptyPage, EndAction, PageFrame, PageHeader } from "../components/PageFrame";
 import { LINE_BETWEEN, OFF_ROW_HIDE, ON_ROW, ON_ROW_SHOW, ROW } from "../components/pageRows";
 import { BackButton, SettingsGroup, SettingsLabel } from "../components/SettingsRow";
 import { ShowHowButton } from "../components/ShowBerry";
@@ -241,7 +241,7 @@ const Fact: React.FC<{ label: string; onOpen: () => void; children: React.ReactN
   </button>
 );
 
-// A routine's own page: who and what on top, what it does in full, three facts, its runs on a thread, and Delete.
+// A routine's own page: who and when it's next on top, what it does in full, three facts, its runs on a thread, and Delete.
 const RoutineView: React.FC<{ routine: Routine }> = ({ routine }) => {
   const library = useLibrary();
   const mascot = useMascots().find(routine.mascotId);
@@ -250,7 +250,6 @@ const RoutineView: React.FC<{ routine: Routine }> = ({ routine }) => {
   const [runs] = useFromMain<RoutineRun[]>([], () => api().getRuns(routine.id), undefined, library);
   const queued = routine.status === "queued";
   const part = (which: RoutinePart) => () => openRoutines({ page: "part", id: routine.id, part: which });
-  const next = routine.paused ? "paused" : routine.nextRunAt !== null ? `next ${nextInWords(routine.nextRunAt)}` : null;
 
   const remove = async () => {
     if (await api().delete(routine.id)) openRoutines({ page: "list" });
@@ -263,15 +262,16 @@ const RoutineView: React.FC<{ routine: Routine }> = ({ routine }) => {
         <Berry mood={moodFor(routine.status)} size={44} mascot={mascot} />
         <div className="flex-1 min-w-0">
           <RoutineName key={routine.id} routine={routine} />
-          <p className="mt-0.5 text-14 text-ink-2">
-            {scheduleWords(routine)}
-            {next && (
-              <>
-                {" "}
-                · <span className="font-mono text-11.5 text-ink-3 tabular-nums">{next}</span>
-              </>
-            )}
-          </p>
+          {/* The schedule is When, below, so this says only what it doesn't: when it's next, or that it's paused. */}
+          {routine.paused ? (
+            <p className="mt-0.5 text-14 text-ink-2">Paused</p>
+          ) : (
+            routine.nextRunAt !== null && (
+              <p className="mt-0.5 text-14 text-ink-2">
+                Next <span className="font-mono text-11.5 text-ink-3 tabular-nums">{nextInWords(routine.nextRunAt)}</span>
+              </p>
+            )
+          )}
           {routine.cloudNote && <p className="mt-0.5 text-13 text-ink-2">{routine.cloudNote}</p>}
           {routine.status === "needs-approval" && (
             <StatusPill tone="ask" className="mt-2">
@@ -308,7 +308,8 @@ const RoutineView: React.FC<{ routine: Routine }> = ({ routine }) => {
         {routine.instructions}
       </p>
 
-      <div className="mt-5 grid grid-cols-[1.25fr_1fr_1fr] border-y border-line">
+      {/* Its hairlines start and end where the words do, as a row's, so the page keeps one left edge. */}
+      <div className="relative mt-5 grid grid-cols-[1.25fr_1fr_1fr] before:absolute before:inset-x-2 before:top-0 before:h-px before:bg-line after:absolute after:inset-x-2 after:bottom-0 after:h-px after:bg-line">
         <Fact label={PART_NAMES.when} onOpen={part("when")}>
           <span>{scheduleWords(routine)}</span>
         </Fact>
@@ -338,9 +339,7 @@ const RoutineView: React.FC<{ routine: Routine }> = ({ routine }) => {
         </ol>
       )}
 
-      <Button size="sm" variant="ghost" className="self-start mt-4 text-ask hover:text-ask" onClick={() => void remove()}>
-        Delete {routine.name}
-      </Button>
+      <EndAction onAct={() => void remove()}>Delete {routine.name}</EndAction>
     </>
   );
 };

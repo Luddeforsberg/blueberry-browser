@@ -15,8 +15,10 @@ const BOOKMARKS_BAR_HEIGHT = 40;
 // The gutter: the ground showing between the page's sheet and the window's right and bottom edges, and between sheets.
 const PAGE_INSET = 8;
 export const FLOATING_INSET = 8;
-// The find bar's card with 12px on every side, for its shadow.
-const FIND_BAR = { width: 384, height: 72 };
+// The find bar's card, 360 by 48, 12px from the page's top and right edges, with room for its `lift` shadow to fade out
+// before the view ends: 24px to its left and 40px under it, where it falls. Less leaves the view's edge showing as a
+// pale box round the card.
+const FIND_BAR = { width: 396, height: 100 };
 export const MIN_PAGE_WIDTH = 480;
 export const MIN_WINDOW = { width: 900, height: 600 };
 

@@ -60,7 +60,7 @@ const DoesAnswer: React.FC<{ values: RoutineFormValues; onChange: (values: Routi
       rows={3}
       maxLength={5000}
       value={values.instructions}
-      placeholder="Read SVT and sum up the five biggest stories."
+      placeholder="Read the news and sum up the five biggest stories."
       onChange={(event) => onChange({ ...values, instructions: event.target.value })}
       className={cn(FIELD, "block min-h-[76px] max-h-[260px] px-4 py-[13px] resize-none text-15 leading-[1.5] [field-sizing:content]")}
     />
@@ -69,13 +69,19 @@ const DoesAnswer: React.FC<{ values: RoutineFormValues; onChange: (values: Routi
 
 // --- Step 2: when ----------------------------------------------------------------------------------------------------
 
-const HOW_OFTEN: { value: HowOften; label: string }[] = [
-  { value: "once", label: "Once" },
-  { value: "daily", label: "Every day" },
-  { value: "weekdays", label: "Weekdays" },
-  { value: "weekly", label: "Weekly" },
-  { value: "monthly", label: "Monthly" },
-  { value: "manual", label: "Only when you ask" },
+// Two rows, what repeats and what doesn't, so six pills never leave one alone on a line of its own. The card under a
+// chat offers only the first.
+const HOW_OFTEN: { value: HowOften; label: string }[][] = [
+  [
+    { value: "daily", label: "Every day" },
+    { value: "weekdays", label: "Weekdays" },
+    { value: "weekly", label: "Weekly" },
+    { value: "monthly", label: "Monthly" },
+  ],
+  [
+    { value: "once", label: "Once" },
+    { value: "manual", label: "Only when you ask" },
+  ],
 ];
 
 // Monday first, with the numbers the schedule counts by, from Sunday.
@@ -125,12 +131,18 @@ export const WhenAnswer: React.FC<{ values: RoutineFormValues; set: Set; often?:
     set({ days: values.days.includes(day) ? values.days.filter((each) => each !== day) : [...values.days, day] });
   return (
     <div className="flex flex-col gap-2">
-      <div role="radiogroup" aria-label="How often" className={row}>
-        {HOW_OFTEN.filter(({ value }) => !often || often.includes(value)).map(({ value, label }) => (
-          <Pill key={value} quiet={quiet} chosen={howOften(values) === value} onChoose={() => set(withHowOften(values, value))}>
-            {label}
-          </Pill>
-        ))}
+      <div role="radiogroup" aria-label="How often" className="flex flex-col gap-1.5">
+        {HOW_OFTEN.map((pills) => pills.filter(({ value }) => !often || often.includes(value)))
+          .filter((pills) => pills.length > 0)
+          .map((pills) => (
+            <div key={pills[0]?.value} className={row}>
+              {pills.map(({ value, label }) => (
+                <Pill key={value} quiet={quiet} chosen={howOften(values) === value} onChoose={() => set(withHowOften(values, value))}>
+                  {label}
+                </Pill>
+              ))}
+            </div>
+          ))}
       </div>
       {values.kind === "weekly" && howOften(values) === "weekly" && (
         <div role="group" aria-label="Days" className={row}>
