@@ -2,6 +2,8 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { BrowserContext } from "playwright-core";
+import { vi } from "vitest";
+import { CdpTab } from "../tools/CdpTab";
 import type { CloudBrowser } from "./cloudProvider";
 import { CloudTabs, type CloudTabsHooks } from "./CloudTabs";
 
@@ -11,6 +13,25 @@ import { CloudTabs, type CloudTabsHooks } from "./CloudTabs";
 export type Provider = ConstructorParameters<typeof CloudTabs>[1];
 
 export const tempFile = () => join(mkdtempSync(join(tmpdir(), "cloud-tabs-")), "cloud.json");
+
+// Pages the cloud browser opens, as tabs that do nothing, by id.
+export const attachTabs = () => {
+  const tabs = new Map<string, { close: ReturnType<typeof vi.fn> }>();
+  vi.spyOn(CdpTab, "attach").mockImplementation(async (id) => {
+    const tab = {
+      id,
+      url: "https://example.com/",
+      title: "",
+      isClosed: false,
+      loadURL: async () => {},
+      settled: async () => {},
+      close: vi.fn(async () => {}),
+    };
+    tabs.set(id, tab);
+    return tab as unknown as CdpTab;
+  });
+  return tabs;
+};
 
 // A browser whose pages open when `opened` says so, standing in for the local one.
 export const fakeLocal = () => {

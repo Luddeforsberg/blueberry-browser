@@ -201,7 +201,7 @@ const KEY_CHANGED = "Nothing was taken out, because the cloud browser's key chan
 export class CloudLogins {
   private lists: Record<string, CloudLogin[]> = {};
   // A list from before there was one per project, while it can't be told whose it is, which nothing may write over.
-  private readonly undecided: boolean;
+  private undecided = false;
   private busy = false;
   // The cloud browser as it is now. It ends or is replaced with a new one, so a copy still waiting on the user never lands
   // in it.
@@ -214,15 +214,21 @@ export class CloudLogins {
     // The projects a list from before there was one per project may be in, or null while that can't be told.
     upgradeTo: string[] | null = [],
   ) {
+    this.load(upgradeTo);
+  }
+
+  // What the file lists, read as a launch reads it, in place of what's kept: on a launch, and when the cloud's files are
+  // read again on Forget. A list from before there was one per project goes to the projects in `upgradeTo` and is kept
+  // as theirs at once, so a key saved later can't take it, or stays as it is while that's null.
+  load(upgradeTo: string[] | null): void {
     let data: unknown = null;
     try {
-      data = JSON.parse(readFileSync(file, "utf8"));
+      data = JSON.parse(readFileSync(this.file, "utf8"));
     } catch {
       // Nothing listed.
     }
     this.undecided = Array.isArray(data) && upgradeTo === null;
     this.lists = parseLists(data, upgradeTo ?? []);
-    // Kept as those projects' at once, so a key saved later can't take it.
     if (Array.isArray(data) && upgradeTo) this.write();
   }
 

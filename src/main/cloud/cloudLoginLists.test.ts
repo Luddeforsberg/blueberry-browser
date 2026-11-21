@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { CloudLogins, MAX_PROJECTS, type CookieJar } from "./cloudLogins";
+import { CloudLogins, MAX_PROJECTS, type CookieJar, type StoredCookie } from "./cloudLogins";
 
 // The list of sign-ins on disk: one list for each project, and the one list from before there was one per project.
 
@@ -18,7 +18,7 @@ const fileWith = (data: unknown): string => {
 
 // Logins whose cloud browser is the one for `at.origin`, the same one every time as `CloudSessions` is, with a cookie
 // jar that holds nothing.
-const loginsAt = (file: string, upgradeTo: string[] | null, at: { origin: string }) => {
+const loginsAt = (file: string, upgradeTo: string[] | null, at: { origin: string }, cookies: StoredCookie[] = []) => {
   const jar: CookieJar = { addCookies: async () => {}, clearCookies: async () => {} };
   const browser = {
     account: {},
@@ -28,7 +28,7 @@ const loginsAt = (file: string, upgradeTo: string[] | null, at: { origin: string
     withContext: <T>(act: (one: CookieJar) => Promise<T>) => act(jar),
   };
   const confirm = vi.fn(async () => true);
-  const logins = new CloudLogins(file, { jar: () => browser, confirm, readCookies: async () => [], onChange: () => {} }, upgradeTo);
+  const logins = new CloudLogins(file, { jar: () => browser, confirm, readCookies: async () => cookies, onChange: () => {} }, upgradeTo);
   return { logins, confirm };
 };
 const sites = (logins: CloudLogins) => logins.logins.map(({ site }) => site);
@@ -62,6 +62,16 @@ describe("the list of sign-ins on disk", () => {
     expect(sites(logins)).toEqual([]);
     await logins.forgetAll();
     expect(JSON.parse(readFileSync(file, "utf8"))).toEqual(OLD_LIST);
+  });
+
+  it("keeps a sign-in brought along once the files can be read and the list from before is decided", async () => {
+    const file = fileWith(OLD_LIST);
+    const { logins } = loginsAt(file, null, { origin: A }, [{ name: "sid", value: "v", domain: "github.com", path: "/" }]);
+    logins.load([A]);
+    expect(await logins.bring("github.com")).toBeNull();
+    expect(JSON.parse(readFileSync(file, "utf8"))).toEqual({
+      projects: { [A]: [expect.objectContaining({ site: "github.com" }), expect.objectContaining({ site: "example.com" })] },
+    });
   });
 
   it(`reads every project's list, and takes a new project's only while fewer than ${MAX_PROJECTS} have one`, async () => {

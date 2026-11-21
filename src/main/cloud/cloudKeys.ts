@@ -30,11 +30,13 @@ export class CloudKeys {
     this.browsers.clear();
   }
 
-  // The browser for `key`, carrying the id its sessions' handles name its key by, where it's Browserbase's own.
+  // The browser for `key`, carrying the id its sessions' handles name its key by, where it's Browserbase's own. None for a
+  // Browserbase key that can't be sealed, since a session it made would be kept with nothing on disk to end it.
   browserOf(key: Key): CloudBrowser | null {
     const made = this.provider(key);
-    const keyId = made && made.origin === (key.projectId && browserbaseOrigin(key.projectId)) ? this.idFor(key) : null;
-    return made && keyId ? { ...made, keyId } : made;
+    if (!made || made.origin !== (key.projectId && browserbaseOrigin(key.projectId))) return made;
+    const keyId = this.idFor(key);
+    return keyId ? { ...made, keyId } : null;
   }
 
   // The browser for the key a handle was made with, or null where it isn't kept or can't be opened.

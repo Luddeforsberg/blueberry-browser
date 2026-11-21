@@ -46,6 +46,11 @@ export class SignedInTo {
     return this.logins.logins;
   }
 
+  // The list read again, as a launch reads it, with the projects a list from before may be in.
+  load(upgradeTo: string[] | null): void {
+    this.logins.load(upgradeTo);
+  }
+
   // The site a tab is open to check, if it's one.
   siteOf(id: string): string | null {
     return this.checking.get(id) ?? null;

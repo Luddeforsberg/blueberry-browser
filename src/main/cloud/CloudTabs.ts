@@ -1,7 +1,7 @@
 import { dirname, join } from "path";
 import { safeStorage, type WebContents } from "electron";
 import type { CloudState, CloudView } from "../../shared/ipc";
-import { browserbaseOrigin, isLiveView } from "./browserbase";
+import { isLiveView } from "./browserbase";
 import { forgetBefore, MAX_FIELD_LENGTH, NO_KEY, readCloud, sessionsFile, writeCloudIds, writeCloudKey, type Key } from "./cloudFile";
 import { CloudKeys } from "./cloudKeys";
 import type { CdpTab } from "../tools/CdpTab";
@@ -20,6 +20,7 @@ import { CloudPictures } from "./cloudPictures";
 // browser behind it.
 
 const NOT_SAFE = "This computer can't keep the key encrypted, so it wasn't saved.";
+const NOT_SEALED = "This computer couldn't keep the key encrypted, so nothing in the cloud can start. Open Blueberry again.";
 const NOT_SAVED = "The key couldn't be saved.";
 // Nothing is written, and no session started, while the cloud's files may say more than was read, until the user forgets
 // the key and what couldn't be read with it.
@@ -79,18 +80,12 @@ export class CloudTabs implements ChatCloud {
     this.before = read.fromBefore;
     this.keys = new CloudKeys(read.keys, provider);
     const browser = this.keys.browserOf(this.key);
+    if (this.key.apiKey && !browser) this.problem = NOT_SEALED;
     this.sessions = new CloudSessions(browser, read.ids, {
       onChange: () => this.changed(),
       onIds: (ids) => this.keepIds(ids),
       browserFor: (handle) => this.keys.browserFor(handle),
     });
-    // What came from an app before this one goes into the sessions' file, and a session pruned or a key no session names
-    // leaves it, so nothing sealed stays on disk for a session that has gone.
-    const { handles } = this.sessions.ids;
-    const named = new Set(handles.flatMap(({ keyId }) => (keyId ? [keyId] : [])));
-    const stale = handles.length < read.ids.handles.length || Object.keys(read.keys).some((id) => !named.has(id));
-    if (this.before || stale) this.keepIds(this.sessions.ids);
-    this.shareKey(browser);
     this.pictures = new CloudPictures({
       page: (id) => this.page(id),
       working: (id) => !!this.sessions.usedBy(id) && !this.sessions.heldByUser(id),
@@ -111,6 +106,13 @@ export class CloudTabs implements ChatCloud {
       },
       read.oldLoginsIn,
     );
+    // Only now, with the sign-ins decided, what came from an app before this one goes into the sessions' file, and a
+    // session pruned or a key no session names leaves it, so nothing sealed stays on disk for a session that has gone.
+    const { handles } = this.sessions.ids;
+    const named = new Set(handles.flatMap(({ keyId }) => (keyId ? [keyId] : [])));
+    const stale = handles.length < read.ids.handles.length || Object.keys(read.keys).some((id) => !named.has(id));
+    if (this.before || stale) this.keepIds(this.sessions.ids);
+    this.shareKey(browser);
   }
 
   // A window opened. Its tabs show the cloud's pages, and its chrome hears about every change. What comes back is for its
@@ -173,28 +175,26 @@ export class CloudTabs implements ChatCloud {
     } else if (!safeStorage.isEncryptionAvailable()) {
       this.problem = NOT_SAFE;
     } else if (!this.unreadable) {
-      this.letGoOfTabs();
-      // A session still running stays, with the key it was made with, so the new key never waits for it. Each project's
-      // Context stays with it too.
-      await this.sessions.replace(() => {
-        const next: Key = { apiKey: key, projectId: project };
-        const browser = this.keys.browserOf(next);
-        // Browserbase's key with no id is one that couldn't be sealed after all, which nothing could end a session with.
-        if (browser?.origin === browserbaseOrigin(project) && !browser.keyId) {
-          this.problem = NOT_SAFE;
-          return null;
-        }
-        // The sessions it ends are kept with it first, since this writes over the key `cloud.json` has now, which may be
-        // the only one that can end them.
-        if (!this.shareKey(browser) || !this.keep(next)) {
-          this.problem = NOT_SAVED;
-          return null;
-        }
-        return { browser };
-      });
+      const next: Key = { apiKey: key, projectId: project };
+      // Sealed before anything stops, so a key that can't be leaves the work in the cloud going.
+      const browser = this.keys.browserOf(next);
+      if (!browser) this.problem = NOT_SAFE;
+      else await this.replaceWith(next, browser);
     }
     this.changed();
     return this.state;
+  }
+
+  // A session still running stays, with the key it was made with, so the new key never waits for it. Each project's
+  // Context stays with it too. The sessions the key ends are kept with it first, since this writes over the key
+  // `cloud.json` has now, which may be the only one that can end them.
+  private async replaceWith(next: Key, browser: CloudBrowser): Promise<void> {
+    this.letGoOfTabs();
+    await this.sessions.replace(() => {
+      if (this.shareKey(browser) && this.keep(next)) return { browser };
+      this.problem = NOT_SAVED;
+      return null;
+    });
   }
 
   // A session of this browser's project with no key of its own that opens, as after the system's keychain changed, takes
@@ -214,8 +214,10 @@ export class CloudTabs implements ChatCloud {
     const lost = (handle: Handle) => this.keys.unopenable(handle);
     if (this.unreadable || this.ids.handles.some(lost)) {
       if (!(await (this.hooks?.confirmForget() ?? Promise.resolve(false)))) return this.state;
-      // The same load as a launch, from the files alone, so what reads now is kept, and only what still doesn't goes.
+      // The same load as a launch, from the files alone, so what reads now is kept, and only what still doesn't goes. The
+      // sign-ins are decided first, as on a launch, before anything written takes the Context from before away.
       const again = readCloud(this.file);
+      this.signedIn.load(again.oldLoginsIn);
       this.keys.load(again.keys);
       this.before = again.fromBefore;
       this.unreadable = null;
@@ -357,10 +359,11 @@ export class CloudTabs implements ChatCloud {
     return true;
   }
 
-  // On disk first, and only once what came from before is in the sessions' file, since this writes over `cloud.json`. A
-  // key that couldn't be saved isn't used.
+  // On disk first, and only once the sessions' file has everything kept here, since this writes over the key in
+  // `cloud.json`: what came from before, and a key given to a session whose own write failed, for which that key may be
+  // the only one on disk. A key that couldn't be saved isn't used.
   private keep(key: Key): boolean {
-    if (this.unreadable || (this.before && !this.keepIds(this.ids)) || !writeCloudKey(this.file, key)) {
+    if (this.unreadable || !this.keepIds(this.ids) || !writeCloudKey(this.file, key)) {
       this.problem = NOT_SAVED;
       return false;
     }

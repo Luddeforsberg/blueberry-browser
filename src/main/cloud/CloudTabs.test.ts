@@ -7,28 +7,10 @@ vi.mock("electron", () => ({
 }));
 
 const { CloudSessions } = await import("./cloudBrowser");
-const { fakeLocal, hooks, makeTabs, makeWindowTabs, tempFile } = await import("./cloudTabsTesting");
+const { attachTabs, fakeLocal, hooks, makeTabs, makeWindowTabs, tempFile } = await import("./cloudTabsTesting");
 
 // How long a session nobody uses stays open.
 const IDLE = 3 * 60_000;
-
-const attachTabs = () => {
-  const tabs = new Map<string, { close: ReturnType<typeof vi.fn> }>();
-  vi.spyOn(CdpTab, "attach").mockImplementation(async (id) => {
-    const tab = {
-      id,
-      url: "https://example.com/",
-      title: "",
-      isClosed: false,
-      loadURL: async () => {},
-      settled: async () => {},
-      close: vi.fn(async () => {}),
-    };
-    tabs.set(id, tab);
-    return tab as unknown as CdpTab;
-  });
-  return tabs;
-};
 
 describe("CloudTabs", () => {
   it("fits a cloud tab's page to the size the chrome shows it at, within limits, and ignores anything else", async () => {
