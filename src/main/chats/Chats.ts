@@ -3,7 +3,7 @@ import { siteName, siteOf } from "../../shared/sites";
 import type { ActionApproval } from "../../shared/ipc";
 import type { StoredChat } from "./ChatStore";
 import type { Tab } from "../tabs/Tab";
-import type { ChatStep, ChatThread, MascotProfile, WorkOutcome } from "../../shared/library";
+import { REPLY_NOT_SAVED, type ChatStep, type ChatThread, type MascotProfile, type WorkOutcome } from "../../shared/library";
 import { BERRY, narrowSites } from "../../shared/mascots";
 import { sentAttachment, type PreparedFile } from "./Attachments";
 import { MAX_FILES, MAX_TABS, type SentAttachment, type TabChoice } from "../../shared/attachments";
@@ -160,8 +160,10 @@ export class Chats {
   private toThread(chat: StoredChat): ChatThread {
     const run = this.runs.get(chat.id);
     if (this.runner?.has(chat.id)) return this.runnerChats.threadOf(chat);
+    const unsaved = this.finished.get(chat.id)?.unsaved;
     return {
       ...chat,
+      messages: unsaved ? [...chat.messages, unsaved] : chat.messages,
       partial: run?.partial ?? null,
       statusLine: run?.statusLine ?? null,
       steps: run?.steps ?? [],
@@ -223,6 +225,7 @@ export class Chats {
     if (!message) return null;
     if (chatId && (!this.store.chat(chatId) || this.isRunning(chatId))) return null;
     if (files.length > MAX_FILES || tabIds.length > MAX_TABS || new Set(tabIds).size !== tabIds.length) return null;
+    if (chatId) this.saveUnsaved(chatId);
     const attaching = files.length > 0 || tabIds.length > 0;
     // Only the user starts one there, from this window, so not an app and never with a page. What's attached would go
     // to our server with the job, so nothing attached goes there.
@@ -265,6 +268,17 @@ export class Chats {
     return this.thread(id);
   }
 
+  // An answer that couldn't be saved goes in before the next message, wherever that runs, so the model reads it. If it
+  // still can't be saved, this throws and it stays on screen.
+  private saveUnsaved(chatId: string): void {
+    const ended = this.finished.get(chatId);
+    if (!ended?.unsaved) return;
+    const { unsaved, ...saved } = ended;
+    this.store.addMessage(chatId, unsaved);
+    this.finished.set(chatId, saved);
+    if (this.errors.get(chatId) === REPLY_NOT_SAVED) this.errors.delete(chatId);
+  }
+
   adoptRunnerChat(prompt: string, mascotId: string | null): string {
     return this.runnerChats.adoptRunnerChat(prompt, mascotId);
   }
@@ -305,13 +319,14 @@ export class Chats {
     this.runs.delete(chatId);
     this.publishWorkingTabs();
     this.errors.delete(chatId);
-    this.finished.delete(chatId);
     this.jobs.delete(chatId);
     this.cloudChats.delete(chatId);
     this.runnerChats.runnerPending.delete(chatId);
     this.runner?.forget(chatId);
     this.memory?.dropOffers(chatId);
     if (!this.store.deleteChat(chatId)) return false;
+    // Only once it's gone, since an answer that couldn't be saved is kept here.
+    this.finished.delete(chatId);
     this.events.onListChanged();
     return true;
   }

@@ -608,6 +608,7 @@ Mock: [reply-states.html](./docs/design/mocks/reply-states.html).
 - **Something to remember.** Rarely, under a finished reply, one strip on `sheet-2`: the mascot looking curious, the fact in the words it would be kept in, **Remember**, raised, and **No thanks** as quiet text. Ignoring it is as good as No thanks. When and how seldom this appears, and what can never be kept, are unchanged: see the memory section of the old document.
 - **Stopped.** The folded line and what it found, as for done, then "You stopped this after 3 steps.", with the reply's face at rest, and **Carry on**, raised, which says "Carry on" as you.
 - **Went wrong.** The reply's face in Oops, what happened in plain words under anything it did write, and **Try again**, filled, which says "Try again" as you. With no key, or a key the service turned down, trying again can't help, so it's **Add a key**, which opens Settings at AI service. The folded line above opens its steps.
+- **Not saved.** The answer came but couldn't be saved. It shows as for done, with Copy, and the face in Oops says "This reply couldn't be saved, so it's only here until you quit." with no Try again, because its job may already have acted. The next message saves it first.
 
 ### The working view
 

@@ -6,7 +6,7 @@ import type { ChatThreadSummary, NeedsYouItem } from "./library/chats";
 import type { MascotDraft, MascotProfile, MemoryState } from "./library/mascots";
 import type { Routine, RoutineDraft } from "./library/routines";
 
-export { STEP_KINDS } from "./library/chats";
+export { REPLY_NOT_SAVED, STEP_KINDS } from "./library/chats";
 export type {
   ChatApproval,
   ChatStep,
