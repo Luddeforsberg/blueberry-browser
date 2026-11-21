@@ -19,7 +19,7 @@ export const addStarters = (
     const catalog = starterMascots();
     for (const id of STARTER_IDS) {
       const entry = catalog.find((candidate) => candidate.id === id);
-      if (entry) mascots.addFromGallery(entry.id, entry.draft);
+      if (entry) mascots.addFromGallery(entry.id, entry.draft, entry.description);
     }
   }
   settings.update({ startersAdded: true });

@@ -14,11 +14,11 @@ import { useMascots, useLibrary } from "../contexts/useLibrary";
 import { Berry } from "../components/Berry";
 import { useAssistantName } from "../components/useAssistantName";
 import { ChatError } from "../components/ChatMessage";
-import { EmptyPage, PageFrame, PageHeader } from "../components/PageFrame";
+import { EmptyPage, EndAction, PageFrame, PageHeader } from "../components/PageFrame";
 import { LINE_BETWEEN, OFF_ROW_HIDE, ON_ROW, ON_ROW_SHOW, ROW } from "../components/pageRows";
 import { BackButton, SettingsGroup, SettingsLink, SettingsRow } from "../components/SettingsRow";
 import { useMascotState } from "../components/useMascotState";
-import { firstSentence, limitsInBrief, narrowerLimits } from "../shortWords";
+import { mascotLine, narrowerLimits } from "../shortWords";
 import { useAccount } from "../useAccount";
 import { useCloud } from "../useCloud";
 import { useRunner } from "../useRunner";
@@ -42,7 +42,6 @@ import { blankForm, startRoutine } from "../routinesView";
 // one in steps, changing one part, and what each remembers. Where it is lives in the tab's param (mascotsPlaces.ts).
 
 const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-focus";
-const BERRY_LINE = "Does whatever you ask, wherever you let it.";
 
 const PART_NAMES: Record<MascotPart, string> = { look: "Look", name: "Name", purpose: "What it’s for", limits: "Limits" };
 
@@ -108,9 +107,7 @@ export const MascotRow: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
         <Berry mood={mood} size={36} mascot={mascot} still />
         <span className="flex-1 min-w-0">
           <span className="block truncate text-14 font-medium text-ink">{name}</span>
-          <span className="block truncate text-13 text-ink-2">
-            {mascot.id === BERRY_ID ? BERRY_LINE : firstSentence(mascot.instructions)}
-          </span>
+          <span className="block truncate text-13 text-ink-2">{mascotLine(mascot)}</span>
         </span>
         {mood === "fetching" && (
           <span className="flex items-center gap-[7px] font-mono text-11.5 text-ink-2 whitespace-nowrap">
@@ -173,7 +170,8 @@ const lookInWords = ({ look }: MascotProfile) => {
   return wearing ? `${berry}, ${wearing}` : berry;
 };
 
-// A mascot's own page: who it is, a row for each part you can change, its things, and Delete.
+// A mascot's own page: who it is, a row for each part you can change, its memory and routines, the Gallery and the
+// cloud, and Delete. The top says who it is, so a part's row only names it, except the look, whose words aren't said above.
 const MascotPage: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
   const { choose } = useMascots();
   const stateOf = useMascotState();
@@ -185,6 +183,7 @@ const MascotPage: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
   const [error, setError] = useState<string | null>(null);
   const isBerry = mascot.id === BERRY_ID;
   const canWorkInCloud = !isBerry && (cloud.status !== "off" || runner.status === "linked");
+  const inGallery = !isBerry && account.status !== "not-set-up";
   const part = (which: MascotPart) => () => openMascots({ page: "part", id: mascot.id, part: which });
 
   const setWorksInCloud = async (worksInCloud: boolean) => {
@@ -203,9 +202,7 @@ const MascotPage: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
         <Berry mood={stateOf(mascot).mood} size={64} mascot={mascot} className="mt-0.5" still />
         <div className="flex-1 min-w-0">
           <h1 className="mb-1 text-20 font-semibold [overflow-wrap:anywhere]">{name}</h1>
-          <p className="text-14 leading-[1.45] text-ink-2 line-clamp-3 [overflow-wrap:anywhere]">
-            {isBerry ? BERRY_LINE : mascot.instructions}
-          </p>
+          <p className="text-14 leading-[1.45] text-ink-2 [overflow-wrap:anywhere]">{mascotLine(mascot)}</p>
           <LimitTags mascot={mascot} className="mt-3" />
         </div>
         <Button aria-label={`Chat with ${name}`} onClick={() => chatWith(choose, mascot)}>
@@ -215,23 +212,14 @@ const MascotPage: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
 
       {!isBerry && (
         <SettingsGroup label="Change">
-          <SettingsLink
-            title={PART_NAMES.look}
-            value={
-              <>
-                <Berry size={20} mascot={mascot} still />
-                <span>{lookInWords(mascot)}</span>
-              </>
-            }
-            onOpen={part("look")}
-          />
-          <SettingsLink title={PART_NAMES.name} value={<span>{mascot.name}</span>} onOpen={part("name")} />
-          <SettingsLink title={PART_NAMES.purpose} value={<span>{mascot.instructions}</span>} onOpen={part("purpose")} />
-          <SettingsLink title={PART_NAMES.limits} value={<span>{limitsInBrief(mascot)}</span>} onOpen={part("limits")} />
+          <SettingsLink title={PART_NAMES.look} value={<span>{lookInWords(mascot)}</span>} onOpen={part("look")} />
+          <SettingsLink title={PART_NAMES.name} onOpen={part("name")} />
+          <SettingsLink title={PART_NAMES.purpose} onOpen={part("purpose")} />
+          <SettingsLink title={PART_NAMES.limits} onOpen={part("limits")} />
         </SettingsGroup>
       )}
 
-      <SettingsGroup label="Its things">
+      <SettingsGroup label="Memory and routines">
         <SettingsLink
           title="What it remembers"
           value={<span>{remembers > 0 ? count(remembers, "thing") : "Nothing yet"}</span>}
@@ -246,45 +234,44 @@ const MascotPage: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
             New routine
           </Button>
         </SettingsRow>
-        {!isBerry &&
-          account.status !== "not-set-up" &&
-          (mascot.galleryId ? (
-            <SettingsRow
-              id="mascot-gallery"
-              title="In the Gallery"
-              description="It’s a copy from the Gallery, so only its author can publish it."
-            >
-              <StatusPill>A copy</StatusPill>
-            </SettingsRow>
-          ) : (
-            <SettingsLink
-              title="In the Gallery"
-              description="Others can add a copy of it. They never get what it remembers."
-              state={mascot.publishedId ? { words: "Published", tone: "on" } : { words: "Not published" }}
-              onOpen={() => openMascots({ page: "publish", id: mascot.id })}
-            />
-          ))}
-        {canWorkInCloud && (
-          <SettingsRow
-            id="mascot-works-in-cloud"
-            title="Works in the cloud"
-            description="Choosing it turns on Do this in the cloud. You can still turn that off for one message."
-          >
-            <Switch labelledBy="mascot-works-in-cloud" checked={!!mascot.worksInCloud} onChange={(on) => void setWorksInCloud(on)} />
-          </SettingsRow>
-        )}
       </SettingsGroup>
+      {(inGallery || canWorkInCloud) && (
+        <SettingsGroup label="Beyond this computer">
+          {inGallery &&
+            (mascot.galleryId ? (
+              <SettingsRow
+                id="mascot-gallery"
+                title="In the Gallery"
+                description="It’s a copy from the Gallery, so only its author can publish it."
+              >
+                <StatusPill>A copy</StatusPill>
+              </SettingsRow>
+            ) : (
+              <SettingsLink
+                title="In the Gallery"
+                description="Others can add a copy of it. They never get what it remembers."
+                state={mascot.publishedId ? { words: "Published", tone: "on" } : { words: "Not published" }}
+                onOpen={() => openMascots({ page: "publish", id: mascot.id })}
+              />
+            ))}
+          {canWorkInCloud && (
+            <SettingsRow
+              id="mascot-works-in-cloud"
+              title="Works in the cloud"
+              description="Choosing it turns on Do this in the cloud. You can still turn that off for one message."
+            >
+              <Switch labelledBy="mascot-works-in-cloud" checked={!!mascot.worksInCloud} onChange={(on) => void setWorksInCloud(on)} />
+            </SettingsRow>
+          )}
+        </SettingsGroup>
+      )}
       {error && (
         <div className="mt-3 px-2">
           <ChatError message={error} />
         </div>
       )}
 
-      {!isBerry && (
-        <Button size="sm" variant="ghost" className="self-start mt-5 text-ask hover:text-ask" onClick={() => void remove()}>
-          Delete {mascot.name}
-        </Button>
-      )}
+      {!isBerry && <EndAction onAct={() => void remove()}>Delete {mascot.name}</EndAction>}
     </>
   );
 };

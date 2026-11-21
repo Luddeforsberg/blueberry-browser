@@ -30,12 +30,13 @@ export const PermissionCard: React.FC<{
           ? "Allow is for this time only. Block is remembered for this site."
           : "Your answer is remembered for this site. You can change it in Settings."}
       </p>
-      <div className="mt-3 flex justify-end gap-2">
-        <Button size="sm" variant="raised" disabled={!armed} onClick={() => onDecide(false)}>
-          Block
-        </Button>
+      {/* Allow first, as on every card that asks (DESIGN.md section 10, What a reply can be), whoever is asking. */}
+      <div className="mt-3 flex gap-2">
         <Button size="sm" disabled={!armed} onClick={() => onDecide(true)}>
           Allow
+        </Button>
+        <Button size="sm" variant="raised" disabled={!armed} onClick={() => onDecide(false)}>
+          Block
         </Button>
       </div>
     </section>

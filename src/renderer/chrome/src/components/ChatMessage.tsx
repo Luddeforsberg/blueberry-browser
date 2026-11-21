@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import type { ChatStep, MascotProfile, SaidOnTheWay, UsedPage } from "@shared/library";
 import { linkSite } from "@shared/publishing";
-import { NO_KEY } from "@shared/aiKey";
+import { NEEDS_A_KEY } from "@shared/aiKey";
 import { ArrowUpRight, Check, Cloud, Copy, Repeat } from "lucide-react";
 import { stepsWord } from "../workLine";
 import { useShell } from "../contexts/useShell";
@@ -185,11 +185,11 @@ const TroubleLine: React.FC<{ words: string; alert?: boolean; children?: React.R
   </div>
 );
 
-// What went wrong, in plain words, with Try again. The folded line above it opens the steps it got through. With no
-// key, trying again can't work, so it's Add a key, which opens Settings where the key is kept.
+// What went wrong, in plain words, with Try again. The folded line above it opens the steps it got through. With no key,
+// or one the service turned down, trying again can't work, so it's Add a key, which opens Settings where the key is kept.
 const WhatWentWrong: React.FC<{ message: string; actions?: ReplyActions | undefined }> = ({ message, actions }) => (
   <TroubleLine words={message} alert>
-    {message === NO_KEY ? (
+    {NEEDS_A_KEY.includes(message) ? (
       <Button onClick={() => openSettings("ai-service")}>Add a key</Button>
     ) : (
       actions && <Button onClick={() => actions.onSay("Try again")}>Try again</Button>

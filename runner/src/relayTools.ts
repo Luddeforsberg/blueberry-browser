@@ -18,10 +18,11 @@ const MAX_TASK_LENGTH = 4000;
 const MAX_SITES = 20;
 
 const MAC_OFF =
-  "Blueberry isn't open on the user's Mac right now, or they haven't allowed jobs from here to run there (Settings > " +
+  "Blueberry isn't open on the user's computer right now, or they haven't allowed jobs from here to run there (Settings > " +
   'Cloud in Blueberry). Ask them to open it, or start the job with where: "cloud" or "auto".';
 
-const ON_MAC = "It's waiting for the user in Blueberry on their Mac, where only they can answer. Tell them, then check again with get_job.";
+const ON_MAC =
+  "It's waiting for the user in Blueberry on their computer, where only they can answer. Tell them, then check again with get_job.";
 
 const NOT_YOURS =
   "Only the user can answer this, in Blueberry or on their phone, and nothing you send can. Tell the user it's waiting " +
@@ -95,7 +96,7 @@ export const createRelayTools = (host: RelayHost): McpTool[] => {
       name: "list_agents",
       title: "List the mascots",
       description:
-        "The user's mascots (agents) in Blueberry, as their Mac last shared them: each one's name, what it's for, and the sites it may use and what it may do, in words. Berry is always first and has no limits.",
+        "The user's mascots (agents) in Blueberry, as their computer last shared them: each one's name, what it's for, and the sites it may use and what it may do, in words. Berry is always first and has no limits.",
       shape: {},
       readOnly: true,
       run: async () => {
@@ -107,7 +108,7 @@ export const createRelayTools = (host: RelayHost): McpTool[] => {
       name: "start_job",
       title: "Give a mascot a job",
       description:
-        'Start a job for one of the user\'s mascots, by name or id from list_agents, or Berry if you leave it out. `where` says where it runs. "cloud": in a browser in the cloud, signed in only to the sites the user brought there, and it keeps going with their computer off. "mac": in Blueberry on the user\'s own Mac, with their real tabs and sign-ins, only while it\'s open and they\'ve allowed it, and otherwise you get an error saying so. "auto", the default: the Mac if it\'s available, and the cloud if not. Either way it asks the user before anything risky. `sites` keeps it to those sites, and can only narrow what the mascot may do. Returns a job id at once, and where it went: check on it with get_job.',
+        'Start a job for one of the user\'s mascots, by name or id from list_agents, or Berry if you leave it out. `where` says where it runs. "cloud": in a browser in the cloud, signed in only to the sites the user brought there, and it keeps going with their computer off. "mac": in Blueberry on the user\'s own computer, with their real tabs and sign-ins, only while it\'s open and they\'ve allowed it, and otherwise you get an error saying so. "auto", the default: their computer if it\'s available, and the cloud if not. Either way it asks the user before anything risky. `sites` keeps it to those sites, and can only narrow what the mascot may do. Returns a job id at once, and where it went: check on it with get_job.',
       shape: {
         task: z.string().min(1).max(MAX_TASK_LENGTH).describe("What to do, in plain words, as you'd ask a person."),
         agent: z.string().max(100).optional().describe("The mascot's name or id. Leave out for Berry."),
@@ -120,7 +121,7 @@ export const createRelayTools = (host: RelayHost): McpTool[] => {
           .enum(["auto", "mac", "cloud"])
           .optional()
           .describe(
-            "auto (the default): the user's Mac if Blueberry is open there and allowed, otherwise the cloud. mac: only the Mac. cloud: only the cloud.",
+            "auto (the default): the user's computer if Blueberry is open there and allowed, otherwise the cloud. mac: only their computer. cloud: only the cloud.",
           ),
       },
       readOnly: false,
@@ -141,7 +142,7 @@ export const createRelayTools = (host: RelayHost): McpTool[] => {
           );
         const wanted: RelayWhere = where === "mac" || where === "cloud" ? where : "auto";
         const id = await host.startJob(prompt, { ...mascotSnapshot(mascot), sites: narrowed }, wanted);
-        if (!id) return failed(MAC_OFF, "Mac not available");
+        if (!id) return failed(MAC_OFF, "Computer not available");
         const [row] = await host.jobs([id]);
         const mac = !!row && onMac(row);
         return {
@@ -151,7 +152,7 @@ export const createRelayTools = (host: RelayHost): McpTool[] => {
             where: mac ? "mac" : "cloud",
             status: "queued",
             note: mac
-              ? "It runs in Blueberry on the user's Mac and can take a few minutes. Check on it with get_job. It may stop to ask the user, who answers there."
+              ? "It runs in Blueberry on the user's computer and can take a few minutes. Check on it with get_job. It may stop to ask the user, who answers there."
               : "It runs in the cloud and can take a few minutes. Check on it with get_job. It may stop to ask the user, who answers in Blueberry or on their phone.",
           }),
           summary: "Started a job",

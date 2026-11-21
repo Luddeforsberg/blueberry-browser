@@ -251,12 +251,19 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
       "galleryId",
       "id",
       "instructions",
+      "line",
       "look",
       "name",
       "sites",
       "tools",
     ]);
-    expect(onFile()[0]).toMatchObject({ instructions: original, sites: ["svt.se"], tools: ["visit"], galleryId: id });
+    expect(onFile()[0]).toMatchObject({
+      instructions: original,
+      line: String(defined(server.rows[0]).description),
+      sites: ["svt.se"],
+      tools: ["visit"],
+      galleryId: id,
+    });
     await expect.poll(() => defined(server.rows[0]).add_count).toBe(1);
 
     // It's a limited mascot, under the safety rules, and it never reads the entry again.

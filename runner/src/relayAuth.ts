@@ -168,7 +168,7 @@ export class RelayAuth implements OAuthServerProvider {
       if (error instanceof ServerError && error.status === 400 && error.code === "invalid_credentials")
         return again("That email and password didn't match.");
       if (error instanceof ServerError)
-        return again("Set up keeping going with your Mac off in Blueberry first, under Settings > Cloud, then try again.");
+        return again("Set up keeping going with your computer off in Blueberry first, under Settings > Cloud, then try again.");
       return again(error instanceof Unreachable ? "Couldn't reach Blueberry's server. Try again." : "That didn't work. Try again.");
     }
     const code = randomBytes(32).toString("base64url");

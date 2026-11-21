@@ -142,7 +142,7 @@ describe("MacJobs", () => {
     // One that passes but isn't here.
     const { jobs, rows } = setUp({ mascot: { ...SCOUT, id: "gone" } });
     await jobs.tick();
-    expect(rows.get("job-1")).toMatchObject({ status: "failed", error: expect.stringMatching(/isn't in Blueberry on the Mac/) });
+    expect(rows.get("job-1")).toMatchObject({ status: "failed", error: expect.stringMatching(/isn't in Blueberry on the computer/) });
   });
 
   it("stops the chat when the relay asks, and says it stopped", async () => {
@@ -171,7 +171,7 @@ describe("MacJobs", () => {
     expect(host.stop).toHaveBeenCalledWith("chat-1");
     await jobs.tick();
     expect(presence).toEqual([true, false]);
-    expect(rows.get("job-1")).toMatchObject({ status: "stopped", error: expect.stringMatching(/turned off on the Mac/) });
+    expect(rows.get("job-1")).toMatchObject({ status: "stopped", error: expect.stringMatching(/turned off on the computer/) });
     expect(server.macClaimJob).toHaveBeenCalledTimes(1);
   });
 
@@ -187,7 +187,7 @@ describe("MacJobs", () => {
     expect(host.start).not.toHaveBeenCalled();
     expect(rows.get("job-1")).toMatchObject({
       status: "failed",
-      error: expect.stringMatching(/turned off on the Mac before this one started/),
+      error: expect.stringMatching(/turned off on the computer before this one started/),
     });
   });
 
@@ -201,7 +201,10 @@ describe("MacJobs", () => {
     await round;
     expect(host.start).not.toHaveBeenCalled();
     expect(jobs.running).toBeNull();
-    expect(rows.get("job-1")).toMatchObject({ status: "failed", error: expect.stringMatching(/quit on the Mac before this job started/) });
+    expect(rows.get("job-1")).toMatchObject({
+      status: "failed",
+      error: expect.stringMatching(/quit on the computer before this job started/),
+    });
     await jobs.tick();
     expect(server.macClaimJob).toHaveBeenCalledTimes(1);
   });

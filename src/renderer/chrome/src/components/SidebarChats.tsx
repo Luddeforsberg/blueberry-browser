@@ -265,13 +265,16 @@ export const ChatsFace: React.FC<{ onSheet?: boolean }> = ({ onSheet = false }) 
                     </span>
                     <span className="flex-1 truncate">{routine.name}</span>
                     {/* A run ended since Routines was last opened, which may be one that couldn't finish. */}
+                    {/* A time is the machine's words, in mono. A state, news or paused, is a word, so it isn't. */}
                     {routine.unseen ? (
-                      <span className="shrink-0 font-mono text-11.5 text-ink">
-                        news<span className="sr-only">. Has news</span>
+                      <span className="shrink-0 text-12 font-medium text-ink">
+                        News<span className="sr-only">. Has news</span>
                       </span>
+                    ) : routine.paused ? (
+                      <span className="shrink-0 text-12 text-ink-3">Paused</span>
                     ) : (
                       <span className="shrink-0 font-mono text-11.5 text-ink-3 tabular-nums">
-                        {routine.paused ? "paused" : routine.nextRunAt ? rowTime(routine.nextRunAt) : ""}
+                        {routine.nextRunAt ? rowTime(routine.nextRunAt) : ""}
                       </span>
                     )}
                   </button>

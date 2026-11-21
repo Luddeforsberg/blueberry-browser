@@ -245,9 +245,9 @@ describe("the list", () => {
       words: null,
       last: { text: "Not run yet", ask: false },
     });
-    expect(routineLine(routine("f", { cloudNote: "Moving back to this Mac…" }))).toEqual({
+    expect(routineLine(routine("f", { cloudNote: "Moving back to this computer…" }))).toEqual({
       words: "Every day at 09:00",
-      last: { text: "Moving back to this Mac…", ask: false },
+      last: { text: "Moving back to this computer…", ask: false },
     });
   });
 });
