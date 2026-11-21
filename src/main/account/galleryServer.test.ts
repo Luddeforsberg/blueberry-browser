@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { GalleryServer, publicPageLink, serverConfig } from "./galleryServer";
+import { GalleryServer, publicPageLink, ServerError, serverConfig } from "./galleryServer";
 
 const KEY = "sb_publishable_abc";
 
@@ -59,5 +59,27 @@ describe("a conversation's jobs", () => {
     expect(rows.map(({ id }) => id)).toEqual(Array.from({ length: total }, (_, index) => `job-${index}`));
     // One more page than it fills, or just the one.
     expect(asked).toHaveLength(Math.floor(total / 100) + 1);
+  });
+});
+
+describe("an answer that should be a list", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const server = new GalleryServer({ url: "https://example.supabase.co", key: "sb_publishable_x" });
+  const answering = (body: string) => vi.stubGlobal("fetch", async () => new Response(body, { status: 200 }));
+
+  // Read as none, the routines' keys would say every routine sent from here had gone from the cloud, so one deleted here
+  // would never be taken off it there.
+  it.each(["", "null", "{}", '"key"', "<html>Signed out of the network</html>"])("fails rather than reads as none: %j", async (body) => {
+    answering(body);
+    await expect(server.myCloudRoutineKeys("token")).rejects.toThrow(ServerError);
+    await expect(server.cloudJobs("token", ["j"])).rejects.toThrow(ServerError);
+  });
+
+  it("reads what's in it, and only what it can be", async () => {
+    answering("[]");
+    expect(await server.myCloudRoutineKeys("token")).toEqual([]);
+    answering('["a", 1, null, "b"]');
+    expect(await server.myCloudRoutineKeys("token")).toEqual(["a", "b"]);
+    expect(await server.cloudJobs("token", ["j"])).toEqual([{}, {}, {}, {}]);
   });
 });

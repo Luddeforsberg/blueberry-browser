@@ -7,6 +7,7 @@ import { boundaries } from "./eslint.boundaries.mjs";
 import { callBlocks } from "./eslint.calls.mjs";
 import { fenceBlocks } from "./eslint.fences.mjs";
 import { savedBlocks } from "./eslint.saved.mjs";
+import { answerBlocks } from "./eslint.answers.mjs";
 import { complexityOver, linesOver, paramsOver } from "./eslint.limits.mjs";
 
 export default tseslint.config(
@@ -81,14 +82,9 @@ export default tseslint.config(
   },
   {
     // Held back: each takes what it reads as the type it was written as, with no parser to check it, and a parser would
-    // drop what doesn't fit. JSON the stores wrote to their own SQLite columns, Telegram's answers, and what a tab's
-    // page script returns, which runInPage<T> hands on as its caller's T (docs/quality-plan.md, step 20).
-    files: [
-      "src/main/chats/ChatStore.ts",
-      "src/main/routines/RoutineStore.ts",
-      "src/main/phone/TelegramChannel.ts",
-      "src/main/tabs/TabPage.ts",
-    ],
+    // drop what doesn't fit. JSON the stores wrote to their own SQLite columns, and what a tab's page script returns,
+    // which runInPage<T> hands on as its caller's T (docs/quality-plan.md, step 20).
+    files: ["src/main/chats/ChatStore.ts", "src/main/routines/RoutineStore.ts", "src/main/tabs/TabPage.ts"],
     rules: { "@typescript-eslint/no-unsafe-assignment": "off", "@typescript-eslint/no-unsafe-return": "off" },
   },
   {
@@ -174,6 +170,8 @@ export default tseslint.config(
   ...fenceBlocks,
   // Whether a file was saved is never dropped.
   ...savedBlocks,
+  // An answer from outside is never handed on as whatever its caller names.
+  ...answerBlocks,
   ...Object.entries(linesOver).map(([file, max]) => ({ files: [file], rules: { "max-lines": ["error", max] } })),
   ...Object.entries(complexityOver).map(([file, max]) => ({ files: [file], rules: { complexity: ["error", max] } })),
   ...Object.entries(paramsOver).map(([file, max]) => ({ files: [file], rules: { "max-params": ["error", max] } })),
