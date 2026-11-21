@@ -226,7 +226,7 @@ export class Gallery {
             example: entry.example ?? null,
             addCount: entry.addCount ?? 0,
             link: publicPageLink(this.site, entry.id),
-            hidden: (row as { hidden?: unknown }).hidden === true,
+            hidden: fieldsOf(row).hidden === true,
           },
         ];
       });

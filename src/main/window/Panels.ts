@@ -4,6 +4,7 @@ import { computeLayout, type Layout } from "./Layout";
 import { sendToRenderer } from "./ipc";
 import type { Popover } from "../../shared/ipc";
 import type { WindowParts, WindowStores } from "./WindowParts";
+import { fieldsOf } from "../../shared/fields";
 
 // What's open around the page, the sidebar, the chat panel and what floats over the page in the overlay view, and where
 // that puts every view in the window.
@@ -169,12 +170,8 @@ export class Panels {
 // What a renderer asked to open, checked: a known kind, a mascot named by a string, and a rect of finite numbers.
 export const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 const validPopover = (input: unknown): Popover | null => {
-  const { kind, mascotId, anchor } = (input ?? {}) as {
-    kind?: unknown;
-    mascotId?: unknown;
-    anchor?: { x?: unknown; y?: unknown; width?: unknown; height?: unknown };
-  };
-  const { x, y, width, height } = anchor ?? {};
+  const { kind, mascotId, anchor } = fieldsOf(input);
+  const { x, y, width, height } = fieldsOf(anchor);
   if (!finite(x) || !finite(y) || !finite(width) || !finite(height)) return null;
   const rect = { x, y, width, height };
   if (kind === "chats") return { kind: "chats", anchor: rect };

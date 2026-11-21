@@ -1,3 +1,5 @@
+import { fieldsOf } from "../../shared/fields";
+
 // A web search through Firecrawl, for the `web_search` tool. Plain Node, so the cloud runner gets it too. The key stays
 // in here: it never goes into a result, an error, a log or the disk.
 
@@ -44,10 +46,8 @@ export const firecrawlSearch = (env: Record<string, string | undefined> = proces
       throw new WebSearchError("The search service couldn't be reached.");
     }
     if (!response.ok) throw new WebSearchError(`The search service answered ${response.status}.`);
-    const body = (await response.json().catch(() => null)) as {
-      data?: { web?: unknown };
-    } | null;
-    return parseResults(body?.data?.web);
+    const body: unknown = await response.json().catch(() => null);
+    return parseResults(fieldsOf(fieldsOf(body).data).web);
   };
 };
 
@@ -56,17 +56,18 @@ const text = (value: unknown, max: number) => (typeof value === "string" ? value
 // Only what's needed, and only web addresses, however much else the service sends.
 export const parseResults = (web: unknown): SearchResult[] =>
   (Array.isArray(web) ? web : [])
-    .flatMap((item: Record<string, unknown> | null) => {
-      const address = text(item?.url, 2000);
+    .flatMap((item: unknown) => {
+      const { url, title, description } = fieldsOf(item);
+      const address = text(url, 2000);
       if (!URL.canParse(address)) return [];
       // As the browser reads it, so nothing like a line break stays in it.
       const { href, protocol } = new URL(address);
       if (protocol !== "http:" && protocol !== "https:") return [];
       return [
         {
-          title: text(item?.title, 200),
+          title: text(title, 200),
           url: href,
-          snippet: text(item?.description, 400),
+          snippet: text(description, 400),
         },
       ];
     })

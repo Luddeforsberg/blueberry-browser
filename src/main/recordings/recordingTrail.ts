@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import type { RecordedChange, RecordedDraft, TrailKind, TrailStep } from "../../shared/library";
 import { withoutInvisible } from "../../shared/publishing";
+import { fieldsOf } from "../../shared/fields";
 
 // What's seen while the user shows Berry something, as plain notes. It's all pure, and all in memory: nothing here is
 // saved, and nothing here is sent until the user confirms on the review screen.
@@ -134,7 +135,7 @@ export class Trail {
 
   // Each of these came through `isTrusted` in the page, or from main itself. Anything unexpected is simply not a note.
   note(raw: unknown, site: string, now: number, frameIsReal: (host: string) => boolean): void {
-    const note = (raw ?? {}) as Record<string, unknown>;
+    const note = fieldsOf(raw);
     const label = clean(note.label, MAX_LABEL);
     const value = clean(note.value, MAX_VALUE);
     switch (note.type) {
@@ -357,7 +358,7 @@ export const draftFromReply = (reply: string, steps: readonly TrailStep[]): Reco
   const fallback = plainDraft(steps);
   let parsed: Record<string, unknown>;
   try {
-    parsed = JSON.parse(reply.slice(reply.indexOf("{"), reply.lastIndexOf("}") + 1)) as Record<string, unknown>;
+    parsed = fieldsOf(JSON.parse(reply.slice(reply.indexOf("{"), reply.lastIndexOf("}") + 1)));
   } catch {
     return fallback;
   }
@@ -369,13 +370,12 @@ export const draftFromReply = (reply: string, steps: readonly TrailStep[]): Reco
   if (!name || !written || !namesOnly(`${name} ${written}`, sites)) return fallback;
 
   const entered = enteredIn(steps).map(({ value }) => normal(value));
-  const changes: RecordedChange[] = (Array.isArray(parsed.changes) ? parsed.changes : []).flatMap(
-    (change: Record<string, unknown> | null) => {
-      const value = clean(change?.value, MAX_VALUE);
-      const label = clean(change?.label, MAX_CHANGE_LABEL);
-      return label && value && written.includes(value) && entered.includes(normal(value)) ? [{ label, value }] : [];
-    },
-  );
+  const changes: RecordedChange[] = (Array.isArray(parsed.changes) ? parsed.changes : []).flatMap((change: unknown) => {
+    const fields = fieldsOf(change);
+    const value = clean(fields.value, MAX_VALUE);
+    const label = clean(fields.label, MAX_CHANGE_LABEL);
+    return label && value && written.includes(value) && entered.includes(normal(value)) ? [{ label, value }] : [];
+  });
   const start = startOf(steps);
   const firstSite = sites[0];
   return {

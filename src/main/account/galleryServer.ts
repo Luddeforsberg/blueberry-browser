@@ -2,6 +2,7 @@
 // ever here, and row-level security is what limits it. The email and password go to the sign-in calls and nowhere else,
 // and no error passes on anything from a request or a reply but a status and a code.
 
+import { fieldsOf } from "../../shared/fields";
 import type { CloudRoutineRow } from "../remoteJobs/cloudJobs";
 
 const CALL_ABORT_MS = 10_000;
@@ -132,7 +133,7 @@ export class GalleryServer {
       // A server error can be a page of HTML. The status says enough.
     }
     if (!response.ok) {
-      const code = (parsed as { error_code?: unknown } | null)?.error_code;
+      const code = fieldsOf(parsed).error_code;
       throw new ServerError(response.status, typeof code === "string" ? code : "");
     }
     return parsed as T;

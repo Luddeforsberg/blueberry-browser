@@ -1,4 +1,5 @@
 import type { MascotDraft, MascotExample, MascotProfile, GalleryMascot, PublishChoices } from "./library";
+import { fieldsOf } from "./fields";
 import { parseMascotDraft } from "./mascots";
 
 // What strangers can read and add. Runtime code shared by main, the chrome renderer and the public site, so preloads may
@@ -31,7 +32,7 @@ const isPublicSite = (site: string) => !HOST_IS_LOCAL.test(site);
 
 // The same checks as a hand-made mascot, then the stricter ones for what comes from or goes to strangers.
 export const parsePublicDraft = (input: unknown): { draft: MascotDraft } | { error: string } => {
-  const { name, instructions, ...rest } = (input ?? {}) as Record<string, unknown>;
+  const { name, instructions, ...rest } = fieldsOf(input);
   const parsed = parseMascotDraft({ ...rest, name: cleanLine(name), instructions: withoutInvisible(instructions) });
   if ("error" in parsed) return parsed;
   const { draft } = parsed;
@@ -45,7 +46,7 @@ export const parsePublicDraft = (input: unknown): { draft: MascotDraft } | { err
 
 const parseExample = (input: unknown): { example: MascotExample | null } | { error: string } => {
   if (input === null || input === undefined) return { example: null };
-  const { prompt, answer } = input as Record<string, unknown>;
+  const { prompt, answer } = fieldsOf(input);
   const clean = { prompt: withoutInvisible(prompt), answer: withoutInvisible(answer) };
   if (!clean.prompt || !clean.answer) return { error: "An example needs both what was asked and what it gave. Or choose no example." };
   if (clean.prompt.length > MAX_EXAMPLE_PROMPT) return { error: `Keep what was asked under ${MAX_EXAMPLE_PROMPT} characters.` };
@@ -64,7 +65,7 @@ const authorProblem = (author: string): string | null => {
 };
 
 export const parsePublishChoices = (input: unknown): { choices: PublishChoices } | { error: string } => {
-  const { author, description, category, example } = (input ?? {}) as Record<string, unknown>;
+  const { author, description, category, example } = fieldsOf(input);
   const cleanAuthor = cleanLine(author);
   const problem = authorProblem(cleanAuthor);
   if (problem) return { error: problem };
@@ -101,7 +102,7 @@ export const isUuid = (value: unknown): value is string => typeof value === "str
 // A row from the server, whoever wrote it. Anything wrong with it and it shows nothing, rather than something the app
 // would read differently. A category we don't know is Other, and a bad example just isn't shown.
 export const parsePublishedRow = (input: unknown): GalleryMascot | null => {
-  const row = (input ?? {}) as Record<string, unknown>;
+  const row = fieldsOf(input);
   if (!isUuid(row.id)) return null;
   const parsed = parsePublicDraft({
     name: row.name,

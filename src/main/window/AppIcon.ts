@@ -3,6 +3,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { APP_ICON_SIZE, type AppIconGround } from "../../shared/appIcon";
 import { removeFile, saveFile } from "../library/savedFile";
+import { fieldsOf } from "../../shared/fields";
 
 // Settings > General > App icon. Main can't draw a mascot, so the chrome draws the chosen icon and hands it over as a PNG.
 // What arrives is untrusted bytes: it's set only if it's for what's chosen and is a PNG of the right size that the system
@@ -71,7 +72,7 @@ export class AppIcon {
     let drawnFor: Record<string, unknown>;
     let bytes: Buffer;
     try {
-      drawnFor = (JSON.parse(readFileSync(this.drawnFor, "utf8")) ?? {}) as Record<string, unknown>;
+      drawnFor = fieldsOf(JSON.parse(readFileSync(this.drawnFor, "utf8")));
       bytes = readFileSync(this.picture);
     } catch {
       return;

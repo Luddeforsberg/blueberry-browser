@@ -8,6 +8,7 @@ import type { AuthorizationParams, OAuthServerProvider } from "@modelcontextprot
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import type { OAuthClientInformationFull, OAuthTokenRevocationRequest, OAuthTokens } from "@modelcontextprotocol/sdk/shared/auth.js";
 import { ServerError, Unreachable, type GalleryServer } from "../../src/main/account/galleryServer";
+import { entriesOf, fieldsOf } from "../../src/shared/fields";
 import { signedClients } from "./relayClients";
 import { b64, hash, keysFrom, mac, newToken, seal, unseal, unsigned, signed, type Keys } from "./relayCrypto";
 import { appName, signInPage } from "./relaySignInPage";
@@ -48,6 +49,15 @@ interface Grant {
   createdAt: number;
   lastUsedAt: number;
 }
+
+// A grant from the state file, each field checked, and anything else on it dropped.
+const savedGrant = (entry: unknown): Grant | null => {
+  const { id, clientId, secret, accessHash, accessExpiresAt, refreshHash, createdAt, lastUsedAt } = fieldsOf(entry);
+  if (typeof id !== "string" || typeof clientId !== "string" || typeof secret !== "string") return null;
+  if (typeof accessHash !== "string" || typeof refreshHash !== "string") return null;
+  if (typeof accessExpiresAt !== "number" || typeof createdAt !== "number" || typeof lastUsedAt !== "number") return null;
+  return { id, clientId, secret, accessHash, accessExpiresAt, refreshHash, createdAt, lastUsedAt };
+};
 
 interface Code {
   clientId: string;
@@ -344,16 +354,7 @@ export class RelayAuth implements OAuthServerProvider {
       return;
     }
     try {
-      for (const grant of JSON.parse(plain) as Grant[]) {
-        if (
-          typeof grant?.id === "string" &&
-          typeof grant.secret === "string" &&
-          typeof grant.createdAt === "number" &&
-          typeof grant.lastUsedAt === "number"
-        ) {
-          this.grants.set(grant.id, grant);
-        }
-      }
+      entriesOf(JSON.parse(plain), savedGrant).entries.forEach((grant) => this.grants.set(grant.id, grant));
     } catch {
       // Nothing usable.
     }

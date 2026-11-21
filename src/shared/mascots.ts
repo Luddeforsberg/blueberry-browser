@@ -1,3 +1,4 @@
+import { fieldsOf } from "./fields";
 import type { MascotAccessory, MascotDraft, MascotPalette, MascotProfile, MascotTool } from "./library";
 
 // Runtime code shared by main and the chrome renderer. Preloads may only `import type` from here.
@@ -105,14 +106,14 @@ const isOneOf = <T extends string>(list: { id: T }[], value: unknown): value is 
 // What comes from the renderer or a saved file is checked here. Anything else on the object is dropped, so nothing
 // can come in that the limits don't know about. Errors are worded for the form.
 export const parseMascotDraft = (input: unknown): { draft: MascotDraft } | { error: string } => {
-  const { name, look, instructions, sites, tools } = (input ?? {}) as Record<string, unknown>;
+  const { name, look, instructions, sites, tools } = fieldsOf(input);
   const cleanName = typeof name === "string" ? name.trim() : "";
   if (!cleanName) return { error: "Give it a name." };
   if (cleanName.length > MAX_MASCOT_NAME) return { error: `Keep the name under ${MAX_MASCOT_NAME} characters.` };
   const cleanInstructions = typeof instructions === "string" ? instructions.trim() : "";
   if (!cleanInstructions) return { error: "Say what it’s for." };
   if (cleanInstructions.length > MAX_MASCOT_INSTRUCTIONS) return { error: `Keep this under ${MAX_MASCOT_INSTRUCTIONS} characters.` };
-  const { palette: savedPalette, accessory } = (look ?? {}) as Record<string, unknown>;
+  const { palette: savedPalette, accessory } = fieldsOf(look);
   const palette = paletteOf(savedPalette);
   if (!palette || !isOneOf(ACCESSORIES, accessory)) return { error: "Choose a look." };
   if (!Array.isArray(sites) || !Array.isArray(tools)) return { error: "Choose where it can go and what it can do." };

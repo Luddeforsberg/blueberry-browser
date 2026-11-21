@@ -2,6 +2,7 @@ import type { MemoryFact } from "../../shared/library";
 import { siteAllowed, normaliseSite } from "../../shared/mascots";
 import { factProblem } from "../../shared/memory";
 import { cleanLine } from "../../shared/publishing";
+import { fieldsOf } from "../../shared/fields";
 
 // The pure parts of a mascot's memory: what's worth asking about, what the model is given, what's kept of what it says, and
 // what goes into a job.
@@ -131,14 +132,14 @@ export const parseProposals = (
 ): KnownFact[] => {
   let facts: unknown;
   try {
-    ({ facts } = JSON.parse(raw.replace(/^[^{]*/, "").replace(/[^}]*$/, "")) as { facts?: unknown });
+    ({ facts } = fieldsOf(JSON.parse(raw.replace(/^[^{]*/, "").replace(/[^}]*$/, ""))));
   } catch {
     return [];
   }
   if (!Array.isArray(facts)) return [];
   const chosen: KnownFact[] = [];
   for (const fact of facts) {
-    const { text: rawText, site: rawSite } = (fact ?? {}) as Record<string, unknown>;
+    const { text: rawText, site: rawSite } = fieldsOf(fact);
     const text = cleanLine(rawText);
     const site = typeof rawSite === "string" ? normaliseSite(rawSite) : null;
     if (typeof rawSite === "string" && (!site || !sites.includes(site))) continue;

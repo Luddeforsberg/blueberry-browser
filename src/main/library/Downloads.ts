@@ -6,6 +6,7 @@ import type { DownloadItem } from "electron";
 import type { DownloadAction, DownloadInfo, DownloadState, Settings } from "../../shared/ipc";
 import { replaceControlCharacters } from "./controlCharacters";
 import { bestEffort, readJsonFile, savedEntries, saveFile } from "./savedFile";
+import { fieldsOf } from "../../shared/fields";
 
 type Item = Pick<
   DownloadItem,
@@ -41,6 +42,7 @@ const MAX_NAME_BYTES = 200;
 const PROGRESS_INTERVAL_MS = 200;
 
 const STATES: readonly DownloadState[] = ["progressing", "paused", "completed", "cancelled", "interrupted"];
+const isState = (value: unknown): value is DownloadState => STATES.some((state) => state === value);
 
 // A site picks the suggested name, so nothing in it may leave the folder or hide what the file is.
 export const safeFilename = (raw: string): string => {
@@ -77,17 +79,17 @@ const sourceOf = (url: string): string | null => {
 
 // Anything running when the app last closed has stopped for good, since its item is gone.
 const readSaved = (raw: unknown): DownloadInfo | null => {
-  const entry = (raw && typeof raw === "object" ? raw : {}) as Partial<DownloadInfo>;
+  const entry = fieldsOf(raw);
   const number = (value: unknown) => (typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0);
   if (typeof entry.id !== "string" || typeof entry.filename !== "string" || typeof entry.path !== "string") return null;
   if (entry.path !== "" && !isAbsolute(entry.path)) return null;
-  if (!STATES.includes(entry.state as DownloadState)) return null;
+  if (!isState(entry.state)) return null;
   return {
     id: entry.id,
     filename: entry.filename,
     path: entry.path,
     source: typeof entry.source === "string" ? entry.source : null,
-    state: entry.state === "progressing" || entry.state === "paused" ? "interrupted" : (entry.state as DownloadState),
+    state: entry.state === "progressing" || entry.state === "paused" ? "interrupted" : entry.state,
     receivedBytes: number(entry.receivedBytes),
     totalBytes: number(entry.totalBytes),
     startedAt: number(entry.startedAt),

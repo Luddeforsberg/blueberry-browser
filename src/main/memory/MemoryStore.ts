@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { fieldsOf } from "../../shared/fields";
 import type { MemoryFact, MemoryOffer, MemoryResult, MemoryState } from "../../shared/library";
 import { normaliseSite } from "../../shared/mascots";
 import { factProblem, MAX_FACTS_PER_MASCOT } from "../../shared/memory";
@@ -29,7 +30,7 @@ export interface MemoryToOffer extends JobToRemember {
 
 // Read back through the same check, so a file changed by hand can't put in what the app would never keep.
 const parseStored = (item: unknown): MemoryFact | null => {
-  const { id, mascotId, text, site, savedAt } = (item ?? {}) as Record<string, unknown>;
+  const { id, mascotId, text, site, savedAt } = fieldsOf(item);
   const clean = cleanLine(text);
   const cleanSite = typeof site === "string" ? normaliseSite(site) : null;
   if (typeof id !== "string" || typeof mascotId !== "string" || (site !== null && !cleanSite) || factProblem(clean, cleanSite)) return null;

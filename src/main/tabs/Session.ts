@@ -45,6 +45,7 @@ const PAGES: readonly InternalPage[] = [
   "mascot-gallery",
   "needs-you",
 ];
+const isPage = (value: unknown): value is InternalPage => PAGES.some((page) => page === value);
 const MAX_ENTRIES = 50;
 const WRITE_DELAY_MS = 500;
 
@@ -69,14 +70,14 @@ export const savedEntries = (
 };
 
 const sanitizeTab = (raw: unknown): SavedTab | null => {
-  const tab = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const tab = fieldsOf(raw);
   // The mascots' page was saved as "flock" before the mascots were called mascots.
   const page = tab.page === "flock" ? "mascots" : tab.page;
-  if (PAGES.includes(page as InternalPage)) {
+  if (isPage(page)) {
     // From when a chat could be open before it began. Chats start on the new tab page now.
     if (page === "chat" && typeof tab.param !== "string") return null;
     return {
-      page: page as InternalPage,
+      page,
       param: typeof tab.param === "string" ? tab.param : null,
       title: text(tab.title),
     };
@@ -92,7 +93,7 @@ const sanitizeTab = (raw: unknown): SavedTab | null => {
 
 // Whatever is on disk, only what can really be opened again gets through.
 export const sanitizeSession = (raw: unknown): Session | null => {
-  const input = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const input = fieldsOf(raw);
   if (!Array.isArray(input.tabs)) return null;
   // Tabs that are dropped mustn't shift which one was active.
   const active: unknown = input.tabs[Number(input.active)];

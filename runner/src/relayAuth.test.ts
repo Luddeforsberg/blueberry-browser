@@ -1,10 +1,11 @@
-import { mkdtempSync, readFileSync, rmSync } from "fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Response } from "express";
 import { ServerError, type ServerSession } from "../../src/main/account/galleryServer";
 import { AGE_LIMIT_MS, IDLE_LIMIT_MS, RelayAuth, redirectAllowed, type RelayAuthOptions } from "./relayAuth";
+import { hash, keysFrom, seal } from "./relayCrypto";
 import { defined } from "../../src/shared/testing";
 
 const OWNER = "owner@example.com";
@@ -91,6 +92,30 @@ describe("RelayAuth", () => {
     const info = await restarted.verifyAccessToken(tokens.access_token);
     expect(restarted.secretOf(String(info.extra!.grantId))).toBe("grant-secret-1");
     await expect(new RelayAuth({ ...options, secret: "t".repeat(40) }).verifyAccessToken(tokens.access_token)).rejects.toThrow();
+  });
+
+  it("loads a saved connection only if every field has its type, as an older relay saved it too", async () => {
+    folder = mkdtempSync(join(tmpdir(), "relay-"));
+    const stateFile = join(folder, "relay.json");
+    const now = Date.now();
+    const grant = (id: string, token: string) => ({
+      id,
+      clientId: "client",
+      secret: `secret-${id}`,
+      accessHash: hash(token),
+      accessExpiresAt: now + 60_000,
+      refreshHash: hash(`refresh-${id}`),
+      createdAt: now,
+      lastUsedAt: now,
+    });
+    // usedRefresh was saved before refresh tokens were signed, and is simply dropped.
+    const older = { ...grant("older", "older-token"), usedRefresh: ["spent"] };
+    // An expiry that isn't a time would never come.
+    const odd = { ...grant("odd", "odd-token"), accessExpiresAt: "never" };
+    writeFileSync(stateFile, seal(keysFrom(SECRET), JSON.stringify([older, odd])));
+    const { auth } = setUp({ stateFile, now: () => now });
+    expect((await auth.verifyAccessToken("older-token")).extra?.grantId).toBe("older");
+    await expect(auth.verifyAccessToken("odd-token")).rejects.toThrow();
   });
 
   it("takes up the grant only when the code is exchanged, and gives no tokens when it can't be", async () => {

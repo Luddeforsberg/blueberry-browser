@@ -7,6 +7,7 @@ import { FIRST_JOBS, FIRST_RUN_STEPS, knownOnly } from "../../shared/firstRun";
 import { APP_ICON_GROUNDS } from "../../shared/appIcon";
 import { BERRY_ID } from "../../shared/mascots";
 import { bestEffort, readJsonFile, saveFile } from "../library/savedFile";
+import { fieldsOf } from "../../shared/fields";
 
 export const DEFAULT_SETTINGS: Settings = {
   layoutMode: "vertical",
@@ -58,20 +59,20 @@ const mascotId = (value: unknown, fallback: string | null): string | null => {
 
 const spot = (value: unknown, fallback: DesktopBerrySpot | null): DesktopBerrySpot | null => {
   if (value === null) return null;
-  const { displayId, edge, fraction } = (value ?? {}) as Partial<DesktopBerrySpot>;
-  return Number.isFinite(displayId) && Number.isFinite(fraction)
+  const { displayId, edge, fraction } = fieldsOf(value);
+  return typeof displayId === "number" && Number.isFinite(displayId) && typeof fraction === "number" && Number.isFinite(fraction)
     ? {
-        displayId: displayId as number,
+        displayId,
         // Before it could stand anywhere else, it only stood on the bottom.
         edge: pick(edge, ["bottom", "top", "left", "right"] as const, "bottom"),
-        fraction: Math.min(Math.max(fraction as number, 0), 1),
+        fraction: Math.min(Math.max(fraction, 0), 1),
       }
     : fallback;
 };
 
 // Whatever arrives, from disk or a renderer, only valid values get through.
 export function sanitizeSettings(raw: unknown, base: Settings = DEFAULT_SETTINGS): Settings {
-  const input = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const input = fieldsOf(raw);
   return {
     layoutMode: pick(input.layoutMode, ["vertical", "horizontal"] as const, base.layoutMode),
     appearance: pick(input.appearance, ["system", "light", "dark"] as const, base.appearance),

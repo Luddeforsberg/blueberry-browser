@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { dirname } from "path";
+import { fieldsOf } from "../../shared/fields";
 import { fresh, type Entry } from "./runnerTypes";
 
 // The file of ids RunnerJobs keeps: which chat is which conversation and has which of its jobs, the conversations deleted
@@ -17,10 +18,10 @@ interface RunnerSaved {
 
 export const loadRunnerJobs = (file: string, { entries, forgotten, routinesThere }: RunnerSaved): void => {
   try {
-    const { chats, forgotten: gone, routinesSentFromHere } = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
+    const { chats, forgotten: gone, routinesSentFromHere } = fieldsOf(JSON.parse(readFileSync(file, "utf8")));
     const id = (value: unknown): value is string => typeof value === "string" && value.length > 0 && value.length <= 100;
-    Object.entries(chats ?? {}).forEach(([chatId, value]) => {
-      const { account, jobId, active, conversationId, jobIds } = (value ?? {}) as Record<string, unknown>;
+    Object.entries(fieldsOf(chats)).forEach(([chatId, value]) => {
+      const { account, jobId, active, conversationId, jobIds } = fieldsOf(value);
       if (typeof account !== "string" || (jobId !== null && !id(jobId))) return;
       const known = Array.isArray(jobIds) ? jobIds.filter(id) : id(jobId) ? [jobId] : [];
       // A chat saved before conversations is one under its job's id, which is what the server makes of it too.

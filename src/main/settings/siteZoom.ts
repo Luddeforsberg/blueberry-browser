@@ -1,3 +1,5 @@
+import { fieldsOf } from "../../shared/fields";
+
 // The steps a normal browser uses, as percentages.
 const ZOOM_LEVELS = [25, 33, 50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300, 400, 500];
 
@@ -28,7 +30,7 @@ export const nextZoom = (percent: number, direction: 1 | -1): number => {
 export const sanitizeSiteZoom = (raw: unknown, fallback: SiteZoomLevels = {}): SiteZoomLevels => {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return fallback;
   return Object.fromEntries(
-    Object.entries(raw as Record<string, unknown>).filter(
+    Object.entries(fieldsOf(raw)).filter(
       (entry): entry is [string, number] => typeof entry[1] === "number" && entry[1] !== 100 && ZOOM_LEVELS.includes(entry[1]),
     ),
   );

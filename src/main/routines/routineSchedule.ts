@@ -1,6 +1,7 @@
 import type { RoutineDraft, RoutineSchedule } from "../../shared/library";
 import { normaliseSite } from "../../shared/mascots";
 import { missing } from "../../shared/missing";
+import { fieldsOf } from "../../shared/fields";
 
 const MAX_NAME_LENGTH = 100;
 const MAX_INSTRUCTIONS_LENGTH = 5000;
@@ -79,12 +80,12 @@ export const scheduleLabel = (schedule: RoutineSchedule): string => {
 const isTime = (value: unknown): value is string => typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 
 const isWhole = (value: unknown, min: number, max: number): value is number =>
-  Number.isInteger(value) && (value as number) >= min && (value as number) <= max;
+  typeof value === "number" && Number.isInteger(value) && value >= min && value <= max;
 
 export const parseSchedule = (input: unknown): RoutineSchedule | null => {
-  const value = (input ?? {}) as Record<string, unknown>;
+  const value = fieldsOf(input);
   if (value.kind === "once") {
-    return Number.isFinite(value.at) && (value.at as number) > 0 ? { kind: "once", at: value.at as number } : null;
+    return typeof value.at === "number" && Number.isFinite(value.at) && value.at > 0 ? { kind: "once", at: value.at } : null;
   }
   if (value.kind === "manual") return { kind: "manual" };
   if (!isTime(value.time)) return null;
@@ -118,7 +119,7 @@ export const nameFromWords = (instructions: string): string => {
 
 // What comes from the renderer is checked here, and its errors are worded for the form.
 export const parseDraft = (input: unknown): { draft: RoutineDraft } | { error: string } => {
-  const { name, instructions, schedule: rawSchedule, mascotId, sites } = (input ?? {}) as Record<string, unknown>;
+  const { name, instructions, schedule: rawSchedule, mascotId, sites, inCloud: rawInCloud } = fieldsOf(input);
   const cleanName = typeof name === "string" ? name.trim() : "";
   const cleanInstructions = typeof instructions === "string" ? instructions.trim() : "";
   // No name is asked for: an empty one means name it from what it does, or keep the one it has.
@@ -137,7 +138,7 @@ export const parseDraft = (input: unknown): { draft: RoutineDraft } | { error: s
   }
   if (cleanSites.length > MAX_SITES) return { error: `Keep it to ${MAX_SITES} sites.` };
   // Only a scheduled routine has anything for the cloud to run.
-  const inCloud = (input as { inCloud?: unknown } | null)?.inCloud === true && schedule.kind !== "manual";
+  const inCloud = rawInCloud === true && schedule.kind !== "manual";
   return {
     draft: {
       name: cleanName,

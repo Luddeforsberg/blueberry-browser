@@ -1,5 +1,6 @@
 import { FINISHED, stepsFromRow, type CloudJobStatus } from "./cloudJobs";
 import { endError, fresh, newJobs, type Entry, type NewJob, type RunnerParts } from "./runnerTypes";
+import { fieldsOf } from "../../shared/fields";
 
 // Conversations on the account that this computer didn't send, or that went on elsewhere, such as from the phone: each
 // comes here as a runner chat, or joins the chat it follows.
@@ -83,7 +84,7 @@ export class RunnerDiscovery {
     const [oldest] = fresher;
     if (!oldest) return;
     if (!found) {
-      const mascotId = (oldest.mascot as { id?: unknown } | null)?.id;
+      const mascotId = fieldsOf(oldest.mascot).id;
       const chatId = this.hooks.adopt?.({ prompt: oldest.prompt, mascotId: typeof mascotId === "string" ? mascotId : null });
       if (!chatId) return;
       found = [chatId, fresh({ account, conversationId, jobIds: [], jobId: null, active: false })];
