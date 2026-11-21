@@ -137,10 +137,13 @@ export const followUpHistory = (last: ConversationJob): HistoryMessage[] => {
 
 const conversationIdOf = (job: Pick<ConversationJob, "id" | "conversation_id">): string => job.conversation_id || job.id;
 
-// One per conversation, the newest first, each with its jobs oldest first. A job from before conversations is one alone.
-export const conversationsOf = <T extends ConversationJob>(jobs: readonly T[]): { id: string; jobs: T[]; latest: T }[] => {
+// One per conversation, the newest first, each with its jobs in their turns, the latest last, as the server decides which
+// job a follow-up must be built on. A job from before conversations is one alone.
+export const conversationsOf = <T extends ConversationJob & { turn: number }>(
+  jobs: readonly T[],
+): { id: string; jobs: T[]; latest: T }[] => {
   const groups = new Map<string, T[]>();
-  for (const job of [...jobs].sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))) {
+  for (const job of [...jobs].sort((a, b) => a.turn - b.turn)) {
     const id = conversationIdOf(job);
     groups.set(id, [...(groups.get(id) ?? []), job]);
   }

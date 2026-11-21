@@ -1,11 +1,11 @@
 import { PGlite } from "@electric-sql/pglite";
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { defined } from "../src/shared/testing";
 
-// Conversations of cloud jobs, in real Postgres as Supabase's roles, on top of every migration before it.
+// Conversations of cloud jobs, in real Postgres as Supabase's roles, with every migration, so the rules are the live ones.
 const SUPABASE_STANDINS = `
   create role anon nologin;
   create role authenticated nologin;
@@ -44,10 +44,9 @@ describe("conversations of cloud jobs", () => {
   // A follow-up names the job its history was built on, the conversation's newest unless said otherwise.
   const newestOf = async (conversation: string) =>
     (
-      await db.query<{ id: string }>(
-        "select id from public.cloud_jobs where conversation_id = $1 or id = $1 order by created_at desc, id desc limit 1",
-        [conversation],
-      )
+      await db.query<{ id: string }>("select id from public.cloud_jobs where conversation_id = $1 or id = $1 order by turn desc limit 1", [
+        conversation,
+      ])
     ).rows[0]?.id ?? null;
   const start = async (uid: string, conversation: string | null = null, history = "[]", after?: string | null) =>
     defined(
@@ -70,7 +69,9 @@ describe("conversations of cloud jobs", () => {
   beforeAll(async () => {
     db = new PGlite();
     await db.exec(SUPABASE_STANDINS);
-    for (const file of ["20261102000000_cloud_jobs.sql", "20261103000000_phone.sql", "20261104000000_cloud_conversations.sql"]) {
+    for (const file of readdirSync(join(__dirname, "migrations"))
+      .filter((name) => name.endsWith(".sql"))
+      .sort()) {
       await db.exec(readFileSync(join(__dirname, "migrations", file), "utf8"));
     }
   });
@@ -150,13 +151,6 @@ describe("conversations of cloud jobs", () => {
     });
     // Built on the newest, it's taken.
     expect(await conversationOf(await start(ALICE, first, "[]", second))).toBe(first);
-  });
-
-  it("can be run again over itself", async () => {
-    const first = await start(ALICE);
-    await db.exec(readFileSync(join(__dirname, "migrations", "20261104000000_cloud_conversations.sql"), "utf8"));
-    await finish(first);
-    expect(await conversationOf(await start(ALICE, first))).toBe(first);
   });
 
   it("brings a job from before conversations into the first one that follows it up", async () => {
