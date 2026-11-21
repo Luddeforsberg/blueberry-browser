@@ -3,7 +3,7 @@ import type { PageTool } from "../tools/browserTools";
 import { mascotNote } from "./mascotNote";
 import type { ActionApproval } from "../../shared/ipc";
 import type { Tab } from "../tabs/Tab";
-import type { ChatStep, SaidOnTheWay, StepKind } from "../../shared/library";
+import { REPLY_NOT_SAVED, type ChatStep, type ChatThreadMessage, type SaidOnTheWay, type StepKind } from "../../shared/library";
 import { BERRY, narrowSites } from "../../shared/mascots";
 import { publicApproval, type Approvals } from "./Approvals";
 import type { ChatTitles } from "./chatTitles";
@@ -51,6 +51,16 @@ const keepSaid = (said: SaidOnTheWay[], after: number, text: string): void => {
   const last = said.at(-1);
   if (last && last.after === after && text.startsWith(last.text)) last.text = text;
   else said.push({ after, text });
+};
+
+// One step of ending a reply. One that throws is logged and stops none after it, so every reply ends the same way.
+const carryOn = <T>(what: string, step: () => T): T | undefined => {
+  try {
+    return step();
+  } catch (error) {
+    console.error(`Couldn't ${what}:`, error);
+    return undefined;
+  }
 };
 
 const ASKING: readonly ActionApproval[] = ["never", "risky", "always"];
@@ -131,9 +141,8 @@ export class Replies {
     this.titles = parts.titles;
   }
 
-  // Never rejects: whatever goes wrong ends up on the thread.
+  // Never rejects. Whatever goes wrong while it runs ends up on the thread, and `end` tells everyone waiting how it went.
   async reply(chatId: string, run: Run, seePage: boolean, attachedTabs: readonly Tab[]): Promise<void> {
-    const { signal } = run.controller;
     try {
       // Read before anything waits, so it's the page the message was sent from wherever the user has gone since.
       const page = seePage && this.pageAccess() ? this.reader.activeTab : null;
@@ -150,25 +159,40 @@ export class Replies {
         if (content) this.events.onChunk(chatId, content);
       });
     } catch (error) {
-      if (!signal.aborted) {
+      if (!run.controller.signal.aborted) {
         console.error("Error in chat reply:", error);
         this.errors.set(chatId, errorMessage(error));
       }
     }
+    this.end(chatId, run);
+  }
 
-    if (run.cloud) this.cloud?.release(chatId);
-    // Deleted while replying, so there's nowhere to save it.
-    if (this.runs.get(chatId) !== run) return;
+  // The one place a chat's reply ends. Whoever started it hears how it went, once, and the thread hears it's over,
+  // whatever fails while it's put away, since its job may have acted on a page already.
+  private end(chatId: string, run: Run): void {
+    const { signal } = run.controller;
     const error = this.errors.get(chatId) ?? null;
     const outcome = signal.aborted ? "stopped" : error ? "failed" : "done";
-    const ended = endedRun(run, outcome);
-    this.finished.set(chatId, ended);
-    this.runs.delete(chatId);
-    const pages = this.jobs.closeJobTabs(chatId, run);
-    this.publishWorkingTabs();
     const steps = endedSteps(run.steps, signal.aborted);
+    // Deleted while replying, so there's nowhere to save it.
+    const kept = this.runs.get(chatId) === run;
+    if (kept) {
+      this.finished.set(chatId, endedRun(run, outcome));
+      this.runs.delete(chatId);
+    }
+    if (run.cloud) carryOn("release the cloud browser", () => this.cloud?.release(chatId));
+    if (kept) this.putAway(chatId, run, steps);
+    carryOn("tell who started a reply", () => run.onEnd?.({ reply: run.partial, steps, outcome, error }));
+    carryOn("show a reply ended", () => this.notify(chatId));
+    if (kept) carryOn("look back on a reply", () => this.lookBack(chatId, run, error));
+  }
+
+  // A save that fails keeps the answer readable from `finished`, which the next message saves first.
+  private putAway(chatId: string, run: Run, steps: ChatStep[]): void {
+    const pages = carryOn("close a job's tabs", () => this.jobs.closeJobTabs(chatId, run)) ?? [];
+    carryOn("show the tabs at work", () => this.publishWorkingTabs());
     if (run.partial || steps.length > 0) {
-      this.store.addMessage(chatId, {
+      const message: ChatThreadMessage = {
         role: "assistant",
         content: run.partial,
         steps,
@@ -177,17 +201,30 @@ export class Replies {
         said: this.saidOf(run),
         startedAt: run.startedAt,
         took: Date.now() - run.startedAt,
+      };
+      const saved = carryOn("save a reply", () => {
+        this.store.addMessage(chatId, message);
+        return true;
       });
+      const ended = this.finished.get(chatId);
+      if (!saved && ended) {
+        this.finished.set(chatId, { ...ended, unsaved: message });
+        this.errors.set(chatId, REPLY_NOT_SAVED);
+      }
     }
     // Finished while the user was somewhere else, so the sidebar shows it as done until they open it.
-    if (!signal.aborted && this.browser.chatInFront && !this.browser.chatInFront(chatId)) this.store.setSeen(chatId, false);
-    run.onEnd?.({ reply: run.partial, steps, outcome, error });
-    this.notify(chatId);
+    if (!run.controller.signal.aborted && this.browser.chatInFront && !this.browser.chatInFront(chatId)) {
+      carryOn("mark a reply unseen", () => this.store.setSeen(chatId, false));
+    }
+  }
+
+  private lookBack(chatId: string, run: Run, error: string | null): void {
     if (run.partial && !error) void this.titles.nameChat(chatId);
     // Another app wrote what this chat started with, so none of it is what the user said about themselves.
     if (this.store.chat(chatId)?.from) return;
     // An offer is only wanted while this is still the chat's last reply. Its summary says so, so nothing waiting on the
     // model holds on to the run.
+    const ended = this.finished.get(chatId);
     this.jobMemory.offerToRemember(chatId, run, error !== null, {
       said: this.jobMemory.userWords(chatId),
       routine: null,
@@ -293,10 +330,12 @@ export class Replies {
         error = errorMessage(caught);
       }
     }
-    if (cloud) this.cloud?.release(id);
     this.runs.delete(id);
-    this.publishWorkingTabs();
-    this.jobMemory.offerToRemember(id, run, error !== null, { said: [], routine: message, stillWanted: () => true });
+    if (cloud) carryOn("release the cloud browser", () => this.cloud?.release(id));
+    carryOn("show the tabs at work", () => this.publishWorkingTabs());
+    carryOn("look back on a task", () =>
+      this.jobMemory.offerToRemember(id, run, error !== null, { said: [], routine: message, stillWanted: () => true }),
+    );
     const tabIds = [...(this.jobs.get(id)?.own ?? []), ...(this.jobs.taskPopups.get(id) ?? [])];
     this.jobs.delete(id);
     this.jobs.taskPopups.delete(id);

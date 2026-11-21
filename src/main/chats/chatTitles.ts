@@ -22,10 +22,10 @@ export class ChatTitles {
 
   // Never rejects: a chat keeps its first message as its title until this works.
   async nameChat(chatId: string): Promise<void> {
-    const chat = this.store.chat(chatId);
-    if (!chat || !this.store.needsTitle(chatId)) return;
-    if (chat.messages.filter((message) => message.role === "user").length > MAX_TITLE_ATTEMPTS) return;
     try {
+      const chat = this.store.chat(chatId);
+      if (!chat || !this.store.needsTitle(chatId)) return;
+      if (chat.messages.filter((message) => message.role === "user").length > MAX_TITLE_ATTEMPTS) return;
       const title = await this.generateTitle(chat.messages);
       if (title && this.store.setGeneratedTitle(chatId, title)) this.notify(chatId);
     } catch (error) {

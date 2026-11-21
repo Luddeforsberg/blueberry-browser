@@ -160,8 +160,10 @@ export class Chats {
   private toThread(chat: StoredChat): ChatThread {
     const run = this.runs.get(chat.id);
     if (this.runner?.has(chat.id)) return this.runnerChats.threadOf(chat);
+    const unsaved = this.finished.get(chat.id)?.unsaved;
     return {
       ...chat,
+      messages: unsaved ? [...chat.messages, unsaved] : chat.messages,
       partial: run?.partial ?? null,
       statusLine: run?.statusLine ?? null,
       steps: run?.steps ?? [],
@@ -248,11 +250,13 @@ export class Chats {
       ...tabsNow.map((tab) => ({ kind: "tab" as const, title: this.withoutCodes(tab.title || siteOf(tab.url)), site: siteOf(tab.url) })),
       ...files.map(sentAttachment),
     ];
+    const earlier = this.finished.get(id);
+    // Before this message, so the model reads it. If it still can't be saved, it stays on screen.
+    if (earlier?.unsaved) this.store.addMessage(id, earlier.unsaved);
+    this.finished.delete(id);
     this.store.addMessage(id, { role: "user", content: message, ...(attached.length > 0 ? { attached } : {}) }, files);
     if (tabsNow.length > 0) this.jobs.attach(id, tabsNow);
     this.errors.delete(id);
-    const earlier = this.finished.get(id);
-    this.finished.delete(id);
     this.memory?.dropOffers(id);
 
     const run = newRun({ mascot, earlierSites: new Set(earlier?.beenTo), cloud: inCloud, askAtLeast, onEnd, userPresent });

@@ -105,6 +105,9 @@ export interface ChatThreadSummary {
   unseen?: boolean;
 }
 
+// Said on a reply whose answer couldn't be saved. It stays on screen, and the next message tries to save it first.
+export const REPLY_NOT_SAVED = "This reply couldn't be saved, so it's only here until you quit.";
+
 export interface ChatThread extends ChatThreadSummary {
   messages: ChatThreadMessage[];
   // The reply being written, which is saved once it ends. Null when no reply is running.
