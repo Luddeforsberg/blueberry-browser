@@ -5,6 +5,7 @@ import { menuPlacement, type MenuSheetBox } from "../window/floatingPlaces";
 import type { Rect } from "../window/Layout";
 import { AskBook, buildMenu, MenuBook, type EditRole, type OwnMenuItem } from "./ownMenu";
 import type { AskCard, MenuAnchor, MenuEntry, MenuPlacement, MenuViewState, ThemeState } from "../../shared/ipc";
+import { fieldsOf } from "../../shared/fields";
 
 // Where a menu view lives: a window, or a window of its own on the desktop.
 export interface MenuSurface {
@@ -261,7 +262,7 @@ const validSheets = (input: unknown, entries: MenuEntry[]): MenuSheetBox[] | nul
   if (!Array.isArray(input) || input.length === 0 || input.length > MAX_SHEETS) return null;
   const sheets: MenuSheetBox[] = [];
   for (const sheet of input) {
-    const { path, width, height, rowTop } = (sheet ?? {}) as Record<string, unknown>;
+    const { path, width, height, rowTop } = fieldsOf(sheet);
     if (typeof path !== "string" || !finite(width) || !finite(height) || !finite(rowTop)) return null;
     if (width <= 0 || width > MAX_SHEET.width || height <= 0 || height > MAX_SHEET.height || rowTop < 0 || rowTop > MAX_SHEET.height)
       return null;

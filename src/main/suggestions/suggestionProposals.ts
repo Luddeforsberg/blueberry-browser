@@ -4,6 +4,7 @@ import { ACCESSORIES, BERRY, PALETTES, normaliseSite, paletteOf, parseMascotDraf
 import type { Digest, Evidence, Feedback } from "./suggestionDigest";
 import { clock, parseDraft } from "../routines/routineSchedule";
 import { areSimilar, nameOfSite, plainText, wordsOf, type Pattern } from "./suggestionPatterns";
+import { fieldsOf } from "../../shared/fields";
 
 // What the model proposes, and the checks every proposal has to pass before it's a card. The model decides what to
 // suggest. Code decides whether it's true: every id it cites must exist, its sites come only from that evidence, its
@@ -295,12 +296,11 @@ export const verifyProposals = (reply: string, digest: Digest, existing: Existin
   } catch {
     return [];
   }
-  const cards = (parsed as { cards?: unknown } | null)?.cards;
+  const { cards } = fieldsOf(parsed);
   if (!Array.isArray(cards)) return [];
   const kept: Proposal[] = [];
   for (const raw of cards) {
-    if (!raw || typeof raw !== "object") continue;
-    const proposal = verifyOne(raw as Record<string, unknown>, digest);
+    const proposal = verifyOne(fieldsOf(raw), digest);
     if (!proposal || alreadyThere(proposal, existing) || repeatsDismissed(proposal, existing.feedback)) continue;
     // Never two about the same thing.
     const own = wordsOf(`${proposal.card.title} ${textOf(proposal.card)}`);

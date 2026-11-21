@@ -3,6 +3,7 @@ import { createChromeView, type ChromeView } from "./chromeView";
 import { sendToRenderer } from "./ipc";
 import { tooltipRect } from "./floatingPlaces";
 import type { Rect, ThemeState, TooltipRequest } from "../../shared/ipc";
+import { fieldsOf } from "../../shared/fields";
 
 const MAX_WORDS = 200;
 const MAX_KEYS = 4;
@@ -60,16 +61,16 @@ export class TooltipView {
 // The chrome is trusted, but what it sends is drawn in another view, so only words, short keys and a sane box get there.
 const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 const validRequest = (input: unknown): TooltipRequest | null => {
-  const { words, keys, box, slide } = (input ?? {}) as { words?: unknown; keys?: unknown; box?: Record<string, unknown>; slide?: unknown };
-  const { x, y, width, height } = box ?? {};
+  const { words, keys, box, slide } = fieldsOf(input);
+  const { x, y, width, height } = fieldsOf(box);
   if (typeof words !== "string" || words.length === 0 || words.length > MAX_WORDS) return null;
   if (
     !Array.isArray(keys) ||
     keys.length > MAX_KEYS ||
-    !keys.every((key) => typeof key === "string" && key.length > 0 && key.length <= MAX_KEY)
+    !keys.every((key): key is string => typeof key === "string" && key.length > 0 && key.length <= MAX_KEY)
   )
     return null;
   if (!finite(x) || !finite(y) || !finite(width) || !finite(height) || width <= 0 || width > MAX_WIDTH || height <= 0 || height > 64)
     return null;
-  return { words, keys: keys as string[], box: { x, y, width, height }, slide: slide === true };
+  return { words, keys, box: { x, y, width, height }, slide: slide === true };
 };

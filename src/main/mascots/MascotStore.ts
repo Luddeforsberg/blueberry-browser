@@ -17,8 +17,7 @@ const LOST: Omit<MascotProfile, "id"> = {
 
 const galleryIdOf = (galleryId: unknown) => (typeof galleryId === "string" ? { galleryId } : {});
 const publishedIdOf = (publishedId: unknown) => (typeof publishedId === "string" ? { publishedId } : {});
-const worksInCloudOf = (input: unknown) =>
-  (input as { worksInCloud?: unknown } | null)?.worksInCloud === true ? { worksInCloud: true } : {};
+const worksInCloudOf = (input: unknown) => (fieldsOf(input).worksInCloud === true ? { worksInCloud: true } : {});
 
 const NOT_SAVED = "This mascot couldn't be saved. Check that there's space on your disk and try again.";
 

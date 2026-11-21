@@ -1,3 +1,5 @@
+import { fieldsOf } from "../../shared/fields";
+
 // A page's text through Firecrawl, for the `fetch_page` tool, without opening a tab. Plain Node, so the cloud runner gets
 // it too. The key stays in here: it never goes into a result, an error, a log or the disk.
 
@@ -65,27 +67,22 @@ export const firecrawlFetch = (env: Record<string, string | undefined> = process
       response = await scrape(url);
     }
     if (!response.ok) throw new WebFetchError(`The page service answered ${response.status}.`);
-    const body = (await response.json().catch(() => null)) as {
-      data?: unknown;
-    } | null;
-    return parsePage(body?.data, url);
+    const body: unknown = await response.json().catch(() => null);
+    return parsePage(fieldsOf(body).data, url);
   };
 };
 
 // Only the text and where it came from, however much else the service sends. With no address of its own that's a web
 // address, the page counts as the one asked for.
 export const parsePage = (data: unknown, asked: string): FetchedPage => {
-  const { markdown, metadata } = (data ?? {}) as {
-    markdown?: unknown;
-    metadata?: { url?: unknown; statusCode?: unknown };
-  };
-  const final = typeof metadata?.url === "string" ? metadata.url.trim() : "";
+  const { markdown, metadata } = fieldsOf(data);
+  const { url: address, statusCode: status } = fieldsOf(metadata);
+  const final = typeof address === "string" ? address.trim() : "";
   const parsed = URL.canParse(final) ? new URL(final) : null;
-  const status = metadata?.statusCode;
   return {
     // As the browser reads it, so nothing like a line break stays in it.
     url: parsed && ["http:", "https:"].includes(parsed.protocol) ? parsed.href : asked,
-    status: Number.isInteger(status) ? (status as number) : null,
+    status: typeof status === "number" && Number.isInteger(status) ? status : null,
     markdown: typeof markdown === "string" ? markdown.trim().slice(0, MAX_MARKDOWN) : "",
   };
 };

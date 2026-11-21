@@ -100,6 +100,28 @@ const fences = [
       "No `as unknown as` in app code: check the value where it enters, or read SQLite rows with rowOf or rowsOf from src/main/library/database.ts (eslint.fences.mjs).",
   },
   {
+    // A cast to an object of unknown fields says a value from outside is an object when it may be null, a list or
+    // anything else. fieldsOf gives each field as `unknown`, from an object or from nothing, so it's checked before use.
+    name: "fields",
+    in: ["src/**/*.{ts,tsx}", "runner/src/**/*.ts"],
+    heldBack: {
+      "src/main/cloud/cloudFile.ts": "Being rewritten in #170, and moves onto fieldsOf after it.",
+      "src/main/cloud/cloudLogins.ts": "Being rewritten in #170, and moves onto fieldsOf after it.",
+    },
+    rules: {
+      "no-restricted-syntax": [
+        // `as Record<string, unknown>`, alone, in a list or a union, or inside another type.
+        ':matches(TSAsExpression, TSTypeAssertion) TSTypeReference[typeName.name="Record"][typeArguments.params.0.type="TSStringKeyword"][typeArguments.params.1.type="TSUnknownKeyword"]',
+        // `as { [key: string]: unknown }`.
+        ':matches(TSAsExpression, TSTypeAssertion) TSIndexSignature[typeAnnotation.typeAnnotation.type="TSUnknownKeyword"]',
+        // `as { name?: unknown }`, the same thing for one field.
+        ":matches(TSAsExpression, TSTypeAssertion) TSPropertySignature[optional=true] > TSTypeAnnotation > TSUnknownKeyword",
+      ],
+    },
+    message:
+      "Use fieldsOf from src/shared/fields.ts, not a cast: each field comes out `unknown`, from an object or from nothing, to check before it's used. A list goes through entriesOf (eslint.fences.mjs).",
+  },
+  {
     // A store that writes its own file catches the failure itself, and has always ended up logging it and carrying on
     // as if it worked. savedFile.ts writes beside the file and renames it over, and says whether it happened.
     name: "writes",

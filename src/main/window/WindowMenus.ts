@@ -8,6 +8,7 @@ import type { ChromeRegion, MenuAnchor } from "../../shared/ipc";
 import type { PublishResult } from "../../shared/library";
 import { BERRY } from "../../shared/mascots";
 import type { WindowParts, WindowStores } from "./WindowParts";
+import { fieldsOf } from "../../shared/fields";
 
 // The menus the window opens from its views, and the questions it asks before deleting something or after something
 // went wrong, all drawn by its own menu view.
@@ -20,7 +21,7 @@ export class WindowMenus {
   // A menu opened from a view, at its button or at the pointer, in the window. The chrome fills the window, and the
   // overlay is wherever it is now.
   openMenu(items: OwnMenuItem[], anchor: unknown, from: ChromeRegion, label: string, onClosed?: () => void): void {
-    const { x, y, width, height } = (anchor ?? {}) as Record<string, unknown>;
+    const { x, y, width, height } = fieldsOf(anchor);
     if (!finite(x) || !finite(y) || !finite(width) || !finite(height) || width < 0 || height < 0) return onClosed?.();
     const origin = from === "overlay" ? this.w.overlayView.view.getBounds() : { x: 0, y: 0 };
     const at: MenuAnchor = { x: origin.x + x, y: origin.y + y, width, height };

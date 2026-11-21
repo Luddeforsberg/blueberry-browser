@@ -1,4 +1,5 @@
-import type { GalleryMascot, MascotExample } from "../../shared/library";
+import { fieldsOf } from "../../shared/fields";
+import type { GalleryMascot } from "../../shared/library";
 import { parseMascotDraft } from "../../shared/mascots";
 import { STARTER_EXAMPLES } from "./starterExamples";
 
@@ -136,12 +137,14 @@ const STARTERS: GalleryMascot[] = [
 // Only what a card needs and what a mascot's own checks accept, so a bad entry shows nothing rather than something
 // the store would refuse or read differently. Anything else on it is dropped here, and again when it's added.
 export const parseGalleryMascot = (input: unknown): GalleryMascot | null => {
-  const { id, author, category, description, draft, example } = (input ?? {}) as Record<string, unknown>;
+  const { id, author, category, description, draft, example } = fieldsOf(input);
   const parsed = parseMascotDraft(draft);
   if ("error" in parsed) return null;
   if (typeof id !== "string" || typeof author !== "string" || typeof category !== "string" || typeof description !== "string") return null;
   if (!id || !author || !category || !description) return null;
-  return { id, author, category, description, draft: parsed.draft, ...(example ? { example: example as MascotExample } : {}) };
+  const { prompt, answer } = fieldsOf(example);
+  const shown = typeof prompt === "string" && typeof answer === "string" ? { example: { prompt, answer } } : {};
+  return { id, author, category, description, draft: parsed.draft, ...shown };
 };
 
 // The ones that come with the app, so the Gallery always has something to show. What people publish is in `Gallery.ts`.

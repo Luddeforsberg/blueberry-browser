@@ -1,5 +1,6 @@
 import type { AiService } from "../../shared/aiKey";
 import { modelsFor, SERVICE_ADDRESS } from "../chats/agent";
+import { fieldsOf } from "../../shared/fields";
 
 // Trying a key is one short message to the service's cheap model, from main. A 4xx answer is the service turning the
 // key down: a wrong key, or an account that can't be charged. No answer, the service failing, or a reply that isn't a
@@ -48,8 +49,8 @@ const request = (
 // Whether the reply is a model's answer in the service's own shape, so an empty 200 from something in between isn't
 // taken for one.
 const answered = (service: AiService, reply: unknown): boolean => {
-  if (!reply || typeof reply !== "object") return false;
-  const said = service === "anthropic" ? (reply as { content?: unknown }).content : (reply as { choices?: unknown }).choices;
+  const { content, choices } = fieldsOf(reply);
+  const said = service === "anthropic" ? content : choices;
   return Array.isArray(said) && said.length > 0;
 };
 

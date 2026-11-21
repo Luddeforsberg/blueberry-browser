@@ -6,6 +6,7 @@ import type { AddressSuggestion, AddressSuggestionsRequest, Rect, ThemeState } f
 import type { MascotLook } from "../../shared/library";
 import { ACCESSORIES, PALETTES } from "../../shared/mascots";
 import { Latest, type Turn } from "../../shared/lateWork";
+import { entriesOf, fieldsOf } from "../../shared/fields";
 
 const MAX_ROWS = 6;
 const MAX_TEXT = 2048;
@@ -81,13 +82,13 @@ const webOrEmpty = (value: unknown): value is string => text(value) && (value ==
 const icon = (value: unknown): string | null => (text(value) && /^https?:\/\//i.test(value) ? value : null);
 
 const validLook = (value: unknown): MascotLook | null => {
-  const { palette, accessory } = (value ?? {}) as Record<string, unknown>;
+  const { palette, accessory } = fieldsOf(value);
   const look = { palette: PALETTES.find(({ id }) => id === palette)?.id, accessory: ACCESSORIES.find(({ id }) => id === accessory)?.id };
   return look.palette && look.accessory ? { palette: look.palette, accessory: look.accessory } : null;
 };
 
 const validRow = (value: unknown): AddressSuggestion | null => {
-  const row = (value ?? {}) as Record<string, unknown>;
+  const row = fieldsOf(value);
   switch (row.kind) {
     case "tab":
       // A tab is acted on by its id, so its address is only shown.
@@ -118,12 +119,12 @@ const validRow = (value: unknown): AddressSuggestion | null => {
 };
 
 const validRequest = (input: unknown): AddressSuggestionsRequest | null => {
-  const { rows, selected, field } = (input ?? {}) as { rows?: unknown; selected?: unknown; field?: Record<string, unknown> };
-  const { x, y, width, height } = field ?? {};
+  const { rows, selected, field } = fieldsOf(input);
+  const { x, y, width, height } = fieldsOf(field);
   if (!finite(x) || !finite(y) || !finite(width) || !finite(height)) return null;
   if (!Array.isArray(rows) || rows.length > MAX_ROWS) return null;
-  const valid = rows.map(validRow);
-  if (valid.some((row) => row === null)) return null;
+  const { entries: valid, dropped } = entriesOf(rows, validRow);
+  if (dropped > 0) return null;
   const chosen = typeof selected === "number" && Number.isInteger(selected) && selected >= 0 && selected < valid.length ? selected : null;
-  return { rows: valid as AddressSuggestion[], selected: chosen, field: { x, y, width, height } satisfies Rect };
+  return { rows: valid, selected: chosen, field: { x, y, width, height } satisfies Rect };
 };

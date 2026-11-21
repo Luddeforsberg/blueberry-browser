@@ -12,6 +12,7 @@ import {
   type SentAttachment,
 } from "../../shared/attachments";
 import { cleanFileName, sniffFile } from "./fileKind";
+import { fieldsOf } from "../../shared/fields";
 
 // A file the user added to a prompt box, read and checked in main and kept here until it's sent with a message or let
 // go. Nothing of its contents goes back to a renderer: only its chip.
@@ -137,7 +138,7 @@ export class Attachments {
     if (!Array.isArray(files)) return [];
     const room = this.roomFor(kept);
     return files.map((file) => {
-      const { name, bytes } = (file ?? {}) as { name?: unknown; bytes?: unknown };
+      const { name, bytes } = fieldsOf(file);
       if (room.left <= 0) return refused(name, ATTACHMENT_WORDS.tooMany);
       return this.stageOne(name, bytes instanceof Uint8Array ? Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength) : null, room);
     });

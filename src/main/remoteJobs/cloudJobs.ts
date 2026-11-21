@@ -3,6 +3,7 @@ import type { ActionApproval } from "../../shared/ipc";
 import { STEP_KINDS, type ChatApproval, type ChatStep, type MascotProfile, type StepKind } from "../../shared/library";
 import { BERRY, BERRY_ID, normaliseSite, parseMascotDraft } from "../../shared/mascots";
 import { fitHistory, type MascotSnapshot } from "../../shared/phone";
+import { fieldsOf } from "../../shared/fields";
 
 export { mascotSnapshot } from "../../shared/phone";
 
@@ -29,7 +30,7 @@ export const JOB_LEASE_MS = SERVER_SILENCE_MS - 30_000;
 // limited to some sites comes as Berry with those sites, which can only narrow it. Anyone else must pass the same checks
 // as a mascot made in the app, or the job doesn't run at all.
 export const mascotFromSnapshot = (input: unknown): MascotProfile | null => {
-  const snapshot = (input ?? {}) as Record<string, unknown>;
+  const snapshot = fieldsOf(input);
   if (snapshot.id === BERRY_ID) {
     const { sites, tools } = snapshot;
     if (!Array.isArray(sites) || !Array.isArray(tools) || !BERRY.tools.every((tool) => tools.includes(tool))) return null;
@@ -53,7 +54,7 @@ const kindOf = (kind: unknown): { kind?: StepKind } => (isStepKind(kind) ? { kin
 
 export const stepsFromRow = (input: unknown): ChatStep[] =>
   (Array.isArray(input) ? input : [])
-    .map((step: unknown) => (step ?? {}) as Record<string, unknown>)
+    .map(fieldsOf)
     .filter((step) => typeof step.text === "string")
     .slice(-MAX_STEPS)
     .map((step) => ({ text: String(step.text).slice(0, MAX_STEP_TEXT), done: step.done === true, ...kindOf(step.kind) }));

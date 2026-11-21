@@ -1,4 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, hkdfSync, randomBytes, timingSafeEqual } from "crypto";
+import { fieldsOf } from "../../src/shared/fields";
 
 // The relay's keys, both made from RELAY_SECRET: one signs what it hands out and reads back, such as registered clients
 // and refresh tokens, and one seals the connections it keeps across a restart.
@@ -28,7 +29,7 @@ export const unsigned = (keys: Keys, text: unknown): Record<string, unknown> | n
   try {
     const data: unknown = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
     // Anything but an object is turned away by every caller anyway.
-    return data !== null && typeof data === "object" ? (data as Record<string, unknown>) : null;
+    return data !== null && typeof data === "object" ? fieldsOf(data) : null;
   } catch {
     return null;
   }

@@ -2,6 +2,7 @@ import { HANDOFF_WORDS } from "../tools/handoffWords";
 import { plausibleCode } from "../phone/phoneReplies";
 import type { DesktopAsk, DesktopDropSays, DesktopFace, DesktopTray } from "../../shared/ipc";
 import type { ChatApproval, MascotProfile, NeedsYouItem } from "../../shared/library";
+import { fieldsOf } from "../../shared/fields";
 
 const MAX_LINE_LENGTH = 90;
 const MIN_READING_MS = 5000;
@@ -241,8 +242,7 @@ export type DecisionCheck =
 // unchanged, and only once. A handoff isn't answered here, and an answer shaped like a code isn't sent.
 export const checkDecision = (shown: ShownAsk | null, waiting: readonly NeedsYouItem[], decision: unknown): DecisionCheck => {
   if (!shown || shown.decided) return { ok: false, why: "gone" };
-  if (typeof decision !== "object" || decision === null) return { ok: false, why: "invalid" };
-  const { key, allow, answer } = decision as { key?: unknown; allow?: unknown; answer?: unknown };
+  const { key, allow, answer } = fieldsOf(decision);
   if (typeof key !== "string" || typeof allow !== "boolean" || (answer !== undefined && typeof answer !== "string"))
     return { ok: false, why: "invalid" };
   if (key !== shown.key) return { ok: false, why: "stale" };

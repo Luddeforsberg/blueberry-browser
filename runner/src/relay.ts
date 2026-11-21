@@ -6,6 +6,7 @@ import { mcpAuthRouter, getOAuthProtectedResourceMetadataUrl } from "@modelconte
 import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js";
 import { GalleryServer } from "../../src/main/account/galleryServer";
 import { mascotsFromSharedRows } from "../../src/shared/phone";
+import { fieldsOf } from "../../src/shared/fields";
 import { DbError, type RelayDb } from "./db";
 import { RelayAuth } from "./relayAuth";
 import { createRelayTools, type RelayHost } from "./relayTools";
@@ -118,7 +119,7 @@ export const relayApp = (config: RelayConfig, supabase: { url: string; key: stri
 
   app.post("/sign-in", express.urlencoded({ extended: false, limit: "10kb" }), async (req, res) => {
     res.setHeader("cache-control", "no-store");
-    const result = await auth.signIn((req.body ?? {}) as Record<string, unknown>, req.ip ?? "unknown");
+    const result = await auth.signIn(fieldsOf(req.body), req.ip ?? "unknown");
     if ("redirect" in result) return res.redirect(302, result.redirect);
     return res.status(200).type("html").send(result.page);
   });

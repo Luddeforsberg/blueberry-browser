@@ -6,6 +6,7 @@ import type { Layout } from "../window/Layout";
 import { Tab } from "./Tab";
 import type { Rect, TabPreviewRequest, ThemeState } from "../../shared/ipc";
 import { Latest } from "../../shared/lateWork";
+import { fieldsOf } from "../../shared/fields";
 
 // The card's picture at twice its width, 16:10 and cut from the top of the page.
 const PICTURE_WIDTH = TAB_PREVIEW.width * 2;
@@ -139,8 +140,8 @@ const siteOf = (url: string): string => {
 // The chrome is trusted, but it only names a tab and where its row is, and the row must be a sane box.
 const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 const validRequest = (input: unknown): TabPreviewRequest | null => {
-  const { tabId, row, slide } = (input ?? {}) as { tabId?: unknown; row?: Record<string, unknown>; slide?: unknown };
-  const { x, y, width, height } = row ?? {};
+  const { tabId, row, slide } = fieldsOf(input);
+  const { x, y, width, height } = fieldsOf(row);
   if (typeof tabId !== "string" || tabId.length === 0 || tabId.length > 100) return null;
   if (!finite(x) || !finite(y) || !finite(width) || !finite(height) || width <= 0 || height <= 0 || height > 200) return null;
   return { tabId, row: { x, y, width, height }, slide: slide === true };

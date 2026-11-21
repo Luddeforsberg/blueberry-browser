@@ -3,6 +3,7 @@ import type { AccountState } from "../../shared/ipc";
 import { Latest } from "../../shared/lateWork";
 import { bestEffort, readTextFile, removeFile, saveFile, type Saved } from "../library/savedFile";
 import { ServerError, type GalleryServer, type ServerSession } from "./galleryServer";
+import { fieldsOf } from "../../shared/fields";
 
 // Who's signed in, for publishing. The session stays in here: main never sends a token to a renderer, no tool can reach
 // this, and only the email goes out, to Settings. The password passes through one call and isn't kept or logged.
@@ -186,7 +187,7 @@ export class Account {
       const saved = readTextFile(this.file);
       if (saved === undefined) return null;
       const text = safeStorage.decryptString(Buffer.from(saved, "base64"));
-      const { accessToken, refreshToken, expiresAt, email } = JSON.parse(text) as Record<string, unknown>;
+      const { accessToken, refreshToken, expiresAt, email } = fieldsOf(JSON.parse(text));
       if (typeof accessToken !== "string" || typeof refreshToken !== "string" || typeof expiresAt !== "number" || typeof email !== "string")
         return null;
       return { accessToken, refreshToken, expiresAt, email };

@@ -1,5 +1,6 @@
 import type { WebContents, WebFrameMain } from "electron";
 import type { ChatSendOptions, EventChannels, InvokeChannel, InvokeChannels } from "../../shared/ipc";
+import { fieldsOf } from "../../shared/fields";
 
 const BOTH = ["chrome", "overlay"] as const;
 
@@ -206,7 +207,7 @@ export const isTrustedSender = (event: IpcSender, endpoint: ChromeEndpoint): boo
 // What a renderer may ask of `chat:send`, and nothing else, each checked for its type. What only main sets on a reply,
 // such as `from`, `sites`, `tools`, `askAtLeast` and `onEnd`, can't come in this way.
 export const chatSendOptions = (options: unknown): ChatSendOptions => {
-  const { seePage, mascotId, cloud, runner, files, tabs } = (options ?? {}) as Record<string, unknown>;
+  const { seePage, mascotId, cloud, runner, files, tabs } = fieldsOf(options);
   return {
     seePage: seePage === true,
     mascotId: typeof mascotId === "string" ? mascotId : null,

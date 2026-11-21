@@ -1,3 +1,5 @@
+import { fieldsOf } from "./fields";
+
 // Why an action needed the user's leave, as a code. Each is one rule in `askFirst.ts`, a tool's own `whyRisky`,
 // `pageScripts.ts` or `agent.ts`, and the words a person reads are chosen from it on screen, so nothing the model or a
 // page wrote is ever one.
@@ -50,7 +52,7 @@ const isReason = (value: unknown): value is AskReason => ASK_REASONS.includes(va
 
 // What goes on the card with these exact words: a known reason, and a mark only if it's in them verbatim.
 export const whyOnCard = (text: string, why: unknown): AskWhy | null => {
-  const { reason, mark } = (why ?? {}) as { reason?: unknown; mark?: unknown };
+  const { reason, mark } = fieldsOf(why);
   if (!isReason(reason)) return null;
   return typeof mark === "string" && mark !== "" && text.includes(mark) ? { reason, mark } : { reason };
 };
