@@ -42,6 +42,7 @@ export const hooks = (over: Partial<CloudTabsHooks> = {}): CloudTabsHooks => ({
   takenOver: () => {},
   showTab: () => {},
   confirmLogin: async () => true,
+  confirmForget: async () => true,
   ...over,
 });
 

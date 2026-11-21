@@ -5,6 +5,9 @@ import type { CloudTabs, CloudTabsHooks } from "./CloudTabs";
 import { quietly } from "./cloudCheckPlan";
 import { LOCAL, type CloudWorld, type LocalSession } from "./cloudWorldTesting";
 
+// What a confirm to forget the key waits under, beside the sites' own.
+export const FORGET = "the key";
+
 // What the checker drives. The test file says how this version of the cloud is made and attached.
 export interface CloudUnderTest {
   tabs: Pick<
@@ -29,14 +32,14 @@ interface Making {
 export interface Setup {
   net: { connect: (url: string) => Promise<unknown>; attach: (id: string) => Promise<unknown> };
   // The cloud's files by name, read and written by the app's own code. `failsFor` is how many of the next saves fail,
-  // `readFails` the files whose next read fails if they're there, which sets `unread`, and `onWrite` hears each file's new
-  // text just before it replaces the old.
+  // `readFails` the files whose next read fails if they're there, `unread` those whose read failed this launch, and
+  // `onWrite` hears each file's new text just before it replaces the old.
   disk: {
     files: Map<string, string>;
     onWrite: (name: string, text: string) => void;
     failsFor: number;
     readFails: Set<string>;
-    unread: boolean;
+    unread: Set<string>;
   };
   makeCloud: (making: Making) => CloudUnderTest;
   // Before each run: nothing left on disk from the last.
@@ -50,7 +53,7 @@ export class Win {
   open = true;
   private count = 0;
   readonly tabs = new Map<string, { cloud: boolean; title: string }>();
-  // Sign-in confirms waiting on the user, by site.
+  // Confirms waiting on the user: bringing a sign-in, by site, and forgetting the key, under `FORGET`.
   readonly confirms = new Map<string, (yes: boolean) => void>();
 
   nextId(): string {
@@ -84,12 +87,17 @@ export class Launch {
   readonly transfers = new Map<string, string>();
 
   private readonly breaks: Breaks;
+  // Told the moment the user agrees to forget the key and what the app couldn't read.
+  private readonly forgetting: () => void;
+  // A Forget waiting on that answer, which is an ending only once the user agrees.
+  private forgetWork: Promise<unknown> | null = null;
 
   constructor(
     readonly local: boolean,
-    { world, breaks, makeCloud }: { world: CloudWorld; breaks: Breaks; makeCloud: Setup["makeCloud"] },
+    { world, breaks, makeCloud, forgetting }: { world: CloudWorld; breaks: Breaks; makeCloud: Setup["makeCloud"]; forgetting: () => void },
   ) {
     this.breaks = breaks;
+    this.forgetting = forgetting;
     this.cloud = makeCloud({
       local,
       launchLocal: world.launchLocal,
@@ -132,6 +140,13 @@ export class Launch {
   }
 
   // An ending drops every claim, every page and everything on its way, so the checker's users go with it.
+  // Settings' Forget, which asks first when there's something it couldn't read.
+  forget(): void {
+    const work = this.cloud.tabs.forget();
+    if (this.win.confirms.has(FORGET)) this.forgetWork = work;
+    else this.ending(work);
+  }
+
   ending(work: Promise<unknown>): void {
     this.endings++;
     this.jobs.clear();
@@ -177,6 +192,19 @@ export class Launch {
       takenOver: () => {},
       showTab: (id) => void this.reach(win, id, "switched to"),
       confirmLogin: (site) => (win.open ? new Promise<boolean>((resolve) => win.confirms.set(site, resolve)) : Promise.resolve(false)),
+      // Asking first is one card at a time, so a new one answers the last no.
+      confirmForget: () => {
+        if (!win.open) return Promise.resolve(false);
+        win.confirms.get(FORGET)?.(false);
+        return new Promise<boolean>((resolve) =>
+          win.confirms.set(FORGET, (yes) => {
+            if (yes) this.forgetting();
+            if (yes && this.forgetWork) this.ending(this.forgetWork);
+            this.forgetWork = null;
+            resolve(yes);
+          }),
+        );
+      },
     };
   }
 

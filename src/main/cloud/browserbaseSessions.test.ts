@@ -227,11 +227,12 @@ describe("CloudSessions at Browserbase", () => {
   it("lists and releases only in its own project, and keeps another project's sessions for a key from there", async () => {
     const { calls, send } = stub({});
     const elsewhere = [handle("sess-1", { by: "browserbase:other" }), handle(null, { tag: "t", by: "browserbase:other" })];
-    const sessions = new CloudSessions(provider(send), at({ handles: elsewhere }));
+    const saved: CloudIds[] = [];
+    const sessions = new CloudSessions(provider(send), at({ handles: elsewhere }), { onIds: (ids) => saved.push(ids) > 0 });
     expect(sessions.canEnd).toBe(false);
     expect(await sessions.end()).toBe("ended");
     expect(calls).toEqual([]);
-    expect(sessions.keptBy("browserbase:other")).toBe(true);
+    expect(saved).toEqual([]);
   });
 
   it("asks for no new session while a hundred may still be running, and says why", async () => {

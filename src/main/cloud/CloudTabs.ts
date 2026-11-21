@@ -1,12 +1,13 @@
 import { dirname, join } from "path";
 import { safeStorage, type WebContents } from "electron";
 import type { CloudState, CloudView } from "../../shared/ipc";
-import { browserbaseOrigin, isLiveView } from "./browserbase";
+import { isLiveView } from "./browserbase";
 import { forgetBefore, MAX_FIELD_LENGTH, NO_KEY, readCloud, sessionsFile, writeCloudIds, writeCloudKey, type Key } from "./cloudFile";
+import { CloudKeys } from "./cloudKeys";
 import type { CdpTab } from "../tools/CdpTab";
 import type { ChatCloud } from "../chats/Chats";
 import { CloudSessions } from "./cloudBrowser";
-import type { CloudBrowser, CloudIds, Released } from "./cloudProvider";
+import type { CloudBrowser, CloudIds, Handle, Released } from "./cloudProvider";
 import type { StoredCookie } from "./cloudLogins";
 import { SignedInTo } from "./signedInTo";
 import { sendToRenderer } from "../window/ipc";
@@ -20,12 +21,11 @@ import { CloudPictures } from "./cloudPictures";
 
 const NOT_SAFE = "This computer can't keep the key encrypted, so it wasn't saved.";
 const NOT_SAVED = "The key couldn't be saved.";
-// Nothing is written, and no session started, while the cloud's files may say more than was read.
-const UNREADABLE = "Blueberry couldn't read its cloud settings, so it won't change them or start a cloud session. Quit and open it again.";
+// Nothing is written, and no session started, while the cloud's files may say more than was read, until the user forgets
+// the key and what couldn't be read with it.
+const UNREADABLE =
+  "Blueberry couldn't read its cloud settings, so nothing in the cloud can start. Open it again, or forget the key to start over.";
 const NO_WINDOW = "Blueberry has no window open.";
-// The session's id is the only way to end it, and it goes with the key, unless Browserbase no longer takes that key.
-const STILL_RUNNING = "The cloud session didn't confirm it ended, so the key was kept to end it with. Press End again first.";
-const KEPT_FOR_OTHER = "A Browserbase session from before may still be running, so its key was kept to end it with.";
 const LEFT_RUNNING = "Browserbase no longer takes that key, so its last session couldn't be ended. It ends on its own within an hour.";
 
 // The open window's part.
@@ -41,6 +41,8 @@ export interface CloudTabsHooks {
   showTab: (id: string) => void;
   // Touch ID, or a plain confirm where there's none, before a site's cookies are read.
   confirmLogin: (site: string) => Promise<boolean>;
+  // Asking first, before Forget drops what couldn't be read, and the sessions only that could end.
+  confirmForget: () => Promise<boolean>;
 }
 
 // One window's time with the cloud. Anything that finishes late acts only through the one it started in, and only while
@@ -52,12 +54,12 @@ export class CloudTabs implements ChatCloud {
   private readonly sessions: CloudSessions;
   private attached: Attachment | null = null;
   private problem: string | null = null;
-  private readonly unreadable: string | null;
+  private unreadable: string | null;
   // The ids as last told, and whether `cloud.json` still has what an app before this one kept there.
   private ids: CloudIds;
   private before: boolean;
-  // Forget or a new key kept the key, for a session the provider didn't confirm had ended or another provider made.
-  private endFirst = false;
+  // The key each session was made with.
+  private readonly keys: CloudKeys;
   private readonly pictures: CloudPictures;
   // Settings > Cloud > Signed in to, and the tabs open to check it.
   readonly signedIn: SignedInTo;
@@ -66,7 +68,7 @@ export class CloudTabs implements ChatCloud {
   constructor(
     private readonly file: string,
     // The browser a saved key makes: Browserbase, a Chrome on this computer where an unpackaged app asked for one, or none.
-    private readonly provider: (key: Key) => CloudBrowser | null,
+    provider: (key: Key) => CloudBrowser | null,
     // That one site's cookies from this browser's own session. Nothing else.
     readCookies: (site: string) => Promise<StoredCookie[]>,
   ) {
@@ -75,11 +77,15 @@ export class CloudTabs implements ChatCloud {
     this.unreadable = read.unreadable ? UNREADABLE : null;
     this.ids = read.ids;
     this.before = read.fromBefore;
+    this.keys = new CloudKeys(read.keys, provider);
     if (this.before) this.keepIds(read.ids);
-    this.sessions = new CloudSessions(provider(this.key), read.ids, {
+    const browser = this.keys.browserOf(this.key);
+    this.sessions = new CloudSessions(browser, read.ids, {
       onChange: () => this.changed(),
       onIds: (ids) => this.keepIds(ids),
+      browserFor: (handle) => this.keys.browserFor(handle),
     });
+    this.shareKey(browser);
     this.pictures = new CloudPictures({
       page: (id) => this.page(id),
       working: (id) => !!this.sessions.usedBy(id) && !this.sessions.heldByUser(id),
@@ -135,28 +141,13 @@ export class CloudTabs implements ChatCloud {
       busy: !!sessions.busyWith,
       canEnd: sessions.canEnd,
       unreleased: sessions.unreleased,
-      problem: this.unreadable ?? this.problem ?? this.waitedFor ?? sessions.problem,
+      unreadable: this.unreadable !== null,
+      problem: this.unreadable ?? this.problem ?? sessions.problem,
       logins: this.signedIn.list,
     };
   }
 
-  // Why Forget or a new key kept the key, while that's still so.
-  private get waitedFor(): string | null {
-    if (!this.endFirst) return null;
-    if (this.sessions.canEnd) return STILL_RUNNING;
-    return this.keyNeeded ? KEPT_FOR_OTHER : null;
-  }
-
-  // Whether the saved key is the only way to end a session the browser now can't, as when a Chrome on this computer
-  // stands in for Browserbase.
-  private get keyNeeded(): boolean {
-    const origin = this.key.projectId ? browserbaseOrigin(this.key.projectId) : null;
-    return origin !== null && origin !== this.sessions.origin && this.sessions.keptBy(origin);
-  }
-
   private changed(): void {
-    // Once nothing is left to end, however it ended, there's nothing to wait for.
-    if (!this.waitedFor) this.endFirst = false;
     const chrome = this.hooks?.chrome();
     if (chrome && !chrome.isDestroyed()) sendToRenderer(chrome, "cloud:updated", this.state);
   }
@@ -165,39 +156,52 @@ export class CloudTabs implements ChatCloud {
     const key = typeof apiKey === "string" ? apiKey.trim() : "";
     const project = typeof projectId === "string" ? projectId.trim() : "";
     this.problem = null;
-    this.endFirst = false;
     if (!key || !project || key.length > MAX_FIELD_LENGTH || project.length > MAX_FIELD_LENGTH) {
       this.problem = "Both the API key and the project id are needed.";
     } else if (!safeStorage.isEncryptionAvailable()) {
       this.problem = NOT_SAFE;
     } else if (!this.unreadable) {
       this.letGoOfTabs();
-      await this.sessions.replace((released) => {
+      // A session still running stays, with the key it was made with, so the new key never waits for it. Each project's
+      // Context stays with it too.
+      await this.sessions.replace(() => {
         const next: Key = { apiKey: key, projectId: project };
-        const browser = this.provider(next);
-        // The key that made a session still running is kept until it has ended, since a new one, even for the same
-        // project, may not work. Each project's Context stays with it.
-        if (released === "running" || this.keyNeeded) {
-          this.endFirst = true;
-          return null;
-        }
-        return this.keep(next) ? { browser } : null;
+        const browser = this.keys.browserOf(next);
+        if (!this.keep(next)) return null;
+        this.shareKey(browser);
+        return { browser };
       });
     }
     this.changed();
     return this.state;
   }
 
+  // A session of this browser's project with no key of its own that opens, as after the system's keychain changed, takes
+  // this one, whether it was saved or brought from an app before this one, so a key for another project later doesn't
+  // leave it with nothing to end it.
+  private shareKey(browser: CloudBrowser | null): void {
+    const keyId = browser?.keyId;
+    if (!keyId) return;
+    this.sessions.giveKey((handle) => handle.by === browser.origin && (handle.keyId === null || this.keys.unopenable(handle)), keyId);
+  }
+
+  // Sessions still running stay, each with the key it was made with, until they've ended. What couldn't be read, and a
+  // session whose key can't be opened, go only once the user has said so, since nothing here could end those.
   async forget(): Promise<CloudState> {
-    if (this.unreadable) return this.state;
+    const lost = (handle: Handle) => this.keys.unopenable(handle);
+    if (this.unreadable || this.ids.handles.some(lost)) {
+      if (!(await (this.hooks?.confirmForget() ?? Promise.resolve(false)))) return this.state;
+      this.unreadable = null;
+    }
     this.letGoOfTabs();
     this.problem = null;
-    this.endFirst = false;
     await this.sessions.replace((released) => {
-      this.endFirst = released === "running" || this.keyNeeded;
       this.problem = released === "refused" ? LEFT_RUNNING : null;
-      if (this.endFirst || !this.keep(NO_KEY)) return null;
-      return { browser: this.provider(this.key) };
+      if (!this.sessions.letGoOf(lost) || !this.keep(NO_KEY)) {
+        this.problem = NOT_SAVED;
+        return null;
+      }
+      return { browser: this.keys.browserOf(this.key) };
     });
     this.changed();
     return this.state;
@@ -320,7 +324,7 @@ export class CloudTabs implements ChatCloud {
   // What an app before this one kept leaves `cloud.json` only once it's in the sessions' file.
   private keepIds(ids: CloudIds): boolean {
     this.ids = ids;
-    if (this.unreadable || !writeCloudIds(sessionsFile(this.file), ids)) return false;
+    if (this.unreadable || !writeCloudIds(sessionsFile(this.file), ids, this.keys.all)) return false;
     if (this.before) this.before = !forgetBefore(this.file);
     return true;
   }

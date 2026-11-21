@@ -15,6 +15,8 @@ export interface CloudLifeHooks {
   onChange?: () => void;
   // Told each time the ids change, to keep for next time. False if they couldn't be kept.
   onIds?: (ids: CloudIds) => boolean;
+  // The browser for the key a handle was made with, where that isn't the key now.
+  browserFor?: (handle: Handle) => CloudBrowser | null;
 }
 
 const IDLE_MS = 3 * 60_000;
@@ -70,7 +72,11 @@ export abstract class CloudLife {
     private readonly hooks: CloudLifeHooks,
     private readonly idleMs = IDLE_MS,
   ) {
-    this.handles = new CloudHandles(ids, () => this.browser, { onIds: hooks.onIds, changed: () => this.changed() });
+    this.handles = new CloudHandles(ids, () => this.browser, {
+      onIds: hooks.onIds,
+      browserFor: hooks.browserFor,
+      changed: () => this.changed(),
+    });
   }
 
   // Whether a job or the user is using it.
@@ -120,11 +126,6 @@ export abstract class CloudLife {
     return this.browser?.origin ?? null;
   }
 
-  // Whether a session from `origin` may still be running, which only a provider from there can end.
-  keptBy(origin: string): boolean {
-    return this.handles.keptBy(origin);
-  }
-
   // Whether it will end on its own once the idle time is up.
   get winding(): boolean {
     return this.idle !== null;
@@ -138,11 +139,12 @@ export abstract class CloudLife {
     return null;
   }
 
-  // The one rule for winding down: anything that may be running, with nobody using it, ends once the idle time is up.
-  // A timer belongs to the life it was armed in, so it never ends one that came after.
+  // The one rule for winding down: anything that may be running, with nobody using it, ends once the idle time is up,
+  // with no key now too, since each handle has its own. A timer belongs to the life it was armed in, so it never ends one
+  // that came after.
   protected settle(): void {
     const something = this.session !== null || this.connecting !== null || this.handles.endable;
-    if (this.inUse() || !something || this.refusal) {
+    if (this.inUse() || !something || this.closed || this.ending > 0) {
       this.stopIdle();
       return;
     }
@@ -170,11 +172,24 @@ export abstract class CloudLife {
     this.changed();
   }
 
-  // Sessions left from last time with only a tag, no id, are looked for and ended as soon as it starts. One with an id
-  // is ended by the idle rule, unless something uses it first.
+  // Sessions left from last time with only a tag, no id, or that the key now can't use again, are looked for and ended
+  // as soon as it starts. One it could use is ended by the idle rule, unless something uses it first.
   protected recover(): void {
-    const tagOnly = ({ id }: Handle) => id === null;
-    if (this.handles.mine().some(tagOnly)) void this.steps.run(() => this.releaseKept(tagOnly));
+    const unused = (handle: Handle) => handle.id === null || !this.handles.usable(handle);
+    if (this.handles.mine().some(unused)) void this.steps.run(() => this.releaseKept(unused));
+  }
+
+  // Gives the handles `pick` picks the key `keyId` names, as for those of a project whose own key can't be opened, once
+  // a key for that project is saved. False if that couldn't be kept.
+  giveKey(pick: (handle: Handle) => boolean, keyId: string): boolean {
+    return this.handles.giveKey(pick, keyId);
+  }
+
+  // Forgets the handles `pick` picks, on the user's word alone. False if that couldn't be kept.
+  letGoOf(pick: (handle: Handle) => boolean): boolean {
+    const kept = this.handles.letGoOf(pick);
+    this.settled();
+    return kept;
   }
 
   protected async ensure(): Promise<CloudSession> {

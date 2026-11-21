@@ -50,14 +50,14 @@ export class CloudWorld extends WorldBrowsers {
   // Sessions a release was refused for, because Browserbase no longer took the key it came with, and keys it refused.
   readonly refused = new Set<string>();
   private readonly refusedKeys = new Set<string>();
-  // Projects the app has no key for, since an app before this one replaced it with one for another, until the app saves
-  // one again. Their sessions can only end on their own, though they must still be found from the disk.
+  // Projects whose sessions' keys a keychain reset sealed away, until the app has a key for the project again. Their
+  // sessions can only end on their own, though they must still be found from the disk.
   readonly unheld = new Set<string>();
   // Sessions an app before this one lost track of itself, by saving another key over their id.
   readonly lostBefore = new Set<string>();
-  // Keys an app before this one replaced with another for the same project, and the key that replaced each. A session
-  // from one is ended through the last key in that line, so once that's refused, nothing the app holds can end it.
-  readonly replaced = new Map<string, string>();
+  // Ids and tags of sessions the user let go of, by forgetting the key once the app said it couldn't read them, and
+  // sessions from before whose project only a keychain that has gone could open, so nothing can say whose they are.
+  readonly letGo = new Set<string>();
   // Every release asked for, by session id, in order.
   readonly releases: string[] = [];
   // Told of every release that lands, with the key that asked, before it ends the session.
@@ -77,6 +77,21 @@ export class CloudWorld extends WorldBrowsers {
     return this.projects.get(key);
   }
 
+  // Every key there has been, and every project.
+  get keys(): string[] {
+    return [...this.projects.keys()];
+  }
+
+  get allProjects(): string[] {
+    return [...new Set(this.projects.values())];
+  }
+
+  // Whether the user let this one go.
+  private gone(id: string): boolean {
+    const tag = this.tagOf(id);
+    return this.lostBefore.has(id) || this.letGo.has(id) || (tag !== undefined && this.letGo.has(tag));
+  }
+
   status(id: string): "RUNNING" | "COMPLETED" | "TIMED_OUT" | undefined {
     const session = this.sessions.get(id);
     if (!session) return undefined;
@@ -88,23 +103,23 @@ export class CloudWorld extends WorldBrowsers {
     return this.status(id) === "RUNNING";
   }
 
-  // The app's sessions that still run and cost, that it could still end. One it was refused a release for, or one made
-  // with a key it has since been refused for, may be another account's, and ends on its own.
-  get running(): string[] {
+  // The app's sessions that still run and cost, that it could still end while it holds `held`. One it was refused a
+  // release for, or one made with a key it has since been refused for, ends on its own, unless `held` is a key
+  // Browserbase takes for its project, since any key of a project ends that project's sessions.
+  runningWith(held: string | null): string[] {
+    const project = held !== null && this.accepted.has(held) ? this.projects.get(held) : undefined;
     const endable = ([id, session]: [string, Session]) =>
       this.isRunning(id) &&
       isApp(session) &&
-      !this.refused.has(id) &&
-      !this.refusedKeys.has(session.key) &&
+      (session.project === project || (!this.refused.has(id) && !this.refusedKeys.has(session.key))) &&
       !this.unheld.has(session.project) &&
-      !this.lostBefore.has(id) &&
-      !this.stranded(session.key);
+      !this.gone(id);
     return [...[...this.sessions].filter(endable).map(([id]) => id), ...this.localRunning];
   }
 
   // The app's sessions that still run at all, even those it can't end now.
   get appRunning(): string[] {
-    return [...this.sessions].filter(([id, session]) => this.isRunning(id) && isApp(session) && !this.lostBefore.has(id)).map(([id]) => id);
+    return [...this.sessions].filter(([id, session]) => this.isRunning(id) && isApp(session) && !this.gone(id)).map(([id]) => id);
   }
 
   get anyRunning(): boolean {
@@ -176,12 +191,6 @@ export class CloudWorld extends WorldBrowsers {
     if (method === "GET") return answered("lookup", (how) => this.lookUp(id, key, how));
     return this.release(id, key, said);
   };
-
-  private stranded(key: string): boolean {
-    let last = key;
-    for (let k = 0; k < this.replaced.size && this.replaced.has(last); k++) last = this.replaced.get(last) ?? last;
-    return last !== key && this.refusedKeys.has(last);
-  }
 
   private refuse(key: string): Answer {
     this.refusedKeys.add(key);

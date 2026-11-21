@@ -1,7 +1,7 @@
 // The steps of the cloud's model checker that happen while the app runs, as the window, Settings, chats and the network
 // take them. Each says what happened for the trace, or null when it can't happen now.
 import { vi } from "vitest";
-import type { Breaks, Launch, Setup } from "./cloudCheckApp";
+import { FORGET, type Breaks, type Launch, type Setup } from "./cloudCheckApp";
 import { flush, nth, quietly, type Action, type Op } from "./cloudCheckPlan";
 import type { Runners } from "./cloudCheckRunners";
 import { FAILS, WORKS, type CloudWorld } from "./cloudWorldTesting";
@@ -25,7 +25,7 @@ type Step = (action: Action) => string | null | Promise<string | null>;
 
 export const runningSteps = (
   context: StepContext,
-): Record<Exclude<Op, "quit" | "crash" | "keyDamaged" | "readFails" | "downgrade">, Step> => ({
+): Record<Exclude<Op, "quit" | "crash" | "keychainReset" | "readFails" | "downgrade">, Step> => ({
   ...appSteps(context),
   ...worldSteps(context),
 });
@@ -88,7 +88,7 @@ const appSteps = ({ app, world, breaks, next }: StepContext) => ({
     return "Settings: End";
   },
   forget: () => {
-    app().ending(app().cloud.tabs.forget());
+    app().forget();
     return "Settings: Forget";
   },
   // Some keys are for another project, which sees none of the first one's sessions.
@@ -136,7 +136,7 @@ const appSteps = ({ app, world, breaks, next }: StepContext) => ({
     const yes = b % 4 !== 0;
     confirms.get(site)?.(yes);
     confirms.delete(site);
-    return `the user ${yes ? "confirms" : "declines"} bringing ${site}`;
+    return `the user ${yes ? "confirms" : "declines"} ${site === FORGET ? "forgetting the key and what couldn't be read" : `bringing ${site}`}`;
   },
 });
 

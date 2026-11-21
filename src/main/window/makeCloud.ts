@@ -49,6 +49,14 @@ export const cloudHooks = (w: WindowParts): CloudTabsHooks => ({
   takenOver: (id) => w.chats.releaseTab(id),
   showTab: (id) => w.tabs.switchActiveTab(id),
   confirmLogin: (site) => confirmCloudLogin(w.baseWindow, site),
+  confirmForget: () =>
+    w.menus.ask({
+      question: "Forget the cloud key?",
+      detail:
+        "What Blueberry couldn’t read goes too. Sessions started with an old key can’t be ended from here, and Browserbase stops them within 6 hours.",
+      action: "Forget key",
+      mascot: null,
+    }),
 });
 
 // Sites to offer in Settings > Cloud > Signed in to, from history and bookmarks. Names only.

@@ -23,6 +23,7 @@ const ELECTRON_ADAPTERS = main(
   "account/Account.ts",
   "cloud/CloudTabs.ts",
   "cloud/cloudFile.ts",
+  "cloud/cloudKeys.ts",
   "cloud/cloudLoginAccess.ts",
   "phone/TelegramChannel.ts",
   "phone/telegramFile.ts",
@@ -334,9 +335,9 @@ const rules = [
     "The cloud's key and live view go to the chrome only, never to a tool or a chat.",
   ),
   onlyFrom(
-    "the cloud's settings file",
-    file("cloudFile"),
-    ["cloud/CloudTabs.ts"],
+    "the cloud's settings file and the keys kept in it",
+    file("cloudFile", "cloudKeys"),
+    ["cloud/CloudTabs.ts", "cloud/cloudKeys.ts"],
     "The cloud's key and live view go to the chrome only, never to a tool or a chat.",
   ),
   onlyFrom(

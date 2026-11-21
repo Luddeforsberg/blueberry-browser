@@ -28,6 +28,9 @@ const WANTED = process.env.CLOUD_WANT ? new RegExp(process.env.CLOUD_WANT) : nul
 // What Settings says while a session may still be running.
 const STILL_RUNNING = /may still be running|End again/;
 
+// What a sealed value is once the keychain that sealed it has gone.
+const DAMAGED = "ZGFtYWdlZA==";
+
 // As the fake `safeStorage` in cloudLifetime.test.ts seals a key.
 const seal = (text: string) => Buffer.from(`sealed:${text}`).toString("base64");
 const unseal = (value: unknown) => {
@@ -47,6 +50,19 @@ const handlesIn = (files: Files): Record<string, unknown>[] => {
   const { sessionId, projectId } = read(files, KEY_FILE);
   const project = unseal(projectId);
   return typeof sessionId === "string" && project ? [...entries, { id: sessionId, by: `browserbase:${project}` }] : entries;
+};
+
+// What the app couldn't read, so the user may let it go by forgetting the key: everything in a file it couldn't read, a
+// session from before whose project or key doesn't open, and a handle whose key doesn't, by id and tag.
+const unreadableIn = (files: Files, unread: Set<string>): string[] => {
+  const saved = read(files, KEY_FILE);
+  const kept = read(files, SESSIONS_FILE);
+  const keys = fieldsOf(kept.keys);
+  const { entries } = entriesOf(kept.handles, (one) => fieldsOf(one));
+  const sealedAway = (one: Record<string, unknown>) => typeof one.keyId === "string" && !unseal(fieldsOf(keys[one.keyId]).apiKey);
+  const lost = entries.filter((one) => unread.has(SESSIONS_FILE) || sealedAway(one));
+  const before = unread.has(KEY_FILE) || !unseal(saved.projectId) || !unseal(saved.apiKey) ? [saved.sessionId] : [];
+  return [...lost.flatMap((one) => [one.id, one.tag]), ...before].filter((one): one is string => typeof one === "string");
 };
 
 // Each Context saved, with the project it's kept for.
@@ -80,7 +96,7 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
   disk.files = FIRST();
   disk.failsFor = 0;
   disk.readFails = new Set();
-  disk.unread = false;
+  disk.unread = new Set();
   const trace: string[] = [];
   let broken: string | null = null;
   const breaks = (rule: string, why: string) => {
@@ -88,8 +104,15 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
   };
   disk.onWrite = (name, text) => {
     // A launch that couldn't read a file that's there writes neither.
-    if (disk.unread) breaks("wrote-unread", `${name} was written by a launch that couldn't read what was saved`);
+    if (disk.unread.size) breaks("wrote-unread", `${name} was written by a launch that couldn't read what was saved`);
+    // A key goes to disk only sealed.
+    for (const key of world.keys) if (text.includes(`"${key}"`)) breaks("key-in-plain", `${key} was written to ${name} as it is`);
     const next = new Map(disk.files).set(name, text);
+    // A key is kept only while a handle made with it is.
+    const kept = read(next, SESSIONS_FILE);
+    const named = new Set(entriesOf(kept.handles, (one) => fieldsOf(one).keyId).entries);
+    for (const id of Object.keys(fieldsOf(kept.keys)))
+      if (!named.has(id)) breaks("key-kept-unused", `${id} was kept with no session made with it`);
     // Nothing running at Browserbase becomes impossible to find from the disk, even one whose key it no longer takes.
     for (const id of world.appRunning)
       if (findable(disk.files, world, id) && !findable(next, world, id))
@@ -101,7 +124,12 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
   };
   let count = 0;
   const next = () => ++count;
-  let app = new Launch(false, { world, breaks, makeCloud });
+  // The user agreed to forget the key and what the app couldn't read, so that may go, and the app may write again.
+  const forgetting = () => {
+    for (const one of unreadableIn(disk.files, disk.unread)) world.letGo.add(one);
+    disk.unread = new Set();
+  };
+  let app = new Launch(false, { world, breaks, makeCloud, forgetting });
   const runners = new Runners(world, breaks);
   await flush();
 
@@ -123,7 +151,7 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
   const relaunch = async (local: boolean, readFails: string[] = []) => {
     await flush();
     world.lose();
-    disk.unread = false;
+    disk.unread = new Set();
     disk.readFails = new Set(readFails);
     // Its timers go with it. Clearing them puts the clock back too, so it's set again.
     const now = Date.now();
@@ -131,7 +159,7 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
     vi.setSystemTime(now);
     app.win.close();
     world.localRunning.forEach((name) => world.local.set(name, false));
-    app = new Launch(local, { world, breaks, makeCloud });
+    app = new Launch(local, { world, breaks, makeCloud, forgetting });
     disk.readFails.clear();
     const how = readFails.length
       ? `, and couldn't read ${readFails.join(" or ")}`
@@ -153,26 +181,38 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
     const saved = read(disk.files, KEY_FILE);
     const held = unseal(saved.apiKey);
     const key = b % 2 === 0 ? (held ?? "key-0") : `key-${next()}`;
-    const was = held ? world.projectOfKey(held) : undefined;
     if (!world.projectOfKey(key)) world.accept(key, "proj-2");
     const { id, context } = world.before(key, saved.sessionId);
     const project = world.projectOfKey(key) ?? "";
-    if (was && was !== project) world.unheld.add(was);
-    else if (held && held !== key) world.replaced.set(held, key);
     disk.files.set(KEY_FILE, JSON.stringify({ apiKey: seal(key), projectId: seal(project), contextId: context, sessionId: id }));
     trace.push(`the app before this one, with ${key} for ${project}, makes ${id} and keeps it, and stops`);
     await relaunch(false);
   };
 
-  // The saved key can't be opened any more, as when the system's keychain changed, and the app launches again without
-  // it. The user saves the same key again, as often as it takes while saves fail.
-  const keyDamaged = async () => {
+  // The system's keychain changes, so nothing sealed opens any more: the key, its project, and the keys kept with the
+  // sessions, which then only a key for their project can end. The app launches again without them, and the user saves
+  // the same key again, as often as it takes while saves fail, or forgets it.
+  const keychainReset = async ({ a }: Action) => {
     const key = app.cloud.key();
     const project = key ? world.projectOfKey(key) : undefined;
     if (app.local || !key || !project || !disk.files.has(KEY_FILE)) return;
-    disk.files.set(KEY_FILE, JSON.stringify({ ...read(disk.files, KEY_FILE), apiKey: "ZGFtYWdlZA==" }));
-    trace.push("the saved key is damaged, and the app stops without quitting");
+    const sealedAway = (fields: Record<string, unknown>) =>
+      Object.fromEntries(Object.entries(fields).map(([name, value]) => [name, ["apiKey", "projectId"].includes(name) ? DAMAGED : value]));
+    const before = read(disk.files, KEY_FILE);
+    if (typeof before.sessionId === "string") world.letGo.add(before.sessionId);
+    disk.files.set(KEY_FILE, JSON.stringify(sealedAway(before)));
+    const kept = read(disk.files, SESSIONS_FILE);
+    const keys = Object.fromEntries(Object.entries(fieldsOf(kept.keys)).map(([id, one]) => [id, sealedAway(fieldsOf(one))]));
+    if (disk.files.has(SESSIONS_FILE)) disk.files.set(SESSIONS_FILE, JSON.stringify({ ...kept, keys }));
+    world.allProjects.forEach((one) => world.unheld.add(one));
+    trace.push("the system's keychain changes, and the app stops without quitting");
     await relaunch(false);
+    if (a % 2 === 0) {
+      trace.push("Settings: Forget");
+      app.forget();
+      await flush();
+      return;
+    }
     for (let tries = 0; tries < 4 && app.cloud.key() !== key; tries++) {
       trace.push(`Settings: save ${key} again`);
       app.ending(app.cloud.tabs.saveKey(key, project));
@@ -214,7 +254,7 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
     trace.push("  every answer comes back, and three minutes pass");
     await drain();
     await idle();
-    for (const id of world.running)
+    for (const id of world.runningWith(app.cloud.key()))
       breaks("quit-left-running", `${id} is still running after the next launch, which had nothing to end it by`);
   };
 
@@ -239,13 +279,19 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
   };
 
   // Once the steps are over: every answer comes back, nobody uses it for a while, and then everyone lets go.
-  // A launch that couldn't read what was saved changes nothing, so the user opens it again.
+  // A launch that couldn't read what was saved changes nothing, so the user opens it again, and if it still can't, as
+  // after the keychain changed, forgets the key.
   const reopen = async () => {
-    if (!disk.unread) return;
-    trace.push("Quit, and open it again");
-    quietly(app.cloud.quit());
-    await drain();
-    await relaunch(false);
+    if (disk.unread.size) {
+      trace.push("Quit, and open it again");
+      quietly(app.cloud.quit());
+      await drain();
+      await relaunch(false);
+    }
+    if (!app.cloud.tabs.state.unreadable) return;
+    trace.push("Settings: Forget");
+    app.forget();
+    await flush();
   };
 
   const afterwards = async () => {
@@ -272,10 +318,11 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
     const settled = () => !app.cloud.tabs.state.unreleased;
     if (broken) return;
     // Before any probe, since a job that lets go arms the timer again and would hide a session left without one.
-    if (settled() && app.users() === 0 && world.running.length) {
+    if (settled() && app.users() === 0 && world.runningWith(app.cloud.key()).length) {
       trace.push("three minutes pass with nobody using it");
       await idle();
-      if (settled() && world.running.length) breaks("no-wind-down", `${world.running.join(", ")} is still running with nobody using it`);
+      if (settled() && world.runningWith(app.cloud.key()).length)
+        breaks("no-wind-down", `${world.runningWith(app.cloud.key()).join(", ")} is still running with nobody using it`);
       if (broken) return;
     }
     if (settled()) await works();
@@ -286,7 +333,8 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
     app.jobs.clear();
     await flush();
     await idle();
-    if (settled() && world.running.length) breaks("never-ends", `${world.running.join(", ")} is still running after everyone let go`);
+    if (settled() && world.runningWith(app.cloud.key()).length)
+      breaks("never-ends", `${world.runningWith(app.cloud.key()).join(", ")} is still running after everyone let go`);
     const { problem, canEnd } = app.cloud.tabs.state;
     if (!world.anyRunning && !canEnd && problem && STILL_RUNNING.test(problem))
       breaks("stale-problem", `Settings still says "${problem}" with nothing running`);
@@ -309,8 +357,8 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
     if (action.op === "crash") {
       trace.push("the app stops without quitting");
       await relaunch(action.a % 3 === 0);
-    } else if (action.op === "keyDamaged") {
-      await keyDamaged();
+    } else if (action.op === "keychainReset") {
+      await keychainReset(action);
     } else if (action.op === "readFails") {
       trace.push("the app stops without quitting");
       await relaunch(false, [[KEY_FILE], [SESSIONS_FILE], [KEY_FILE, SESSIONS_FILE]][action.a % 3]);

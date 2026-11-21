@@ -6,7 +6,8 @@ import { KeyRefused, type CloudBrowser, type CloudIds, type CreateHooks, type Ha
 // A list that doesn't show it never is, since its create may land afterwards, and a release that failed never is. The
 // deadline only says when a handle may be forgotten: once it's further past than any session lasts, so a clock that's
 // wrong by less than that loses nothing. It never stops a try, since ending a session that has gone does no harm. A
-// handle is released only through the provider and project that made it, and a new key never drops one, or another
+// handle is released only through the provider and project that made it: with the key it was made with, and then with
+// the key now if that's for the same project, so a new key never drops one or waits for one, and neither does another
 // project's Context. Plain Node, like `CloudLife`, which owns one.
 
 const NOT_KEPT = "The cloud settings couldn't be saved, so no cloud session was started.";
@@ -21,6 +22,8 @@ const TOO_MANY =
 export interface HandlesHooks {
   // Told each time the ids change, to keep for next time. False if they couldn't be kept.
   onIds?: ((ids: CloudIds) => boolean) | undefined;
+  // The browser for the key a handle was made with, by its `keyId`, or null where that key isn't kept or can't be opened.
+  browserFor?: ((handle: Handle) => CloudBrowser | null) | undefined;
   changed: () => void;
 }
 
@@ -54,10 +57,18 @@ export class CloudHandles {
     return origin ? (this.ids.contexts[origin] ?? null) : null;
   }
 
-  // The handles this provider can end, past their deadline or not. Another's stay saved, untouched, for that one.
+  // The handles something here can end, past their deadline or not. The rest stay saved, untouched, for a key that can.
   mine(): Handle[] {
-    const origin = this.browser()?.origin;
-    return origin ? this.ids.handles.filter(({ by }) => by === origin) : [];
+    return this.ids.handles.filter((handle) => this.endersOf(handle).length > 0);
+  }
+
+  // What can end a handle, in order: its own key's browser, then the browser now if it's for the same provider and
+  // project, since a project's sessions can be ended with any of its keys.
+  private endersOf(handle: Handle): CloudBrowser[] {
+    const now = this.browser();
+    const same = now && now.origin === handle.by ? now : null;
+    const own = handle.keyId !== null && handle.keyId !== now?.keyId ? (this.hooks.browserFor?.(handle) ?? null) : null;
+    return [own?.origin === handle.by ? own : null, same].filter((one): one is CloudBrowser => one !== null);
   }
 
   kept(): string[] {
@@ -77,20 +88,32 @@ export class CloudHandles {
     return this.mine().some(({ tag }) => !this.refused.has(tag));
   }
 
-  // Whether a session from `origin` may still be running, which only a browser from there can end.
-  keptBy(origin: string): boolean {
-    return this.ids.handles.some(({ by }) => by === origin);
-  }
-
   // Releases still on their way, which Quit waits for.
   get sending(): Promise<void>[] {
     return [...this.releasing.values()];
   }
 
-  // The session to use again: this provider's newest with an id, unless it's being released.
+  // The session to use again: the newest with an id from this provider and project, unless it's being released.
   private get reusable(): string | null {
-    const known = this.mine().filter(({ id, tag }) => id !== null && !this.releasing.has(tag));
+    const origin = this.browser()?.origin;
+    const known = this.ids.handles.filter(({ id, tag, by }) => by === origin && id !== null && !this.releasing.has(tag));
     return known[known.length - 1]?.id ?? null;
+  }
+
+  // Whether the browser now could use this one again, rather than its having to be ended.
+  usable(handle: Handle): boolean {
+    return handle.by === this.browser()?.origin;
+  }
+
+  // Gives the handles `pick` picks the key `keyId` names, so they end with it.
+  giveKey(pick: (handle: Handle) => boolean, keyId: string): boolean {
+    if (!this.ids.handles.some(pick)) return true;
+    return this.set({ ...this.ids, handles: this.ids.handles.map((handle) => (pick(handle) ? { ...handle, keyId } : handle)) });
+  }
+
+  // Forgets the handles `pick` picks, on the user's word alone, since nothing else may drop one without proof.
+  letGoOf(pick: (handle: Handle) => boolean): boolean {
+    return this.set({ ...this.ids, handles: this.ids.handles.filter((handle) => !pick(handle) || this.releasing.has(handle.tag)) });
   }
 
   // A new provider or key, so what the last one said about its releases no longer holds. Every handle and Context stays.
@@ -133,7 +156,7 @@ export class CloudHandles {
       tag: (until) => {
         const before = this.pruned(this.ids);
         if (before.handles.length >= MAX_KEPT) throw new Error(TOO_MANY);
-        const handle: Handle = { tag: randomUUID(), id: null, by: browser.origin, until };
+        const handle: Handle = { tag: randomUUID(), id: null, by: browser.origin, keyId: browser.keyId ?? null, until };
         if (!this.set({ ...before, handles: [...before.handles, handle] })) {
           this.set(before);
           throw new Error(NOT_KEPT);
@@ -179,15 +202,25 @@ export class CloudHandles {
   }
 
   // Asks the provider to end one session, by its id if it has one and by its tag if not, unless that's on its way
-  // already. The handle goes only on proof, and only if it's still kept.
+  // already: with its own key, and with the key now if the provider no longer takes that one. The handle goes only on
+  // proof, and only if it's still kept.
   private releaseOne(tag: string): Promise<void> {
     const known = this.releasing.get(tag);
     if (known) return known;
-    const browser = this.browser();
     const handle = this.ids.handles.find((one) => one.tag === tag);
-    if (!browser || !handle || handle.by !== browser.origin) return Promise.resolve();
+    const [first, ...rest] = handle ? this.endersOf(handle) : [];
+    if (!handle || !first) return Promise.resolve();
     const { id } = handle;
-    const asked = id ? browser.release(id).then(() => true) : browser.releaseTagged(tag).then((found) => found === "ended");
+    const ask = (browser: CloudBrowser) =>
+      id ? browser.release(id).then(() => true) : browser.releaseTagged(tag).then((found) => found === "ended");
+    const asked = rest.reduce<Promise<boolean>>(
+      (tried, next) =>
+        tried.catch((error: unknown) => {
+          if (error instanceof KeyRefused) return ask(next);
+          throw error;
+        }),
+      ask(first),
+    );
     const sent = asked
       .then(
         (proven) => {

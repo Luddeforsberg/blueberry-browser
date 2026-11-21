@@ -27,6 +27,9 @@ export interface Handle {
   id: string | null;
   // Who can end it, as `CloudBrowser.origin` says: the provider, and for Browserbase the project.
   by: string;
+  // The key it was made with, by the id its owner keeps that key under, so it's ended with that key whatever key is
+  // used now. Null where the provider's key now ends it, as for a local browser, the runner, or a session from before.
+  keyId: string | null;
   // Milliseconds since 1970. By then the provider has ended it on its own.
   until: number;
 }
@@ -68,6 +71,8 @@ export interface CloudBrowser {
   // Which sessions it can end: those of its own provider and, for Browserbase, its own project. Nothing else is listed
   // or released through it.
   readonly origin: string;
+  // The id its owner keeps its key under, which the handles of sessions it makes carry.
+  readonly keyId?: string;
   // The session `sessionId` names if it's still running, or a new one.
   create(ids: { contextId: string | null; sessionId: string | null }, hooks: CreateHooks): Promise<MadeSession>;
   // Ends that session at the provider, from its id alone, so nothing keeps running or costing. Rejects if that wasn't

@@ -65,6 +65,7 @@ export const handle = (id: string | null, more: Partial<Handle> = {}): Handle =>
   tag: `tag-of-${id ?? "nothing"}`,
   id,
   by: "browserbase:p",
+  keyId: null,
   until: Date.now() + 3_600_000,
   ...more,
 });
