@@ -85,6 +85,8 @@ export class TelegramChannel implements PhoneChannel {
   private readonly connections = new Latest();
   private connection: Turn | null = null;
   private notSaved = false;
+  // Read once for the app. A window that opens again goes on from what's in use, not from a file that may be behind it.
+  private loaded = false;
   private onReply: (reply: IncomingReply) => void = () => {};
   private onChoice: (choice: IncomingChoice) => void = () => {};
 
@@ -113,10 +115,12 @@ export class TelegramChannel implements PhoneChannel {
     };
   }
 
-  // Off until a token has been saved, so this does nothing at all for most people. A bot connected since launch is the
-  // one, even if its file couldn't be written.
+  // Off until a token has been saved, so this does nothing at all for most people. After the first start, what's in use is
+  // the one: a bot connected since launch even if its file couldn't be written, and none after Disconnect even if its
+  // file couldn't be removed.
   start(): void {
-    const saved = this.token === null ? readTelegramFile(this.file) : null;
+    const saved = this.loaded ? null : readTelegramFile(this.file);
+    this.loaded = true;
     if (saved) {
       this.token = saved.token;
       this.botName = saved.botName;

@@ -5,6 +5,16 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { sleep, TelegramChannel, telegramApiBase } from "./TelegramChannel";
 
+// Removing the bot's file can fail, as when something else has it open.
+const removal = vi.hoisted(() => ({ fails: false }));
+vi.mock("../library/savedFile", async (original) => {
+  const real = await original<typeof import("../library/savedFile")>();
+  return {
+    ...real,
+    removeFile: (...args: Parameters<typeof real.removeFile>) => (removal.fails ? (false as never) : real.removeFile(...args)),
+  };
+});
+
 vi.mock("electron", () => ({
   app: { isPackaged: true },
   safeStorage: {
@@ -152,6 +162,27 @@ describe("TelegramChannel", () => {
     held.fail?.();
     expect(await sending).toBeNull();
     expect(channel.state.problem).toBeNull();
+    channel.close();
+    vi.unstubAllGlobals();
+  });
+
+  it("stays disconnected in the next window when the bot's file couldn't be removed", async () => {
+    const telegram = fakeTelegram();
+    const file = join(folder(), "phone.json");
+    writeFileSync(file, JSON.stringify({ token: Buffer.from(B).toString("base64"), botName: "bot_b", chatId: 7 }));
+    const channel = new TelegramChannel(file, () => {}, "http://127.0.0.1:1");
+    channel.start();
+    await vi.waitFor(() => expect(telegram.polls()).toBe(1));
+    removal.fails = true;
+    try {
+      expect(channel.disconnect().status).toBe("off");
+    } finally {
+      removal.fails = false;
+    }
+    channel.close();
+    channel.start();
+    expect(channel.state).toMatchObject({ status: "off", botName: null });
+    expect(telegram.polls()).toBe(1);
     channel.close();
     vi.unstubAllGlobals();
   });

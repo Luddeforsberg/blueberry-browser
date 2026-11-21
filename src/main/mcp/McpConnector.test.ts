@@ -99,4 +99,22 @@ describe("McpConnector", () => {
       keychain.refuses = false;
     }
   });
+
+  it("stays off with a new token that couldn't be saved when a window opens again, as on a Mac", async () => {
+    const file = join(mkdtempSync(join(tmpdir(), "mcp-")), "mcp.json");
+    const mcp = connector(file);
+    mcp.start();
+    await mcp.setOn(true);
+    mkdirSync(`${file}.tmp`);
+    try {
+      expect(mcp.revoke()).toMatchObject({ on: false, url: null });
+      // The window closes and the next one starts the app's same connector, with the old token still on file.
+      mcp.close();
+      mcp.start();
+      expect(mcp.state).toMatchObject({ on: false, url: null });
+    } finally {
+      rmSync(`${file}.tmp`, { recursive: true });
+      mcp.close();
+    }
+  });
 });

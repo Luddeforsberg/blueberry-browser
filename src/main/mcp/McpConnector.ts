@@ -126,6 +126,8 @@ export class McpConnector {
   private saved: Saved = { on: false, token: null, port: DEFAULT_PORT };
   // What the file holds, which is what the next launch starts from: what was read, or the last save that worked.
   private onDisk: Saved = { ...this.saved };
+  // Read once for the app. A window that opens again goes on from what's in use, not from a file that may be behind it.
+  private loaded = false;
   private server: Server | null = null;
   // Still finding a port, so switching off can close it before it's ever used.
   private starting: Server | null = null;
@@ -160,8 +162,11 @@ export class McpConnector {
   }
 
   start(): void {
-    this.saved = this.load();
-    this.onDisk = { ...this.saved };
+    if (!this.loaded) {
+      this.loaded = true;
+      this.saved = this.load();
+      this.onDisk = { ...this.saved };
+    }
     if (this.saved.on) void this.listen();
   }
 
