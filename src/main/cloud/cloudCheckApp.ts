@@ -32,14 +32,17 @@ interface Making {
 export interface Setup {
   net: { connect: (url: string) => Promise<unknown>; attach: (id: string) => Promise<unknown> };
   // The cloud's files by name, read and written by the app's own code. `failsFor` is how many of the next saves fail,
-  // `readFails` the files whose next read fails if they're there, `unread` those whose read failed this launch, and
+  // `readFails` the files whose next read fails if they're there, `stuck` those whose every read fails for the rest of the
+  // launch unless they're written, `unread` those whose read failed this launch, unless the user `forgave` it by forgetting the key, and
   // `onWrite` hears each file's new text just before it replaces the old.
   disk: {
     files: Map<string, string>;
     onWrite: (name: string, text: string) => void;
     failsFor: number;
     readFails: Set<string>;
+    stuck: Set<string>;
     unread: Set<string>;
+    forgave: boolean;
   };
   makeCloud: (making: Making) => CloudUnderTest;
   // Before each run: nothing left on disk from the last.

@@ -283,6 +283,45 @@ describe("CloudTabs' key", () => {
     encryption.available = false;
   });
 
+  it("reads both files again when the user agrees to forget, and keeps whatever reads by then", async () => {
+    encryption.available = true;
+    const file = tempFile();
+    writeFileSync(file, JSON.stringify(OLD_KEY));
+    writeFileSync(sessionsAt(file), "{ damaged");
+    const handle = { tag: "t-1", id: "sess-2", by: "browserbase:proj", keyId: "k", until: Date.now() + 60 * 60_000 };
+    const kept = {
+      contexts: { "browserbase:proj": "ctx-2" },
+      handles: [handle],
+      keys: { k: { apiKey: sealed("bb_2"), by: "browserbase:proj" } },
+    };
+    const { provider } = releasing();
+    // The file reads again by the time the user answers, as after a passing fault.
+    const confirmForget = vi.fn(async () => {
+      writeFileSync(sessionsAt(file), JSON.stringify(kept));
+      return true;
+    });
+    const tabs = makeTabs(file, provider, { confirmForget });
+    expect(tabs.state.unreadable).toBe(true);
+    expect((await tabs.forget()).unreadable).toBe(false);
+    expect(confirmForget).toHaveBeenCalledOnce();
+    expect(savedIn(file)()).toEqual({ key: NO_KEY, sessions: kept });
+    encryption.available = false;
+  });
+
+  it("takes a session long gone, and a key no session names, out of the file as it launches", () => {
+    encryption.available = true;
+    const file = tempFile();
+    writeFileSync(file, JSON.stringify(OLD_KEY));
+    const live = { tag: "t-1", id: "sess-2", by: "browserbase:proj", keyId: "k", until: Date.now() + 60 * 60_000 };
+    const gone = { tag: "t-2", id: "sess-3", by: "browserbase:proj", keyId: "k2", until: Date.now() - 7 * 60 * 60_000 };
+    const key = (text: string) => ({ apiKey: sealed(text), by: "browserbase:proj" });
+    const keys = { k: key("bb_2"), k2: key("bb_3"), k3: key("bb_4") };
+    writeFileSync(sessionsAt(file), JSON.stringify({ contexts: {}, handles: [live, gone], keys }));
+    makeTabs(file, releasing().provider);
+    expect(savedIn(file)().sessions).toEqual({ contexts: {}, handles: [live], keys: { k: keys.k } });
+    encryption.available = false;
+  });
+
   it("asks first before forgetting a session whose key it doesn't have, and keeps it if the user says no", async () => {
     encryption.available = true;
     const file = tempFile();

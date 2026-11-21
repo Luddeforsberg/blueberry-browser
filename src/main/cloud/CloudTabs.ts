@@ -1,7 +1,7 @@
 import { dirname, join } from "path";
 import { safeStorage, type WebContents } from "electron";
 import type { CloudState, CloudView } from "../../shared/ipc";
-import { isLiveView } from "./browserbase";
+import { browserbaseOrigin, isLiveView } from "./browserbase";
 import { forgetBefore, MAX_FIELD_LENGTH, NO_KEY, readCloud, sessionsFile, writeCloudIds, writeCloudKey, type Key } from "./cloudFile";
 import { CloudKeys } from "./cloudKeys";
 import type { CdpTab } from "../tools/CdpTab";
@@ -27,6 +27,13 @@ const UNREADABLE =
   "Blueberry couldn't read its cloud settings, so nothing in the cloud can start. Open it again, or forget the key to start over.";
 const NO_WINDOW = "Blueberry has no window open.";
 const LEFT_RUNNING = "Browserbase no longer takes that key, so its last session couldn't be ended. It ends on its own within an hour.";
+
+// The project the one list of sign-ins from before there was one per project was brought into: the saved key's, or
+// failing that the only project with a Context.
+const upgradeTo = ({ projectId }: Key, { contexts }: CloudIds): string | null => {
+  const origins = Object.keys(contexts);
+  return projectId ? browserbaseOrigin(projectId) : origins.length === 1 ? (origins[0] ?? null) : null;
+};
 
 // The open window's part.
 export interface CloudTabsHooks {
@@ -78,30 +85,39 @@ export class CloudTabs implements ChatCloud {
     this.ids = read.ids;
     this.before = read.fromBefore;
     this.keys = new CloudKeys(read.keys, provider);
-    if (this.before) this.keepIds(read.ids);
     const browser = this.keys.browserOf(this.key);
     this.sessions = new CloudSessions(browser, read.ids, {
       onChange: () => this.changed(),
       onIds: (ids) => this.keepIds(ids),
       browserFor: (handle) => this.keys.browserFor(handle),
     });
+    // What came from an app before this one goes into the sessions' file, and a session pruned or a key no session names
+    // leaves it, so nothing sealed stays on disk for a session that has gone.
+    const { handles } = this.sessions.ids;
+    const named = new Set(handles.flatMap(({ keyId }) => (keyId ? [keyId] : [])));
+    const stale = handles.length < read.ids.handles.length || Object.keys(read.keys).some((id) => !named.has(id));
+    if (this.before || stale) this.keepIds(this.sessions.ids);
     this.shareKey(browser);
     this.pictures = new CloudPictures({
       page: (id) => this.page(id),
       working: (id) => !!this.sessions.usedBy(id) && !this.sessions.heldByUser(id),
       chrome: () => this.hooks?.chrome() ?? null,
     });
-    this.signedIn = new SignedInTo(join(dirname(file), "cloud-logins.json"), {
-      sessions: this.sessions,
-      window: () => {
-        const at = this.attached;
-        return at && { ...at.hooks, still: () => this.still(at) !== null, retitle: (id) => this.retitle(at, id) };
+    this.signedIn = new SignedInTo(
+      join(dirname(file), "cloud-logins.json"),
+      {
+        sessions: this.sessions,
+        window: () => {
+          const at = this.attached;
+          return at && { ...at.hooks, still: () => this.still(at) !== null, retitle: (id) => this.retitle(at, id) };
+        },
+        page: (id) => this.page(id),
+        confirm: (site) => this.hooks?.confirmLogin(site) ?? Promise.resolve(false),
+        readCookies,
+        onChange: () => this.changed(),
       },
-      page: (id) => this.page(id),
-      confirm: (site) => this.hooks?.confirmLogin(site) ?? Promise.resolve(false),
-      readCookies,
-      onChange: () => this.changed(),
-    });
+      upgradeTo(this.key, read.ids),
+    );
   }
 
   // A window opened. Its tabs show the cloud's pages, and its chrome hears about every change.
@@ -191,7 +207,12 @@ export class CloudTabs implements ChatCloud {
     const lost = (handle: Handle) => this.keys.unopenable(handle);
     if (this.unreadable || this.ids.handles.some(lost)) {
       if (!(await (this.hooks?.confirmForget() ?? Promise.resolve(false)))) return this.state;
+      // Read again now, as on a launch, so what reads now is kept and only what still doesn't goes.
+      const again = readCloud(this.file);
+      this.keys.add(again.keys);
+      this.before ||= again.fromBefore;
       this.unreadable = null;
+      this.sessions.take(again.ids);
     }
     this.letGoOfTabs();
     this.problem = null;

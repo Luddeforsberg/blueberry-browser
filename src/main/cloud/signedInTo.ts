@@ -35,9 +35,11 @@ export class SignedInTo {
   constructor(
     file: string,
     private readonly hooks: SignedInToHooks,
+    // The project a list from before there was one per project was brought into, if that can be known.
+    upgradeTo: string | null,
   ) {
     const { sessions, confirm, readCookies, onChange } = hooks;
-    this.logins = new CloudLogins(file, { jar: () => (sessions.provider ? sessions : null), confirm, readCookies, onChange });
+    this.logins = new CloudLogins(file, { jar: () => (sessions.provider ? sessions : null), confirm, readCookies, onChange }, upgradeTo);
   }
 
   get list(): CloudLogin[] {

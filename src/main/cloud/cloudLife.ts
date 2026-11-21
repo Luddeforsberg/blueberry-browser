@@ -179,6 +179,18 @@ export abstract class CloudLife {
     if (this.handles.mine().some(unused)) void this.steps.run(() => this.releaseKept(unused));
   }
 
+  // What's kept: every handle and Context, as the file should have them.
+  get ids(): CloudIds {
+    return this.handles.current;
+  }
+
+  // Adds what the files hold that isn't kept here, as when they're read again. False if that couldn't be kept.
+  take(ids: CloudIds): boolean {
+    const kept = this.handles.take(ids);
+    this.settled();
+    return kept;
+  }
+
   // Gives the handles `pick` picks the key `keyId` names, as for those of a project whose own key can't be opened, once
   // a key for that project is saved. False if that couldn't be kept.
   giveKey(pick: (handle: Handle) => boolean, keyId: string): boolean {

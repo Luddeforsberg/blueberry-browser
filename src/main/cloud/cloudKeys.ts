@@ -24,6 +24,12 @@ export class CloudKeys {
     return this.keys;
   }
 
+  // Keys read again from the file, where they aren't kept here already.
+  add(keys: KeptKeys): void {
+    this.keys = { ...keys, ...this.keys };
+    Object.keys(keys).forEach((id) => this.browsers.delete(id));
+  }
+
   // The browser for `key`, carrying the id its sessions' handles name its key by, where it's Browserbase's own.
   browserOf(key: Key): CloudBrowser | null {
     const made = this.provider(key);

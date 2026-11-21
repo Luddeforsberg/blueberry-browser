@@ -96,7 +96,9 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
   disk.files = FIRST();
   disk.failsFor = 0;
   disk.readFails = new Set();
+  disk.stuck = new Set();
   disk.unread = new Set();
+  disk.forgave = false;
   const trace: string[] = [];
   let broken: string | null = null;
   const breaks = (rule: string, why: string) => {
@@ -124,10 +126,12 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
   };
   let count = 0;
   const next = () => ++count;
-  // The user agreed to forget the key and what the app couldn't read, so that may go, and the app may write again.
+  // The user agreed to forget the key and what the app can't read, so that may go, and the app may write again. Only
+  // what still can't be read: a file that failed once and reads now is the app's to keep.
   const forgetting = () => {
-    for (const one of unreadableIn(disk.files, disk.unread)) world.letGo.add(one);
+    for (const one of unreadableIn(disk.files, disk.stuck)) world.letGo.add(one);
     disk.unread = new Set();
+    disk.forgave = true;
   };
   let app = new Launch(false, { world, breaks, makeCloud, forgetting });
   const runners = new Runners(world, breaks);
@@ -148,10 +152,12 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
 
   // The app is gone, with whatever it asked for unanswered, and launches again from what's on the disk. A Chrome it
   // started goes with it.
-  const relaunch = async (local: boolean, readFails: string[] = []) => {
+  const relaunch = async (local: boolean, readFails: string[] = [], stays = false) => {
     await flush();
     world.lose();
     disk.unread = new Set();
+    disk.forgave = false;
+    disk.stuck = new Set();
     disk.readFails = new Set(readFails);
     // Its timers go with it. Clearing them puts the clock back too, so it's set again.
     const now = Date.now();
@@ -161,8 +167,9 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
     world.localRunning.forEach((name) => world.local.set(name, false));
     app = new Launch(local, { world, breaks, makeCloud, forgetting });
     disk.readFails.clear();
+    if (stays) readFails.forEach((name) => disk.stuck.add(name));
     const how = readFails.length
-      ? `, and couldn't read ${readFails.join(" or ")}`
+      ? `, and couldn't read ${readFails.join(" or ")}${stays ? ", nor can it again this launch unless they're written" : ""}`
       : local
         ? ", with a Chrome on this computer standing in"
         : "";
@@ -279,10 +286,10 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
   };
 
   // Once the steps are over: every answer comes back, nobody uses it for a while, and then everyone lets go.
-  // A launch that couldn't read what was saved changes nothing, so the user opens it again, and if it still can't, as
-  // after the keychain changed, forgets the key.
+  // A launch that couldn't read what was saved changes nothing, so the user opens it again, unless it still can't read
+  // it and there's a window to forget the key from, and if it still can't, as after the keychain changed, forgets it.
   const reopen = async () => {
-    if (disk.unread.size) {
+    if (disk.unread.size && !(disk.stuck.size && app.win.open)) {
       trace.push("Quit, and open it again");
       quietly(app.cloud.quit());
       await drain();
@@ -361,7 +368,7 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
       await keychainReset(action);
     } else if (action.op === "readFails") {
       trace.push("the app stops without quitting");
-      await relaunch(false, [[KEY_FILE], [SESSIONS_FILE], [KEY_FILE, SESSIONS_FILE]][action.a % 3]);
+      await relaunch(false, [[KEY_FILE], [SESSIONS_FILE], [KEY_FILE, SESSIONS_FILE]][action.a % 3], action.b % 2 === 0);
     } else if (action.op === "downgrade") {
       await downgrade(action);
     } else {

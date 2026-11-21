@@ -25,7 +25,9 @@ const disk = vi.hoisted((): Setup["disk"] => ({
   onWrite: () => {},
   failsFor: 0,
   readFails: new Set(),
+  stuck: new Set(),
   unread: new Set(),
+  forgave: false,
 }));
 
 vi.mock("electron", () => ({
@@ -58,8 +60,8 @@ vi.mock("fs", async (original) => {
       if (!name) return fs.readFileSync(path, options as BufferEncoding);
       const text = disk.files.get(name);
       if (text === undefined) throw missing();
-      if (disk.readFails.delete(name)) {
-        disk.unread.add(name);
+      if (disk.readFails.delete(name) || disk.stuck.has(name)) {
+        if (!disk.forgave) disk.unread.add(name);
         throw new Error("EIO: i/o error, read");
       }
       return text;
@@ -81,6 +83,7 @@ vi.mock("fs", async (original) => {
       disk.files.delete(source);
       disk.onWrite(name, text);
       disk.files.set(name, text);
+      disk.stuck.delete(name);
     },
   };
 });

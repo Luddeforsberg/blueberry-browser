@@ -111,6 +111,14 @@ export class CloudHandles {
     return this.set({ ...this.ids, handles: this.ids.handles.map((handle) => (pick(handle) ? { ...handle, keyId } : handle)) });
   }
 
+  // Adds what the files hold that this doesn't, as a launch would read it: each handle not kept already, and the Context
+  // of a project with none here.
+  take({ contexts, handles }: CloudIds): boolean {
+    const [tags, ids] = [new Set(this.ids.handles.map(({ tag }) => tag)), new Set(this.ids.handles.map(({ id }) => id))];
+    const added = handles.filter(({ tag, id }) => !tags.has(tag) && (id === null || !ids.has(id)));
+    return this.set({ contexts: { ...contexts, ...this.ids.contexts }, handles: [...this.ids.handles, ...added] });
+  }
+
   // Forgets the handles `pick` picks, on the user's word alone, since nothing else may drop one without proof.
   letGoOf(pick: (handle: Handle) => boolean): boolean {
     return this.set({ ...this.ids, handles: this.ids.handles.filter((handle) => !pick(handle) || this.releasing.has(handle.tag)) });
