@@ -3,7 +3,8 @@ import type { MascotDraft, RoutineSchedule, SuggestionWords } from "../../shared
 import { ACCESSORIES, BERRY, PALETTES, normaliseSite, paletteOf, parseMascotDraft, siteAllowed } from "../../shared/mascots";
 import type { Digest, Evidence, Feedback } from "./suggestionDigest";
 import { clock, parseDraft } from "../routines/routineSchedule";
-import { areSimilar, nameOfSite, plainText, wordsOf, type Pattern } from "./suggestionPatterns";
+import { areSimilar, plainText, wordsOf, type Pattern } from "./suggestionPatterns";
+import { siteWord } from "../../shared/siteDomains";
 import { fieldsOf } from "../../shared/fields";
 
 // What the model proposes, and the checks every proposal has to pass before it's a card. The model decides what to
@@ -238,7 +239,7 @@ const verifyOne = (raw: Record<string, unknown>, digest: Digest): Proposal | nul
 
   const otherNames = [
     ...WELL_KNOWN_SITES,
-    ...digest.allHosts.flatMap((host) => (hosts.includes(host) ? [] : [host, nameOfSite(host) ?? ""])),
+    ...digest.allHosts.flatMap((host) => (hosts.includes(host) ? [] : [host, siteWord(host) ?? ""])),
   ].filter((name) => name.length > 2 && !hosts.some((host) => host.includes(name.toLowerCase())));
   const fits = (...texts: string[]) => texts.every((text) => !DIGEST_ID.test(text) && namesOnly(text, hosts, otherNames));
 

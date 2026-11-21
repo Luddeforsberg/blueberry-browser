@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { Bookmark, MascotProfile } from "../../shared/library";
 import { at, clip, count, failed, fromWeb, json, UNTRUSTED_NOTE } from "./mcpResults";
 import type { McpHost, McpTool } from "./mcpTools";
+import { siteName, siteOf } from "../../shared/sites";
 
 // The tools that only read what's in the user's Blueberry: open tabs, a page that's open already, history, bookmarks and
 // what the mascots remember.
@@ -9,13 +10,6 @@ import type { McpHost, McpTool } from "./mcpTools";
 const MAX_LIST = 100;
 const DEFAULT_LIST = 20;
 
-const siteOf = (url: string) => {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "") || url;
-  } catch {
-    return url;
-  }
-};
 // The same page however it's written, such as with a capital in the host. Only http and https are pages here.
 const sameAddress = (a: string, b: string) => {
   try {
@@ -82,15 +76,18 @@ export const browsingTools = (host: McpHost, liveMascots: () => MascotProfile[])
       if (typeof url === "string" && url && !tab) {
         return failed(
           `No open tab is at ${url}. read_page only reads pages that are open already. To open it, use run_browser_task, which asks the user before anything that could send data.`,
-          `Refused: ${siteOf(url)} not open`,
+          `Refused: ${siteName(url)} not open`,
         );
       }
       if (tab) {
         if (tab.heldForUser)
-          return failed("The user is signing in or entering a code in that tab, so it can't be read.", `Refused: ${siteOf(tab.url)} held`);
+          return failed(
+            "The user is signing in or entering a code in that tab, so it can't be read.",
+            `Refused: ${siteName(tab.url)} held`,
+          );
         return {
           text: pageContent(host.clean(tab.url), host.clean(await host.readTab(tab.id, from))),
-          summary: `Read ${siteOf(tab.url)}`,
+          summary: `Read ${siteName(tab.url)}`,
         };
       }
       return failed("Give a tabId, or the url of an open tab.", "Nothing to read");

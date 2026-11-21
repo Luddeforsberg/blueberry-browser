@@ -2,7 +2,7 @@ import React from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
-import { linkSite } from "@shared/publishing";
+import { siteOf } from "@shared/sites";
 import { cn } from "@common/lib/utils";
 
 // Part of the message layout (ChatMessage.tsx): a reply's markdown.
@@ -13,7 +13,7 @@ import { cn } from "@common/lib/utils";
 const STRANGER_COMPONENTS: Components = {
   img: ({ alt }) => <span>{alt}</span>,
   a: ({ children, href }) => {
-    const site = href ? linkSite(href) : null;
+    const site = href ? siteOf(href) : null;
     const words = String(children);
     if (!site || words === site) return <span>{children}</span>;
     return (

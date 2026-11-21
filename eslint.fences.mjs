@@ -207,6 +207,23 @@ const fences = [
       "What keeps a file in the user data folder, or the account, or work that outlives a window, is made once in src/main/app (AppServices or appStores.ts). A window reaches it through w.app or w.stores and makes only what draws or lives in it (docs/ARCHITECTURE.md, eslint.fences.mjs).",
   },
   {
+    // A site decides limits and approvals, so every copy of "the host without www." has to be the same one. Each copy
+    // written out by hand answered a bad address differently, and one gave the words "a page" back as a site.
+    name: "sites",
+    in: ["src/**/*.{ts,tsx}", "runner/src/**/*.ts"],
+    allowed: { "src/shared/sites.ts": "stripWww and siteOf themselves." },
+    rules: {
+      "no-restricted-syntax": [
+        // /^www\./, /^(?:www\.)?/ and the like.
+        "Literal[regex.pattern=/^\\^\\(?(\\?:)?www/]",
+        // .replace("www.", ""), .startsWith("www.").
+        'CallExpression[callee.property.name=/^(replace|replaceAll|startsWith)$/][arguments.0.value="www."]',
+      ],
+    },
+    message:
+      "Get a site from src/shared/sites.ts: siteOf for an address's site (null where it has none), siteName for the words a person reads, stripWww for a host you already have, and siteDomains.ts for the whole site it belongs to (eslint.fences.mjs).",
+  },
+  {
     // The words follow the platform (DESIGN.md section 14). A sentence says "this computer", which is true on a Mac and a
     // PC alike, and only the switch between here and the cloud names the computer, for whichever it is. A log line is
     // nobody's words, so it may say what it likes.

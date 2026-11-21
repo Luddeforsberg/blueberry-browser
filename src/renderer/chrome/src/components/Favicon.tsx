@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Globe } from "lucide-react";
 import { cn } from "@common/lib/utils";
+import { siteOf, stripWww } from "@shared/sites";
 
 interface FaviconProps {
   src?: string | null | undefined;
@@ -14,14 +15,8 @@ interface FaviconProps {
 // The first letter of the site's name, so sites with no icon still look different from each other, on a tile in a colour
 // of its own (DESIGN.md section 8). The colour is the site's, from its name, never the chrome's.
 const LETTER_TILES = 8;
-const hostOf = (site: string) => {
-  try {
-    return new URL(site).hostname.replace(/^www\./, "");
-  } catch {
-    // Already a host.
-    return site.replace(/^www\./, "");
-  }
-};
+// Already a host where it isn't an address.
+const hostOf = (site: string) => siteOf(site) ?? stripWww(site);
 const tileOf = (site: string) => `var(--site-${([...hostOf(site)].reduce((sum, char) => sum + char.charCodeAt(0), 0) % LETTER_TILES) + 1})`;
 
 const siteLetter = (site: string) => hostOf(site).charAt(0).toUpperCase();

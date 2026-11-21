@@ -2,6 +2,8 @@ import { randomUUID } from "crypto";
 import type { RecordedChange, RecordedDraft, TrailKind, TrailStep } from "../../shared/library";
 import { withoutInvisible } from "../../shared/publishing";
 import { fieldsOf } from "../../shared/fields";
+import { registrableSite } from "../../shared/siteDomains";
+import { stripWww } from "../../shared/sites";
 
 // What's seen while the user shows Berry something, as plain notes. It's all pure, and all in memory: nothing here is
 // saved, and nothing here is sent until the user confirms on the review screen.
@@ -25,7 +27,10 @@ const MAX_CHANGE_LABEL = 40;
 const SEARCH_PARAMS = /^(q|query|p|s|k|search|searchstring|search_query|keyword|keywords|term|text|wd)$/i;
 // One segment like this in a path is a token rather than a place.
 const TOKEN_SEGMENT = /^(?=.*\d)[A-Za-z0-9_-]{24,}$/;
-const SECOND_LEVEL = /^(co|com|org|net|ac|gov|edu|or|ne)$/;
+// A name right under a country's own com, co, org and the like, such as alice.com.uk, is often sold to a stranger by
+// whoever holds com.uk, and the Public Suffix List doesn't know every one. It stays whole, so a routine there never
+// reaches its neighbours.
+const RESOLD_UNDER = /^(co|com|org|net|ac|gov|edu|or|ne)\.[^.]{2}$/;
 // One company runs many unrelated products on these, so docs.google.com is a site of its own, and a routine on it can't
 // reach mail.google.com.
 const MANY_PRODUCTS = [
@@ -46,14 +51,13 @@ const clean = (text: unknown, max: number): string => {
 };
 
 // A site as a person means it, so www.shop.example.co.uk is example.co.uk, but docs.google.com stays as it is. It's what a
-// routine stays on, along with its subdomains, and an address it can't read as a site gets no site at all.
+// routine stays on, along with its subdomains, and an address it can't read as a site gets no site at all. A host written
+// with a trailing dot stays whole, since the suffix list would read it as the undotted name and widen it.
 export const siteOfHost = (hostname: string): string => {
-  const host = hostname.toLowerCase().replace(/^www\./, "");
-  if (/^[\d.]+$/.test(host) || host.startsWith("[") || !host.includes(".")) return host;
-  const parts = host.split(".");
-  const [secondLevel, topLevel] = parts.slice(-2);
-  const keep = parts.length > 2 && topLevel?.length === 2 && secondLevel !== undefined && SECOND_LEVEL.test(secondLevel) ? 3 : 2;
-  const site = parts.slice(-keep).join(".");
+  const host = stripWww(hostname.toLowerCase());
+  if (host.endsWith(".")) return host;
+  const whole = registrableSite(host);
+  const site = RESOLD_UNDER.test(whole) ? host.replace(/\.$/, "").split(".").slice(-3).join(".") : whole;
   return MANY_PRODUCTS.includes(site) ? host : site;
 };
 
@@ -78,8 +82,8 @@ export const trailAddress = (url: string): TrailAddress | null => {
     const scheme = protocol === "http:" ? "http://" : "";
     return {
       site: siteOfHost(hostname),
-      host: hostname.replace(/^www\./, ""),
-      place: clean(`${scheme}${host.replace(/^www\./, "")}${path}`, MAX_PATH),
+      host: stripWww(hostname),
+      place: clean(`${scheme}${stripWww(host)}${path}`, MAX_PATH),
     };
   } catch {
     return null;

@@ -1,4 +1,4 @@
-import { siteOf } from "../tools/browserTools";
+import { siteName, siteOf } from "../../shared/sites";
 import type { Tab } from "../tabs/Tab";
 import type { CdpTab } from "../tools/CdpTab";
 import type { MascotProfile, UsedPage } from "../../shared/library";
@@ -97,7 +97,8 @@ export class Jobs extends Map<string, Job> {
     const job = this.jobOf(chatId);
     tabs.forEach((tab) => {
       job.attached.add(tab.id);
-      if (/^https?:/.test(tab.url)) job.attachedSites.add(siteOf(tab.url));
+      const site = siteOf(tab.url);
+      if (site) job.attachedSites.add(site);
       // Attaching a tab is the user sharing it, as sending the page in front is.
       job.takenOver.delete(tab.id);
       this.handoffs.letGo(tab);
@@ -152,7 +153,7 @@ export class Jobs extends Map<string, Job> {
       .filter((tab) => tab.id !== front && !this.isOwnTab(tab.id) && siteAllowed(tab.url, mascot.sites))
       .map((tab) => ({
         id: tab.id,
-        title: this.withoutCodes(tab.title || siteOf(tab.url)),
+        title: this.withoutCodes(tab.title || siteName(tab.url)),
         site: siteOf(tab.url),
         favicon: tab.favicon,
         problem: this.tabProblem(tab, chatId, mascot),
@@ -197,7 +198,7 @@ export class Jobs extends Map<string, Job> {
         handedBack: this.handoffs.everHandedOver.has(tab.id),
         codeTyped: "noScreenshotsUntil" in tab && tab.noScreenshotsUntil > 0,
       });
-      if (url) pages.set(url, { url: this.withoutCodes(url), title: this.withoutCodes(tab.title || siteOf(url)) });
+      if (url) pages.set(url, { url: this.withoutCodes(url), title: this.withoutCodes(tab.title || siteName(url)) });
     });
     const current = job.current ? tabOf(job.current) : null;
     const pointed = current && job.own.has(current.id) && replyPointsTo(run.partial, current.url) ? current.id : null;

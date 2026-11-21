@@ -1,6 +1,7 @@
 import type { MascotDraft, MascotExample, MascotProfile, GalleryMascot, PublishChoices } from "./library";
 import { fieldsOf } from "./fields";
 import { parseMascotDraft } from "./mascots";
+import { siteOf } from "./sites";
 
 // What strangers can read and add. Runtime code shared by main, the chrome renderer and the public site, so preloads may
 // only `import type` from here. Everything published is untrusted, in both directions: this checks what's sent, and
@@ -157,19 +158,9 @@ export const publishWarnings = (draft: Pick<MascotProfile, "instructions">, { au
   );
 };
 
-// Where a stranger's link goes, as a site name, so it reads as words and not a long address. Null for anything that isn't
-// a web address.
-export const linkSite = (href: string): string | null => {
-  try {
-    const url = new URL(href);
-    return url.protocol === "http:" || url.protocol === "https:" ? url.hostname.replace(/^www\./, "") : null;
-  } catch {
-    return null;
-  }
-};
-
 const linkWords = (text: string, href: string) => {
-  const site = linkSite(href);
+  // Where a stranger's link goes, as a site name, so it reads as words and not a long address.
+  const site = siteOf(href);
   if (!site || text === site) return text;
   return text === href || text === "" ? site : `${text} (${site})`;
 };

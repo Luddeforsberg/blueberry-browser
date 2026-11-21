@@ -1,4 +1,4 @@
-import { siteOf } from "../tools/browserTools";
+import { siteName } from "../../shared/sites";
 import type { Tab } from "../tabs/Tab";
 import type { CdpTab } from "../tools/CdpTab";
 import type { WorkTabState } from "../../shared/library";
@@ -73,7 +73,7 @@ export class WorkView {
     };
     return shown.tabIds
       .flatMap((id) => open.filter((tab) => tab.id === id))
-      .map((tab) => ({ tab, state: state(tab), site: siteOf(tab.url) }));
+      .map((tab) => ({ tab, state: state(tab), site: siteName(tab.url) }));
   }
 
   // A job in the cloud's pages are only ever its own. The chrome shows them from the cloud tab's own live view or
@@ -87,6 +87,6 @@ export class WorkView {
     };
     return shown.tabIds
       .flatMap((id) => this.cloud?.page(id) ?? [])
-      .map((tab) => ({ tab, cloud: true as const, state: state(tab), site: siteOf(tab.url) }));
+      .map((tab) => ({ tab, cloud: true as const, state: state(tab), site: siteName(tab.url) }));
   }
 }

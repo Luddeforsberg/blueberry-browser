@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createPageTools } from "../tools/browserTools";
 import { draftFromReply, MAX_STEPS, plainDraft, searchIn, siteOfHost, sitesOf, Trail, trailAddress, trailForModel } from "./recordingTrail";
 import type { Tab } from "../tabs/Tab";
-import { narrowSites } from "../../shared/mascots";
+import { narrowSites, siteAllowed } from "../../shared/mascots";
 import { defined } from "../../shared/testing";
 
 const trail = (site = "shop.example") => {
@@ -33,6 +33,26 @@ describe("addresses", () => {
     expect(siteOfHost("cdn.webhallen.com")).toBe("webhallen.com");
     expect(siteOfHost("127.0.0.1")).toBe("127.0.0.1");
     expect(siteOfHost("localhost")).toBe("localhost");
+  });
+
+  it("keeps someone's own site on a host anyone can have a name on to itself", () => {
+    expect(siteOfHost("myshop.herokuapp.com")).toBe("myshop.herokuapp.com");
+    expect(siteOfHost("www.someone.github.io")).toBe("someone.github.io");
+    expect(siteOfHost("example.tokyo.jp")).toBe("example.tokyo.jp");
+    // Never wider than a name under a country's com or co, which the list may not have.
+    expect(siteOfHost("shop.alice.com.uk")).toBe("alice.com.uk");
+    expect(siteOfHost("alice.co.se")).toBe("alice.co.se");
+    expect(siteOfHost("alice.co.a1")).toBe("alice.co.a1");
+    // Only one "www." is taken off.
+    expect(siteOfHost("www.www.localhost")).toBe("www.localhost");
+  });
+
+  it("never widens a host written with a trailing dot", () => {
+    const site = siteOfHost("shop.example.com.");
+    expect(site).toBe("shop.example.com.");
+    expect(narrowSites([], [site])).toEqual([site]);
+    expect(siteAllowed("https://other.example.com/", [site])).toBe(false);
+    expect(siteAllowed("https://example.com/", [site])).toBe(false);
   });
 
   it("keeps the whole host where one company runs many products", () => {
