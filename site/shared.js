@@ -244,9 +244,53 @@ var conversationsOf = (jobs) => {
   const groups = /* @__PURE__ */ new Map();
   for (const job of [...jobs].sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))) {
     const id = conversationIdOf(job);
-    groups.set(id, [...groups.get(id) ?? [], job]);
+    const before = groups.get(id);
+    groups.set(id, before ? [...before, job] : [job]);
   }
   return [...groups].map(([id, grouped]) => ({ id, jobs: grouped, latest: grouped.at(-1) })).sort((a, b) => b.latest.created_at.localeCompare(a.latest.created_at));
+};
+var STATUSES = ["queued", "running", "waiting", "done", "failed", "stopped"];
+var isStatus = (value) => STATUSES.some((status) => status === value);
+var MAX_PHONE_STEPS = 200;
+var textOr = (value, otherwise) => typeof value === "string" ? value : otherwise;
+var phoneJobFromRow = (input) => {
+  const row = fieldsOf(input);
+  const { id, prompt, created_at: createdAt, status, mascot, steps, history } = row;
+  if (typeof id !== "string" || typeof prompt !== "string" || typeof createdAt !== "string") return null;
+  const who = fieldsOf(mascot);
+  return {
+    id,
+    conversation_id: textOr(row.conversation_id, null),
+    prompt,
+    created_at: createdAt,
+    updated_at: textOr(row.updated_at, createdAt),
+    status: isStatus(status) ? status : "stopped",
+    mascot: { id: textOr(who.id, ""), name: textOr(who.name, "") },
+    steps: (Array.isArray(steps) ? steps : []).flatMap((step) => {
+      const { text, done, kind } = fieldsOf(step);
+      return typeof text === "string" ? [{ text, done: done === true, kind: textOr(kind, null) }] : [];
+    }).slice(-MAX_PHONE_STEPS),
+    reply: textOr(row.reply, ""),
+    error: textOr(row.error, null),
+    live_view_url: textOr(row.live_view_url, null),
+    context_id: textOr(row.context_id, null),
+    ...history === void 0 ? {} : { history },
+    ask: null
+  };
+};
+var phoneAskFromRow = (input) => {
+  const row = fieldsOf(input);
+  const { id, approval_id: approvalId, approval_kind: kind } = row;
+  if (typeof id !== "string" || typeof approvalId !== "string") return null;
+  return {
+    id,
+    approval_id: approvalId,
+    approval_kind: kind === "question" || kind === "handoff" ? kind : "approval",
+    approval_text: textOr(row.approval_text, ""),
+    approval_need: textOr(row.approval_need, null),
+    approval_site: textOr(row.approval_site, null),
+    approval_asked_at: textOr(row.approval_asked_at, null)
+  };
 };
 
 // src/shared/lateWork.ts
@@ -397,6 +441,7 @@ export {
   asContinuation,
   conversationsOf,
   fetchWithin,
+  fieldsOf,
   finishedWhen,
   followUpHistory,
   isUuid,
@@ -406,6 +451,8 @@ export {
   oneAtATime,
   parsePublishedRow,
   permissionsInWords,
+  phoneAskFromRow,
+  phoneJobFromRow,
   plainFromMarkdown,
   plausibleCode,
   rowTime,

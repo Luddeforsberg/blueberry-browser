@@ -1,8 +1,10 @@
 // Pictures of Blueberry for the front page, made of the app's own parts (DESIGN.md sections 3 to 9): the mascots, the
 // pips, a message, the working line, an approval card in its shell. They're pictures, not controls: every one is built
 // inert and hidden from assistive technology, and the words beside it say what it shows.
-import { drawPose, el, pips } from "./draw.js";
+import { el, pips, poseDrawer } from "./draw.js";
 import { HOME_POSES } from "./homePoses.js";
+
+/** @import { Child, Drawn, Mood } from "./draw.js" */
 
 export { el, pips };
 
@@ -20,6 +22,7 @@ const ICONS = {
   tick: ["M20 6 9 17l-5-5"],
 };
 
+/** @param {keyof typeof ICONS} name */
 export const icon = (name, className = "") => {
   const drawing = document.createElementNS(SVG, "svg");
   drawing.setAttribute("viewBox", "0 0 24 24");
@@ -75,6 +78,7 @@ export const MASCOTS = [
 
 // One job, told the way the app tells it: the steps in the words main writes, the card in the words the tool layer
 // and askingWords.ts write.
+/** @type {{ title: string, asked: string, time: string, steps: [string, string][], said: string }} */
 export const JOB = {
   title: "Reply to Anna",
   asked: "Tell Anna that Thursday at 10 works for me.",
@@ -89,22 +93,29 @@ export const JOB = {
 };
 
 // A picture is never a control: nothing in it takes the pointer or the keyboard.
+/** @param {string} className @param {...Child} children */
 export const picture = (className, ...children) => {
   const node = el("div", { className: `pic ${className}`, ariaHidden: "true" }, ...children);
   node.inert = true;
   return node;
 };
 
-export const face = (mascot, mood, size) => drawPose(HOME_POSES, mascot, mood, size, { named: false });
+const drawHome = poseDrawer(HOME_POSES);
+/** @param {Drawn} mascot @param {Mood} mood @param {number} size */
+export const face = (mascot, mood, size) => drawHome(mascot, mood, size, { named: false });
 
 // A letter on a coloured tile, as a site with no icon of its own shows (DESIGN.md section 8, Favicons).
+/** @param {string} letter @param {number} colour */
 export const tile = (letter, colour) => el("span", { className: `tile site-${colour}` }, letter);
 
+/** @param {string} text */
 export const bubble = (text) => el("p", { className: "bubble" }, text);
 
+/** @param {string} mark @param {string} words */
 const step = (mark, words, className = "") => el("li", { className }, pips(mark), el("span", {}, words));
 
 // The working line and the steps under it, the live one last (Main chat in DESIGN.md).
+/** @param {string} live */
 export const working = (live) =>
   el(
     "div",
@@ -120,6 +131,7 @@ export const working = (live) =>
     ),
   );
 
+/** @param {string} words @param {string} kind */
 const button = (words, kind) => el("span", { className: `btn ${kind}` }, words);
 
 // Asking, for leave to do something: a card set into a shell, with the exact words and why it asks under it.
@@ -138,5 +150,6 @@ export const askCard = () =>
   );
 
 // A mascot's reply, its face beside its first line.
+/** @param {Mood} mood @param {...Child} children */
 export const reply = (mood, ...children) =>
   el("div", { className: "reply" }, face(BERRY, mood, 24), el("div", { className: "reply-body" }, ...children));

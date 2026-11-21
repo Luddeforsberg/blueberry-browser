@@ -1,0 +1,18 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.json",
+  // The phone page's service worker, plain JavaScript like the rest of site/, with a worker's globals instead of a page's.
+  "include": ["site/app/sw.js"],
+  "compilerOptions": {
+    "composite": true,
+    "allowJs": true,
+    "checkJs": true,
+    "lib": ["ESNext", "WebWorker"],
+    "types": [],
+    "noImplicitAny": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "noUncheckedIndexedAccess": true
+  }
+}

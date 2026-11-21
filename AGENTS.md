@@ -8,7 +8,7 @@ An AI browser built with Electron, React and TypeScript. [DESIGN.md](./DESIGN.md
 |---|---|
 | `pnpm install` | Install dependencies |
 | `pnpm dev` | Run the app with hot reload |
-| `pnpm run typecheck` | Typecheck main, preload, tests and renderers |
+| `pnpm run typecheck` | Typecheck main, preload, tests, renderers and `site/` |
 | `pnpm run format` | Format everything with Prettier (`.prettierrc.json`). `pnpm run format:check` fails on any file that isn't |
 | `pnpm run lint` | Lint, with types, so every TypeScript file must be in a tsconfig. Any warning or error fails, and a comment can't turn a rule off: change it in `eslint.config.mjs`. Also runs `scripts/oldNames.mjs` and `scripts/runnerElectron.mjs` |
 | `pnpm run knip` | Fail on unused files, exports and dependencies. `knip.config.ts` says where the entry points are |

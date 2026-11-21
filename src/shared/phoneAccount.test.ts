@@ -56,7 +56,7 @@ const phone = (await import(/* @vite-ignore */ new URL("../../site/app/state.js"
   };
 };
 
-const job = (id: string, status = "done") => ({ id, status, conversation_id: id, created_at: "2026-11-20T10:00:00Z" });
+const job = (id: string, status = "done") => ({ id, status, conversation_id: id, prompt: "Go", created_at: "2026-11-20T10:00:00Z" });
 const json = (body: unknown) => new Response(JSON.stringify(body));
 
 const signInAnswer = (name: string) =>

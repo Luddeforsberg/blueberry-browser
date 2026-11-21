@@ -2,6 +2,7 @@
 const KEPT = "blueberry.appearance";
 const dark = matchMedia("(prefers-color-scheme: dark)");
 
+/** @returns {Appearance} */
 const read = () => {
   try {
     const kept = localStorage.getItem(KEPT);
@@ -10,12 +11,16 @@ const read = () => {
     return "system";
   }
 };
+/** @typedef {"system" | "light" | "dark"} Appearance */
+
+/** @type {Appearance} */
 let chosen = read();
 
 export const appearance = () => chosen;
 
 const follow = () => document.documentElement.classList.toggle("dark", chosen === "dark" || (chosen === "system" && dark.matches));
 
+/** @param {Appearance} choice */
 export const setAppearance = (choice) => {
   chosen = choice === "light" || choice === "dark" ? choice : "system";
   try {

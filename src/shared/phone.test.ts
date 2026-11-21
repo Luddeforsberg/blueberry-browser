@@ -10,6 +10,8 @@ import {
   followUpHistory,
   MAX_HISTORY,
   mascotSnapshot,
+  phoneAskFromRow,
+  phoneJobFromRow,
 } from "./phone";
 import { defined } from "./testing";
 
@@ -159,5 +161,90 @@ describe("conversations in the cloud", () => {
       ["legacy", ["legacy"], "legacy"],
     ]);
     expect(conversationsOf([])).toEqual([]);
+  });
+});
+
+describe("a job row as the phone reads it", () => {
+  const read = (row: unknown) => {
+    const job = phoneJobFromRow(row);
+    if (!job) throw new Error("The row wasn't read");
+    return job;
+  };
+  const ROW = {
+    id: "j-1",
+    conversation_id: "c-1",
+    prompt: "Find a cable",
+    created_at: "2026-11-21T10:00:00Z",
+    updated_at: "2026-11-21T10:05:00Z",
+    status: "done",
+    mascot: { id: "m-1", name: "Scout", instructions: "kept on the server" },
+    steps: [{ text: "Opened shop.example", done: true, kind: "open" }],
+    reply: "Found one.",
+    error: null,
+    live_view_url: null,
+    context_id: "ctx-1",
+  };
+
+  it("keeps what the page draws, with no ask until one is read", () => {
+    expect(phoneJobFromRow(ROW)).toEqual({
+      ...ROW,
+      mascot: { id: "m-1", name: "Scout" },
+      ask: null,
+    });
+  });
+
+  it("leaves out a row it can't place in a conversation", () => {
+    for (const missing of ["id", "prompt", "created_at"]) expect(phoneJobFromRow({ ...ROW, [missing]: 1 }), missing).toBeNull();
+    for (const row of [null, "j-1", [ROW], 3]) expect(phoneJobFromRow(row)).toBeNull();
+  });
+
+  it("reads anything else that's off as nothing", () => {
+    const job = read({
+      id: "j-2",
+      prompt: "Go",
+      created_at: "2026-11-21T10:00:00Z",
+      status: "paused",
+      mascot: "Scout",
+      steps: [{ text: "Opened" }, { done: true }, "Clicked", null],
+      reply: 4,
+      error: { message: "no" },
+    });
+    expect(job).toMatchObject({
+      conversation_id: null,
+      updated_at: "2026-11-21T10:00:00Z",
+      status: "stopped",
+      mascot: { id: "", name: "" },
+      steps: [{ text: "Opened", done: false, kind: null }],
+      reply: "",
+      error: null,
+      live_view_url: null,
+      context_id: null,
+    });
+    expect("history" in job).toBe(false);
+  });
+
+  it("keeps the newest 200 steps", () => {
+    const steps = Array.from({ length: 201 }, (_, at) => ({ text: `Step ${at}` }));
+    const kept = read({ ...ROW, steps }).steps;
+    expect(kept).toHaveLength(200);
+    expect(kept[0]?.text).toBe("Step 1");
+    expect(read({ ...ROW, steps: steps.slice(0, 200) }).steps).toHaveLength(200);
+    expect(read({ ...ROW, steps: [] }).steps).toEqual([]);
+  });
+
+  it("carries the history only when it was asked for, for followUpHistory to check", () => {
+    const history = [{ role: "user", content: "Earlier" }];
+    const job = read({ ...ROW, history });
+    expect(job.history).toBe(history);
+    expect(followUpHistory(job)[0]).toEqual({ role: "user", content: "Earlier" });
+  });
+
+  it("reads an ask only with the ids to answer it by, and an unknown kind as asking for an OK", () => {
+    const ask = { id: "j-1", approval_id: "a-1", approval_kind: "question", approval_text: "Which colour?", approval_site: "shop.example" };
+    expect(phoneAskFromRow(ask)).toEqual({ ...ask, approval_need: null, approval_asked_at: null });
+    expect(phoneAskFromRow({ ...ask, approval_id: null })).toBeNull();
+    expect(phoneAskFromRow({ ...ask, id: undefined })).toBeNull();
+    expect(phoneAskFromRow({ ...ask, approval_kind: "something new" })?.approval_kind).toBe("approval");
+    expect(phoneAskFromRow({ ...ask, approval_text: null })?.approval_text).toBe("");
   });
 });

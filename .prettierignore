@@ -21,6 +21,7 @@ site/app/pips.js
 site/app/poses.js
 site/homePoses.js
 site/shared.js
+site/shared.d.ts
 
 # Pages tests and evals load as they are, and design mocks made by their own scripts.
 evals/fixtures
