@@ -172,8 +172,8 @@ test("real keys, going back, and closing only a tab Berry opened", async () => {
   const finish = model.holdBeforeFirstToken();
   await panel.getByRole("textbox", { name: "Message" }).fill("Go");
   await panel.getByRole("textbox", { name: "Message" }).press("Enter");
-  // Each click and key in this job waits Tab.settled's 300ms for a load to start, and the first message loads LangChain,
-  // so the job takes about 4.5s alone: too close to the default 5s, and past it under load.
+  // Each click and key in this job waits Tab.settled's 300ms for a load to start, and the first message may wait for LangChain
+  // to finish loading, so the job takes about 4.5s alone: too close to the default 5s, and past it under load.
   await expect.poll(() => JSON.stringify(model.requests.at(-1)?.messages), { timeout: 15_000 }).toContain('"name":"go_back"');
 
   const said = JSON.stringify(model.requests.at(-1)?.messages);
