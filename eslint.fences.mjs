@@ -195,7 +195,7 @@ const fences = [
     // PC alike, and only the switch between here and the cloud names the computer, for whichever it is. A log line is
     // nobody's words, so it may say what it likes.
     name: "platform-words",
-    in: ["src/**/*.{ts,tsx}"],
+    in: ["src/**/*.{ts,tsx}", "runner/src/**/*.ts"],
     allowed: { "src/renderer/chrome/src/whereSides.ts": "This Mac or This PC, on the switch." },
     rules: {
       "no-restricted-syntax": [

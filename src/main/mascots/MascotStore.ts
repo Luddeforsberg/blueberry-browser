@@ -87,9 +87,14 @@ export class MascotStore {
     if (taken) return { ok: false, error: `You already have a ${draft.name}. Give this one its own name.` };
     const savedId = id ?? randomUUID();
     // Editing a copy from the Gallery leaves it that copy, so the Gallery doesn't offer a second one. Its line goes
-    // with the first change to its instructions, since it described the ones it came with.
+    // with the first change to its instructions, since it described the ones it came with. A starter's comes back with
+    // the starter's words, as it does on loading, so a restart never changes what shows.
     const before = id ? this.mascots.find((mascot) => mascot.id === id) : undefined;
-    const line = before ? (before.instructions === draft.instructions ? before.line : undefined) : from?.line;
+    const line = before
+      ? before.instructions === draft.instructions
+        ? before.line
+        : starterLine(before.galleryId, draft.instructions)
+      : from?.line;
     // A Gallery entry is someone else's, so where it works is the user's own choice, made later.
     const saved: MascotProfile = {
       ...draft,

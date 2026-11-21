@@ -146,6 +146,16 @@ describe("MascotStore", () => {
     expect(store.find("Kept")?.line).toBe(starter.description);
     expect(store.find("Changed")?.line).toBeUndefined();
     expect(store.find("Long")?.line).toBeUndefined();
+
+    // Changed and changed back, it's the same before a restart as after.
+    const { look, sites, tools } = starter.draft;
+    const edit = (instructions: string) => store.save("Kept", { name: "Kept", look, sites, tools, instructions });
+    expect(edit("Mine now.").ok).toBe(true);
+    expect(store.find("Kept")?.line).toBeUndefined();
+    expect(new MascotStore(path).find("Kept")?.line).toBeUndefined();
+    expect(edit(starter.draft.instructions).ok).toBe(true);
+    expect(store.find("Kept")?.line).toBe(starter.description);
+    expect(new MascotStore(path).find("Kept")?.line).toBe(starter.description);
   });
 
   it("holds a Gallery copy to everything a hand-made mascot is, and refuses a name that's taken", () => {
