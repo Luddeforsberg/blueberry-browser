@@ -20,6 +20,10 @@ const BUTTONS = "Its own buttons, from before the kit.";
 const FIELDS = "A field, which the kit has none of yet.";
 const BOTH = "Its own buttons, from before the kit, and a field, which the kit has none of yet.";
 
+// The type a cast is to, or any type inside it, and never the expression being cast.
+const CAST = ":matches(TSAsExpression, TSTypeAssertion)";
+const castTo = (type) => `${CAST} > ${type}.typeAnnotation, ${CAST} > *.typeAnnotation ${type}`;
+
 const fences = [
   {
     name: "fetch",
@@ -111,11 +115,15 @@ const fences = [
     rules: {
       "no-restricted-syntax": [
         // `as Record<string, unknown>`, alone, in a list or a union, or inside another type.
-        ':matches(TSAsExpression, TSTypeAssertion) TSTypeReference[typeName.name="Record"][typeArguments.params.0.type="TSStringKeyword"][typeArguments.params.1.type="TSUnknownKeyword"]',
+        castTo(
+          'TSTypeReference[typeName.name="Record"][typeArguments.params.0.type="TSStringKeyword"][typeArguments.params.1.type="TSUnknownKeyword"]',
+        ),
         // `as { [key: string]: unknown }`.
-        ':matches(TSAsExpression, TSTypeAssertion) TSIndexSignature[typeAnnotation.typeAnnotation.type="TSUnknownKeyword"]',
+        castTo(
+          'TSIndexSignature[parameters.0.typeAnnotation.typeAnnotation.type="TSStringKeyword"][typeAnnotation.typeAnnotation.type="TSUnknownKeyword"]',
+        ),
         // `as { name?: unknown }`, the same thing for one field.
-        ":matches(TSAsExpression, TSTypeAssertion) TSPropertySignature[optional=true] > TSTypeAnnotation > TSUnknownKeyword",
+        castTo("TSPropertySignature[optional=true] > TSTypeAnnotation > TSUnknownKeyword"),
       ],
     },
     message:
