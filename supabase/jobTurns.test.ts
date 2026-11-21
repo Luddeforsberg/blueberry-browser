@@ -150,10 +150,15 @@ describe("which job of a conversation is newest", () => {
   });
 
   it("can be run again over itself, and leaves every turn as it was", async () => {
-    const before = await turns(MANY);
+    // Every job, those whose clock disagrees with their turns among them.
+    const all = () => db.query("select id, turn from public.cloud_jobs order by id").then(({ rows }) => rows);
+    const before = await all();
+    expect(before.length).toBeGreaterThan(20);
     await run(THIS);
-    expect(await turns(MANY)).toEqual(before);
+    expect(await all()).toEqual(before);
     // And the start still has one signature, so no call is ambiguous.
+    const signatures = await db.query("select 1 from pg_proc where proname = 'start_cloud_job' and pronamespace = 'public'::regnamespace");
+    expect(signatures.rows).toHaveLength(1);
     const fresh = randomUUID();
     expect(await start(ALICE, fresh, fresh, null)).toBe(fresh);
     expect(await turns(fresh)).toEqual([[fresh, 1]]);
