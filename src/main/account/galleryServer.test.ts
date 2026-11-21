@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { GalleryServer, publicPageLink, serverConfig } from "./galleryServer";
+import { GalleryServer, publicPageLink, ServerError, serverConfig } from "./galleryServer";
 
 const KEY = "sb_publishable_abc";
 
@@ -59,5 +59,44 @@ describe("a conversation's jobs", () => {
     expect(rows.map(({ id }) => id)).toEqual(Array.from({ length: total }, (_, index) => `job-${index}`));
     // One more page than it fills, or just the one.
     expect(asked).toHaveLength(Math.floor(total / 100) + 1);
+  });
+});
+
+describe("an answer that should be a list", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const server = new GalleryServer({ url: "https://example.supabase.co", key: "sb_publishable_x" });
+  const answering = (body: string) => vi.stubGlobal("fetch", async () => new Response(body, { status: 200 }));
+
+  // Read as none, the routines' keys would say every routine sent from here had gone from the cloud, so one deleted here
+  // would never be taken off it there.
+  it.each(["", "null", "{}", '"key"', "<html>Signed out of the network</html>"])("fails rather than reads as none: %j", async (body) => {
+    answering(body);
+    await expect(server.myCloudRoutineKeys("token")).rejects.toThrow(ServerError);
+    await expect(server.cloudJobs("token", ["j"])).rejects.toThrow(ServerError);
+  });
+
+  it("reads what's in it, and only what it can be", async () => {
+    answering("[]");
+    expect(await server.myCloudRoutineKeys("token")).toEqual([]);
+    answering('["a", 1, null, "b"]');
+    expect(await server.myCloudRoutineKeys("token")).toEqual(["a", "b"]);
+    expect(await server.cloudJobs("token", ["j"])).toEqual([{}, {}, {}, {}]);
+  });
+});
+
+describe("a sign-in's answer", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const server = new GalleryServer({ url: "https://example.supabase.co", key: "sb_publishable_x" });
+  const answering = (body: string) => vi.stubGlobal("fetch", async () => new Response(body, { status: 200 }));
+
+  // Taken for no session, a refresh would sign the user out over an answer nobody could read.
+  it.each(["", "null", "[]", "<html>Signed out of the network</html>"])("that isn't one fails as the server: %j", async (body) => {
+    answering(body);
+    await expect(server.refresh("refresh", "a@example.com")).rejects.toThrow(expect.objectContaining({ status: 500 }));
+  });
+
+  it("with no session in it, as a signup waiting on the email gives, is none", async () => {
+    answering(JSON.stringify({ id: "user", email: "a@example.com" }));
+    expect(await server.signUp("a@example.com", "password")).toBeNull();
   });
 });

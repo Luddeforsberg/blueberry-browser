@@ -4,6 +4,7 @@ import type { PhoneState } from "../../shared/ipc";
 import type { IncomingChoice, IncomingReply, PhoneChannel, PhoneChoice } from "./Phone";
 import { readTelegramFile, writeTelegramFile, type SavedBot } from "./telegramFile";
 import { removeFile } from "../library/savedFile";
+import { botUsername, envelopeOf, sentId, updatesOf, type Message, type Update } from "./telegramAnswers";
 
 // The user's own Telegram bot, reached from here with long polling, so no server of ours is involved. The token only
 // ever goes in the address of these requests and, encrypted, into one file. Nothing logs either, and no error from a
@@ -51,19 +52,6 @@ class TelegramError extends Error {
   ) {
     super(`Telegram answered ${status}`);
   }
-}
-
-interface Message {
-  message_id: number;
-  chat: { id: number; type: string };
-  text?: string;
-  reply_to_message?: { message_id: number };
-}
-
-interface Update {
-  update_id: number;
-  message?: Message;
-  callback_query?: { id: string; from: { id: number }; message?: { message_id: number; chat: { id: number } }; data?: string };
 }
 
 // Ends early on abort. Either way the other is undone, so a poller that backs off for long doesn't gather listeners.
@@ -149,7 +137,7 @@ export class TelegramChannel implements PhoneChannel {
     if (!safeStorage.isEncryptionAvailable()) return refuse("This computer has no safe place to keep the token, so it wasn’t saved.");
     let username: string | undefined;
     try {
-      username = (await this.request<{ username?: string }>(token, "getMe", {}, AbortSignal.timeout(CALL_ABORT_MS))).username;
+      username = botUsername(await this.request(token, "getMe", {}, AbortSignal.timeout(CALL_ABORT_MS)));
     } catch (error) {
       return refuse(
         error instanceof TelegramError ? "Telegram didn’t accept that token." : "Couldn’t reach Telegram, so nothing was saved. Try again.",
@@ -200,7 +188,7 @@ export class TelegramChannel implements PhoneChannel {
   async send(text: string, choices: PhoneChoice[] = []): Promise<string | null> {
     if (!this.ready) return null;
     try {
-      const sent = await this.call<Message>("sendMessage", {
+      const sent = await this.call("sendMessage", {
         chat_id: this.chatId,
         text,
         // Telegram's servers would fetch any address in the message for a preview, and it may be one with data in it.
@@ -210,7 +198,7 @@ export class TelegramChannel implements PhoneChannel {
           : {}),
       });
       if (this.problem === CANT_MESSAGE) this.setProblem(null);
-      return String(sent.message_id);
+      return sentId(sent);
     } catch (error) {
       if (error instanceof TelegramError && error.status === 403) this.setProblem(CANT_MESSAGE);
       else this.noteFailure(error);
@@ -254,7 +242,9 @@ export class TelegramChannel implements PhoneChannel {
         const params = caughtUp
           ? { offset, timeout: POLL_SECONDS, allowed_updates: ONLY_THESE_UPDATES }
           : { offset: -1, limit: 1, timeout: 0, allowed_updates: ONLY_THESE_UPDATES };
-        const updates = await this.call<Update[]>("getUpdates", params, AbortSignal.any([signal, AbortSignal.timeout(POLL_ABORT_MS)]));
+        const updates = updatesOf(await this.call("getUpdates", params, AbortSignal.any([signal, AbortSignal.timeout(POLL_ABORT_MS)])));
+        // Read as none, it would ask again at once, so it waits as when Telegram can't be reached.
+        if (!updates) throw new Error("Telegram's updates couldn't be read");
         if (signal.aborted) return;
         backoff = FIRST_BACKOFF_MS;
         if (this.problem === NO_NETWORK || this.problem === OTHER_POLLER) this.setProblem(null);
@@ -332,13 +322,13 @@ export class TelegramChannel implements PhoneChannel {
   }
 
   // Waits out a limit Telegram has set, then tries once more if it sets another.
-  private async call<T = unknown>(method: string, params: object, signal = AbortSignal.timeout(CALL_ABORT_MS)): Promise<T> {
+  private async call(method: string, params: object, signal = AbortSignal.timeout(CALL_ABORT_MS)): Promise<unknown> {
     const token = this.token;
     if (token === null) throw new TelegramError(401, null);
     for (let attempt = 0; ; attempt++) {
       await sleep(this.waitUntil - Date.now(), signal);
       try {
-        return await this.request<T>(token, method, params, signal);
+        return await this.request(token, method, params, signal);
       } catch (error) {
         if (!(error instanceof TelegramError) || error.retryAfter === null) throw error;
         this.waitUntil = Date.now() + error.retryAfter * 1000;
@@ -347,9 +337,10 @@ export class TelegramChannel implements PhoneChannel {
     }
   }
 
-  private async request<T>(token: string, method: string, params: object, signal: AbortSignal): Promise<T> {
+  // What the method gave, to be checked by whoever asked: a caller never names its type.
+  private async request(token: string, method: string, params: object, signal: AbortSignal): Promise<unknown> {
     let response: Response;
-    let body: { ok?: boolean; result?: T; parameters?: { retry_after?: number } };
+    let body: unknown;
     try {
       response = await fetch(`${this.api}/bot${token}/${method}`, {
         method: "POST",
@@ -362,8 +353,9 @@ export class TelegramChannel implements PhoneChannel {
       // Dropped, whatever it says, as it could quote the address.
       throw new Error("Couldn't reach Telegram");
     }
-    if (!body.ok) throw new TelegramError(response.status, body.parameters?.retry_after ?? null);
-    return body.result as T;
+    const { ok, result, retryAfter } = envelopeOf(body);
+    if (!ok) throw new TelegramError(response.status, retryAfter);
+    return result;
   }
 
   private load(): SavedBot | null {

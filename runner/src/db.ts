@@ -7,6 +7,7 @@ import {
   type CloudJobStatus,
 } from "../../src/main/remoteJobs/cloudJobs";
 import type { ActionApproval } from "../../src/shared/ipc";
+import { fieldsOf } from "../../src/shared/fields";
 import { GalleryServer, type ServerSession } from "../../src/main/account/galleryServer";
 import type { ChatStep } from "../../src/shared/library";
 import type { PushDb, PushSubscriptionRow } from "./push";
@@ -151,7 +152,8 @@ export const supabaseDb = (
       throw new DbError(0);
     }
   };
-  const rpc = async <T>(name: string, body: object): Promise<T> => {
+  // What the function answered, to be checked here: a caller never names its type.
+  const rpc = async (name: string, body: object): Promise<unknown> => {
     let { status, text } = await call(name, body);
     // An expired session: once more, with a new one.
     if (status === 401) {
@@ -159,37 +161,47 @@ export const supabaseDb = (
       ({ status, text } = await call(name, body));
     }
     if (status < 200 || status >= 300) throw new DbError(status);
-    return (text ? JSON.parse(text) : null) as T;
+    try {
+      return text ? JSON.parse(text) : null;
+    } catch {
+      throw new DbError(500);
+    }
+  };
+  // A function that returns a table or a set answers with rows, each as its fields. Anything else fails as a call does,
+  // so it never reads as there being none.
+  const rows = async (name: string, body: object): Promise<Record<string, unknown>[]> => {
+    const answer = await rpc(name, body);
+    if (!Array.isArray(answer)) throw new DbError(500);
+    return answer.map(fieldsOf);
   };
 
   return {
     // Takes up the link the owner made in Blueberry. False until they have.
-    accept: async () => (await rpc<unknown>("accept_cloud_runner_link", { p_owner_email: owner })) === true,
+    accept: async () => (await rpc("accept_cloud_runner_link", { p_owner_email: owner })) === true,
     // Where ChatGPT and Claude connect, for the owner to see in Settings. Null when the relay is off.
     setRelayUrl: async (relayUrl) => {
       await rpc("runner_set_relay_url", { p_url: relayUrl });
     },
     // The relay's calls, as this runner, each with a grant's secret. None of them can decide anything.
-    relayMascots: async (secret) => (await rpc<Record<string, unknown>[]>("relay_mascots", { p_secret: secret })) ?? [],
+    relayMascots: async (secret) => rows("relay_mascots", { p_secret: secret }),
     relayStartJob: async (secret, prompt, mascot, where) => {
-      const id = await rpc<unknown>("relay_start_job", { p_secret: secret, p_prompt: prompt, p_mascot: mascot, p_where: where });
+      const id = await rpc("relay_start_job", { p_secret: secret, p_prompt: prompt, p_mascot: mascot, p_where: where });
       if (id === null && where === "mac") return null;
       if (typeof id !== "string") throw new DbError(500);
       return id;
     },
-    relayJobs: async (secret, ids) => (await rpc<Record<string, unknown>[]>("relay_jobs", { p_secret: secret, p_ids: ids })) ?? [],
+    relayJobs: async (secret, ids) => rows("relay_jobs", { p_secret: secret, p_ids: ids }),
     relayStopJob: async (secret, jobId) => {
       await rpc("relay_stop_job", { p_secret: secret, p_job: jobId });
     },
     relayActivate: async (secret) => {
-      if ((await rpc<unknown>("relay_activate_grant", { p_secret: secret })) !== true) throw new DbError(500);
+      if ((await rpc("relay_activate_grant", { p_secret: secret })) !== true) throw new DbError(500);
     },
     relayRevoke: async (secret) => {
       await rpc("relay_revoke_grant", { p_secret: secret });
     },
     claim: async () => {
-      const rows = await rpc<Record<string, unknown>[]>("runner_claim_job", {});
-      const row = rows?.[0];
+      const [row] = await rows("runner_claim_job", {});
       if (!row || typeof row.id !== "string" || typeof row.prompt !== "string") return null;
       return {
         id: row.id,
@@ -204,7 +216,7 @@ export const supabaseDb = (
     update: async (jobId, update) => {
       const { status, steps, reply, error, liveView } = fitJobUpdate(update);
       return (
-        (await rpc<boolean>("runner_update_job", {
+        (await rpc("runner_update_job", {
           p_job: jobId,
           p_status: status ?? null,
           p_steps: steps ?? null,
@@ -215,13 +227,13 @@ export const supabaseDb = (
       );
     },
     ask: async (jobId, { kind, text, need, site }) => {
-      const id = await rpc<unknown>("runner_ask", { p_job: jobId, p_kind: kind, p_text: text, p_need: need, p_site: site });
+      const id = await rpc("runner_ask", { p_job: jobId, p_kind: kind, p_text: text, p_need: need, p_site: site });
       if (typeof id !== "string") throw new DbError(500);
       return id;
     },
     // Where the owner wants a notification. Only the address and its keys, to send one with no content.
     pushSubscriptions: async () =>
-      ((await rpc<Record<string, unknown>[]>("runner_push_subscriptions", {})) ?? []).flatMap((row): PushSubscriptionRow[] =>
+      (await rows("runner_push_subscriptions", {})).flatMap((row): PushSubscriptionRow[] =>
         typeof row.endpoint === "string" && typeof row.p256dh === "string" && typeof row.auth === "string"
           ? [{ endpoint: row.endpoint, p256dh: row.p256dh, auth: row.auth }]
           : [],
@@ -230,17 +242,17 @@ export const supabaseDb = (
       await rpc("runner_forget_push_subscription", { p_endpoint: endpoint });
     },
     dueRoutines: async () =>
-      ((await rpc<Record<string, unknown>[]>("runner_due_routines", {})) ?? []).flatMap((row): DueRoutine[] =>
+      (await rows("runner_due_routines", {})).flatMap((row): DueRoutine[] =>
         typeof row.id === "string" && typeof row.time_zone === "string" && typeof row.next_run_at === "string"
           ? [{ id: row.id, schedule: row.schedule, timeZone: row.time_zone, dueAt: row.next_run_at }]
           : [],
       ),
     startRoutine: async (routineId, dueAt, next) => {
-      const id = await rpc<unknown>("runner_start_routine", { p_routine: routineId, p_due: dueAt, p_next: next });
+      const id = await rpc("runner_start_routine", { p_routine: routineId, p_due: dueAt, p_next: next });
       return typeof id === "string" ? id : null;
     },
     decision: async (approvalId) => {
-      const [row] = (await rpc<Record<string, unknown>[]>("runner_decision", { p_approval: approvalId })) ?? [];
+      const [row] = await rows("runner_decision", { p_approval: approvalId });
       const decision = row?.decision === "allow" || row?.decision === "deny" ? row.decision : null;
       return { decision, answer: typeof row?.answer === "string" ? row.answer : null };
     },
