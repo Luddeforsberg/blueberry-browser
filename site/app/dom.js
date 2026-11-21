@@ -1,14 +1,25 @@
 import { OneAtATime } from "../shared.js";
-import { drawPose, el, pips } from "../draw.js";
+import { el, isDrawn, pips, poseDrawer } from "../draw.js";
 import { POSES } from "./poses.js";
 import { STEP_PIPS } from "./pips.js";
 
+/** @import { Child } from "../draw.js" */
+
 // Building the page, with ../draw.js. The mascots are drawn from poses.js, every accessory in every mood the page shows.
 
-export { el, pips };
+export { el, isDrawn, pips };
+
+// One of the places index.html always has: #app, #sheets or #live.
+/** @param {"app" | "sheets" | "live"} id */
+export const region = (id) => {
+  const node = document.getElementById(id);
+  if (!node) throw new Error(`index.html has no #${id}`);
+  return node;
+};
 
 const SVG = "http://www.w3.org/2000/svg";
 
+/** @param {string} tag @param {Record<string, string>} [attrs] @param {...Node} children */
 const svg = (tag, attrs = {}, ...children) => {
   const node = document.createElementNS(SVG, tag);
   for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
@@ -17,6 +28,7 @@ const svg = (tag, attrs = {}, ...children) => {
 };
 
 // Lucide's shapes, drawn here so the page loads nothing from elsewhere.
+/** @typedef {keyof typeof ICONS} IconName */
 const ICONS = {
   back: ["m15 18-6-6 6-6"],
   down: ["m6 9 6 6 6-6"],
@@ -46,6 +58,7 @@ const ICONS = {
     "M14 9.6c.6-.4 1.3-.6 2-.6 2.4 0 4 2.4 4 4.8 0 .5-.1 1-.2 1.4",
   ],
 };
+/** @param {IconName} name */
 export const icon = (name, className = "") =>
   svg(
     "svg",
@@ -56,9 +69,9 @@ export const icon = (name, className = "") =>
 // The square inside Stop.
 export const stopSquare = () => el("i", { className: "stop-square", ariaHidden: "true" });
 
-// A mascot in one mood, at one of the sizes app.css has.
 // A form whose submit runs one at a time: another while the first is on its way does nothing. Enter submits through
 // requestSubmit, which doesn't look at whether Send is disabled, so this is what keeps it from starting a second job.
+/** @param {HTMLFormElement} form @param {() => Promise<unknown>} work */
 export const submitsOnce = (form, work) => {
   const sending = new OneAtATime();
   form.addEventListener("submit", (event) => {
@@ -68,14 +81,29 @@ export const submitsOnce = (form, work) => {
   return form;
 };
 
-export const drawMascot = (mascot, mood, size, options) => drawPose(POSES, mascot, mood, size, options);
+// Enter sends on a computer's keyboard; a phone's return key, Shift+Enter and an input method's Enter make text.
+/** @param {HTMLTextAreaElement} box @param {HTMLFormElement} form */
+export const sendsOnEnter = (box, form) => {
+  box.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey && !event.isComposing && matchMedia("(pointer: fine)").matches) {
+      event.preventDefault();
+      form.requestSubmit();
+    }
+  });
+};
+
+// A mascot in one mood, at one of the sizes app.css has.
+export const drawMascot = poseDrawer(POSES);
 
 // Which pips a step has. Its kind comes from the server, so anything but a kind there is takes the plain ones.
-export const stepPips = (step) => STEP_PIPS[typeof step?.kind === "string" && Object.hasOwn(STEP_PIPS, step.kind) ? step.kind : "plain"];
+const PIPS_OF_KIND = new Map(Object.entries(STEP_PIPS));
+/** @param {{ kind: string | null }} step */
+export const stepPips = (step) => PIPS_OF_KIND.get(step.kind ?? "plain") ?? STEP_PIPS.plain;
 
 // A reply's links and bold, built as elements so nothing from the server is read as HTML. Only http and https become
 // links, and they open outside the page.
 const LINKED = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>"')\]]+)|\*\*([^*\n]+)\*\*/g;
+/** @param {string} href @param {string} label */
 const webLink = (href, label) => {
   try {
     const url = new URL(href);
@@ -85,16 +113,20 @@ const webLink = (href, label) => {
     return label;
   }
 };
+/** @param {string} text */
 export const replyText = (text) => {
+  /** @type {(Node | string)[]} */
   const parts = [];
   let at = 0;
   for (const match of text.matchAll(LINKED)) {
     parts.push(text.slice(at, match.index));
-    const [whole, label, href, found, bold] = match;
+    const [whole, label = "", href = "", found, bold] = match;
     // A sentence's full stop after a bare address isn't part of it.
-    const bare = found?.replace(/[.,;:!?]+$/, "");
-    parts.push(bold !== undefined ? el("strong", { textContent: bold }) : webLink(href ?? bare, label ?? bare));
-    at = match.index + (found ? whole.length - (found.length - bare.length) : whole.length);
+    const bare = found?.replace(/[.,;:!?]+$/, "") ?? "";
+    if (bold !== undefined) parts.push(el("strong", { textContent: bold }));
+    else if (found !== undefined) parts.push(webLink(bare, bare));
+    else parts.push(webLink(href, label));
+    at = match.index + whole.length - (found === undefined ? 0 : found.length - bare.length);
   }
   parts.push(text.slice(at));
   return parts.filter((part) => part !== "");
@@ -102,23 +134,31 @@ export const replyText = (text) => {
 
 // Draws a part of the screen again only when what it shows has changed, so a poll leaves the rest alone. A part with
 // someone typing in it waits, and a button that had the keyboard gets it back if it's drawn again.
+/** @type {WeakMap<Element, string>} */
 const drawnAs = new WeakMap();
 export const typing = () => {
   const active = document.activeElement;
   return !!active && (active.matches("input, textarea") || active.tagName === "IFRAME");
 };
+/**
+ * @param {Element} node
+ * @param {string} signature What it shows, as text: drawn again only when this changes.
+ * @param {() => (Child | Child[])[]} build
+ */
 export const patch = (node, signature, build, { force = false } = {}) => {
   if (!force && drawnAs.get(node) === signature) return false;
   const active = document.activeElement;
   if (!force && node.contains(active) && typing()) return false;
-  const key = node.contains(active) ? active?.dataset.key : undefined;
+  const key = active instanceof HTMLElement && node.contains(active) ? active.dataset.key : undefined;
   drawnAs.set(node, signature);
-  node.replaceChildren(...build().flat().filter(Boolean));
-  if (key) node.querySelector(`[data-key="${CSS.escape(key)}"]`)?.focus({ preventScroll: true });
+  node.replaceChildren(...build().flat().filter(isDrawn));
+  const again = key ? node.querySelector(`[data-key="${CSS.escape(key)}"]`) : null;
+  if (again instanceof HTMLElement) again.focus({ preventScroll: true });
   return true;
 };
 
 // A text box that grows with what's typed, up to a limit app.css sets.
+/** @param {HTMLTextAreaElement} box */
 export const grow = (box) => {
   const fit = () => {
     box.style.height = "auto";
@@ -130,6 +170,7 @@ export const grow = (box) => {
 };
 
 // Copying a reply, with a tick for a moment once it's done.
+/** @param {string} text */
 export const copyButton = (text) => {
   const words = el("span", { textContent: "Copy" });
   const mark = el("span", { className: "swap" }, icon("copy"));

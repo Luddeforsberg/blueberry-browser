@@ -29,28 +29,34 @@ const put = (file, text) => {
   if (current !== lf(text)) stale.push(relative(root, file).replaceAll("\\", "/"));
 };
 
+// What site/shared.js gives the site, from the app's own code. site/shared.d.ts names the same, with the types the site
+// reads them by, so tsconfig.site.json checks the site against the code shared.js was built from.
+const SHARED = [
+  `export { isUuid, parsePublishedRow, plainFromMarkdown } from "./src/shared/publishing";`,
+  // Reading what comes from the server, field by field.
+  `export { fieldsOf } from "./src/shared/fields";`,
+  `export { BERRY_ID, permissionsInWords } from "./src/shared/mascots";`,
+  // The phone page: the mascots as the app shares them, its jobs and their asks as it reads them, conversations and
+  // their history, the words for an approval, and what counts as a code.
+  `export { conversationsOf, mascotsFromSharedRows, followUpHistory, mascotSnapshot, phoneAskFromRow, phoneJobFromRow } from "./src/shared/phone";`,
+  // How it calls the server: a deadline on every call, one poll at a time, and how often to ask about the link.
+  `export { fetchWithin, oneAtATime, runnerLinkDue } from "./src/shared/phoneCalls";`,
+  // Work that finishes later: whose answer still counts, one at a time, and what stays in a box once it has sent.
+  `export { Latest, OneAtATime } from "./src/shared/lateWork";`,
+  `export { leftAfterSend } from "./src/shared/draft";`,
+  `export { stripWww } from "./src/shared/sites";`,
+  `export { asContinuation, withSiteNames } from "./src/renderer/chrome/src/siteNames";`,
+  // Times written the one way the app writes them.
+  `export { finishedWhen, rowTime } from "./src/renderer/chrome/src/shortWords";`,
+  `export { plausibleCode } from "./src/main/phone/phoneReplies";`,
+];
+// Types only, which the bundle has no use for.
+const SHARED_TYPES = [
+  `export type { HistoryMessage, PhoneAsk, PhoneJob, PhoneJobStatus, PhoneStep } from "./src/shared/phone";`,
+  `export type { GalleryMascot, MascotProfile } from "./src/shared/library";`,
+];
 const shared = await build({
-  stdin: {
-    contents: [
-      `export { isUuid, parsePublishedRow, plainFromMarkdown } from "./src/shared/publishing";`,
-      `export { BERRY_ID, permissionsInWords } from "./src/shared/mascots";`,
-      // The phone page: the mascots as the app shares them, conversations and their history, the words for an approval, and what
-      // counts as a code.
-      `export { conversationsOf, mascotsFromSharedRows, followUpHistory, mascotSnapshot } from "./src/shared/phone";`,
-      // How it calls the server: a deadline on every call, one poll at a time, and how often to ask about the link.
-      `export { fetchWithin, oneAtATime, runnerLinkDue } from "./src/shared/phoneCalls";`,
-      // Work that finishes later: whose answer still counts, one at a time, and what stays in a box once it has sent.
-      `export { Latest, OneAtATime } from "./src/shared/lateWork";`,
-      `export { leftAfterSend } from "./src/shared/draft";`,
-      `export { stripWww } from "./src/shared/sites";`,
-      `export { asContinuation, withSiteNames } from "./src/renderer/chrome/src/siteNames";`,
-      // Times written the one way the app writes them.
-      `export { finishedWhen, rowTime } from "./src/renderer/chrome/src/shortWords";`,
-      `export { plausibleCode } from "./src/main/phone/phoneReplies";`,
-    ].join("\n"),
-    resolveDir: root,
-    loader: "ts",
-  },
+  stdin: { contents: SHARED.join("\n"), resolveDir: root, loader: "ts" },
   bundle: true,
   alias,
   format: "esm",
@@ -60,6 +66,8 @@ const shared = await build({
   write: false,
 });
 put(join(site, "shared.js"), shared.outputFiles[0].text);
+const fromSite = (line) => line.replace(`"./src/`, `"../src/`);
+put(join(site, "shared.d.ts"), `${NOTE}${[...SHARED, ...SHARED_TYPES].map(fromSite).join("\n")}\n`);
 
 // Every accessory in the resting pose, still. Each drawing carries every berry's body, and the `data-mascot` it's given
 // where it's shown picks one, so colours and shapes come from tokens.css and the rules written to mascots.css below.

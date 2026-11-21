@@ -1,0 +1,25 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.json",
+  // The public site and the phone page: plain JavaScript that Netlify serves as it is, checked through JSDoc. What it
+  // gets from the app comes through site/shared.d.ts, which names the app's own code that site/shared.js is built from.
+  // The service worker runs with other globals, so it has tsconfig.site-worker.json.
+  "include": ["site/**/*.js", "site/shared.d.ts"],
+  "exclude": ["site/app/sw.js"],
+  "compilerOptions": {
+    "composite": true,
+    "allowJs": true,
+    "checkJs": true,
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": [],
+    // Off or unset in @electron-toolkit/tsconfig. Each one costs nothing to keep on.
+    "noImplicitAny": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "noUncheckedIndexedAccess": true,
+    // The app's code that site/shared.d.ts names imports by these.
+    "baseUrl": ".",
+    "paths": { "@shared/*": ["src/shared/*"] }
+  }
+}

@@ -27,7 +27,8 @@ const castTo = (type) => `${CAST} > ${type}.typeAnnotation, ${CAST} > *.typeAnno
 const fences = [
   {
     name: "fetch",
-    in: ["src/**/*.{ts,tsx}", "runner/src/**/*.ts"],
+    // The site too, whose generated site/shared.js carries shared/phoneCalls.ts's fetchWithin and isn't linted.
+    in: ["src/**/*.{ts,tsx}", "runner/src/**/*.ts", "site/**/*.js"],
     allowed: {
       "src/main/account/galleryServer.ts": "Supabase, from the app.",
       "runner/src/db.ts": "Supabase, from the cloud runner.",
@@ -43,7 +44,7 @@ const fences = [
       "no-restricted-properties": ["globalThis", "global", "window", "self"].map((object) => ({ object, property: "fetch" })),
     },
     message:
-      "Each service is called from one file: Supabase from account/galleryServer.ts (runner/src/db.ts on the runner, shared/phoneCalls.ts on the phone page), Browserbase from cloud/browserbase.ts, Telegram from phone/TelegramChannel.ts, Firecrawl from tools/webFetch.ts and tools/webSearch.ts, and a model provider's key from settings/aiKeyTry.ts. Call that file, or give a new service a file of its own, allowed in eslint.fences.mjs.",
+      "Each service is called from one file: Supabase from account/galleryServer.ts (runner/src/db.ts on the runner, shared/phoneCalls.ts on the site, as fetchWithin from site/shared.js), Browserbase from cloud/browserbase.ts, Telegram from phone/TelegramChannel.ts, Firecrawl from tools/webFetch.ts and tools/webSearch.ts, and a model provider's key from settings/aiKeyTry.ts. Call that file, or give a new service a file of its own, allowed in eslint.fences.mjs.",
   },
   {
     // Main's timers stay where they are: they're the scheduler's and the pollers' own logic.
@@ -175,8 +176,8 @@ const fences = [
     // An input method uses Enter to choose its words, as for Japanese or Chinese, and a field's own check of the key
     // read that as the user pressing it, which sent a message they were still writing.
     name: "enter",
-    in: ["src/renderer/**/*.{ts,tsx}"],
-    allowed: { "src/renderer/common/lib/keys.ts": "isEnter and sendOnEnter." },
+    in: ["src/renderer/**/*.{ts,tsx}", "site/**/*.js"],
+    allowed: { "src/renderer/common/lib/keys.ts": "isEnter and sendOnEnter.", "site/app/dom.js": "sendsOnEnter, on the phone page." },
     rules: {
       "no-restricted-syntax": [
         'BinaryExpression[left.property.name="key"][right.value="Enter"]',
@@ -184,7 +185,7 @@ const fences = [
       ],
     },
     message:
-      "Read Enter with isEnter from @common/lib/keys, which leaves an input method's Enter to the text, or sendOnEnter in a prompt box (eslint.fences.mjs).",
+      "Read Enter with isEnter from @common/lib/keys, which leaves an input method's Enter to the text, or sendOnEnter in a prompt box, and on the phone page sendsOnEnter from site/app/dom.js (eslint.fences.mjs).",
   },
   {
     // A window that closes and opens again, as on a Mac, would make a second copy of anything it made over the same file

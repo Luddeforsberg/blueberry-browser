@@ -1,14 +1,17 @@
 import { isUuid, leftAfterSend, mascotSnapshot, permissionsInWords } from "../shared.js";
 import * as api from "./api.js";
-import { drawMascot, el, grow, icon, submitsOnce } from "./dom.js";
+import { drawMascot, el, grow, icon, isDrawn, sendsOnEnter, submitsOnce } from "./dom.js";
 import { closeSheet, openSheet, sheetKind } from "./sheet.js";
 import { choose, chosen, contextOf, hooks, NOT_SET_UP, problemWords, state } from "./state.js";
+
+/** @import { MascotProfile } from "../shared.js" */
 
 // Starting a job has no page of its own: the box rises as a sheet over home, with who goes and what that mascot may
 // do, in the app's own words. Putting it away keeps what was typed.
 
 // A new conversation, under the job's own id, as `mascot`, as the phone has it now. `written` is the box as it was sent,
 // so whatever was typed on after it stays for the next job.
+/** @param {string} written @param {MascotProfile} mascot */
 export const startJob = async (written, mascot) => {
   const as = api.asAccount();
   const id = await as.rpc("start_cloud_job", {
@@ -23,11 +26,12 @@ export const startJob = async (written, mascot) => {
   else state.drafts.delete("");
   await hooks.load();
   if (!as.still()) throw new api.AccountGone();
-  location.hash = isUuid(String(id)) ? `#job/${id}` : "";
+  location.hash = isUuid(id) ? `#job/${id}` : "";
 };
 
 // What a mascot may do, in words, each line with what it means: a lock for a limit, a tick for what it can do, and a
 // bell for asking first, which every job from here does.
+/** @param {MascotProfile} mascot */
 const mayDo = (mascot) =>
   el(
     "ul",
@@ -37,6 +41,7 @@ const mayDo = (mascot) =>
   );
 
 // The mascots as faces to choose from, the chosen one ringed.
+/** @param {number} size @param {(mascot: MascotProfile) => void} onChoose */
 const faces = (size, onChoose, current = chosen()) =>
   el(
     "div",
@@ -106,13 +111,7 @@ export const openStart = () => {
       send.disabled = false;
     }
   });
-  box.addEventListener("keydown", (event) => {
-    // Enter sends on a computer's keyboard; a phone's return key makes a new line.
-    if (event.key === "Enter" && !event.shiftKey && !event.isComposing && matchMedia("(pointer: fine)").matches) {
-      event.preventDefault();
-      form.requestSubmit();
-    }
-  });
+  sendsOnEnter(box, form);
   body.append(
     ...[
       el("h2", { className: "lab", textContent: "Who goes" }),
@@ -124,7 +123,7 @@ export const openStart = () => {
       state.linked === false ? el("p", { className: "problem", textContent: NOT_SET_UP }) : null,
       form,
       problem,
-    ].filter(Boolean),
+    ].filter(isDrawn),
   );
   show();
   box.focus({ preventScroll: true });

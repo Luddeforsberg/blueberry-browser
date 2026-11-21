@@ -4,9 +4,12 @@ import { rpc } from "./api.js";
 // Notifications on this phone: the service worker, and a subscription saved for the signed-in user only. iOS gives push
 // only to a page added to the Home Screen, so there it says that first.
 
+/** @typedef {"unavailable" | "add-to-home" | "blocked" | "on" | "off"} PushState */
+
+/** @returns {Promise<PushState>} */
 export const pushState = async () => {
   if (!VAPID_PUBLIC_KEY || !("serviceWorker" in navigator)) return "unavailable";
-  const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  const standalone = matchMedia("(display-mode: standalone)").matches || ("standalone" in navigator && navigator.standalone === true);
   if (!("PushManager" in window)) return /iPhone|iPad/.test(navigator.userAgent) && !standalone ? "add-to-home" : "unavailable";
   if (Notification.permission === "denied") return "blocked";
   const registration = await navigator.serviceWorker.getRegistration("./");
@@ -15,6 +18,7 @@ export const pushState = async () => {
 
 export const register = () => navigator.serviceWorker?.register("./sw.js", { scope: "./" }).catch(() => null);
 
+/** @param {string} base64 */
 const keyBytes = (base64) => {
   const padded = (base64 + "=".repeat((4 - (base64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/");
   return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
@@ -28,7 +32,13 @@ export const turnOn = async () => {
     applicationServerKey: keyBytes(VAPID_PUBLIC_KEY),
   });
   const { endpoint, keys } = subscription.toJSON();
-  const saved = await rpc("save_push_subscription", { p_endpoint: endpoint, p_p256dh: keys.p256dh, p_auth: keys.auth }).catch(() => false);
+  const p256dh = keys?.p256dh;
+  const auth = keys?.auth;
+  // One without its keys can't be sent to, so it isn't saved.
+  const saved =
+    endpoint && p256dh && auth
+      ? await rpc("save_push_subscription", { p_endpoint: endpoint, p_p256dh: p256dh, p_auth: auth }).catch(() => false)
+      : false;
   // Not saved, so nothing would ever arrive: this browser shouldn't say it's on.
   if (saved !== true) await subscription.unsubscribe().catch(() => {});
   return saved === true;

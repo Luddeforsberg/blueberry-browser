@@ -1,6 +1,7 @@
 // The front page: the product first. One picture of the window with a job running, then three of the app's parts, each
 // a picture of something real, then the mascots. See The public site in DESIGN.md.
 import "./theme.js";
+import { GET_BLUEBERRY_URL } from "./config.js";
 import {
   BERRY,
   COMPETITOR_WATCH,
@@ -21,12 +22,16 @@ import {
   working,
 } from "./picture.js";
 
-const fill = (id, ...children) => document.getElementById(id).replaceChildren(...children);
+/** @param {string} id @param {...Node} children */
+const fill = (id, ...children) => document.getElementById(id)?.replaceChildren(...children);
 
 fill("mark", face(BERRY, "rest", 24));
+// The address is the one site/config.js gives every page. It's written in index.html too, for a page without scripts.
+document.getElementById("get")?.setAttribute("href", GET_BLUEBERRY_URL);
 
 // --- The window: the sidebar's Tabs with a job's group, the toolbar, and the chat on its sheet. ---
 
+/** @param {Node} lead @param {Node | string} words @param {{ className?: string, end?: Node | null }} [options] */
 const row = (lead, words, { className = "", end = null } = {}) =>
   el("li", { className: `row ${className}`.trim() }, lead, el("span", { className: "row-words" }, words), end);
 
@@ -125,7 +130,8 @@ fill(
 );
 
 // A mascot for each kind of work, as the menu that chooses one shows them.
-const choice = (mascot, chosen) =>
+/** @param {import("./draw.js").Drawn & { may: string }} mascot */
+const choice = (mascot, chosen = false) =>
   el(
     "li",
     { className: chosen ? "chosen" : "" },

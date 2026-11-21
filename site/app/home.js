@@ -22,9 +22,11 @@ import {
   SET_UP,
   senderOf,
   state,
-  stepsOf,
   waiting,
 } from "./state.js";
+
+/** @import { MascotProfile, PhoneJob } from "../shared.js" */
+/** @import { Conversation, Waiting } from "./state.js" */
 
 // Home, on the ground: the greeting and what's going on, the mascots, what needs you, what's working and what's done,
 // and the box at the bottom. With nothing going on it's the mascots standing together over the greeting.
@@ -32,10 +34,12 @@ import {
 const sep = () => el("span", { className: "sep", ariaHidden: "true" });
 
 // How each mascot is now: asking if a job of its is waiting, working if one is going, at rest otherwise.
+/** @param {MascotProfile} mascot @returns {import("../draw.js").Mood} */
 const moodOfMascot = (mascot) => {
+  /** @type {import("../draw.js").Mood} */
   let mood = "rest";
   for (const { latest } of conversations()) {
-    const id = latest.mascot?.id;
+    const { id } = latest.mascot;
     if (id !== mascot.id && !(mascot.id === BERRY_ID && id === BERRY_ID)) continue;
     const now = moodOf(latest);
     if (now === "asking") return "asking";
@@ -54,6 +58,7 @@ const initial = () => {
 };
 
 // The line under the greeting: what needs you and what's working, or why nothing can run.
+/** @param {number} asks @param {number} working */
 const statusLine = (asks, working) => {
   if (state.problem) return el("p", { className: "status problem", role: "alert", textContent: state.problem });
   if (state.linked === false) return el("p", { className: "status", textContent: NOT_SET_UP });
@@ -63,6 +68,7 @@ const statusLine = (asks, working) => {
   return parts.length ? el("p", { className: "status" }, ...parts.flatMap((part, at) => (at ? [sep(), part] : [part]))) : null;
 };
 
+/** @param {MascotProfile} mascot */
 const pick = (mascot) => {
   choose(mascot);
   hooks.show();
@@ -98,7 +104,8 @@ const stage = () => {
   const others = state.mascots.filter((mascot) => mascot.id !== current.id).slice(0, 4);
   const left = others.filter((_, at) => at % 2 === 1).reverse();
   const right = others.filter((_, at) => at % 2 === 0);
-  const side = (mascot, at, edge) =>
+  /** @param {MascotProfile} mascot @param {boolean} edge */
+  const side = (mascot, edge) =>
     el(
       "button",
       {
@@ -114,13 +121,14 @@ const stage = () => {
   return el(
     "div",
     { className: "stage wings" },
-    el("div", { className: "wing left" }, ...left.map((mascot, at) => side(mascot, at, at === 0 && left.length === 2))),
+    el("div", { className: "wing left" }, ...left.map((mascot, at) => side(mascot, at === 0 && left.length === 2))),
     el("span", { className: "stand front" }, drawMascot(current, "rest", 96)),
-    el("div", { className: "wing" }, ...right.map((mascot, at) => side(mascot, at, at === 1))),
+    el("div", { className: "wing" }, ...right.map((mascot, at) => side(mascot, at === 1))),
   );
 };
 
 // One ask, as a card: anywhere on it opens the ask.
+/** @param {Waiting} entry */
 const askCard = (entry) =>
   el(
     "button",
@@ -136,8 +144,10 @@ const askCard = (entry) =>
   );
 
 // What a going job is doing now: its live step with its pips, or what it's waiting for.
+/** @typedef {{ pattern: string, words: string, ask?: boolean }} NowStep */
+/** @param {PhoneJob} job @returns {NowStep} */
 export const nowStep = (job) => {
-  const last = stepsOf(job).at(-1);
+  const last = job.steps.at(-1);
   if (job.status === "queued") return { pattern: "think", words: "Waiting to start.." };
   if (askOf(job)) return { pattern: "waiting", words: "Waiting for you..", ask: true };
   if (last && !last.done) return { pattern: stepPips(last).live, words: last.text };
@@ -145,6 +155,7 @@ export const nowStep = (job) => {
 };
 
 // A conversation goes by what it began with, as a chat does.
+/** @param {Conversation} conversation */
 const workingRow = ({ id, jobs, latest }) => {
   const now = nowStep(latest);
   return el(
@@ -166,6 +177,7 @@ const workingRow = ({ id, jobs, latest }) => {
   );
 };
 
+/** @param {Conversation} conversation */
 const earlierRow = ({ id, jobs, latest }) => {
   const failed = latest.status === "failed";
   const how = latest.status === "done" ? "Done" : failed ? latest.error || "Didn’t finish" : "Stopped";
@@ -188,16 +200,19 @@ const earlierRow = ({ id, jobs, latest }) => {
   );
 };
 
+/** @param {string} words @param {number} [count] */
 const label = (words, count, ask = false) =>
   el("h2", { className: `lab ${ask ? "ask" : ""}` }, words, count ? el("span", { textContent: String(count) }) : null);
 
 // Jobs sent before, newest first, as chips that put their words back in the box, as their mascot. Never sent from here.
 const CHIPS = 6;
 const chips = () => {
+  /** @type {Set<string>} */
   const seen = new Set();
+  /** @type {{ words: string, mascot: MascotProfile }[]} */
   const list = [];
   for (const job of state.jobs ?? []) {
-    const words = typeof job.prompt === "string" ? job.prompt.trim() : "";
+    const words = job.prompt.trim();
     const mascot = senderOf(job);
     if (!words || !mascot || seen.has(words)) continue;
     seen.add(words);
@@ -207,6 +222,7 @@ const chips = () => {
   return list;
 };
 
+/** @param {HTMLButtonElement} button @param {HTMLElement} problem */
 const send = async (button, problem) => {
   const written = state.drafts.get("") ?? "";
   if (!written.trim() || state.linked === false) return openStart();
@@ -227,15 +243,10 @@ const dock = () => {
   const problem = el("div", { className: "problem-slot" });
   const sendButton = el(
     "button",
-    {
-      type: "button",
-      className: `send ${ready ? "" : "off"}`,
-      ariaLabel: "Send",
-      dataKey: "send",
-      onclick: (event) => send(event.currentTarget, problem),
-    },
+    { type: "button", className: `send ${ready ? "" : "off"}`, ariaLabel: "Send", dataKey: "send" },
     icon("up"),
   );
+  sendButton.onclick = () => void send(sendButton, problem);
   return [
     el(
       "div",
@@ -290,13 +301,14 @@ const dock = () => {
   ];
 };
 
+/** @param {HTMLElement} app */
 export const mountHome = (app) => {
   const top = el("div", { className: "home-top" });
   const bottom = el("div", { className: "dock" });
   app.replaceChildren(
     el("main", { className: "screen home", dataLayer: "1" }, el("div", { className: "dots", ariaHidden: "true" }), top, bottom),
   );
-  return (force) => {
+  return (force = false) => {
     const all = conversations();
     const asks = waiting();
     const working = all.filter(({ id, latest }) => going(latest) && !asks.some((entry) => entry.conversation === id));
@@ -312,8 +324,8 @@ export const mountHome = (app) => {
       state.mascots,
       state.jobs === null,
       asks.map(({ ask, mascot: who }) => [ask, who.name]),
-      working.map(({ id, jobs, latest }) => [id, jobs[0].prompt, latest.status, stepsOf(latest).at(-1), latest.mascot?.id]),
-      earlier.map(({ id, jobs, latest }) => [id, jobs[0].prompt, latest.status, latest.error, latest.updated_at, latest.mascot?.id]),
+      working.map(({ id, jobs, latest }) => [id, jobs[0].prompt, latest.status, latest.steps.at(-1), latest.mascot.id]),
+      earlier.map(({ id, jobs, latest }) => [id, jobs[0].prompt, latest.status, latest.error, latest.updated_at, latest.mascot.id]),
       // Times like "12m" move on.
       Math.floor(Date.now() / 60_000),
     ]);

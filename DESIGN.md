@@ -974,7 +974,7 @@ A mascot on the edge of the screen while you're in other apps: it shows what the
 - **On a phone** the window's picture keeps only the chat on its sheet, without the sidebar or toolbar, and the three parts stack.
 - **What it loads:** only the site's own files, as modules and stylesheets, with no inline script or style. Its content security policy is `default-src 'none'` with `script-src`, `style-src` and `font-src 'self'`. The mascots come from `site/homePoses.js`, which `pnpm run site:build` writes with only the poses the page draws, since every pose carries every berry's body.
 
-The mascot pages at `site/m/` still have the old look, from `site/style.css`, and are to be redrawn on these rules.
+The mascot pages at `site/m/` still have the old look, from `site/style.css`, and are to be redrawn on these rules. They already have its type, from `site/fonts.css` as every page does, and the same CSP with `font-src 'self'`. Until there's a download, getting Blueberry on both pages means running it from its code, at `GET_BLUEBERRY_URL` in `site/config.js`.
 
 ## 11. Not redrawn yet
 
