@@ -28,6 +28,7 @@ const disk = vi.hoisted((): Setup["disk"] => ({
   stuck: new Set(),
   unread: new Set(),
   forgave: false,
+  locked: false,
 }));
 
 vi.mock("electron", () => ({
@@ -36,7 +37,7 @@ vi.mock("electron", () => ({
     encryptString: (text: string) => Buffer.from(`sealed:${text}`),
     decryptString: (sealed: Buffer) => {
       const text = sealed.toString();
-      if (!text.startsWith("sealed:")) throw new Error("It can't be opened.");
+      if (!text.startsWith("sealed:") || disk.locked) throw new Error("It can't be opened.");
       return text.slice("sealed:".length);
     },
   },
@@ -114,7 +115,14 @@ const setup: Setup = {
     // What it holds, which only it knows when a save has failed, as this code keeps it and as the code before did.
     const held = tabs as unknown as { key?: { apiKey: string | null }; saved?: { apiKey: string | null } };
     const key = () => (held.key ?? held.saved)?.apiKey ?? null;
-    return { tabs, key, windowOpened: (hooks) => tabs.attach(hooks), windowClosed: () => tabs.detach(), quit: () => tabs.quit() };
+    let closeWindow: () => Promise<unknown> = async () => {};
+    return {
+      tabs,
+      key,
+      windowOpened: (hooks) => void (closeWindow = tabs.attach(hooks)),
+      windowClosed: () => closeWindow(),
+      quit: () => tabs.quit(),
+    };
   },
   // Each run starts with no sign-ins brought along.
   reset: () => rmSync(join(folder, "cloud-logins.json"), { force: true }),

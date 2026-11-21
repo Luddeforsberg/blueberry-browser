@@ -322,6 +322,27 @@ describe("CloudTabs' key", () => {
     encryption.available = false;
   });
 
+  it("lists the sign-ins from before under the project whose Context came with them, or else every project with one", () => {
+    encryption.available = true;
+    const list = [{ site: "example.com", addedAt: 5, checkedAt: null, status: "brought" }];
+    const listed = (key: object, contexts: Record<string, string>) => {
+      const file = tempFile();
+      writeFileSync(file, JSON.stringify(key));
+      writeFileSync(sessionsAt(file), JSON.stringify({ contexts, handles: [], keys: {} }));
+      writeFileSync(join(dirname(file), "cloud-logins.json"), JSON.stringify(list));
+      makeTabs(file, releasing().provider);
+      return Object.keys((JSON.parse(readFileSync(join(dirname(file), "cloud-logins.json"), "utf8")) as { projects: object }).projects);
+    };
+    // Brought in on proj, then the key for proj-2 was saved, which kept no Context yet.
+    expect(listed({ apiKey: sealed("bb_2"), projectId: sealed("proj-2") }, { "browserbase:proj": "ctx-a" })).toEqual(["browserbase:proj"]);
+    expect(listed(OLD, { "browserbase:proj-2": "ctx-2" })).toEqual(["browserbase:proj"]);
+    expect(listed(NO_KEY, { "browserbase:proj": "ctx-a", "browserbase:proj-2": "ctx-2" })).toEqual([
+      "browserbase:proj",
+      "browserbase:proj-2",
+    ]);
+    encryption.available = false;
+  });
+
   it("asks first before forgetting a session whose key it doesn't have, and keeps it if the user says no", async () => {
     encryption.available = true;
     const file = tempFile();

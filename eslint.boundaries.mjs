@@ -118,6 +118,7 @@ const rules = [
       "cloud/cloudLoginAccess.ts",
       "cloud/signedInTo.ts",
       "cloud/cloudLogins.test.ts",
+      "cloud/cloudLoginLists.test.ts",
       "cloud/cloudLoginAccess.test.ts",
       "window/makeCloud.ts",
     ],

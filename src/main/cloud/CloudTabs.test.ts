@@ -7,7 +7,7 @@ vi.mock("electron", () => ({
 }));
 
 const { CloudSessions } = await import("./cloudBrowser");
-const { fakeLocal, hooks, makeTabs, tempFile } = await import("./cloudTabsTesting");
+const { fakeLocal, hooks, makeTabs, makeWindowTabs, tempFile } = await import("./cloudTabsTesting");
 
 // How long a session nobody uses stays open.
 const IDLE = 3 * 60_000;
@@ -120,12 +120,12 @@ describe("CloudTabs", () => {
     let opened = () => {};
     local.holdPages(new Promise((resolve) => (opened = resolve)));
     let count = 0;
-    const tabs = makeTabs(tempFile(), () => local.browser, { openTab: () => `tab-${++count}` });
+    const { tabs, closeWindow } = makeWindowTabs(tempFile(), () => local.browser, { openTab: () => `tab-${++count}` });
     expect(tabs.claim("job-1")).toBe(true);
     const opening = tabs.open("job-1", "https://example.com/").catch(() => null);
     const checking = tabs.signedIn.check("github.com");
     await new Promise((resolve) => setTimeout(resolve, 0));
-    await tabs.detach();
+    await closeWindow();
     // The next window's tab ids start again, so its own tab-1 and tab-2 are the user's.
     const next = { closeTab: vi.fn(), updateTab: vi.fn(), showTab: vi.fn() };
     tabs.attach(hooks(next));
@@ -135,6 +135,20 @@ describe("CloudTabs", () => {
     expect(next.closeTab).not.toHaveBeenCalled();
     expect(next.updateTab).not.toHaveBeenCalled();
     expect(next.showTab).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+
+  it("leaves a newer window's cloud running when an older window closes after it attached", async () => {
+    attachTabs();
+    const { tabs, closeWindow } = makeWindowTabs();
+    expect(await tabs.signedIn.check("example.com")).toBeNull();
+    const closeNext = tabs.attach(hooks());
+    await closeWindow();
+    expect(tabs.available()).toBe(true);
+    expect(tabs.state.status).toBe("running");
+    await closeNext();
+    expect(tabs.available()).toBe(false);
+    expect(tabs.state.status).toBe("ended");
     vi.restoreAllMocks();
   });
 
@@ -161,11 +175,11 @@ describe("CloudTabs", () => {
     const local = fakeLocal();
     let opened = () => {};
     local.holdPages(new Promise((resolve) => (opened = resolve)));
-    const tabs = makeTabs(tempFile(), () => local.browser);
+    const { tabs, closeWindow } = makeWindowTabs(tempFile(), () => local.browser);
     // The window closes while it opens, and the next one attaches.
     const checking = tabs.signedIn.check("example.com");
     await new Promise((resolve) => setTimeout(resolve, 0));
-    await tabs.detach();
+    await closeWindow();
     tabs.attach(hooks());
     opened();
     expect(await checking).toBe("The cloud browser couldn't open it.");

@@ -10,7 +10,7 @@ import { Latest } from "../../shared/lateWork";
 // sign-ins are.
 
 export const MAX_SITES = 50;
-const MAX_PROJECTS = 100;
+export const MAX_PROJECTS = 100;
 const MAX_SITE_LENGTH = 253;
 const STATUSES: CloudLoginStatus[] = ["brought", "checked", "signed-out"];
 
@@ -148,11 +148,11 @@ export const parseLogins = (data: unknown): CloudLogin[] => {
   });
 };
 
-// Each project's list, by the origin its Context is kept under. A list from before there was one per project is an
-// array, and goes to `upgradeTo`, the project it was brought into, or nowhere where that can't be known.
-const parseLists = (data: unknown, upgradeTo: string | null): Record<string, CloudLogin[]> => {
-  if (Array.isArray(data)) return upgradeTo ? { [upgradeTo]: parseLogins(data) } : {};
-  const lists = Object.entries(fieldsOf(fieldsOf(data).projects)).slice(0, MAX_PROJECTS);
+// Each project's list, by the origin its Context is kept under, every one of them. A list from before there was one per
+// project is an array, and goes to each of the projects in `upgradeTo` it may be in.
+const parseLists = (data: unknown, upgradeTo: string[]): Record<string, CloudLogin[]> => {
+  if (Array.isArray(data)) return Object.fromEntries(upgradeTo.map((origin) => [origin, parseLogins(data)]));
+  const lists = Object.entries(fieldsOf(fieldsOf(data).projects));
   return Object.fromEntries(lists.map(([origin, list]) => [origin, parseLogins(list)]));
 };
 
@@ -192,6 +192,7 @@ export interface CloudLoginsHooks {
 
 const NOT_TAKEN = "The cloud browser didn't take that. Try again.";
 const BROWSER_GONE = "Nothing was brought along, because the cloud browser ended or its key changed meanwhile.";
+const KEY_CHANGED = "Nothing was taken out, because the cloud browser's key changed meanwhile. Try again.";
 
 // Bringing a site's sign-in into the cloud browser, one site at a time, and taking it out again. Only main calls this,
 // from Settings, and the list of sites goes to `cloud-logins.json` with names and dates only, one list for each project.
@@ -199,6 +200,8 @@ const BROWSER_GONE = "Nothing was brought along, because the cloud browser ended
 // browser, and no error that might quote one is passed on.
 export class CloudLogins {
   private lists: Record<string, CloudLogin[]> = {};
+  // A list from before there was one per project, while it can't be told whose it is, which nothing may write over.
+  private readonly undecided: boolean;
   private busy = false;
   // The cloud browser as it is now. It ends or is replaced with a new one, so a copy still waiting on the user never lands
   // in it.
@@ -208,8 +211,8 @@ export class CloudLogins {
   constructor(
     private readonly file: string,
     private readonly hooks: CloudLoginsHooks,
-    // The project a list from before there was one per project was brought into, if that can be known.
-    upgradeTo: string | null = null,
+    // The projects a list from before there was one per project may be in, or null while that can't be told.
+    upgradeTo: string[] | null = [],
   ) {
     let data: unknown = null;
     try {
@@ -217,8 +220,9 @@ export class CloudLogins {
     } catch {
       // Nothing listed.
     }
-    this.lists = parseLists(data, upgradeTo);
-    // Kept as its project's at once, so a key for another project before the next change can't take it.
+    this.undecided = Array.isArray(data) && upgradeTo === null;
+    this.lists = parseLists(data, upgradeTo ?? []);
+    // Kept as those projects' at once, so a key saved later can't take it.
     if (Array.isArray(data) && upgradeTo) this.write();
   }
 
@@ -248,6 +252,8 @@ export class CloudLogins {
     // Every site on the list needs its Remove, so a full list takes no more until one comes off.
     if (list().length >= MAX_SITES && !list().some((login) => login.site === site))
       return `There are already ${MAX_SITES} sites in the cloud browser. Remove one first.`;
+    if (!this.lists[origin] && Object.keys(this.lists).length >= MAX_PROJECTS)
+      return `Sign-ins are kept for ${MAX_PROJECTS} projects already. Forget all cloud logins under another project's key first.`;
     return this.oneAtATime(async () => {
       if (!(await this.hooks.confirm(site))) return "Nothing was brought along, because it wasn't confirmed.";
       const stored = await this.hooks.readCookies(site).catch(() => null);
@@ -274,34 +280,35 @@ export class CloudLogins {
     });
   }
 
-  async revoke(site: string): Promise<string | null> {
-    const jar = this.hooks.jar();
-    const origin = jar?.origin;
-    if (!jar || !origin) return "The cloud browser is off.";
-    return this.oneAtATime(async () => {
-      try {
-        await jar.withContext((context) => context.clearCookies({ domain: cookieDomainPattern(site) }));
-      } catch {
-        return NOT_TAKEN;
-      }
-      this.save(origin, withoutLogin(this.listOf(origin), site));
-      return null;
-    });
+  revoke(site: string): Promise<string | null> {
+    return this.takeOut({ domain: cookieDomainPattern(site) }, (list) => withoutLogin(list, site));
   }
 
   // Every cookie in the cloud browser, including any a job or a sign-in there left, and the whole list for its project.
   // Another project's Context keeps its own.
-  async forgetAll(): Promise<string | null> {
+  forgetAll(): Promise<string | null> {
+    return this.takeOut(undefined, () => []);
+  }
+
+  // Clears cookies in the cloud browser of the account the user asked under, and nothing once its key has changed, even
+  // while it was starting, since the list it changes is that account's project's.
+  private takeOut(cookies: { domain: RegExp } | undefined, next: (list: CloudLogin[]) => CloudLogin[]): Promise<string | null> {
     const jar = this.hooks.jar();
-    const origin = jar?.origin;
-    if (!jar || !origin) return "The cloud browser is off.";
+    if (!jar?.origin) return Promise.resolve("The cloud browser is off.");
+    const { account, origin } = jar;
+    const gone = () => this.hooks.jar() !== jar || jar.account !== account;
     return this.oneAtATime(async () => {
       try {
-        await jar.withContext((context) => context.clearCookies());
+        const cleared = await jar.withContext(async (context) => {
+          if (gone()) return false;
+          await context.clearCookies(cookies);
+          return true;
+        });
+        if (!cleared || gone()) return KEY_CHANGED;
       } catch {
         return NOT_TAKEN;
       }
-      this.save(origin, []);
+      this.save(origin, next(this.listOf(origin)));
       return null;
     });
   }
@@ -333,6 +340,7 @@ export class CloudLogins {
   }
 
   private write(): boolean {
+    if (this.undecided) return false;
     try {
       mkdirSync(dirname(this.file), { recursive: true });
       const temp = `${this.file}.tmp`;

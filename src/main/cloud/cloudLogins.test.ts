@@ -276,6 +276,22 @@ describe("CloudLogins", () => {
     }
   });
 
+  it("takes nothing out, and keeps the list, when the key changes while the cloud browser starts", async () => {
+    const file = join(mkdtempSync(join(tmpdir(), "cloud-logins-")), "cloud-logins.json");
+    writeFileSync(file, JSON.stringify(listed([{ site: "example.com" }])));
+    const clearCookies = vi.fn(async () => {});
+    const jar = {
+      account: {},
+      origin: A,
+      withContext: <T>(act: (one: CookieJar) => Promise<T>) => ((jar.account = {}), act({ addCookies: async () => {}, clearCookies })),
+    };
+    const logins = new CloudLogins(file, { jar: () => jar, confirm: async () => true, readCookies: async () => [], onChange: () => {} });
+    expect(await logins.revoke("example.com")).toMatch(/key changed meanwhile/);
+    expect(await logins.forgetAll()).toMatch(/key changed meanwhile/);
+    expect(clearCookies).not.toHaveBeenCalled();
+    expect(logins.logins.map(({ site }) => site)).toEqual(["example.com"]);
+  });
+
   it("says the sign-in went in when the list couldn't be saved", async () => {
     // A folder where the file should be, so writing it fails.
     const dir = mkdtempSync(join(tmpdir(), "cloud-logins-"));
@@ -354,16 +370,5 @@ describe("CloudLogins", () => {
       onChange: () => {},
     });
     expect(again.logins.map(({ site }) => site)).toEqual(["example.com"]);
-  });
-
-  it("gives the one list from before to the project it was brought into, and keeps it as that project's at once", () => {
-    const file = join(mkdtempSync(join(tmpdir(), "cloud-logins-")), "cloud-logins.json");
-    writeFileSync(file, JSON.stringify([{ site: "example.com", addedAt: 5, checkedAt: null, status: "checked" }]));
-    const hooks = { jar: stable((act) => act(fakeContext())), confirm: async () => true, readCookies: async () => [], onChange: () => {} };
-    const logins = new CloudLogins(file, hooks, A);
-    expect(logins.logins.map(({ site }) => site)).toEqual(["example.com"]);
-    expect(JSON.parse(readFileSync(file, "utf8"))).toEqual({ projects: { [A]: [expect.objectContaining({ site: "example.com" })] } });
-    // Read again with another project's key on disk, it stays A's.
-    expect(new CloudLogins(file, hooks, B).logins.map(({ site }) => site)).toEqual(["example.com"]);
   });
 });

@@ -119,6 +119,8 @@ export class WindowParts {
   readonly memory: MemoryStore;
   readonly mcp: McpConnector;
   readonly cloud: CloudTabs;
+  // Leaves the cloud as this window closes, which ends its session unless another window has attached since.
+  readonly leaveCloud: ReturnType<CloudTabs["attach"]>;
   readonly runnerJobs: RunnerJobs;
   readonly macJobs: MacJobs;
   readonly appIcon: AppIcon;
@@ -181,7 +183,7 @@ export class WindowParts {
     this.phone = createPhone(this);
     this.memory = createMemory(this);
     this.cloud = stores.cloud;
-    this.cloud.attach(cloudHooks(this));
+    this.leaveCloud = this.cloud.attach(cloudHooks(this));
     this.runnerJobs = createRunnerJobs(this, server, stores);
     this.chats = createChats(this, stores);
     this.workViews = createWorkViews(this);

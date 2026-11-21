@@ -43,6 +43,11 @@ export interface CloudFiles {
   keys: KeptKeys;
   // `cloud.json` has a session or Context from an app before this one, to take out once the sessions' file has it.
   fromBefore: boolean;
+  // The projects the one list of sign-ins from before there was one per project may be in: the one whose Context came
+  // from `cloud.json`, which is the last an app before this one brought sites into, or else every project with a Context,
+  // since a site listed where it isn't signed in does no harm and one missing where it is does. Null while the files
+  // can't be read, so nothing is decided until they can.
+  oldLoginsIn: string[] | null;
   // A file that's there couldn't be read, or what an app before this one kept couldn't be opened, so neither file may be
   // written, and no session started, this launch, unless the user forgets the key.
   unreadable: boolean;
@@ -145,17 +150,21 @@ export const readCloud = (keyFile: string): CloudFiles => {
   const keys = keysOf(kept);
   const before = saved ? fromBefore(saved, keys) : NOTHING_BEFORE;
   const known = new Set(ids.handles.map(({ id }) => id));
+  const all = before
+    ? {
+        contexts: { ...ids.contexts, ...before.ids.contexts },
+        handles: [...ids.handles, ...before.ids.handles.filter(({ id }) => !known.has(id))],
+      }
+    : ids;
+  const unreadable = saved === undefined || kept === undefined || !before;
+  const contextBefore = Object.keys(before?.ids.contexts ?? {})[0];
   return {
     key: usable,
-    ids: before
-      ? {
-          contexts: { ...ids.contexts, ...before.ids.contexts },
-          handles: [...ids.handles, ...before.ids.handles.filter(({ id }) => !known.has(id))],
-        }
-      : ids,
+    ids: all,
     keys: { ...keys, ...before?.keys },
     fromBefore: !!before && before !== NOTHING_BEFORE,
-    unreadable: saved === undefined || kept === undefined || !before,
+    oldLoginsIn: unreadable ? null : contextBefore ? [contextBefore] : Object.keys(all.contexts),
+    unreadable,
   };
 };
 

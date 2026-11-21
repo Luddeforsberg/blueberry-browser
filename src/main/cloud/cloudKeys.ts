@@ -24,10 +24,10 @@ export class CloudKeys {
     return this.keys;
   }
 
-  // Keys read again from the file, where they aren't kept here already.
-  add(keys: KeptKeys): void {
-    this.keys = { ...keys, ...this.keys };
-    Object.keys(keys).forEach((id) => this.browsers.delete(id));
+  // The keys the file holds, read again as a launch reads them, in place of what's kept.
+  load(keys: KeptKeys): void {
+    this.keys = keys;
+    this.browsers.clear();
   }
 
   // The browser for `key`, carrying the id its sessions' handles name its key by, where it's Browserbase's own.
@@ -53,15 +53,21 @@ export class CloudKeys {
     return keyId !== null && !this.keys[keyId]?.apiKey;
   }
 
-  // The id for this key and project: the one it's kept under already, or a new one, sealed now.
+  // The id for this key and project: the one it's kept under already, or a new one, sealed now. Null where it can't be
+  // sealed, even after the system said it could.
   private idFor({ apiKey, projectId }: Key): string | null {
     if (!apiKey || !projectId || !safeStorage.isEncryptionAvailable()) return null;
     const by = browserbaseOrigin(projectId);
     const known = Object.entries(this.keys).find(([, one]) => one.by === by && one.apiKey === apiKey);
     if (known) return known[0];
+    let sealed: string;
+    try {
+      sealed = seal(apiKey);
+    } catch {
+      return null;
+    }
     const id = randomUUID();
-    const kept: KeptKey = { sealed: seal(apiKey), by, apiKey };
-    this.keys = { ...this.keys, [id]: kept };
+    this.keys = { ...this.keys, [id]: { sealed, by, apiKey } satisfies KeptKey };
     return id;
   }
 }

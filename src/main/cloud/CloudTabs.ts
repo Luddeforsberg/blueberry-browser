@@ -28,13 +28,6 @@ const UNREADABLE =
 const NO_WINDOW = "Blueberry has no window open.";
 const LEFT_RUNNING = "Browserbase no longer takes that key, so its last session couldn't be ended. It ends on its own within an hour.";
 
-// The project the one list of sign-ins from before there was one per project was brought into: the saved key's, or
-// failing that the only project with a Context.
-const upgradeTo = ({ projectId }: Key, { contexts }: CloudIds): string | null => {
-  const origins = Object.keys(contexts);
-  return projectId ? browserbaseOrigin(projectId) : origins.length === 1 ? (origins[0] ?? null) : null;
-};
-
 // The open window's part.
 export interface CloudTabsHooks {
   chrome: () => WebContents;
@@ -116,14 +109,17 @@ export class CloudTabs implements ChatCloud {
         readCookies,
         onChange: () => this.changed(),
       },
-      upgradeTo(this.key, read.ids),
+      read.oldLoginsIn,
     );
   }
 
-  // A window opened. Its tabs show the cloud's pages, and its chrome hears about every change.
-  attach(hooks: CloudTabsHooks): void {
-    this.attached = { hooks };
+  // A window opened. Its tabs show the cloud's pages, and its chrome hears about every change. What comes back is for its
+  // close, and does nothing once another window has attached since.
+  attach(hooks: CloudTabsHooks): () => Promise<Released> {
+    const at: Attachment = { hooks };
+    this.attached = at;
     this.changed();
+    return () => (this.still(at) ? this.detach() : Promise.resolve("running"));
   }
 
   private get hooks(): CloudTabsHooks | null {
@@ -136,7 +132,7 @@ export class CloudTabs implements ChatCloud {
   }
 
   // The window closed, so the session ends, at the provider if need be. Its pages and tabs went with the window.
-  detach(): Promise<Released> {
+  private detach(): Promise<Released> {
     this.attached = null;
     const ending = this.sessions.end();
     this.stopWork();
@@ -183,8 +179,17 @@ export class CloudTabs implements ChatCloud {
       await this.sessions.replace(() => {
         const next: Key = { apiKey: key, projectId: project };
         const browser = this.keys.browserOf(next);
-        if (!this.keep(next)) return null;
-        this.shareKey(browser);
+        // Browserbase's key with no id is one that couldn't be sealed after all, which nothing could end a session with.
+        if (browser?.origin === browserbaseOrigin(project) && !browser.keyId) {
+          this.problem = NOT_SAFE;
+          return null;
+        }
+        // The sessions it ends are kept with it first, since this writes over the key `cloud.json` has now, which may be
+        // the only one that can end them.
+        if (!this.shareKey(browser) || !this.keep(next)) {
+          this.problem = NOT_SAVED;
+          return null;
+        }
         return { browser };
       });
     }
@@ -194,11 +199,13 @@ export class CloudTabs implements ChatCloud {
 
   // A session of this browser's project with no key of its own that opens, as after the system's keychain changed, takes
   // this one, whether it was saved or brought from an app before this one, so a key for another project later doesn't
-  // leave it with nothing to end it.
-  private shareKey(browser: CloudBrowser | null): void {
+  // leave it with nothing to end it. Those that took it on a try whose write failed are written again with it. False if
+  // that couldn't be kept.
+  private shareKey(browser: CloudBrowser | null): boolean {
     const keyId = browser?.keyId;
-    if (!keyId) return;
-    this.sessions.giveKey((handle) => handle.by === browser.origin && (handle.keyId === null || this.keys.unopenable(handle)), keyId);
+    if (!keyId) return true;
+    const takes = (handle: Handle) => handle.keyId === null || handle.keyId === keyId || this.keys.unopenable(handle);
+    return this.sessions.giveKey((handle) => handle.by === browser.origin && takes(handle), keyId);
   }
 
   // Sessions still running stay, each with the key it was made with, until they've ended. What couldn't be read, and a
@@ -207,12 +214,12 @@ export class CloudTabs implements ChatCloud {
     const lost = (handle: Handle) => this.keys.unopenable(handle);
     if (this.unreadable || this.ids.handles.some(lost)) {
       if (!(await (this.hooks?.confirmForget() ?? Promise.resolve(false)))) return this.state;
-      // Read again now, as on a launch, so what reads now is kept and only what still doesn't goes.
+      // The same load as a launch, from the files alone, so what reads now is kept, and only what still doesn't goes.
       const again = readCloud(this.file);
-      this.keys.add(again.keys);
-      this.before ||= again.fromBefore;
+      this.keys.load(again.keys);
+      this.before = again.fromBefore;
       this.unreadable = null;
-      this.sessions.take(again.ids);
+      this.sessions.load(again.ids);
     }
     this.letGoOfTabs();
     this.problem = null;

@@ -184,9 +184,9 @@ export abstract class CloudLife {
     return this.handles.current;
   }
 
-  // Adds what the files hold that isn't kept here, as when they're read again. False if that couldn't be kept.
-  take(ids: CloudIds): boolean {
-    const kept = this.handles.take(ids);
+  // What the files hold, read again as a launch reads them, in place of what's kept. False if that couldn't be kept.
+  load(ids: CloudIds): boolean {
+    const kept = this.handles.load(ids);
     this.settled();
     return kept;
   }

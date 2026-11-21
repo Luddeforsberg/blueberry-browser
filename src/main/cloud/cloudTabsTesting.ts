@@ -46,8 +46,10 @@ export const hooks = (over: Partial<CloudTabsHooks> = {}): CloudTabsHooks => ({
   ...over,
 });
 
-export const makeTabs = (file = tempFile(), provider: Provider = () => fakeLocal().browser, over: Partial<CloudTabsHooks> = {}) => {
+// The cloud with a window attached, and that window's close.
+export const makeWindowTabs = (file = tempFile(), provider: Provider = () => fakeLocal().browser, over: Partial<CloudTabsHooks> = {}) => {
   const tabs = new CloudTabs(file, provider, async () => []);
-  tabs.attach(hooks(over));
-  return tabs;
+  return { tabs, closeWindow: tabs.attach(hooks(over)) };
 };
+
+export const makeTabs = (...args: Parameters<typeof makeWindowTabs>) => makeWindowTabs(...args).tabs;
