@@ -215,9 +215,16 @@ export class CloudTabs implements ChatCloud {
     if (this.unreadable || this.ids.handles.some(lost)) {
       if (!(await (this.hooks?.confirmForget() ?? Promise.resolve(false)))) return this.state;
       // The same load as a launch, from the files alone, so what reads now is kept, and only what still doesn't goes. The
-      // sign-ins are decided first, as on a launch, before anything written takes the Context from before away.
+      // sign-ins are decided first, as on a launch, before anything written takes the Context from before away. Where
+      // what's read still can't tell whose the list from before is, the user's word decides it as every project with a
+      // Context's, and a list that can't be kept stops everything here.
       const again = readCloud(this.file);
-      this.signedIn.load(again.oldLoginsIn);
+      if (!this.signedIn.load(again.oldLoginsIn ?? Object.keys(again.ids.contexts))) {
+        // Still read-only, saying so, with Forget there to try again.
+        this.unreadable = NOT_SAVED;
+        this.changed();
+        return this.state;
+      }
       this.keys.load(again.keys);
       this.before = again.fromBefore;
       this.unreadable = null;

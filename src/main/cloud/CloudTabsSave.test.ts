@@ -40,6 +40,22 @@ const provider: Provider = ({ apiKey, projectId }) =>
     : null;
 const A_KEY = { apiKey: sealed("bb_a"), projectId: sealed("proj-a") };
 
+// A launch that can't open the key from before, which came with A's Context, while B has one too, and the one list of
+// sign-ins from before there was one per project. It decides nothing.
+const unreadableLaunch = () => {
+  const file = tempFile();
+  writeFileSync(file, JSON.stringify({ ...A_KEY, contextId: "ctx-a" }));
+  writeFileSync(sessionsAt(file), JSON.stringify({ contexts: { "browserbase:proj-b": "ctx-b" }, handles: [] }));
+  const loginsFile = join(dirname(file), "cloud-logins.json");
+  writeFileSync(loginsFile, JSON.stringify([{ site: "example.com", addedAt: 5, checkedAt: null, status: "checked" }]));
+  encryption.openFails = true;
+  const tabs = makeTabs(file, provider);
+  encryption.openFails = false;
+  expect(readJson(loginsFile)).toHaveLength(1);
+  return { file, loginsFile, tabs };
+};
+const listedUnder = (origin: string) => ({ projects: { [origin]: [expect.objectContaining({ site: "example.com" })] } });
+
 describe("a cloud key", () => {
   it("starts nothing at launch with a key it can't seal, so no session is kept with nothing to end it", () => {
     const file = tempFile();
@@ -53,21 +69,33 @@ describe("a cloud key", () => {
   });
 
   it("decides the sign-ins from before on Forget as a launch does, under the project whose Context came with them", async () => {
-    const file = tempFile();
-    writeFileSync(file, JSON.stringify({ ...A_KEY, contextId: "ctx-a" }));
-    writeFileSync(sessionsAt(file), JSON.stringify({ contexts: { "browserbase:proj-b": "ctx-b" }, handles: [] }));
-    const loginsFile = join(dirname(file), "cloud-logins.json");
-    writeFileSync(loginsFile, JSON.stringify([{ site: "example.com", addedAt: 5, checkedAt: null, status: "checked" }]));
-    // The launch can't open the key, so it decides nothing, and the user forgets the key once it can.
-    encryption.openFails = true;
-    const tabs = makeTabs(file, provider);
-    encryption.openFails = false;
-    expect(readJson(loginsFile)).toHaveLength(1);
+    const { file, loginsFile, tabs } = unreadableLaunch();
     await tabs.forget();
-    const onlyA = { projects: { "browserbase:proj-a": [expect.objectContaining({ site: "example.com" })] } };
-    expect(readJson(loginsFile)).toEqual(onlyA);
+    expect(readJson(loginsFile)).toEqual(listedUnder("browserbase:proj-a"));
     makeTabs(file, provider);
-    expect(readJson(loginsFile)).toEqual(onlyA);
+    expect(readJson(loginsFile)).toEqual(listedUnder("browserbase:proj-a"));
+  });
+
+  it("lists the sign-ins from before under every project with a Context when Forget still can't tell whose they are", async () => {
+    const { loginsFile, tabs } = unreadableLaunch();
+    encryption.openFails = true;
+    const state = await tabs.forget();
+    encryption.openFails = false;
+    expect(state.unreadable).toBe(false);
+    expect(readJson(loginsFile)).toEqual(listedUnder("browserbase:proj-b"));
+  });
+
+  it("changes nothing on Forget while the sign-ins it decided can't be kept, and says so", async () => {
+    const { file, loginsFile, tabs } = unreadableLaunch();
+    // A folder where the list is written first, so writing it fails.
+    mkdirSync(`${loginsFile}.tmp`);
+    const state = await tabs.forget();
+    expect(state).toMatchObject({ unreadable: true, problem: "The key couldn't be saved." });
+    expect(readJson(file)).toMatchObject({ contextId: "ctx-a" });
+    expect(readJson(loginsFile)).toHaveLength(1);
+    rmdirSync(`${loginsFile}.tmp`);
+    await tabs.forget();
+    expect(readJson(loginsFile)).toEqual(listedUnder("browserbase:proj-a"));
   });
 
   it("keeps the key it has when the new one can't be sealed after all", async () => {

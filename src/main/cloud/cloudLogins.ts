@@ -219,8 +219,9 @@ export class CloudLogins {
 
   // What the file lists, read as a launch reads it, in place of what's kept: on a launch, and when the cloud's files are
   // read again on Forget. A list from before there was one per project goes to the projects in `upgradeTo` and is kept
-  // as theirs at once, so a key saved later can't take it, or stays as it is while that's null.
-  load(upgradeTo: string[] | null): void {
+  // as theirs at once, so a key saved later can't take it, or stays as it is while that's null. False if it was decided
+  // and couldn't be kept.
+  load(upgradeTo: string[] | null): boolean {
     let data: unknown = null;
     try {
       data = JSON.parse(readFileSync(this.file, "utf8"));
@@ -229,7 +230,7 @@ export class CloudLogins {
     }
     this.undecided = Array.isArray(data) && upgradeTo === null;
     this.lists = parseLists(data, upgradeTo ?? []);
-    if (Array.isArray(data) && upgradeTo) this.write();
+    return !(Array.isArray(data) && upgradeTo) || this.write();
   }
 
   // The current project's.
