@@ -258,7 +258,7 @@ describe("the MCP endpoint", () => {
   it("sends a job to the Mac only while it's there, and says so when it isn't", async () => {
     const offline = await client.callTool({ name: "start_job", arguments: { task: "On my Mac", where: "mac" } });
     expect(offline.isError).toBe(true);
-    expect(textOf(offline)).toMatch(/Blueberry isn't open on the user's Mac/);
+    expect(textOf(offline)).toMatch(/Blueberry isn't open on the user's computer/);
     const auto = dataOf(await client.callTool({ name: "start_job", arguments: { task: "Anywhere" } }));
     expect(auto.where).toBe("cloud");
     await runnerDb.claim();

@@ -204,6 +204,23 @@ const fences = [
       "Get a site from src/shared/sites.ts: siteOf for an address's site (null where it has none), siteName for the words a person reads, stripWww for a host you already have, and siteDomains.ts for the whole site it belongs to (eslint.fences.mjs).",
   },
   {
+    // The words follow the platform (DESIGN.md section 14). A sentence says "this computer", which is true on a Mac and a
+    // PC alike, and only the switch between here and the cloud names the computer, for whichever it is. A log line is
+    // nobody's words, so it may say what it likes.
+    name: "platform-words",
+    in: ["src/**/*.{ts,tsx}", "runner/src/**/*.ts"],
+    allowed: { "src/renderer/chrome/src/whereSides.ts": "This Mac or This PC, on the switch." },
+    rules: {
+      "no-restricted-syntax": [
+        "Literal[value=/(^|[^A-Za-z])Mac([^A-Za-z]|$)/]:not(CallExpression[callee.object.name='console'] Literal)",
+        "TemplateElement[value.raw=/(^|[^A-Za-z])Mac([^A-Za-z]|$)/]:not(CallExpression[callee.object.name='console'] TemplateElement)",
+        "JSXText[value=/(^|[^A-Za-z])Mac([^A-Za-z]|$)/]",
+      ],
+    },
+    message:
+      'Say "this computer" or "your computer", which is true on any platform. Only the switch between here and the cloud names it, through whereSides in src/renderer/chrome/src/whereSides.ts (DESIGN.md section 14).',
+  },
+  {
     name: "kit",
     in: ["src/renderer/**/*.tsx"],
     allowed: { "src/renderer/common/components": "The kit itself." },

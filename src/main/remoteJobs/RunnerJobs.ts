@@ -39,7 +39,7 @@ const LINK_FAILED = "That account couldn't be linked. Try again in a moment.";
 // been unlinked elsewhere. Opening the composer looks too.
 const LINK_POLL_MS = 10_000;
 const LINKED_POLL_MS = 5 * 60_000;
-const NO_RUNNER = "Jobs with your Mac off aren't linked any more, so this wasn't sent. Link them again in Settings > Cloud.";
+const NO_RUNNER = "Jobs with your computer off aren't linked any more, so this wasn't sent. Link them again in Settings > Cloud.";
 const SWITCHED = "You signed in to another account while this was being sent, so it wasn't sent. Send it again.";
 // What tokenFor gives when someone else signed in while the token was coming.
 const SWITCHED_ACCOUNT = Symbol("switched account");

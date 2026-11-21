@@ -2,7 +2,9 @@ import { randomUUID } from "crypto";
 import type { MascotProfile } from "../../shared/library";
 import { BERRY, BERRY_ID, paletteOnDisk, parseMascotDraft } from "../../shared/mascots";
 import { fieldsOf } from "../../shared/fields";
+import { cleanLine, MAX_DESCRIPTION } from "../../shared/publishing";
 import { CANT_SAVE, readJsonFile, savedEntries, saveFile, type Saved } from "../library/savedFile";
+import { starterMascots } from "./mascotCatalog";
 
 // Stands in for a mascot that isn't on file, such as after the file was lost. It can do nothing but talk, because a
 // chat or routine limited to one site mustn't turn into Berry and get them all.
@@ -16,20 +18,29 @@ const LOST: Omit<MascotProfile, "id"> = {
 };
 
 const galleryIdOf = (galleryId: unknown) => (typeof galleryId === "string" ? { galleryId } : {});
+const lineOf = (line: unknown) => {
+  const clean = cleanLine(line).trim();
+  return typeof line === "string" && clean && clean.length <= MAX_DESCRIPTION ? { line: clean } : {};
+};
 const publishedIdOf = (publishedId: unknown) => (typeof publishedId === "string" ? { publishedId } : {});
 const worksInCloudOf = (input: unknown) => (fieldsOf(input).worksInCloud === true ? { worksInCloud: true } : {});
 
 const NOT_SAVED = "This mascot couldn't be saved. Check that there's space on your disk and try again.";
 
+// A starter added before copies kept their line gets the catalogue's, if its instructions are still the starter's.
+const starterLine = (galleryId: unknown, instructions: string) =>
+  starterMascots().find((entry) => entry.id === galleryId && entry.draft.instructions === instructions)?.description;
+
 const savedMascot = (item: unknown): MascotProfile | null => {
   const parsed = parseMascotDraft(item);
-  const { id, deletedAt, galleryId, publishedId } = fieldsOf(item);
+  const { id, deletedAt, galleryId, publishedId, line } = fieldsOf(item);
   if ("error" in parsed || typeof id !== "string" || id === BERRY_ID) return null;
   return {
     ...parsed.draft,
     id,
     deletedAt: typeof deletedAt === "number" ? deletedAt : null,
     ...galleryIdOf(galleryId),
+    ...lineOf(line ?? starterLine(galleryId, parsed.draft.instructions)),
     ...publishedIdOf(publishedId),
     ...worksInCloudOf(item),
   };
@@ -58,7 +69,11 @@ export class MascotStore {
     return this.find(id) ?? { ...LOST, id };
   }
 
-  save(id: string | null, input: unknown, galleryId?: string): { ok: true; id: string } | { ok: false; error: string } {
+  save(
+    id: string | null,
+    input: unknown,
+    from?: { galleryId: string; line: string },
+  ): { ok: true; id: string } | { ok: false; error: string } {
     if (id === BERRY_ID) return { ok: false, error: "Berry stays as it is. Make a new mascot instead." };
     if (id && !this.mascots.some((mascot) => mascot.id === id && mascot.deletedAt === null)) {
       return { ok: false, error: "This mascot no longer exists." };
@@ -71,25 +86,33 @@ export class MascotStore {
     );
     if (taken) return { ok: false, error: `You already have a ${draft.name}. Give this one its own name.` };
     const savedId = id ?? randomUUID();
-    // Editing a copy from the Gallery leaves it that copy, so the Gallery doesn't offer a second one.
+    // Editing a copy from the Gallery leaves it that copy, so the Gallery doesn't offer a second one. Its line goes
+    // with the first change to its instructions, since it described the ones it came with. A starter's comes back with
+    // the starter's words, as it does on loading, so a restart never changes what shows.
     const before = id ? this.mascots.find((mascot) => mascot.id === id) : undefined;
+    const line = before
+      ? before.instructions === draft.instructions
+        ? before.line
+        : starterLine(before.galleryId, draft.instructions)
+      : from?.line;
     // A Gallery entry is someone else's, so where it works is the user's own choice, made later.
     const saved: MascotProfile = {
       ...draft,
       id: savedId,
       deletedAt: null,
-      ...galleryIdOf(before ? before.galleryId : galleryId),
+      ...galleryIdOf(before ? before.galleryId : from?.galleryId),
+      ...lineOf(line),
       ...publishedIdOf(before?.publishedId),
-      ...(galleryId ? {} : worksInCloudOf(input)),
+      ...(from ? {} : worksInCloudOf(input)),
     };
     const next = id ? this.mascots.map((mascot) => (mascot.id === id ? saved : mascot)) : [...this.mascots, saved];
     return this.write(next) ? { ok: true, id: savedId } : { ok: false, error: NOT_SAVED };
   }
 
   // The user's own copy of a Gallery entry, checked like any other mascot. Adding it again finds the copy that's there.
-  addFromGallery(galleryId: string, input: unknown): { ok: true; id: string } | { ok: false; error: string } {
+  addFromGallery(galleryId: string, input: unknown, line: string): { ok: true; id: string } | { ok: false; error: string } {
     const copy = this.mascots.find((mascot) => mascot.galleryId === galleryId && mascot.deletedAt === null);
-    return copy ? { ok: true, id: copy.id } : this.save(null, input, galleryId);
+    return copy ? { ok: true, id: copy.id } : this.save(null, input, { galleryId, line });
   }
 
   // Null once it's been taken down. Nothing else about the mascot changes.

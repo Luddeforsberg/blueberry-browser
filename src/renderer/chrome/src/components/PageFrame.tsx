@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { Search } from "lucide-react";
 import { cn } from "@common/lib/utils";
 import { Tooltip } from "@common/components/Tooltip";
+import { Button } from "@common/components/Button";
 
 // DESIGN.md section 10, A page in a tab: every page of Blueberry's own that opens in a tab is built from these, so they
 // can't drift apart. The page is the sheet, as a chat is (the shell draws it under `PageFrame`), in one column 620px
@@ -50,6 +51,14 @@ export const EmptyPage: React.FC<{
     <p className="max-w-[420px] text-14 text-ink-2">{children}</p>
     {actions && <div className="mt-1.5 flex flex-wrap justify-center gap-2">{actions}</div>}
   </div>
+);
+
+// Last on a page, alone: what can't be undone, such as Delete and its name, in `ask`, which asks first. Its words start
+// where the rows' do, so the page keeps one left edge.
+export const EndAction: React.FC<{ onAct: () => void; children: React.ReactNode }> = ({ onAct, children }) => (
+  <Button size="sm" variant="ghost" className="self-start mt-5 px-2 text-ask hover:text-ask" onClick={onAct}>
+    {children}
+  </Button>
 );
 
 const editable = (target: EventTarget | null) =>

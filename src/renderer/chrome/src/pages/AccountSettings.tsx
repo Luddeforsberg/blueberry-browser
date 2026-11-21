@@ -15,7 +15,7 @@ import { useFromMain } from "@common/lib/latest";
 
 // Settings > Account. The name is the user's own, kept in Settings on this computer: nothing sends, prompts or publishes it.
 
-const NEEDED_FOR = "publishing a mascot and keeping cloud jobs going with your Mac off";
+const NEEDED_FOR = "publishing a mascot and keeping cloud jobs going with your computer off";
 
 // Your published mascots, read from the server, so this still works for one whose copy here is gone.
 const PublishedList: React.FC = () => {

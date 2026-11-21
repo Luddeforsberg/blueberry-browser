@@ -1,4 +1,5 @@
-import type { MascotDraft } from "@shared/library";
+import type { MascotDraft, MascotProfile } from "@shared/library";
+import { BERRY_ID } from "@shared/mascots";
 
 const DAY_MS = 86_400_000;
 
@@ -82,3 +83,10 @@ export const firstSentence = (text: string, max = 90): string => {
   const space = cut.lastIndexOf(" ");
   return `${(space > 0 ? cut.slice(0, space) : sentence.slice(0, max)).replace(/[\s,;:·–—-]+$/, "")}…`;
 };
+
+const BERRY_LINE = "Does whatever you ask, wherever you let it.";
+
+// What a mascot is for, in one line: Berry's own, the Gallery's for a copy whose instructions haven't changed, or else
+// the first sentence of what the user told it, which are their own words.
+export const mascotLine = (mascot: Pick<MascotProfile, "id" | "line" | "instructions">): string =>
+  mascot.id === BERRY_ID ? BERRY_LINE : (mascot.line ?? firstSentence(mascot.instructions));

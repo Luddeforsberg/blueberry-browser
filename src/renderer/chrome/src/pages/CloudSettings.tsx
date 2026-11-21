@@ -22,9 +22,9 @@ const statusLine = (cloud: CloudState): string => {
 };
 
 const runnerLine = (runner: RunnerState): string => {
-  if (runner.status === "linked") return `Jobs in the cloud run on ${runner.email}, and keep going with your Mac off.`;
+  if (runner.status === "linked") return `Jobs in the cloud run on ${runner.email}, and keep going with your computer off.`;
   if (runner.status === "waiting") return `Linked to ${runner.email}. Waiting for it to start and accept.`;
-  return "Jobs can keep going with your Mac off on a server you run, linked here by the email of its own account.";
+  return "Jobs can keep going with your computer off on a server you run, linked here by the email of its own account.";
 };
 
 const LINK = "rounded-row text-ink outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus";
@@ -59,7 +59,7 @@ const Runner: React.FC<{ openAccount: () => void }> = ({ openAccount }) => {
               <button type="button" onClick={openAccount} className={LINK}>
                 Account
               </button>{" "}
-              to keep jobs going with your Mac off.
+              to keep jobs going with your computer off.
             </>
           ) : (
             runnerLine(runner)
@@ -128,7 +128,7 @@ const FromOtherApps: React.FC<{ address: string }> = ({ address }) => {
       <SettingsRow
         id="setting-cloud-relay"
         title="From ChatGPT or Claude"
-        description="Give your mascots jobs from ChatGPT or Claude on the web or your phone, with your Mac off."
+        description="Give your mascots jobs from ChatGPT or Claude on the web or your phone, with your computer off."
         more="They ask you here or on your phone before anything risky, and ChatGPT and Claude can’t answer for you."
         below={
           <>
@@ -160,7 +160,7 @@ const FromOtherApps: React.FC<{ address: string }> = ({ address }) => {
       </SettingsRow>
       <SettingsRow
         id="setting-cloud-relay-mac"
-        title="Run their jobs on this Mac when it’s on"
+        title="Run their jobs on this computer when it’s on"
         description="While Blueberry is open here, a job from ChatGPT or Claude works in your own tabs and sign-ins instead of the cloud."
         more="It asks you here, and they never see the page you’re on."
       >
