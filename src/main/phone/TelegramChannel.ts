@@ -4,7 +4,7 @@ import type { PhoneState } from "../../shared/ipc";
 import type { IncomingChoice, IncomingReply, PhoneChannel, PhoneChoice } from "./Phone";
 import { readTelegramFile, writeTelegramFile } from "./telegramFile";
 import { removeFile } from "../library/savedFile";
-import { botUsername, envelopeOf, sentId, updatesOf, type Message, type Update } from "./telegramAnswers";
+import { botUsername, envelopeOf, messageHandle, messageInChat, sentId, updatesOf, type Message, type Update } from "./telegramAnswers";
 import { Latest, type Turn } from "../../shared/lateWork";
 
 // The user's own Telegram bot, reached from here with long polling, so no server of ours is involved. The token only
@@ -222,10 +222,9 @@ export class TelegramChannel implements PhoneChannel {
           ? { reply_markup: { inline_keyboard: [choices.map(({ label, data }) => ({ text: label, callback_data: data }))] } }
           : {}),
       });
-      // A message sent on a connection that has since ended belongs to that chat, so its id means nothing to this one.
-      if (!on?.current) return null;
-      if (this.problem === CANT_MESSAGE) this.setProblem(null);
-      return sentId(sent);
+      if (on?.current && this.problem === CANT_MESSAGE) this.setProblem(null);
+      const id = sentId(sent);
+      return id === null ? null : messageHandle(this.chatId, id);
     } catch (error) {
       if (error instanceof TelegramError && error.status === 403) {
         if (on?.current) this.setProblem(CANT_MESSAGE);
@@ -237,10 +236,12 @@ export class TelegramChannel implements PhoneChannel {
   // Without a keyboard, so the buttons go.
   async edit(handle: string, text: string): Promise<void> {
     if (!this.ready) return;
+    const messageId = messageInChat(handle, this.chatId);
+    if (messageId === null) return;
     const on = this.connection;
     await this.call("editMessageText", {
       chat_id: this.chatId,
-      message_id: Number(handle),
+      message_id: messageId,
       text,
       link_preview_options: { is_disabled: true },
     }).catch((error) => this.noteFailure(error, on));
@@ -307,7 +308,7 @@ export class TelegramChannel implements PhoneChannel {
     if (choice && this.chatId !== null && choice.from.id === this.chatId && choice.message?.chat.id === this.chatId && choice.data) {
       const on = this.connection;
       this.onChoice({
-        handle: String(choice.message.message_id),
+        handle: messageHandle(this.chatId, choice.message.message_id),
         data: choice.data,
         acknowledge: (note) => {
           void this.call("answerCallbackQuery", { callback_query_id: choice.id, ...(note ? { text: note } : {}) }).catch((error) =>
@@ -338,7 +339,8 @@ export class TelegramChannel implements PhoneChannel {
       return;
     }
     if (chat.id !== this.chatId || text.startsWith("/")) return;
-    this.onReply({ text, ref: String(message_id), replyTo: reply_to_message ? String(reply_to_message.message_id) : null });
+    const replyTo = reply_to_message ? messageHandle(this.chatId, reply_to_message.message_id) : null;
+    this.onReply({ text, ref: String(message_id), replyTo });
   }
 
   private setProblem(problem: string | null): void {

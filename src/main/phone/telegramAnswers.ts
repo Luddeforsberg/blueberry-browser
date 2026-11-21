@@ -77,6 +77,14 @@ export const sentId = (result: unknown): string | null => {
   return isNumber(messageId) ? String(messageId) : null;
 };
 
+// A message's handle names its chat too, since Telegram numbers messages per chat, and an edit or a tap is only ever
+// for a message in the chat paired now.
+export const messageHandle = (chatId: number | null, messageId: string | number): string => `${chatId}:${messageId}`;
+export const messageInChat = (handle: string, chatId: number | null): number | null => {
+  const [chat, message] = handle.split(":");
+  return chatId !== null && chat === String(chatId) && message !== undefined && /^\d+$/.test(message) ? Number(message) : null;
+};
+
 export const botUsername = (result: unknown): string | undefined => {
   const { username } = fieldsOf(result);
   return typeof username === "string" ? username : undefined;
