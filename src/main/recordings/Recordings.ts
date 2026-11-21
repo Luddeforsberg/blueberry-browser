@@ -4,6 +4,7 @@ import { DRAFT_PROMPT, draftFromReply, plainDraft, Trail, trailAddress, trailFor
 import { finishWatching, nextNotes } from "./recorderScript";
 import type { RecordedDraftResult, RecordingState } from "../../shared/library";
 import { Latest, type Turn } from "../../shared/lateWork";
+import { stripWww } from "../../shared/sites";
 import type { Tab } from "../tabs/Tab";
 
 // Past this it stops by itself, so a recording nobody remembers doesn't go on watching.
@@ -180,7 +181,7 @@ export class Recordings {
     const address = trailAddress(tab.url);
     if (!address) return;
     const frames = () => tab.webContents.mainFrame.framesInSubtree.map(({ url }) => trailAddress(url)?.host);
-    notes.forEach((note) => this.trail.note(note, address.site, Date.now(), (host) => frames().includes(host.replace(/^www\./, ""))));
+    notes.forEach((note) => this.trail.note(note, address.site, Date.now(), (host) => frames().includes(stripWww(host))));
     this.publish();
     this.limitReached();
   }

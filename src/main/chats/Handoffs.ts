@@ -1,4 +1,5 @@
-import { HANDOFF_WORDS, siteOf } from "../tools/browserTools";
+import { HANDOFF_WORDS } from "../tools/browserTools";
+import { siteName } from "../../shared/sites";
 import { enterCodeInTab } from "../phone/codeEntry";
 import type { CodeResult } from "../phone/Phone";
 import { codeEcho } from "../phone/phoneReplies";
@@ -70,7 +71,7 @@ export class Handoffs {
     const held = { touched: false, asking: true, host: hostOf(tab.url), entering: false, codeEntered: false };
     this.handedOver.set(tab.id, held);
     const who = run.mascot.id === BERRY.id ? (this.browser.assistantName?.() ?? BERRY.name) : run.mascot.name;
-    const site = siteOf(tab.url);
+    const site = siteName(tab.url);
     // A code from the phone can't be typed into a cloud page yet, so the user always does it in the page there.
     const text = need === "code" ? `${who} needs you to enter a code on ${site}` : `${who} needs you to ${HANDOFF_WORDS[need]} on ${site}`;
     let done = false;
@@ -133,7 +134,7 @@ export class Handoffs {
     run.tabs.delete(tab);
     this.publishWorkingTabs();
     const who = run.mascot.id === BERRY.id ? (this.browser.assistantName?.() ?? BERRY.name) : run.mascot.name;
-    const site = siteOf(tab.url);
+    const site = siteName(tab.url);
     let done = false;
     try {
       const text = need === "code" ? `${who} needs a code for ${site}` : `${who} needs you to ${HANDOFF_WORDS[need]} on ${site}`;

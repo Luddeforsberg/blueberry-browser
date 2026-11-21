@@ -5,6 +5,17 @@
 var isRecord = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
 var fieldsOf = (value) => isRecord(value) ? value : {};
 
+// src/shared/sites.ts
+var stripWww = (host) => host.replace(/^www\./, "");
+var siteOf = (url) => {
+  try {
+    const { protocol, hostname } = new URL(url);
+    return protocol === "http:" || protocol === "https:" ? stripWww(hostname) || null : null;
+  } catch {
+    return null;
+  }
+};
+
 // src/shared/mascots.ts
 var BERRY_ID = "berry";
 var PALETTES = [
@@ -42,18 +53,11 @@ var BERRY = {
 var MAX_MASCOT_NAME = 24;
 var MAX_MASCOT_INSTRUCTIONS = 2e3;
 var MAX_SITES = 20;
-var stripWww = (host) => host.replace(/^www\./, "");
 var normaliseSite = (input) => {
   const text = input.trim().toLowerCase().replace(/^\*\./, "");
   if (!text) return null;
-  try {
-    const { hostname, protocol } = new URL(/^[a-z][a-z0-9+.-]*:\/\//.test(text) ? text : `https://${text}`);
-    if (protocol !== "http:" && protocol !== "https:") return null;
-    const host = stripWww(hostname);
-    return host.includes(".") || host === "localhost" ? host : null;
-  } catch {
-    return null;
-  }
+  const host = siteOf(/^[a-z][a-z0-9+.-]*:\/\//.test(text) ? text : `https://${text}`);
+  return host !== null && (host.includes(".") || host === "localhost") ? host : null;
 };
 var isOneOf = (list, value) => list.some(({ id }) => id === value);
 var parseMascotDraft = (input) => {
@@ -169,16 +173,8 @@ var parsePublishedRow = (input) => {
     publishedAt: Number.isNaN(publishedAt) ? 0 : publishedAt
   };
 };
-var linkSite = (href) => {
-  try {
-    const url = new URL(href);
-    return url.protocol === "http:" || url.protocol === "https:" ? url.hostname.replace(/^www\./, "") : null;
-  } catch {
-    return null;
-  }
-};
 var linkWords = (text, href) => {
-  const site = linkSite(href);
+  const site = siteOf(href);
   if (!site || text === site) return text;
   return text === href || text === "" ? site : `${text} (${site})`;
 };
@@ -328,13 +324,9 @@ var siteParts = (text) => {
   for (const match of text.matchAll(/https?:\/\/[^\s,”"<>]+/g)) {
     const found = match[0];
     const trailing = /[.)]+$/.exec(found)?.[0] ?? "";
-    let hostname;
-    try {
-      hostname = new URL(found.slice(0, found.length - trailing.length)).hostname;
-    } catch {
-      continue;
-    }
-    parts.push({ text: text.slice(at, match.index), site: false }, { text: hostname.replace(/^www\./, ""), site: true });
+    const site = siteOf(found.slice(0, found.length - trailing.length));
+    if (!site) continue;
+    parts.push({ text: text.slice(at, match.index), site: false }, { text: site, site: true });
     at = match.index + found.length - trailing.length;
   }
   parts.push({ text: text.slice(at), site: false });
@@ -410,5 +402,6 @@ export {
   plausibleCode,
   rowTime,
   runnerLinkDue,
+  stripWww,
   withSiteNames
 };

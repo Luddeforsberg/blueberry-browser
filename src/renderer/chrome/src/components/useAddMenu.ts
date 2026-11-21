@@ -28,7 +28,9 @@ export const useAddMenu = (
   // The check as this render has it. The effect takes it as it starts, and runs again only for another chat, mascot or
   // number of tabs, not each time the library sends the same mascot anew.
   const recheck = (choices: TabChoice[]) =>
-    box.recheckTabs(choices, (tab) => (siteAllowed(`https://${tab.site}`, mascot.sites) ? null : note));
+    box.recheckTabs(choices, (tab) =>
+      mascot.sites.length === 0 || (tab.site !== null && siteAllowed(`https://${tab.site}`, mascot.sites)) ? null : note,
+    );
   const latest = useRef(recheck);
   latest.current = recheck;
   useEffect(() => {

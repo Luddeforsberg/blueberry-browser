@@ -38,7 +38,8 @@ export interface FileChip {
 export interface TabChoice {
   id: string;
   title: string;
-  site: string;
+  // Null for a page with no site of its own, such as a blank tab.
+  site: string | null;
   favicon: string | null;
   problem: string | null;
 }
@@ -46,7 +47,7 @@ export interface TabChoice {
 // What went with a message, saved with it and shown over it. Names only: a tab's address can carry a token, and a
 // file's contents stay in main.
 export type SentAttachment =
-  | { kind: "tab"; title: string; site: string }
+  | { kind: "tab"; title: string; site: string | null }
   | { kind: FileKind; name: string; fact: string | null; thumbnail: string | null };
 
 // Said on a chip or a menu row, in the user's words. Main is the only one that decides which applies.

@@ -1,6 +1,7 @@
 import React from "react";
 import { File, FileText, Image, X } from "lucide-react";
 import type { FileChip as FileChipInfo, SentAttachment, TabChoice } from "@shared/attachments";
+import { NO_SITE } from "@shared/sites";
 import { cn } from "@common/lib/utils";
 import { Favicon } from "./Favicon";
 import { siteIcon } from "./siteIcon";
@@ -88,11 +89,11 @@ export const TabChip: React.FC<{
   sheet?: boolean;
 }> = ({ tab, problem, onRemove, sheet }) => (
   <Chip
-    icon={<Favicon src={tab.favicon} site={tab.site} />}
+    icon={<Favicon src={tab.favicon} site={tab.site ?? undefined} />}
     name={tab.title}
-    fact={tab.site}
+    fact={tab.site ?? NO_SITE}
     problem={problem}
-    label={`The tab ${tab.title}, on ${tab.site}`}
+    label={`The tab ${tab.title}, on ${tab.site ?? NO_SITE}`}
     onRemove={onRemove}
     sheet={sheet}
   />
@@ -135,7 +136,7 @@ export const SentAttachments: React.FC<{ attached: readonly SentAttachment[] }> 
     {attached.map((item, index) => (
       <li key={index} className="flex min-w-0">
         {item.kind === "tab" ? (
-          <TabChip tab={{ title: item.title, site: item.site, favicon: siteIcon(`https://${item.site}`) }} sheet />
+          <TabChip tab={{ title: item.title, site: item.site, favicon: item.site ? siteIcon(`https://${item.site}`) : null }} sheet />
         ) : (
           <FileChip file={item} sheet />
         )}

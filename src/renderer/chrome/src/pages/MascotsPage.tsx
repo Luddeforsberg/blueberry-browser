@@ -37,6 +37,7 @@ import {
   type PublishValues,
 } from "../mascotsView";
 import { blankForm, startRoutine } from "../routinesView";
+import { siteOf } from "@shared/sites";
 
 // DESIGN.md section 10, Your mascots: a page in a tab, built like Settings, with the list, each mascot's own page, making
 // one in steps, changing one part, and what each remembers. Where it is lives in the tab's param (mascotsPlaces.ts).
@@ -61,13 +62,7 @@ const useWorkingSite = () => {
   const { tabs } = useBrowser();
   return (mascot: MascotProfile): string | null => {
     const tab = tabs.find((each) => each.berryWorking && (each.workingMascotId ?? BERRY_ID) === mascot.id);
-    if (!tab) return null;
-    try {
-      const { hostname, protocol } = new URL(tab.url);
-      return protocol === "http:" || protocol === "https:" ? hostname.replace(/^www\./, "") : null;
-    } catch {
-      return null;
-    }
+    return tab ? siteOf(tab.url) : null;
   };
 };
 

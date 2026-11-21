@@ -1,4 +1,13 @@
-import { asContinuation, BERRY_ID, conversationsOf, finishedWhen, mascotsFromSharedRows, rowTime, withSiteNames } from "../shared.js";
+import {
+  asContinuation,
+  BERRY_ID,
+  conversationsOf,
+  finishedWhen,
+  mascotsFromSharedRows,
+  rowTime,
+  stripWww,
+  withSiteNames,
+} from "../shared.js";
 import { onAccountChange } from "./api.js";
 
 // What the page knows, and the words it says about it. Everything here was read as the signed-in user only.
@@ -195,7 +204,7 @@ export const sitesOf = (job) => {
   const found = new Set();
   for (const step of stepsOf(job)) {
     for (const [name] of step.text.matchAll(SITE)) {
-      const site = name.toLowerCase().replace(/^www\./, "");
+      const site = stripWww(name.toLowerCase());
       if (!NOT_SITES.test(site)) found.add(site);
     }
   }
