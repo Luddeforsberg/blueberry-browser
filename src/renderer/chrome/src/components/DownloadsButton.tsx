@@ -30,12 +30,9 @@ export const DownloadsProgress: React.FC<{
     active.reduce((sum, download) => sum + download.receivedBytes, 0),
     active.reduce((sum, download) => sum + download.totalBytes, 0),
   );
-  const label =
-    active.length > 0
-      ? `Downloads: ${active.map((download) => `${download.filename}${percent(download)}`).join(", ")}`
-      : unseen.length > 0
-        ? `Downloads: ${unseen.map(ending).join(", ")}`
-        : "Downloads";
+  // A paused download is still active, so what ended beside it is named and marked too.
+  const parts = [...active.map((download) => `${download.filename}${percent(download)}`), ...unseen.map(ending)];
+  const label = parts.length > 0 ? `Downloads: ${parts.join(", ")}` : "Downloads";
 
   return (
     <ToolBarButton
@@ -50,8 +47,15 @@ export const DownloadsProgress: React.FC<{
         className={cn(active.length > 0 ? "size-3" : "size-4", arrivals > 0 && "motion-safe:animate-drop")}
         aria-hidden
       />
-      {active.length === 0 && unseen.length > 0 && (
-        <span aria-hidden className={cn("absolute size-[7px] rounded-full bg-ink", small ? "top-1 right-1" : "top-1.5 right-1.5")} />
+      {unseen.length > 0 && (
+        <span
+          aria-hidden
+          className={cn(
+            "absolute size-[7px] rounded-full bg-ink",
+            // Over a ring it moves out to the corner, cut out of the ring by the toolbar's own colour.
+            active.length > 0 ? "top-0 right-0 shadow-[0_0_0_2px_rgb(var(--ground))]" : small ? "top-1 right-1" : "top-1.5 right-1.5",
+          )}
+        />
       )}
       {active.length > 0 && (
         <svg viewBox="0 0 24 24" className={cn("absolute size-6 -rotate-90", small ? "inset-0.5" : "inset-1")} aria-hidden>
