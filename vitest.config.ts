@@ -13,7 +13,8 @@ export default defineConfig({
     testTimeout: 20_000,
     hookTimeout: 60_000,
     globalSetup: ["tests/tempRun.ts"],
-    // `pnpm run test` runs the src/main/tools/CdpTab tests on their own after the rest: they drive a real headless Chrome, which
-    // stalled for seconds on GitHub's macOS runners while the Postgres tests had every core (issue #145).
+    // `pnpm run test` runs the src/main/tools/CdpTab tests after the rest, one file at a time. Each drives a real headless
+    // Chrome, and on GitHub's 3-core macOS runners other work at once, the Postgres tests or the other CdpTab files, slowed a
+    // page's answers past the half second a click or key has to show it arrived (issue #145).
   },
 });

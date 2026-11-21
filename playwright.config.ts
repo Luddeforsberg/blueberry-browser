@@ -5,6 +5,6 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: 0,
   workers: 1,
-  globalSetup: "./tests/tempRun.ts",
+  globalSetup: ["./tests/tempRun.ts", "./tests/warmUp.ts"],
   reporter: process.env.CI ? "github" : "list",
 });
