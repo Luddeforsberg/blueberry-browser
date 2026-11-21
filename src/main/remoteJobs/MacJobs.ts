@@ -21,13 +21,13 @@ const PRESENCE_MS = 30_000;
 // What the chat says it came from.
 export const RELAY_FROM = "ChatGPT or Claude";
 
-const NO_MASCOT = "That mascot isn't in Blueberry on the Mac, so the job didn't start.";
+const NO_MASCOT = "That mascot isn't in Blueberry on the computer, so the job didn't start.";
 const BAD_MASCOT = "This job's mascot didn't pass Blueberry's checks, so it didn't start.";
-const OFF_BEFORE = "Jobs from ChatGPT and Claude were turned off on the Mac before this one started.";
-const QUIT_BEFORE = "Blueberry quit on the Mac before this job started.";
-const SWITCHED_OFF = "Jobs from ChatGPT and Claude were turned off on the Mac, so it stopped there.";
-const DELETED = "The chat was deleted on the Mac, so the job stopped there.";
-const LOST_TOUCH = "Blueberry on the Mac lost touch with its server, so the job stopped there.";
+const OFF_BEFORE = "Jobs from ChatGPT and Claude were turned off on the computer before this one started.";
+const QUIT_BEFORE = "Blueberry quit on the computer before this job started.";
+const SWITCHED_OFF = "Jobs from ChatGPT and Claude were turned off on the computer, so it stopped there.";
+const DELETED = "The chat was deleted on the computer, so the job stopped there.";
+const LOST_TOUCH = "Blueberry on the computer lost touch with its server, so the job stopped there.";
 
 export interface MacJobsHost {
   // The switch in Settings.

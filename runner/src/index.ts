@@ -1,6 +1,8 @@
+import { createHash } from "node:crypto";
 import { modelConfig } from "../../src/main/chats/agent";
 import { browserbase } from "../../src/main/cloud/browserbase";
-import { CloudSessions, type CloudBrowser } from "../../src/main/cloud/cloudBrowser";
+import { CloudSessions } from "../../src/main/cloud/cloudBrowser";
+import { NO_IDS } from "../../src/main/cloud/cloudProvider";
 import { isLocalEndpoint, localChrome } from "../../src/main/cloud/localChrome";
 import { DbError, dbConfig, runnerSession, supabaseDb, type ClaimedJob } from "./db";
 import { runJob, sessionBrowser, UnreleasedBrowsers } from "./job";
@@ -8,6 +10,7 @@ import { pushConfig, pusher } from "./push";
 import { quietConsole } from "./quietConsole";
 import { RelayAddress, relayConfig, startRelay } from "./relay";
 import { startDueRoutines } from "./routines";
+import { Sweeps } from "./sweeps";
 
 quietConsole();
 
@@ -42,18 +45,31 @@ if (!local && (!apiKey || !projectId)) fail("Set BROWSERBASE_API_KEY and BROWSER
 // The user's Context comes with each job, from the app. Without one, the runner makes one for itself and keeps it while
 // it runs, so jobs at least share theirs.
 let ownContext: string | null = process.env.BROWSERBASE_CONTEXT_ID || null;
-const cloudBrowser = (contextId: string | null): CloudBrowser =>
-  local
-    ? localChrome({ executable: localExecutable, endpoint: localEndpoint })
-    : browserbase({
-        apiKey: apiKey!,
-        projectId: projectId!,
-        // A new session each job, ended with it.
-        saved: { contextId: contextId ?? ownContext, sessionId: null },
-        onSaved: (saved) => {
-          if (!contextId) ownContext = saved.contextId;
-        },
-      });
+// Every session this runner makes carries its mark and its job, so one left by a runner that stopped without ending it is
+// found and ended once its job is over. Never sooner, since another runner on the same account, as during a redeploy,
+// may still be working in it. The mark is from the runner's own account, which is its alone, and never the address.
+const mark = `runner-${createHash("sha256")
+  .update(process.env.BLUEBERRY_RUNNER_EMAIL ?? "")
+  .digest("hex")
+  .slice(0, 16)}`;
+const hosted = (job?: string) => browserbase({ apiKey: apiKey!, projectId: projectId!, mark, ...(job ? { job } : {}) });
+const sweeper = local ? null : hosted();
+const localBrowser = local ? localChrome({ executable: localExecutable, endpoint: localEndpoint }) : null;
+// A new session each job, ended with it.
+const jobSessions = (jobId: string, contextId: string | null): CloudSessions => {
+  const browser = localBrowser ?? hosted(jobId);
+  const context = contextId ?? ownContext;
+  return new CloudSessions(
+    browser,
+    { ...NO_IDS, contexts: context ? { [browser.origin]: context } : {} },
+    {
+      onIds: (ids) => {
+        if (!contextId) ownContext = ids.contexts[browser.origin] ?? null;
+        return true;
+      },
+    },
+  );
+};
 
 const settings = config as Exclude<typeof config, string>;
 const db = supabaseDb(settings, runnerSession(settings));
@@ -85,12 +101,16 @@ if (relaySettings) {
 const unreleased = new UnreleasedBrowsers();
 const shutdown = new AbortController();
 let working: Promise<unknown> | null = null;
+let sweeps: Sweeps | null = null;
 const quit = () => {
   if (shutdown.signal.aborted) return;
   console.log("Shutting down.");
   shutdown.abort();
-  // One last try at anything left running at the provider.
-  void (working ?? Promise.resolve()).then(() => unreleased.retry()).finally(() => process.exit(0));
+  // The job, and a sweep that may be about to end a session left from a runner that stopped, finish first, then one last
+  // try at anything left running at the provider.
+  void Promise.allSettled([working, sweeps?.inFlight])
+    .then(() => unreleased.retry())
+    .finally(() => process.exit(0));
 };
 process.on("SIGTERM", quit);
 process.on("SIGINT", quit);
@@ -172,7 +192,7 @@ const loop = async () => {
     working = runJob(job, {
       db,
       claimedAt,
-      browser: (contextId) => sessionBrowser(new CloudSessions(cloudBrowser(contextId))),
+      browser: (contextId) => sessionBrowser(jobSessions(id, contextId)),
       signal: shutdown.signal,
       unreleased,
       notify,
@@ -183,3 +203,12 @@ const loop = async () => {
 };
 
 void loop();
+if (sweeper) {
+  sweeps = new Sweeps({
+    sweep: () => sweeper.releaseMarked((jobs) => db.liveJobs(jobs)),
+    linked: () => linked,
+    stop: shutdown.signal,
+    sleep,
+  });
+  void sweeps.run();
+}

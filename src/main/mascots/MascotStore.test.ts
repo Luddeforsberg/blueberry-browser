@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { MascotStore } from "./MascotStore";
+import { starterMascots } from "./mascotCatalog";
 import { BERRY, BERRY_ID } from "../../shared/mascots";
 
 const file = () => join(mkdtempSync(join(tmpdir(), "blueberry-mascots-")), "mascots.json");
@@ -13,6 +14,7 @@ const draft = {
   sites: ["https://www.GitHub.com/x"],
   tools: ["visit"],
 };
+const LINE = "Reads things for you.";
 
 describe("MascotStore", () => {
   it("always has Berry, which can't be changed or deleted", () => {
@@ -74,7 +76,7 @@ describe("MascotStore", () => {
     const store = new MascotStore(path);
     const saved = store.save(null, { ...draft, worksInCloud: true });
     const loose = store.save(null, { ...draft, name: "Pip", worksInCloud: "yes" });
-    const copy = store.addFromGallery("entry-1", { ...draft, name: "Wren", worksInCloud: true });
+    const copy = store.addFromGallery("entry-1", { ...draft, name: "Wren", worksInCloud: true }, LINE);
     if (!saved.ok || !loose.ok || !copy.ok) throw new Error("not saved");
     const again = new MascotStore(path);
     expect(again.find(saved.id)?.worksInCloud).toBe(true);
@@ -85,38 +87,98 @@ describe("MascotStore", () => {
   it("adds a Gallery copy once, lets a deleted one be added again, and keeps what it came from through an edit", () => {
     const path = file();
     const store = new MascotStore(path);
-    const first = store.addFromGallery("entry", draft);
+    const first = store.addFromGallery("entry", draft, LINE);
     if (!first.ok) throw new Error(first.error);
-    expect(store.addFromGallery("entry", { ...draft, name: "Other" })).toEqual(first);
+    expect(store.addFromGallery("entry", { ...draft, name: "Other" }, LINE)).toEqual(first);
     expect(store.all()).toHaveLength(2);
 
     expect(store.save(first.id, { ...draft, name: "Mine", galleryId: "another" }).ok).toBe(true);
     expect(new MascotStore(path).find(first.id)).toMatchObject({ name: "Mine", galleryId: "entry" });
 
     expect(store.delete(first.id)).toBe(true);
-    const second = store.addFromGallery("entry", draft);
+    const second = store.addFromGallery("entry", draft, LINE);
     if (!second.ok) throw new Error(second.error);
     expect(second.id).not.toBe(first.id);
     expect(store.find(first.id)?.deletedAt).not.toBeNull();
   });
 
+  it("keeps a copy's line through a restart and a rename, and drops it with the first change to its instructions", () => {
+    const path = file();
+    const store = new MascotStore(path);
+    const copy = store.addFromGallery("entry", draft, ` ${LINE}\u200b `);
+    if (!copy.ok) throw new Error(copy.error);
+    expect(new MascotStore(path).find(copy.id)?.line).toBe(LINE);
+
+    expect(store.save(copy.id, { ...draft, name: "Mine" }).ok).toBe(true);
+    expect(new MascotStore(path).find(copy.id)?.line).toBe(LINE);
+
+    expect(store.save(copy.id, { ...draft, name: "Mine", instructions: "Read other things." }).ok).toBe(true);
+    expect(new MascotStore(path).find(copy.id)?.line).toBeUndefined();
+    expect(store.save(copy.id, { ...draft, name: "Mine" }).ok).toBe(true);
+    expect(store.find(copy.id)?.line).toBeUndefined();
+
+    const own = store.save(null, { ...draft, name: "Pip", line: LINE });
+    if (!own.ok) throw new Error(own.error);
+    expect(store.find(own.id)?.line).toBeUndefined();
+  });
+
+  it("gives a starter added before copies kept their line the catalogue's, only while its instructions are the starter's", () => {
+    const path = file();
+    const starter = starterMascots()[0];
+    if (!starter) throw new Error("no starters");
+    const saved = (id: string, instructions: string) => ({
+      ...starter.draft,
+      name: id,
+      instructions,
+      id,
+      deletedAt: null,
+      galleryId: starter.id,
+    });
+    writeFileSync(
+      path,
+      JSON.stringify([
+        saved("Kept", starter.draft.instructions),
+        saved("Changed", "Mine now."),
+        { ...saved("Long", "x"), line: "x".repeat(141) },
+      ]),
+    );
+    const store = new MascotStore(path);
+    expect(store.find("Kept")?.line).toBe(starter.description);
+    expect(store.find("Changed")?.line).toBeUndefined();
+    expect(store.find("Long")?.line).toBeUndefined();
+
+    // Changed and changed back, it's the same before a restart as after.
+    const { look, sites, tools } = starter.draft;
+    const edit = (instructions: string) => store.save("Kept", { name: "Kept", look, sites, tools, instructions });
+    expect(edit("Mine now.").ok).toBe(true);
+    expect(store.find("Kept")?.line).toBeUndefined();
+    expect(new MascotStore(path).find("Kept")?.line).toBeUndefined();
+    expect(edit(starter.draft.instructions).ok).toBe(true);
+    expect(store.find("Kept")?.line).toBe(starter.description);
+    expect(new MascotStore(path).find("Kept")?.line).toBe(starter.description);
+  });
+
   it("holds a Gallery copy to everything a hand-made mascot is, and refuses a name that's taken", () => {
     const store = new MascotStore(file());
-    expect(store.addFromGallery("a", { ...draft, name: "Berry" }).ok).toBe(false);
-    expect(store.addFromGallery("a", { ...draft, sites: ["com"] }).ok).toBe(false);
-    expect(store.addFromGallery("a", { ...draft, instructions: "x".repeat(2001) }).ok).toBe(false);
+    expect(store.addFromGallery("a", { ...draft, name: "Berry" }, LINE).ok).toBe(false);
+    expect(store.addFromGallery("a", { ...draft, sites: ["com"] }, LINE).ok).toBe(false);
+    expect(store.addFromGallery("a", { ...draft, instructions: "x".repeat(2001) }, LINE).ok).toBe(false);
 
-    const added = store.addFromGallery("a", {
-      ...draft,
-      id: BERRY_ID,
-      deletedAt: 1,
-      galleryId: "b",
-      skipApprovals: true,
-      tools: ["visit", "everything"],
-    });
+    const added = store.addFromGallery(
+      "a",
+      {
+        ...draft,
+        id: BERRY_ID,
+        deletedAt: 1,
+        galleryId: "b",
+        skipApprovals: true,
+        tools: ["visit", "everything"],
+      },
+      LINE,
+    );
     if (!added.ok) throw new Error(added.error);
-    expect(store.find(added.id)).toEqual({ ...draft, sites: ["github.com"], id: added.id, deletedAt: null, galleryId: "a" });
-    expect(store.addFromGallery("b", draft)).toMatchObject({ ok: false, error: expect.stringContaining("already have a Scout") });
+    expect(store.find(added.id)).toEqual({ ...draft, sites: ["github.com"], id: added.id, deletedAt: null, galleryId: "a", line: LINE });
+    expect(store.addFromGallery("b", draft, LINE)).toMatchObject({ ok: false, error: expect.stringContaining("already have a Scout") });
   });
 
   it.each([

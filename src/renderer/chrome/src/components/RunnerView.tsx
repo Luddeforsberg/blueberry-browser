@@ -39,7 +39,7 @@ export const RunnerView: React.FC<{ chatId: string; steps: ChatStep[]; approval:
         <span className="font-medium">In the cloud</span>
       </p>
       <p className="text-14 text-ink-2">
-        {handoff ? `Do it in the page below, then press I’m done.` : "It keeps going with your Mac off. Come back any time."}
+        {handoff ? `Do it in the page below, then press I’m done.` : "It keeps going with your computer off. Come back any time."}
       </p>
       <div className="relative aspect-[4/3] overflow-hidden rounded-tile border bg-tray">
         {url ? (

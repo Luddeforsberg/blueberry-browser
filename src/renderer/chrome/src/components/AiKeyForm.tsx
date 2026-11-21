@@ -213,7 +213,8 @@ export const AiKeyForm: React.FC<{ keyTry: KeyTry; onRemove?: () => void; tryBut
   } else {
     under = (
       <p className="mt-[9px] mx-1 flex justify-between gap-3.5 text-[12.5px] leading-[18px] text-ink-3 text-left">
-        <span>Kept encrypted on this computer. You pay {name} for what I use.</span>
+        {/* In Berry's voice, on the first run's card. Settings says it in its own words over the field. */}
+        {inCard && <span>Kept encrypted on this computer. You pay {name} for what I use.</span>}
         <button
           type="button"
           onClick={() => void window.chromeAPI.aiKey.find(service)}

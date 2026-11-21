@@ -1,90 +1,55 @@
-import type { Browser, BrowserContext, Page, Request, Route } from "playwright-core";
+import type { BrowserContext, Page } from "playwright-core";
 import { CdpTab, type CdpTabEvents } from "../tools/CdpTab";
+import { CloudLife, ENDED_MEANWHILE, type CloudLifeHooks } from "./cloudLife";
+import { NO_IDS, type CloudBrowser, type CloudIds } from "./cloudProvider";
+import { closePopups } from "./cloudPopups";
 
-// A browser somewhere else, reached over CDP, for a mascot to work in. Plain Node, like `CdpTab`, so a runner without a
-// window can use the same code. One session at a time, and one job in it at a time.
+// A browser somewhere else, reached over CDP, for a mascot to work in, and who is using it: one job at a time, and the
+// user in pages they hold. Plain Node, like `CdpTab`, so a runner without a window can use the same code. Its life,
+// from start to release, is `CloudLife`'s.
 
-// A running browser, from whichever provider.
-export interface CloudSession {
-  readonly context: BrowserContext;
-  // An address for an iframe showing this page live, which the user can work in. Null where there's none, as for a
-  // local browser, which shows pictures instead.
-  liveView(page: CdpTab): Promise<string | null>;
-  // Lets go of the connection, and ends a browser this computer started.
-  close(): Promise<void>;
-}
-
-export interface CloudBrowser {
-  readonly name: "browserbase" | "local";
-  start(): Promise<CloudSession>;
-  // Whether a session may still be running at the provider, connected or not.
-  readonly hasSession: boolean;
-  // Ends it there, with or without a connection, so nothing keeps running or costing. Rejects if that wasn't confirmed,
-  // with `KeyRefused` when the provider no longer takes the key, which then can't end it at all.
-  release(): Promise<void>;
-}
-
-export class KeyRefused extends Error {}
-
-// Playwright loads only when a cloud browser is first used, so startup never waits for it.
-export const connectOverCdp = async (endpoint: string): Promise<Browser> => {
-  const { chromium } = await import("playwright-core");
-  return chromium.connectOverCDP(endpoint);
-};
-
-// How long a popup gets to say where it's going before it's closed.
-const POPUP_URL_MS = 2_000;
-
-export type CloudStatus = "idle" | "starting" | "running" | "ended";
-
-const IDLE_MS = 3 * 60_000;
-
-// The session, the job using it and its pages. Whoever owns this decides who may claim it.
-export class CloudSessions {
-  private session: CloudSession | null = null;
-  private starting: Promise<CloudSession> | null = null;
+export class CloudSessions extends CloudLife {
   private owner: string | null = null;
+  // Main changing its cookies, so it doesn't wind down meanwhile.
+  private readonly users = new Set<symbol>();
+  // Pages the user holds, by tab, each with the hold that took it, so a late call can only let go of its own.
+  private readonly held = new Map<string, object>();
   private readonly pages = new Map<string, { tab: CdpTab; jobId: string }>();
-  private _status: CloudStatus = "idle";
-  private _problem: string | null = null;
-  // The last release wasn't confirmed, so a paid session may still be running, and whether that was the key refused.
-  private _unreleased = false;
-  private _keyRefused = false;
   // Every page made here. Anything else in the context is a popup a page opened.
   private readonly ours = new WeakSet<Page>();
   private opening: Promise<unknown> = Promise.resolve();
-  // A session nobody is using still costs, so it ends a while after the last job lets go.
-  private idle: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(
-    private readonly browser: CloudBrowser,
-    private readonly onChange: () => void = () => {},
-    private readonly idleMs = IDLE_MS,
-  ) {}
-
-  get status(): CloudStatus {
-    return this._status;
+  constructor(browser: CloudBrowser | null, ids: CloudIds = NO_IDS, hooks: CloudLifeHooks = {}, idleMs?: number) {
+    super(browser, ids, hooks, idleMs);
+    // A session left running last time ends too, unless something wants it first. Here, once who uses it is known.
+    this.settle();
+    this.recover();
   }
 
-  get problem(): string | null {
-    return this._problem;
+  protected inUse(): boolean {
+    return this.owner !== null || this.users.size > 0 || this.held.size > 0;
   }
 
-  get unreleased(): boolean {
-    return this._unreleased;
+  protected dropAll(): void {
+    this.pages.clear();
+    this.owner = null;
+    this.users.clear();
+    this.held.clear();
   }
 
-  get keyRefused(): boolean {
-    return this._unreleased && this._keyRefused;
+  // A hold is on a page, so it goes with it.
+  protected dropPages(): void {
+    this.pages.clear();
+    this.held.clear();
   }
 
-  // Whether End has anything to end, here or at the provider.
-  get canEnd(): boolean {
-    return this.session !== null || this.starting !== null || this.browser.hasSession || this._unreleased;
-  }
-
-  get provider(): CloudBrowser["name"] {
-    return this.browser.name;
+  protected prepare(context: BrowserContext): Promise<void> {
+    return closePopups(context, {
+      ours: (page) => this.ours.has(page),
+      opening: () => this.opening,
+      jobTabs: () => [...this.pages.values()].filter(({ jobId }) => jobId === this.owner).map(({ tab }) => tab),
+      tabOf: (opener) => [...this.pages.values()].find(({ tab }) => tab.page === opener)?.tab ?? null,
+    });
   }
 
   // The job using it now, if any.
@@ -92,113 +57,37 @@ export class CloudSessions {
     return this.owner;
   }
 
-  // Only one job works in it at a time. False if another has it.
+  // Only one job works in it at a time. False if another has it, or it's ending.
   claim(jobId: string): boolean {
-    if (this.owner && this.owner !== jobId) return false;
+    if (this.refusal || (this.owner && this.owner !== jobId)) return false;
     this.owner = jobId;
-    this.keepOpen();
-    this.onChange();
+    this.settled();
     return true;
   }
 
   release(jobId: string): void {
     if (this.owner !== jobId) return;
     this.owner = null;
-    this.endWhenIdle();
-    this.onChange();
+    this.settled();
   }
 
-  // Nobody needs it now, unless a job claims it before the time is up.
-  endWhenIdle(): void {
-    this.keepOpen();
-    if (this.owner || !this.canEnd) return;
-    this.idle = setTimeout(() => void this.end(), this.idleMs);
+  // The user has a page here, such as one they took over or opened to check a sign-in. It stays open while they do.
+  holdForUser(id: string): object {
+    const hold = {};
+    this.held.set(id, hold);
+    this.settle();
+    return hold;
   }
 
-  // Someone is using it: a job, or the user after taking over, who ends it themselves or at the provider's timeout.
-  keepOpen(): void {
-    if (this.idle) clearTimeout(this.idle);
-    this.idle = null;
+  // Lets go of the page, or only of `hold` if that's still what holds it.
+  letGo(id: string, hold?: object): void {
+    if (!this.held.has(id) || (hold && this.held.get(id) !== hold)) return;
+    this.held.delete(id);
+    this.settle();
   }
 
-  private async ensure(): Promise<CloudSession> {
-    if (this.session) return this.session;
-    this.starting ??= (async () => {
-      this._status = "starting";
-      this._problem = null;
-      this.onChange();
-      try {
-        const session = await this.browser.start();
-        await this.stopPopups(session.context);
-        this.session = session;
-        this._status = "running";
-        session.context.browser()?.on("disconnected", () => this.lost());
-        return session;
-      } catch (error) {
-        this._status = "idle";
-        const problem = error instanceof Error ? error.message : "The cloud browser couldn't start.";
-        // A session may have been made before the connection failed, and nothing else would end it.
-        await this.releaseAtProvider();
-        this._problem ??= problem;
-        throw new Error(problem);
-      } finally {
-        this.starting = null;
-        this.onChange();
-      }
-    })();
-    return this.starting;
-  }
-
-  // A popup is a new page nothing here watches. Playwright holds every new page until its routes are on, so its requests
-  // all come through here. Its first navigation comes before Playwright knows its frame, so it's checked against the
-  // job's limits like any navigation in its tabs, and refused where they say no. Everything else from a popup is
-  // refused, the popup is closed, and an address it was going to loads in the tab it came from, under that tab's limits:
-  // the same as following the link there.
-  private async stopPopups(context: BrowserContext): Promise<void> {
-    await context.route("**/*", (route, request) => this.route(route, request));
-    context.on("page", (page) => void this.closePopup(page));
-  }
-
-  private jobTabs(): CdpTab[] {
-    return [...this.pages.values()].filter(({ jobId }) => jobId === this.owner).map(({ tab }) => tab);
-  }
-
-  private route(route: Route, request: Request): Promise<void> {
-    let page: Page | null = null;
-    try {
-      page = request.frame().page();
-    } catch {
-      // A service worker's, or a navigation in a frame that doesn't exist yet, such as a popup's first.
-      const refused = request.isNavigationRequest() && this.jobTabs().filter((tab) => tab.refuse(request.url())).length > 0;
-      return refused ? route.abort("blockedbyclient").catch(() => {}) : route.fallback();
-    }
-    if (this.ours.has(page)) return route.fallback();
-    return route.abort("blockedbyclient").catch(() => {});
-  }
-
-  private async closePopup(page: Page): Promise<void> {
-    // Our own page is in `ours` once `newPage` is done.
-    await this.opening;
-    if (this.ours.has(page)) return;
-    const opener = await page.opener().catch(() => null);
-    // Where it was going, if it got that far.
-    await page.waitForURL(/^https?:/, { timeout: POPUP_URL_MS }).catch(() => {});
-    const url = page.url();
-    await page.close().catch(() => {});
-    if (!/^https?:/.test(url)) return;
-    // Only into the tab that opened it, whichever chat that is. A popup with no opener to find, as from a `noopener`
-    // link, loads nowhere, so it can't land in another chat's page.
-    const tab = [...this.pages.values()].find(({ tab: one }) => one.page === opener)?.tab;
-    await tab?.loadURL(url).catch(() => {});
-  }
-
-  // The connection went. A kept-alive session can still be running at the provider, which End can release.
-  private lost(): void {
-    if (!this.session) return;
-    this.session = null;
-    this._status = "idle";
-    this.pages.clear();
-    this.onChange();
+  heldByUser(id: string): boolean {
+    return this.held.has(id);
   }
 
   // A new page for the job that has claimed the session. `id` is what the tools and the window call it. `allows` is a
@@ -215,49 +104,76 @@ export class CloudSessions {
       if (allows) await tab.withNavigationLimit(allows, load);
       else await load();
     } catch (error) {
-      // A limit that couldn't be put on leaves no blank page behind it.
-      await this.close(id);
+      // A limit that couldn't be put on leaves no blank page behind it. Only this one: by now the id may be another's.
+      await this.closeOwn(id, tab);
       throw error;
     }
-    this.onChange();
+    this.changed();
     return tab;
   }
 
   // For main only, never a tool: whatever is done to the browser's cookies, such as bringing a login along. Starts the
-  // session if it isn't running, and lets it end as usual afterwards if no job is using it.
+  // session if it isn't running, and lets it wind down as usual afterwards if nobody else is using it.
   async withContext<T>(act: (context: BrowserContext) => Promise<T>): Promise<T> {
-    // Running with no timer means someone is using it, such as the user in a tab they took over, so it stays that way.
-    const wasIdle = this.idle !== null || this.session === null;
-    this.keepOpen();
+    const user = Symbol("cookies");
+    this.users.add(user);
+    this.settle();
     try {
       return await act((await this.ensure()).context);
     } finally {
-      if (wasIdle) this.endWhenIdle();
+      this.users.delete(user);
+      this.settle();
     }
   }
 
-  // A page the user opened themselves, such as a site to see whether they're signed in. It belongs to no job.
-  async openForUser(id: string, url: string, events: CdpTabEvents): Promise<CdpTab> {
-    const tab = await this.newTab(id, "", events);
-    await tab.loadURL(url).then(
-      () => tab.settled(),
-      () => {},
-    );
-    this.onChange();
-    return tab;
+  // A page the user opened themselves, such as a site to see whether they're signed in. It belongs to no job, and it's
+  // the user's from the start. Null if they let go of it before it opened, which closes it.
+  async openForUser(id: string, url: string, events: CdpTabEvents): Promise<CdpTab | null> {
+    const hold = this.holdForUser(id);
+    try {
+      const tab = await this.newTab(id, "", events);
+      if (this.held.get(id) !== hold) {
+        await this.closeOwn(id, tab);
+        return null;
+      }
+      await tab.loadURL(url).then(
+        () => tab.settled(),
+        () => {},
+      );
+      this.changed();
+      return tab;
+    } catch (error) {
+      this.letGo(id, hold);
+      throw error;
+    }
   }
 
   private async newTab(id: string, jobId: string, events: CdpTabEvents): Promise<CdpTab> {
+    const life = this.life;
     const session = await this.ensure();
+    if (!life.current) throw new Error(ENDED_MEANWHILE);
     const made = session.context.newPage();
     this.opening = made.catch(() => null);
     const page = await made;
     this.ours.add(page);
-    const tab = await CdpTab.attach(id, page, events);
+    if (!life.current) {
+      void page.close().catch(() => {});
+      throw new Error(ENDED_MEANWHILE);
+    }
+    const tab = await CdpTab.attach(id, page, events).catch((error: unknown) => {
+      void page.close().catch(() => {});
+      throw error;
+    });
+    if (!life.current) {
+      void tab.close().catch(() => {});
+      throw new Error(ENDED_MEANWHILE);
+    }
     this.pages.set(id, { tab, jobId });
     page.on("close", () => {
+      if (this.pages.get(id)?.tab !== tab) return;
       this.pages.delete(id);
-      this.onChange();
+      this.held.delete(id);
+      this.settled();
     });
     return tab;
   }
@@ -280,47 +196,21 @@ export class CloudSessions {
     return [...this.pages.values()].filter((page) => page.jobId === jobId && !page.tab.isClosed).map(({ tab }) => tab);
   }
 
+  // The page called that now, from the window or the job using it.
   async close(id: string): Promise<void> {
     const page = this.pages.get(id);
-    this.pages.delete(id);
-    await page?.tab.close();
-    this.onChange();
+    if (page) await this.closeOwn(id, page.tab);
+  }
+
+  // That tab, and its place under `id` only while it's still there.
+  private async closeOwn(id: string, tab: CdpTab): Promise<void> {
+    if (this.pages.get(id)?.tab === tab) this.pages.delete(id);
+    await tab.close();
+    this.changed();
   }
 
   async liveView(id: string): Promise<string | null> {
     const page = this.page(id);
     return page && this.session ? this.session.liveView(page).catch(() => null) : null;
-  }
-
-  // True once the provider has confirmed. Otherwise it says so, and End stays there to try again.
-  private async releaseAtProvider(): Promise<boolean> {
-    try {
-      await this.browser.release();
-      this._unreleased = false;
-      this._problem = null;
-      return true;
-    } catch (error) {
-      // Only that it failed, since this runs on the cloud runner too. Settings > Cloud says what to do.
-      console.error("Couldn't release the cloud session.");
-      this._unreleased = true;
-      this._keyRefused = error instanceof KeyRefused;
-      this._problem = "The cloud session may still be running, and costing, because the provider didn't confirm it ended. Try again.";
-      return false;
-    }
-  }
-
-  // Everything goes: the session at the provider first, then the connection, the pages and the job's claim.
-  async end(): Promise<void> {
-    this.keepOpen();
-    // Released by its saved id before waiting, so a session that's still starting, and may never finish, stops costing.
-    if (!this.session && this.starting) await this.releaseAtProvider();
-    const session = this.session ?? (await this.starting?.catch(() => null)) ?? null;
-    await this.releaseAtProvider();
-    await session?.close().catch(() => {});
-    this.session = null;
-    this.pages.clear();
-    this.owner = null;
-    this._status = "ended";
-    this.onChange();
   }
 }

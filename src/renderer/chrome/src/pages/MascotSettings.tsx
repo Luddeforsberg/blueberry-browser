@@ -24,7 +24,7 @@ const APPROVAL_DESCRIPTIONS: Record<ActionApproval, { description: string; more?
 type Look = "moving" | "still" | "hidden";
 
 const LOOK_DESCRIPTIONS: Record<Look, string> = {
-  moving: "Still stops all their animation, as Reduce Motion does. Hidden gives plain icons and neutral words.",
+  moving: "They move while they work, and rest when nothing’s happening.",
   still: "Keeps the mascots and stops all their animation. This is automatic with Reduce Motion.",
   hidden: "Plain icons and neutral words, and everything keeps working.",
 };

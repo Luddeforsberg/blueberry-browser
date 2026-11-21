@@ -123,19 +123,20 @@ const DOCK_FACE = 28;
 const DOCK_GAP = 7;
 
 // Every mascot with its mood for a face. It's how you see who is doing what at a glance. Those that don't fit become a
-// count that opens the mascots' page, so no face is ever cut in half.
+// count that opens the mascots' page, so no face is ever cut in half. The tray is only as wide as its faces, so one
+// face isn't a long empty pill, and how many fit is measured on the room it may grow into.
 const Dock: React.FC<{ open: string | null; onPress: (id: string) => void }> = ({ open, onPress }) => {
   const { mascots } = useMascots();
   const stateOf = useMascotState();
-  const list = useRef<HTMLUListElement>(null);
+  const space = useRef<HTMLDivElement>(null);
+  const tray = useRef<HTMLDivElement>(null);
   const [room, setRoom] = useState(Infinity);
   useLayoutEffect(() => {
-    const element = list.current;
-    if (!element) return;
-    const measure = () => {
-      const { paddingLeft, paddingRight } = getComputedStyle(element);
+    const element = space.current;
+    if (!element || !tray.current) return;
+    const { paddingLeft, paddingRight } = getComputedStyle(tray.current);
+    const measure = () =>
       setRoom(Math.floor((element.clientWidth - parseFloat(paddingLeft) - parseFloat(paddingRight) + DOCK_GAP) / (DOCK_FACE + DOCK_GAP)));
-    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(element);
@@ -144,31 +145,33 @@ const Dock: React.FC<{ open: string | null; onPress: (id: string) => void }> = (
   const faces = dockFaces(mascots, room, (mascot) => stateOf(mascot).mood !== "rest");
 
   return (
-    <div className="flex-1 min-w-0 h-[46px] px-2 flex items-center rounded-tile bg-tray">
-      <ul ref={list} aria-label="Your mascots" className="flex-1 min-w-0 -m-1.5 p-1.5 flex items-center gap-[7px] overflow-hidden">
-        {faces.shown.map((mascot) => (
-          <li key={mascot.id} className="shrink-0">
-            <DockMascot mascot={mascot} mood={stateOf(mascot).mood} open={open === mascot.id} onPress={() => onPress(mascot.id)} />
-          </li>
-        ))}
-        {faces.more > 0 && (
-          <li className="shrink-0">
-            <Tooltip words="All your mascots">
-              <button
-                type="button"
-                aria-label={`${faces.more} more ${faces.more === 1 ? "mascot" : "mascots"}`}
-                onClick={() => openMascots({ page: "list" })}
-                className={cn(
-                  "press size-7 flex items-center justify-center rounded-row font-mono text-11 text-ink-3 hover:bg-hover hover:text-ink app-region-no-drag",
-                  FOCUS,
-                )}
-              >
-                +{faces.more}
-              </button>
-            </Tooltip>
-          </li>
-        )}
-      </ul>
+    <div ref={space} className="flex-1 min-w-0 flex">
+      <div ref={tray} className="max-w-full h-[46px] px-2 flex items-center rounded-tile bg-tray">
+        <ul aria-label="Your mascots" className="min-w-0 -m-1.5 p-1.5 flex items-center gap-[7px] overflow-hidden">
+          {faces.shown.map((mascot) => (
+            <li key={mascot.id} className="shrink-0">
+              <DockMascot mascot={mascot} mood={stateOf(mascot).mood} open={open === mascot.id} onPress={() => onPress(mascot.id)} />
+            </li>
+          ))}
+          {faces.more > 0 && (
+            <li className="shrink-0">
+              <Tooltip words="All your mascots">
+                <button
+                  type="button"
+                  aria-label={`${faces.more} more ${faces.more === 1 ? "mascot" : "mascots"}`}
+                  onClick={() => openMascots({ page: "list" })}
+                  className={cn(
+                    "press size-7 flex items-center justify-center rounded-row font-mono text-11 text-ink-3 hover:bg-hover hover:text-ink app-region-no-drag",
+                    FOCUS,
+                  )}
+                >
+                  +{faces.more}
+                </button>
+              </Tooltip>
+            </li>
+          )}
+        </ul>
+      </div>
     </div>
   );
 };

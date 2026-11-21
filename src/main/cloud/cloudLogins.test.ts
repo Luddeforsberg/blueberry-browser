@@ -139,11 +139,18 @@ const fakeContext = (): CookieJar & { cookies: CloudCookie[] } => {
   return context;
 };
 
-// The same jar every time, as `CloudSessions` is.
+const A = "browserbase:a";
+const B = "browserbase:b";
+
+// The same jar every time, for the same account and project, as `CloudSessions` is.
 const stable = (withContext: <T>(act: (jar: CookieJar) => Promise<T>) => Promise<T>) => {
-  const jar = { withContext };
+  const jar = { account: {}, origin: A, withContext };
   return () => jar;
 };
+
+const listed = (logins: { site: string }[]) => ({
+  projects: { [A]: logins.map(({ site }) => ({ site, addedAt: 5, checkedAt: null, status: "brought" })) },
+});
 
 const setup = ({ confirmed = true, cookies = [] as StoredCookie[] } = {}) => {
   const dir = mkdtempSync(join(tmpdir(), "cloud-logins-"));
@@ -178,7 +185,7 @@ describe("CloudLogins", () => {
     const saved = readFileSync(file, "utf8");
     expect(saved).not.toContain("secret-session-value");
     expect(saved).not.toContain("session");
-    expect(Object.keys(JSON.parse(saved)[0]).sort()).toEqual(["addedAt", "checkedAt", "site", "status"]);
+    expect(Object.keys(JSON.parse(saved).projects[A][0]).sort()).toEqual(["addedAt", "checkedAt", "site", "status"]);
   });
 
   it("says so when Blueberry isn't signed in there, and lists nothing", async () => {
@@ -227,12 +234,7 @@ describe("CloudLogins", () => {
 
   it("takes no more sites once the list is full, before asking or reading anything, but can bring a listed one again", async () => {
     const { file } = setup();
-    writeFileSync(
-      file,
-      JSON.stringify(
-        Array.from({ length: MAX_SITES }, (_, index) => ({ site: `site${index}.com`, addedAt: 5, checkedAt: null, status: "brought" })),
-      ),
-    );
+    writeFileSync(file, JSON.stringify(listed(Array.from({ length: MAX_SITES }, (_, index) => ({ site: `site${index}.com` })))));
     const readCookies = vi.fn(async () => [cookie(".site0.com"), cookie(".example.com")]);
     const confirm = vi.fn(async () => true);
     const logins = new CloudLogins(file, { jar: stable((act) => act(fakeContext())), confirm, readCookies, onChange: () => {} });
@@ -245,12 +247,16 @@ describe("CloudLogins", () => {
   });
 
   it("copies nothing when the cloud browser ends, or its key changes, while the user is still confirming", async () => {
-    for (const change of ["replaced", "ended"] as const) {
+    // The same browser with a new key is a new account, though it's the same object.
+    for (const change of ["replaced", "ended", "new account"] as const) {
       const file = join(mkdtempSync(join(tmpdir(), "cloud-logins-")), "cloud-logins.json");
       const old = vi.fn(async () => {});
-      let current: { withContext: <T>(act: (jar: CookieJar) => Promise<T>) => Promise<T> } | null = {
-        withContext: (act) => act({ addCookies: old, clearCookies: async () => {} }),
+      const same = {
+        account: {},
+        origin: A,
+        withContext: <T>(act: (jar: CookieJar) => Promise<T>) => act({ addCookies: old, clearCookies: async () => {} }),
       };
+      let current: typeof same | null = same;
       let answer: (yes: boolean) => void = () => {};
       const logins = new CloudLogins(file, {
         jar: () => current,
@@ -261,12 +267,29 @@ describe("CloudLogins", () => {
       const pending = logins.bring("example.com");
       await Promise.resolve();
       if (change === "ended") logins.cancelPending();
-      else current = { withContext: (act) => act(fakeContext()) };
+      else if (change === "replaced") current = { account: {}, origin: A, withContext: (act) => act(fakeContext()) };
+      else same.account = {};
       answer(true);
       expect(await pending).toMatch(/ended or its key changed/);
       expect(old).not.toHaveBeenCalled();
       expect(logins.logins).toEqual([]);
     }
+  });
+
+  it("takes nothing out, and keeps the list, when the key changes while the cloud browser starts", async () => {
+    const file = join(mkdtempSync(join(tmpdir(), "cloud-logins-")), "cloud-logins.json");
+    writeFileSync(file, JSON.stringify(listed([{ site: "example.com" }])));
+    const clearCookies = vi.fn(async () => {});
+    const jar = {
+      account: {},
+      origin: A,
+      withContext: <T>(act: (one: CookieJar) => Promise<T>) => ((jar.account = {}), act({ addCookies: async () => {}, clearCookies })),
+    };
+    const logins = new CloudLogins(file, { jar: () => jar, confirm: async () => true, readCookies: async () => [], onChange: () => {} });
+    expect(await logins.revoke("example.com")).toMatch(/key changed meanwhile/);
+    expect(await logins.forgetAll()).toMatch(/key changed meanwhile/);
+    expect(clearCookies).not.toHaveBeenCalled();
+    expect(logins.logins.map(({ site }) => site)).toEqual(["example.com"]);
   });
 
   it("says the sign-in went in when the list couldn't be saved", async () => {
@@ -297,14 +320,55 @@ describe("CloudLogins", () => {
     const { file } = setup();
     writeFileSync(
       file,
-      JSON.stringify([
-        { site: "example.com", addedAt: 5, checkedAt: null, status: "checked", value: "leaked" },
-        { site: "EXAMPLE.com", addedAt: 5 },
-        { site: "x", addedAt: 5 },
-      ]),
+      JSON.stringify({
+        projects: {
+          [A]: [
+            { site: "example.com", addedAt: 5, checkedAt: null, status: "checked", value: "leaked" },
+            { site: "EXAMPLE.com", addedAt: 5 },
+            { site: "x", addedAt: 5 },
+          ],
+        },
+      }),
     );
-    const logins = new CloudLogins(file, { jar: () => null, confirm: async () => true, readCookies: async () => [], onChange: () => {} });
+    const jar = stable((act) => act(fakeContext()));
+    const logins = new CloudLogins(file, { jar, confirm: async () => true, readCookies: async () => [], onChange: () => {} });
     expect(logins.logins).toEqual([{ site: "example.com", addedAt: 5, checkedAt: null, status: "checked" }]);
     expect(parseLogins("nope")).toEqual([]);
+  });
+
+  it("keeps each project's list with its Context, so forgetting all on one leaves another's", async () => {
+    const file = join(mkdtempSync(join(tmpdir(), "cloud-logins-")), "cloud-logins.json");
+    const contexts = { [A]: fakeContext(), [B]: fakeContext() };
+    let origin: typeof A | typeof B = A;
+    const jarFor = (one: typeof A | typeof B) => ({
+      account: {},
+      origin: one,
+      withContext: <T>(act: (jar: CookieJar) => Promise<T>) => act(contexts[one]),
+    });
+    const jars = { [A]: jarFor(A), [B]: jarFor(B) };
+    const logins = new CloudLogins(file, {
+      jar: () => jars[origin],
+      confirm: async () => true,
+      readCookies: async () => signedIn,
+      onChange: () => {},
+    });
+    expect(await logins.bring("example.com")).toBeNull();
+    origin = B;
+    expect(logins.logins).toEqual([]);
+    expect(await logins.bring("github.com")).toBeNull();
+    expect(await logins.revoke("example.com")).toBeNull();
+    expect(await logins.forgetAll()).toBeNull();
+    expect(logins.logins).toEqual([]);
+    origin = A;
+    expect(logins.logins.map(({ site }) => site)).toEqual(["example.com"]);
+    expect(contexts[A].cookies.map(({ name }) => name)).toEqual(["session"]);
+    // And after a restart.
+    const again = new CloudLogins(file, {
+      jar: () => jars[origin],
+      confirm: async () => true,
+      readCookies: async () => [],
+      onChange: () => {},
+    });
+    expect(again.logins.map(({ site }) => site)).toEqual(["example.com"]);
   });
 });
