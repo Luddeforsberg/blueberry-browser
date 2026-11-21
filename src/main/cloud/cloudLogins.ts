@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 import type { CloudLogin, CloudLoginStatus } from "../../shared/ipc";
 import { fieldsOf } from "../../shared/fields";
 import { Latest } from "../../shared/lateWork";
+import { stripWww } from "../../shared/sites";
 
 // Sites the user has brought into the cloud browser, signed in. Plain Node, so a runner without a window can use it.
 // Cookie values pass through here on their way into the cloud browser and are never kept: the list on disk has each
@@ -27,7 +28,7 @@ export const loginSite = (input: unknown): string | null => {
   } catch {
     return null;
   }
-  host = host.replace(/^www\./, "").replace(/\.$/, "");
+  host = stripWww(host).replace(/\.$/, "");
   if (!host.includes(".") || host.length > MAX_SITE_LENGTH || !/^[a-z0-9.-]+$/.test(host) || host.split(".").some((label) => !label))
     return null;
   return host;

@@ -7,7 +7,8 @@ import { cleanLine } from "../../shared/publishing";
 import type { AskWhy } from "../../shared/asking";
 import type { WebSearch } from "./webSearch";
 import type { WebFetch } from "./webFetch";
-import { because, namedSites, siteOf, whyCardFor } from "./askFirst";
+import { because, namedSites, whyCardFor } from "./askFirst";
+import { siteName, siteOf } from "../../shared/sites";
 import { clipWords, heldMessage, inTrouble, NO_ACCESS, NO_CURRENT_TAB, STOPPED, takenOverMessage } from "./toolMessages";
 
 // What every tool works through, made once per reply in `createPageTools` and handed to each group of tools: the job's
@@ -109,7 +110,7 @@ export const toolContext = <T extends PageTarget>({
 }: PageToolAccess<T>) => {
   const allowed = (url: string) => !limits || siteAllowed(url, limits.sites);
   const offLimits = (url: string) => {
-    const name = siteOf(url);
+    const name = siteName(url);
     return {
       label: `Stayed off ${name}`,
       message: `${limits?.name} isn't allowed on ${name}, so nothing happened and nothing was read from it. It may only use ${limits?.sites.join(", ")}. Tell the user if the job needs that site.`,
@@ -156,13 +157,14 @@ export const toolContext = <T extends PageTarget>({
   const chosen = [...namedSites(asked), ...(limits?.sites ?? [])];
   const been = new Set(beenTo);
   const usedTab = (tab: T) => {
-    been.add(siteOf(tab.url));
+    const site = siteOf(tab.url);
+    if (site) been.add(site);
     onUse(tab);
   };
   const whyCard = whyCardFor({ asked, chosen, been });
   const site = (id?: string) => {
     const tab = canSee() ? find(id) : null;
-    return tab ? siteOf(tab.url) : "a tab";
+    return tab ? siteName(tab.url) : "a tab";
   };
 
   // Everything these tools return is the page's words, so the system prompt tells the model not to obey them.
@@ -171,7 +173,7 @@ export const toolContext = <T extends PageTarget>({
     const tab = find(id);
     if (!tab) return noTab(id);
     usedTab(tab);
-    const [text] = await Promise.all([readText(tab, allowed), actorOn(tab)?.read(`${doing} ${siteOf(tab.url)}`)]);
+    const [text] = await Promise.all([readText(tab, allowed), actorOn(tab)?.read(`${doing} ${siteName(tab.url)}`)]);
     if (!canSee()) return NO_ACCESS;
     const taken = tookOver(tab.id);
     if (taken) return taken;
@@ -206,7 +208,7 @@ export const toolContext = <T extends PageTarget>({
     if (entry === "gone") return null;
     if (entry) {
       const spot = await actor.frameSpot(entry.origin);
-      return spot && { spot, name: `a frame from ${siteOf(entry.origin)}` };
+      return spot && { spot, name: `a frame from ${siteName(entry.origin)}` };
     }
     const spot = await tab.runInPage<Spot | null>(spotOf(ref)).catch(() => null);
     return spot && { spot, name: spot.name, ref };
@@ -294,7 +296,7 @@ export const toolContext = <T extends PageTarget>({
     const [firstRefused] = refused;
     return firstRefused === undefined || result.startsWith("data:image/")
       ? result
-      : `${result} The page tried to go to ${siteOf(firstRefused)}, which ${limits?.name} isn't allowed on, so it stayed here.`;
+      : `${result} The page tried to go to ${siteName(firstRefused)}, which ${limits?.name} isn't allowed on, so it stayed here.`;
   };
 
   // The name each element had when it was last described, which for an allowed call is the check just before it runs,

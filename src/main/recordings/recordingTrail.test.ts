@@ -35,6 +35,12 @@ describe("addresses", () => {
     expect(siteOfHost("localhost")).toBe("localhost");
   });
 
+  it("keeps someone's own site on a host anyone can have a name on to itself", () => {
+    expect(siteOfHost("myshop.herokuapp.com")).toBe("myshop.herokuapp.com");
+    expect(siteOfHost("www.someone.github.io")).toBe("someone.github.io");
+    expect(siteOfHost("example.tokyo.jp")).toBe("example.tokyo.jp");
+  });
+
   it("keeps the whole host where one company runs many products", () => {
     expect(siteOfHost("docs.google.com")).toBe("docs.google.com");
     expect(siteOfHost("www.google.com")).toBe("google.com");

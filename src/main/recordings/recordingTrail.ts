@@ -2,6 +2,8 @@ import { randomUUID } from "crypto";
 import type { RecordedChange, RecordedDraft, TrailKind, TrailStep } from "../../shared/library";
 import { withoutInvisible } from "../../shared/publishing";
 import { fieldsOf } from "../../shared/fields";
+import { registrableSite } from "../../shared/siteDomains";
+import { stripWww } from "../../shared/sites";
 
 // What's seen while the user shows Berry something, as plain notes. It's all pure, and all in memory: nothing here is
 // saved, and nothing here is sent until the user confirms on the review screen.
@@ -25,7 +27,6 @@ const MAX_CHANGE_LABEL = 40;
 const SEARCH_PARAMS = /^(q|query|p|s|k|search|searchstring|search_query|keyword|keywords|term|text|wd)$/i;
 // One segment like this in a path is a token rather than a place.
 const TOKEN_SEGMENT = /^(?=.*\d)[A-Za-z0-9_-]{24,}$/;
-const SECOND_LEVEL = /^(co|com|org|net|ac|gov|edu|or|ne)$/;
 // One company runs many unrelated products on these, so docs.google.com is a site of its own, and a routine on it can't
 // reach mail.google.com.
 const MANY_PRODUCTS = [
@@ -48,13 +49,8 @@ const clean = (text: unknown, max: number): string => {
 // A site as a person means it, so www.shop.example.co.uk is example.co.uk, but docs.google.com stays as it is. It's what a
 // routine stays on, along with its subdomains, and an address it can't read as a site gets no site at all.
 export const siteOfHost = (hostname: string): string => {
-  const host = hostname.toLowerCase().replace(/^www\./, "");
-  if (/^[\d.]+$/.test(host) || host.startsWith("[") || !host.includes(".")) return host;
-  const parts = host.split(".");
-  const [secondLevel, topLevel] = parts.slice(-2);
-  const keep = parts.length > 2 && topLevel?.length === 2 && secondLevel !== undefined && SECOND_LEVEL.test(secondLevel) ? 3 : 2;
-  const site = parts.slice(-keep).join(".");
-  return MANY_PRODUCTS.includes(site) ? host : site;
+  const site = registrableSite(hostname);
+  return MANY_PRODUCTS.includes(site) ? stripWww(hostname.toLowerCase()) : site;
 };
 
 export interface TrailAddress {
@@ -78,8 +74,8 @@ export const trailAddress = (url: string): TrailAddress | null => {
     const scheme = protocol === "http:" ? "http://" : "";
     return {
       site: siteOfHost(hostname),
-      host: hostname.replace(/^www\./, ""),
-      place: clean(`${scheme}${host.replace(/^www\./, "")}${path}`, MAX_PATH),
+      host: stripWww(hostname),
+      place: clean(`${scheme}${stripWww(host)}${path}`, MAX_PATH),
     };
   } catch {
     return null;

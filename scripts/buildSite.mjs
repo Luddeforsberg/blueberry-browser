@@ -40,6 +40,7 @@ const shared = await build({
       // Work that finishes later: whose answer still counts, one at a time, and what stays in a box once it has sent.
       `export { Latest, OneAtATime } from "./src/shared/lateWork";`,
       `export { leftAfterSend } from "./src/shared/draft";`,
+      `export { stripWww } from "./src/shared/sites";`,
       `export { asContinuation, withSiteNames } from "./src/renderer/chrome/src/siteNames";`,
       // Times written the one way the app writes them.
       `export { finishedWhen, rowTime } from "./src/renderer/chrome/src/shortWords";`,
@@ -51,6 +52,7 @@ const shared = await build({
   bundle: true,
   format: "esm",
   target: "es2022",
+  alias: { "@shared": join(root, "src/shared") },
   banner: { js: NOTE },
   outfile: join(site, "shared.js"),
   write: false,

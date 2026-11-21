@@ -14,6 +14,7 @@ import { TabIcon } from "./TabIcon";
 import { useAddressSuggestions } from "./useAddressSuggestions";
 import { openRoutines } from "../routinesView";
 import { BERRY_ID } from "@shared/mascots";
+import { stripWww } from "@shared/sites";
 import { Tooltip } from "@common/components/Tooltip";
 import { IconSwap } from "@common/components/IconSwap";
 
@@ -25,7 +26,7 @@ const splitUrl = (url: string) => {
     const parsed = new URL(url);
     return {
       secure: parsed.protocol === "https:",
-      site: parsed.hostname.replace(/^www\./, ""),
+      site: stripWww(parsed.hostname),
       path: parsed.pathname.replace(/\/$/, "") + parsed.search + parsed.hash,
     };
   } catch {

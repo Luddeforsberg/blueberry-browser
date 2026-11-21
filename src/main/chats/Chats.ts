@@ -1,5 +1,5 @@
 import type { GenerateTitle, ReplyMessage, StreamReply } from "./agent";
-import { siteOf } from "../tools/browserTools";
+import { siteName, siteOf } from "../../shared/sites";
 import type { ActionApproval } from "../../shared/ipc";
 import type { StoredChat } from "./ChatStore";
 import type { Tab } from "../tabs/Tab";
@@ -245,7 +245,7 @@ export class Chats {
     if (tabsNow.length !== tabIds.length || tabsNow.some((tab) => this.tabProblem(tab, chatId, mascot) !== null)) return null;
     const id = chatId ?? this.store.createChat(titleFrom(message), chosen, from);
     const attached: SentAttachment[] = [
-      ...tabsNow.map((tab) => ({ kind: "tab" as const, title: this.withoutCodes(tab.title || siteOf(tab.url)), site: siteOf(tab.url) })),
+      ...tabsNow.map((tab) => ({ kind: "tab" as const, title: this.withoutCodes(tab.title || siteName(tab.url)), site: siteOf(tab.url) })),
       ...files.map(sentAttachment),
     ];
     this.store.addMessage(id, { role: "user", content: message, ...(attached.length > 0 ? { attached } : {}) }, files);

@@ -7,6 +7,7 @@ import { Tab } from "./Tab";
 import type { Rect, TabPreviewRequest, ThemeState } from "../../shared/ipc";
 import { Latest } from "../../shared/lateWork";
 import { fieldsOf } from "../../shared/fields";
+import { siteOf } from "../../shared/sites";
 
 // The card's picture at twice its width, 16:10 and cut from the top of the page.
 const PICTURE_WIDTH = TAB_PREVIEW.width * 2;
@@ -100,7 +101,8 @@ export class TabPreviews {
     sendToRenderer(this.contents, "preview:shown", {
       tabId: tab.id,
       title: tab.title || "New tab",
-      site: siteOf(tab.url),
+      // The address itself where there's no site, such as about:blank.
+      site: siteOf(tab.url) ?? tab.url.slice(0, 200),
       picture,
       working,
       still: this.deps.keepStill(),
@@ -127,15 +129,6 @@ export class TabPreviews {
     this.contents.close();
   }
 }
-
-// The site under the title: the host without www, or the address itself where there's none, such as about:blank.
-const siteOf = (url: string): string => {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "") || url.slice(0, 200);
-  } catch {
-    return url.slice(0, 200);
-  }
-};
 
 // The chrome is trusted, but it only names a tab and where its row is, and the row must be a sane box.
 const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);

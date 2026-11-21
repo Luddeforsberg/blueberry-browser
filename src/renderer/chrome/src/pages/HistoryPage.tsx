@@ -10,7 +10,7 @@ import { Favicon } from "../components/Favicon";
 import { EmptyPage, PageFrame, PageHeader, SearchField } from "../components/PageFrame";
 import { OFF_ROW_HIDE, ON_ROW, ON_ROW_SHOW, ROW } from "../components/pageRows";
 import { SettingsGroup } from "../components/SettingsRow";
-import { foldVisits, groupByDay, siteOf, type VisitRun } from "./historyDays";
+import { foldVisits, groupByDay, shownSite, type VisitRun } from "./historyDays";
 import { Tooltip } from "@common/components/Tooltip";
 
 // DESIGN.md section 10, History: a page in a tab, with a group for each day, newest first, and a row of one line for
@@ -32,14 +32,14 @@ export const HistoryRow: React.FC<{
   // Inside a folded group, the site is said once already.
   inGroup?: boolean;
 }> = ({ entry, onOpen, onDelete, inGroup = false }) => {
-  const title = entry.title || siteOf(entry.url);
+  const title = entry.title || shownSite(entry.url);
   return (
     <li className={cn(LINE, "has-[>button:first-child:active]:bg-press")}>
       <button type="button" aria-label={title} onClick={onOpen} className={cn("absolute inset-0 rounded-[inherit]", FOCUS)} />
       <span className="contents pointer-events-none">
         <Favicon src={entry.favicon} site={entry.url} />
         <span className="min-w-0 truncate text-14 text-ink">{title}</span>
-        {!inGroup && <span className="min-w-0 shrink-[2] truncate text-13 text-ink-3">{siteOf(entry.url)}</span>}
+        {!inGroup && <span className="min-w-0 shrink-[2] truncate text-13 text-ink-3">{shownSite(entry.url)}</span>}
         <span className="flex-1" />
       </span>
       <span className="shrink-0 grid justify-items-end items-center [&>*]:[grid-area:1/1]">

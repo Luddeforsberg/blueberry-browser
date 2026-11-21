@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { AppWindow, ChevronLeft, ChevronRight, CircleDot, Paperclip } from "lucide-react";
 import type { TabChoice } from "@shared/attachments";
+import { NO_SITE } from "@shared/sites";
 import { cn } from "@common/lib/utils";
 import { LABEL } from "@common/components/StatusPill";
 import { Favicon } from "./Favicon";
@@ -66,9 +67,9 @@ const Row: React.FC<
   </button>
 );
 
-const SiteIcon: React.FC<{ favicon: string | null; site: string; off: boolean }> = ({ favicon, site, off }) => (
+const SiteIcon: React.FC<{ favicon: string | null; site: string | null; off: boolean }> = ({ favicon, site, off }) => (
   <span className={cn("flex shrink-0", off && "opacity-50")}>
-    <Favicon src={favicon} site={site} />
+    <Favicon src={favicon} site={site ?? undefined} />
   </span>
 );
 
@@ -115,7 +116,7 @@ export const AddMenu: React.FC<AddMenuOptions & { above: boolean; leaving?: bool
         data-tab-row
         icon={<SiteIcon favicon={tab.favicon} site={tab.site} off={why !== null} />}
         title={tab.title}
-        note={tab.site}
+        note={tab.site ?? NO_SITE}
         why={why}
         onPick={() => pick(() => tabs.onChoose(tab))}
       />

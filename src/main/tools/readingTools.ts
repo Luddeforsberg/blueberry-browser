@@ -3,7 +3,7 @@ import { listElements, scrollPage } from "./pageScripts";
 import type { PageTarget } from "./pageTarget";
 import { pageTool, tabId } from "./pageTool";
 import type { ToolContext } from "./toolContext";
-import { siteOf } from "./askFirst";
+import { siteName } from "../../shared/sites";
 import { showsFrameOffLimits } from "./mascotLimits";
 import { heldMessage, NO_ACCESS, takenOverMessage } from "./toolMessages";
 
@@ -130,7 +130,7 @@ export const readingTools = <T extends PageTarget>(context: ToolContext<T>) => {
       label: ({ tabId: id }) => `Looked over ${site(id)}`,
       run: ({ tabId: id, query, everything }) =>
         withTab(id, async (tab) => {
-          void actorOn(tab)?.hop(`Looking over ${siteOf(tab.url)}`, "looking");
+          void actorOn(tab)?.hop(`Looking over ${siteName(tab.url)}`, "looking");
           const top = await tab.runInPage<ListedElements>(listElements({ query, limit: MAX_ELEMENTS, everything, descend: true }));
           const script = listElements({ query, limit: MAX_FRAME_ELEMENTS, everything, descend: false });
           const frames = await Promise.all(
@@ -178,7 +178,7 @@ export const readingTools = <T extends PageTarget>(context: ToolContext<T>) => {
         withTab(id, async (tab) => {
           if (tab.mayShowCode)
             return `Screenshots of tab ${tab.id} aren't available for now, because a code from the user's phone went in there and the page might show it. Read its text instead.`;
-          await actorOn(tab)?.say(`Looking at ${siteOf(tab.url)}`, "looking");
+          await actorOn(tab)?.say(`Looking at ${siteName(tab.url)}`, "looking");
           await tab.settled();
           // Checked on both sides of the capture, so a frame that came in meanwhile doesn't go out in it.
           const framed = () => !!limits && showsFrameOffLimits(tab, limits.sites);

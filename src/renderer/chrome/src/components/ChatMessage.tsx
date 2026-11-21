@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import type { ChatStep, MascotProfile, SaidOnTheWay, UsedPage } from "@shared/library";
-import { linkSite } from "@shared/publishing";
+import { siteOf } from "@shared/sites";
 import { NO_KEY } from "@shared/aiKey";
 import { ArrowUpRight, Check, Cloud, Copy, Repeat } from "lucide-react";
 import { stepsWord } from "../workLine";
@@ -88,7 +88,7 @@ const PageChips: React.FC<{ pages: UsedPage[] }> = ({ pages }) => (
           >
             <Favicon src={siteIcon(page.url)} site={page.url} />
             <span className="min-w-0 truncate max-w-56">{page.title || page.url}</span>
-            {linkSite(page.url) && <span className="shrink-0 text-ink-2">{linkSite(page.url)}</span>}
+            {siteOf(page.url) && <span className="shrink-0 text-ink-2">{siteOf(page.url)}</span>}
             <ArrowUpRight aria-hidden className="size-3.5 shrink-0 text-faint" strokeWidth={1.75} />
           </button>
         </Tooltip>

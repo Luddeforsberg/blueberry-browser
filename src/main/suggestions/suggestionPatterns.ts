@@ -366,13 +366,6 @@ const chatPatterns = (chats: PatternChat[], now: number): Pattern[] => {
   });
 };
 
-// A site by the name people would write, such as "reddit" for old.reddit.com.
-const COUNTRY_SECOND_LEVEL = /^(co|com|org|net|ac|gov|edu)$/;
-export const nameOfSite = (host: string): string | undefined => {
-  const parts = host.split(".");
-  return parts.at(-1)?.length === 2 && COUNTRY_SECOND_LEVEL.test(parts.at(-2) ?? "") ? parts.at(-3) : parts.at(-2);
-};
-
 // Everything the history and chats show, best first. Costs a few milliseconds and no money.
 export const findPatterns = (visits: PatternVisit[], chats: PatternChat[], now = Date.now()): Pattern[] => {
   const usable = visits.filter(({ url, visitedAt }) => visitedAt <= now && now - visitedAt <= PATTERN_WINDOW_MS && isShareable(url));
