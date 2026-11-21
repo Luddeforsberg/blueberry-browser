@@ -8,6 +8,7 @@ import { StepCard } from "../../components/StepCard";
 import { MascotMemoryView } from "../MascotMemory";
 import { MemoryOffersLine, RememberedFacts } from "../../components/MemoryInChat";
 import { BERRY } from "@shared/mascots";
+import { REPLY_NOT_SAVED } from "@shared/library";
 import { RoutineRunRow } from "../../components/RoutineRunRow";
 import { ScheduleSentence, WhenAnswer } from "../RoutineSteps";
 import { blankForm } from "../../routinesView";
@@ -75,6 +76,12 @@ export const ChatSections: React.FC<{
           content=""
           error="Couldn't reach the model. Check your connection and try again."
           steps={[{ text: "Opened klm.com", done: true, kind: "open" }]}
+          actions={{ onSay: () => undefined }}
+        />
+        <AssistantMessage
+          content="Booked a table for two at 19:00 on Friday. The confirmation went to your email."
+          error={REPLY_NOT_SAVED}
+          steps={[{ text: "Opened thefork.com", done: true, kind: "open" }]}
           actions={{ onSay: () => undefined }}
         />
         <WentWrong message="Couldn't reach the model. Check your connection and try again." actions={{ onSay: () => undefined }} />
