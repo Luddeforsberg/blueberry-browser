@@ -4,6 +4,7 @@ import {
   approvalFromRow,
   fitJobUpdate,
   historyFromRow,
+  liveJobsOf,
   mascotFromSnapshot,
   mascotSnapshot,
   stepsFromRow,
@@ -175,5 +176,31 @@ describe("what a job writes to its row", () => {
 
   it("leaves out what wasn't in the update", () => {
     expect(fitJobUpdate({ status: "running" } as { status: string; reply?: string })).toEqual({ status: "running" });
+  });
+});
+
+describe("liveJobsOf", () => {
+  const A = "00000000-0000-4000-8000-000000000001";
+  const B = "00000000-0000-4000-8000-000000000002";
+
+  it("keeps the jobs the server says are still going", async () => {
+    expect(await liveJobsOf([A, B], async () => [A])).toEqual(new Set([A]));
+  });
+
+  it("counts a job id it can't ask about as still going", async () => {
+    const asked: string[][] = [];
+    const live = await liveJobsOf([A, "not-a-job"], async (ids) => (asked.push(ids), []));
+    expect(asked).toEqual([[A]]);
+    expect(live).toEqual(new Set(["not-a-job"]));
+  });
+
+  it("asks nothing when there's nothing to ask about", async () => {
+    let asked = false;
+    expect(await liveJobsOf([], async () => ((asked = true), []))).toEqual(new Set());
+    expect(asked).toBe(false);
+  });
+
+  it.each([null, undefined, "", {}, { jobs: [] }, [1], [A, null]])("refuses an answer that doesn't say: %j", async (answer) => {
+    await expect(liveJobsOf([A], async () => answer)).rejects.toThrow("didn't say which jobs");
   });
 });

@@ -3,6 +3,7 @@ import {
   actionApprovalFromRow,
   fitJobUpdate,
   historyFromRow,
+  liveJobsOf,
   type ApprovalToAsk,
   type CloudJobStatus,
 } from "../../src/main/remoteJobs/cloudJobs";
@@ -137,7 +138,14 @@ export const supabaseDb = (
   { url, key, owner }: DbConfig,
   auth: RunnerSession,
   send: typeof fetch = fetch,
-): RunnerDb & PushDb & RoutineDb & RelayDb & { accept(): Promise<boolean>; setRelayUrl(url: string | null): Promise<void> } => {
+): RunnerDb &
+  PushDb &
+  RoutineDb &
+  RelayDb & {
+    accept(): Promise<boolean>;
+    setRelayUrl(url: string | null): Promise<void>;
+    liveJobs(jobs: string[]): Promise<Set<string>>;
+  } => {
   const call = async (name: string, body: object): Promise<{ status: number; text: string }> => {
     const authorization = `Bearer ${await auth.token()}`;
     try {
@@ -176,6 +184,8 @@ export const supabaseDb = (
   };
 
   return {
+    // Which of these jobs a runner may still be working on, by the server's clock.
+    liveJobs: (jobs) => liveJobsOf(jobs, (ids) => rpc("runner_live_jobs", { p_jobs: ids })),
     // Takes up the link the owner made in Blueberry. False until they have.
     accept: async () => (await rpc("accept_cloud_runner_link", { p_owner_email: owner })) === true,
     // Where ChatGPT and Claude connect, for the owner to see in Settings. Null when the relay is off.

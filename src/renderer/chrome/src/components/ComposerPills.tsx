@@ -1,8 +1,9 @@
 import React, { useRef } from "react";
-import { Check, ChevronDown, Cloud, Laptop, Plus } from "lucide-react";
+import { Check, ChevronDown, Plus } from "lucide-react";
 import type { MascotProfile } from "@shared/library";
 import type { Mood } from "@common/components/moods";
 import { cn } from "@common/lib/utils";
+import { whereSides } from "../whereSides";
 import { useMascots } from "../contexts/useLibrary";
 import { useShell } from "../contexts/useShell";
 import { Berry } from "./Berry";
@@ -146,18 +147,7 @@ export const MascotPill: React.FC<{
 export const WhereSwitch: React.FC<{ on: boolean; onToggle: () => void; small: boolean }> = ({ on, onToggle, small }) => {
   const group = useRef<HTMLDivElement>(null);
   const ruler = useRef<HTMLSpanElement>(null);
-  // The words follow the platform (DESIGN.md section 14).
-  const mac = useShell().theme.platform === "mac";
-  const here = mac ? "This Mac" : "This PC";
-  const sides = ([false, true] as const).map((cloud) => ({
-    chosen: on === cloud,
-    Icon: cloud ? Cloud : Laptop,
-    label: cloud ? "Cloud" : here,
-    // What each side does, in the state it's in.
-    tip: cloud
-      ? `${on ? "Runs" : "Run"} in the cloud, with your ${mac ? "Mac" : "PC"} off`
-      : `${on ? "Run" : "Runs"} on ${mac ? "this Mac" : "this PC"}`,
-  }));
+  const sides = whereSides(on, useShell().theme.platform === "mac");
   const side = cn("flex items-center rounded-full text-13", small ? "h-6 px-2" : "h-7 px-2.5");
   const name = (chosen: boolean) =>
     cn("whitespace-nowrap overflow-hidden", chosen ? "max-w-20 ml-1.5 opacity-100" : "max-w-0 ml-0 opacity-0");

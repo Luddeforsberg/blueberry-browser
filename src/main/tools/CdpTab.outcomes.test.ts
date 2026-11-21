@@ -99,7 +99,7 @@ describe.skipIf(!findChrome())("what Berry knows of what it did, over CDP", () =
   }, 90_000);
 
   afterAll(async () => {
-    await cloud?.end();
+    await cloud?.quit();
     server?.close();
   });
 

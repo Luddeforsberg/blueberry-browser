@@ -2,7 +2,9 @@ import { app } from "electron";
 import { join } from "path";
 import { InternalTab } from "../tabs/InternalTab";
 import type { GalleryServer } from "../account/galleryServer";
-import { CloudTabs } from "../cloud/CloudTabs";
+import { CloudTabs, type CloudTabsHooks } from "../cloud/CloudTabs";
+import { browserbase } from "../cloud/browserbase";
+import { localChrome } from "../cloud/localChrome";
 import { confirmCloudLogin, readSiteCookies } from "../cloud/cloudLoginAccess";
 import { suggestLoginSites } from "../cloud/cloudLogins";
 import { RunnerJobs } from "../remoteJobs/RunnerJobs";
@@ -12,35 +14,50 @@ import { BERRY } from "../../shared/mascots";
 import type { WindowParts, WindowStores } from "./WindowParts";
 
 // Work that runs away from this window, wired to it: the cloud browser and its tabs, the cloud runner's jobs, and relay
-// jobs run on this Mac. Each is made in its turn by the window's constructor, and reaches the rest of the window only
-// when it's called.
+// jobs run on this Mac. The cloud browser is made once for the app, and each window attaches to it. The rest are made in
+// their turn by the window's constructor, and reach the rest of the window only when they're called.
 
-export const createCloud = (w: WindowParts): CloudTabs => {
+export const createCloud = (): CloudTabs => {
   // Only an unpackaged app can be pointed at a Chrome on this computer instead of Browserbase, like the other test hooks.
   const localCloud = app.isPackaged ? undefined : process.env.BLUEBERRY_CLOUD_LOCAL;
+  const local = localCloud
+    ? localCloud === "1"
+      ? { executable: process.env.BLUEBERRY_CLOUD_CHROME || undefined }
+      : { endpoint: localCloud }
+    : null;
   return new CloudTabs(
     join(app.getPath("userData"), "cloud.json"),
-    {
-      chrome: () => w.chromeView.view.webContents,
-      openTab: (title) => w.tabs.openCloudTab(title),
-      updateTab: (id, title) => {
-        const tab = w.tabs.find(id);
-        if (!(tab instanceof InternalTab) || tab.title === title) return;
-        tab.title = title;
-        w.tabs.notifyTabs();
-      },
-      closeTab: (id) => {
-        if (w.tabs.has(id) && w.tabs.tabCount > 1) w.tabs.closeTab(id, false);
-        else w.cloud.tabClosed(id);
-      },
-      takenOver: (id) => w.chats.releaseTab(id),
-      showTab: (id) => w.tabs.switchActiveTab(id),
-      confirmLogin: (site) => confirmCloudLogin(w.baseWindow, site),
-      readCookies: (site) => readSiteCookies(site),
-    },
-    localCloud ? (localCloud === "1" ? { executable: process.env.BLUEBERRY_CLOUD_CHROME || undefined } : { endpoint: localCloud }) : null,
+    ({ apiKey, projectId }) => (local ? localChrome(local) : apiKey && projectId ? browserbase({ apiKey, projectId }) : null),
+    (site) => readSiteCookies(site),
   );
 };
+
+// The window's part of the cloud: its tabs, its chrome and its confirm.
+export const cloudHooks = (w: WindowParts): CloudTabsHooks => ({
+  chrome: () => w.chromeView.view.webContents,
+  openTab: (title) => w.tabs.openCloudTab(title),
+  updateTab: (id, title) => {
+    const tab = w.tabs.find(id);
+    if (!(tab instanceof InternalTab) || tab.title === title) return;
+    tab.title = title;
+    w.tabs.notifyTabs();
+  },
+  closeTab: (id) => {
+    if (w.tabs.has(id) && w.tabs.tabCount > 1) w.tabs.closeTab(id, false);
+    else w.cloud.tabClosed(id);
+  },
+  takenOver: (id) => w.chats.releaseTab(id),
+  showTab: (id) => w.tabs.switchActiveTab(id),
+  confirmLogin: (site) => confirmCloudLogin(w.baseWindow, site),
+  confirmForget: () =>
+    w.menus.ask({
+      question: "Forget the cloud key?",
+      detail:
+        "What Blueberry couldn’t read goes too. Sessions started with an old key can’t be ended from here, and Browserbase stops them within 6 hours.",
+      action: "Forget key",
+      mascot: null,
+    }),
+});
 
 // Sites to offer in Settings > Cloud > Signed in to, from history and bookmarks. Names only.
 export const cloudLoginSuggestions = (stores: WindowStores, cloud: CloudTabs): string[] => {

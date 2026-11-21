@@ -1,10 +1,11 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ArrowUp, ChevronDown, Cloud, Laptop } from "lucide-react";
+import { ArrowUp, ChevronDown } from "lucide-react";
 import type { DesktopPanelState } from "@shared/ipc";
 import { DESKTOP_BOX, DESKTOP_SHADOW } from "@shared/desktopSizes";
 import { SwitchSheet } from "@common/components/Controls";
 import { TIP_KEY, Tooltip } from "@common/components/Tooltip";
 import { cn } from "@common/lib/utils";
+import { whereSides } from "./whereSides";
 import { sendOnEnter } from "@common/lib/keys";
 import { leftAfterSend } from "@shared/draft";
 import { useSendOnce } from "./components/promptSend";
@@ -44,15 +45,7 @@ const Keys: React.FC<{ keys: string[] }> = ({ keys }) => (
 const WhereSwitch: React.FC<{ on: boolean; mac: boolean; onToggle: () => void }> = ({ on, mac, onToggle }) => {
   const group = useRef<HTMLDivElement>(null);
   const ruler = useRef<HTMLSpanElement>(null);
-  const here = mac ? "This Mac" : "This PC";
-  const sides = ([false, true] as const).map((cloud) => ({
-    chosen: on === cloud,
-    Icon: cloud ? Cloud : Laptop,
-    label: cloud ? "Cloud" : here,
-    tip: cloud
-      ? `${on ? "Runs" : "Run"} in the cloud, with your ${mac ? "Mac" : "PC"} off`
-      : `${on ? "Run" : "Runs"} on ${mac ? "this Mac" : "this PC"}`,
-  }));
+  const sides = whereSides(on, mac);
   const side = "h-[26px] px-2 flex items-center rounded-full text-13";
   const name = (chosen: boolean) =>
     cn("whitespace-nowrap overflow-hidden", chosen ? "max-w-20 ml-1.5 opacity-100" : "max-w-0 ml-0 opacity-0");

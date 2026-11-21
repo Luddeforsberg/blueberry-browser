@@ -23,6 +23,7 @@ const ELECTRON_ADAPTERS = main(
   "account/Account.ts",
   "cloud/CloudTabs.ts",
   "cloud/cloudFile.ts",
+  "cloud/cloudKeys.ts",
   "cloud/cloudLoginAccess.ts",
   "phone/TelegramChannel.ts",
   "phone/telegramFile.ts",
@@ -111,11 +112,13 @@ const rules = [
   },
   onlyFrom(
     "the cookie code",
-    file("cloudLogins", "cloudLoginAccess"),
+    file("cloudLogins", "cloudLoginAccess", "signedInTo"),
     [
       "cloud/CloudTabs.ts",
       "cloud/cloudLoginAccess.ts",
+      "cloud/signedInTo.ts",
       "cloud/cloudLogins.test.ts",
+      "cloud/cloudLoginLists.test.ts",
       "cloud/cloudLoginAccess.test.ts",
       "window/makeCloud.ts",
     ],
@@ -319,13 +322,23 @@ const rules = [
   onlyFrom(
     "the cloud's settings and live view",
     file("CloudTabs"),
-    ["cloud/CloudTabs.test.ts", "index.ts", "window/Window.ts", "window/WindowParts.ts", "window/makeCloud.ts"],
+    [
+      "cloud/CloudTabs.test.ts",
+      "cloud/cloudTabsTesting.ts",
+      "cloud/cloudLifetime.test.ts",
+      "cloud/cloudCheckTesting.ts",
+      "cloud/cloudCheckApp.ts",
+      "index.ts",
+      "window/Window.ts",
+      "window/WindowParts.ts",
+      "window/makeCloud.ts",
+    ],
     "The cloud's key and live view go to the chrome only, never to a tool or a chat.",
   ),
   onlyFrom(
-    "the cloud's settings file",
-    file("cloudFile"),
-    ["cloud/CloudTabs.ts"],
+    "the cloud's settings file and the keys kept in it",
+    file("cloudFile", "cloudKeys"),
+    ["cloud/CloudTabs.ts", "cloud/cloudKeys.ts"],
     "The cloud's key and live view go to the chrome only, never to a tool or a chat.",
   ),
   onlyFrom(
@@ -334,6 +347,7 @@ const rules = [
     ["remoteJobs"],
     "Everything outside remoteJobs/ goes through RunnerJobs, which holds the runner's link and whose session each call goes out with.",
   ),
+  onlyFrom("dotenv", "^dotenv(/|$)", ["index.ts"], "`.env` is read once, at startup, so no module reads a file just by being imported."),
 ];
 
 // ESLint keeps one setting of a rule per file, the last block's, so rules can't simply be stacked. Every folder or file

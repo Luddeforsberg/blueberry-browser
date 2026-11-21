@@ -68,7 +68,7 @@ describe("the scheduler", () => {
     const id = save(routines, { ...daily("13:00"), inCloud: true });
     save(routines, daily("13:00"), id);
     started(routines);
-    expect(defined(routines.list()[0]).cloudNote).toBe("Moving back to this Mac…");
+    expect(defined(routines.list()[0]).cloudNote).toBe("Moving back to this computer…");
 
     // Its time comes while the cloud may still run it: skipped here, and on to the next.
     await vi.advanceTimersByTimeAsync(60 * MINUTE);

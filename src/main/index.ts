@@ -19,14 +19,15 @@ import { appAiKey } from "./window/makeAccount";
 import { openStore, type StoreProblem } from "./library/database";
 import { holdQuit } from "./window/holdQuit";
 import type { CloudTabs } from "./cloud/CloudTabs";
+import { createCloud } from "./window/makeCloud";
 import { LINK_SCHEME, mascotFromArgs, mascotFromLink } from "./mascots/mascotLink";
 import { loadAhead } from "./chats/agent";
 import { join } from "path";
 import * as dotenv from "dotenv";
 
-// A packaged app leaves `.env` out of its bundle, so it reads one from the user data folder instead, for the model and the
-// Gallery server. Both are read only once the window opens, after this.
-if (app.isPackaged) dotenv.config({ path: join(app.getPath("userData"), ".env"), quiet: true });
+// The one place `.env` is read, for the model and the Gallery server, which read it only once the window opens, after
+// this. A packaged app leaves it out of its bundle, so it reads one from the user data folder instead.
+dotenv.config({ path: app.isPackaged ? join(app.getPath("userData"), ".env") : join(__dirname, "../../.env"), quiet: true });
 
 // One copy per profile, so a link or a second launch goes to the window that's already open.
 const firstCopy = app.requestSingleInstanceLock();
@@ -48,7 +49,7 @@ let downloads: Downloads | null = null;
 let sitePermissions: SitePermissions | null = null;
 let historyStore: HistoryStore | null = null;
 let aiKey: AiKey | null = null;
-// Kept after its window closes, so Quit can wait for its session to end.
+// One for the app, whichever window is open, so Quit can wait for its session to end.
 let cloud: CloudTabs | null = null;
 // Said once, after the window it sits on is open.
 let storeNotices: string[] = [];
@@ -107,6 +108,7 @@ const createWindow = (): Window => {
   }
   const sessionStore = new SessionStore(join(app.getPath("userData"), "session.json"));
   aiKey ??= appAiKey();
+  cloud ??= createCloud();
   const window = new Window(
     {
       settingsStore: settings,
@@ -116,12 +118,12 @@ const createWindow = (): Window => {
       history: historyStore,
       sessionStore,
       aiKey,
+      cloud,
     },
     routineStore,
     downloads,
     sitePermissions,
   );
-  cloud = window.cloud;
   showStoreNotices(window);
   menu = new AppMenu(window);
   eventManager = new EventManager(window);
@@ -167,8 +169,6 @@ void app.whenReady().then(() => {
   linkedMascot = null;
 
   app.on("activate", () => {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
     if (BaseWindow.getAllWindows().length === 0) {
       mainWindow = createWindow();
     } else if (mainWindow && !mainWindow.baseWindow.isVisible() && !mainWindow.baseWindow.isMinimized()) {
@@ -180,7 +180,7 @@ void app.whenReady().then(() => {
 });
 
 // A cloud session left running costs until it times out, and a local test browser would be left behind.
-holdQuit(app, () => cloud?.destroy());
+holdQuit(app, () => cloud?.quit());
 
 app.on("will-quit", () => globalShortcut.unregisterAll());
 

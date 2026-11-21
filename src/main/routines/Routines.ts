@@ -242,7 +242,7 @@ export class Routines {
   }
 
   private cloudNote({ id, inCloud }: StoredRoutine): string | null {
-    if (!inCloud) return this.events.stillInCloud?.(id) ? "Moving back to this Mac…" : null;
+    if (!inCloud) return this.events.stillInCloud?.(id) ? "Moving back to this computer…" : null;
     return this.events.cloudFailed?.(id) ? "Couldn’t reach the cloud, will retry" : null;
   }
 
