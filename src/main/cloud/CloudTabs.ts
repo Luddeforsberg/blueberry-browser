@@ -2,11 +2,11 @@ import { dirname, join } from "path";
 import { safeStorage, type WebContents } from "electron";
 import type { CloudState, CloudView } from "../../shared/ipc";
 import { browserbaseOrigin, isLiveView } from "./browserbase";
-import { MAX_FIELD_LENGTH, NO_KEY, readCloudIds, readCloudKey, sessionsFile, writeCloudIds, writeCloudKey, type Key } from "./cloudFile";
+import { forgetBefore, MAX_FIELD_LENGTH, NO_KEY, readCloud, sessionsFile, writeCloudIds, writeCloudKey, type Key } from "./cloudFile";
 import type { CdpTab } from "../tools/CdpTab";
 import type { ChatCloud } from "../chats/Chats";
 import { CloudSessions } from "./cloudBrowser";
-import type { CloudBrowser, Released } from "./cloudProvider";
+import type { CloudBrowser, CloudIds, Released } from "./cloudProvider";
 import type { StoredCookie } from "./cloudLogins";
 import { SignedInTo } from "./signedInTo";
 import { sendToRenderer } from "../window/ipc";
@@ -20,6 +20,8 @@ import { CloudPictures } from "./cloudPictures";
 
 const NOT_SAFE = "This computer can't keep the key encrypted, so it wasn't saved.";
 const NOT_SAVED = "The key couldn't be saved.";
+// Nothing is written, and no session started, while the cloud's files may say more than was read.
+const UNREADABLE = "Blueberry couldn't read its cloud settings, so it won't change them or start a cloud session. Quit and open it again.";
 const NO_WINDOW = "Blueberry has no window open.";
 // The session's id is the only way to end it, and it goes with the key, unless Browserbase no longer takes that key.
 const STILL_RUNNING = "The cloud session didn't confirm it ended, so the key was kept to end it with. Press End again first.";
@@ -50,6 +52,10 @@ export class CloudTabs implements ChatCloud {
   private readonly sessions: CloudSessions;
   private attached: Attachment | null = null;
   private problem: string | null = null;
+  private readonly unreadable: string | null;
+  // The ids as last told, and whether `cloud.json` still has what an app before this one kept there.
+  private ids: CloudIds;
+  private before: boolean;
   // Forget or a new key kept the key, for a session the provider didn't confirm had ended or another provider made.
   private endFirst = false;
   private readonly pictures: CloudPictures;
@@ -64,13 +70,15 @@ export class CloudTabs implements ChatCloud {
     // That one site's cookies from this browser's own session. Nothing else.
     readCookies: (site: string) => Promise<StoredCookie[]>,
   ) {
-    this.key = readCloudKey(file);
-    const idsFile = sessionsFile(file);
-    const { ids, moved } = readCloudIds(idsFile, file);
-    if (moved) writeCloudIds(idsFile, ids);
-    this.sessions = new CloudSessions(provider(this.key), ids, {
+    const read = readCloud(file);
+    this.key = read.key;
+    this.unreadable = read.unreadable ? UNREADABLE : null;
+    this.ids = read.ids;
+    this.before = read.fromBefore;
+    if (this.before) this.keepIds(read.ids);
+    this.sessions = new CloudSessions(provider(this.key), read.ids, {
       onChange: () => this.changed(),
-      onIds: (next) => writeCloudIds(idsFile, next),
+      onIds: (ids) => this.keepIds(ids),
     });
     this.pictures = new CloudPictures({
       page: (id) => this.page(id),
@@ -127,7 +135,7 @@ export class CloudTabs implements ChatCloud {
       busy: !!sessions.busyWith,
       canEnd: sessions.canEnd,
       unreleased: sessions.unreleased,
-      problem: this.problem ?? this.waitedFor ?? sessions.problem,
+      problem: this.unreadable ?? this.problem ?? this.waitedFor ?? sessions.problem,
       logins: this.signedIn.list,
     };
   }
@@ -162,22 +170,18 @@ export class CloudTabs implements ChatCloud {
       this.problem = "Both the API key and the project id are needed.";
     } else if (!safeStorage.isEncryptionAvailable()) {
       this.problem = NOT_SAFE;
-    } else {
+    } else if (!this.unreadable) {
       this.letGoOfTabs();
       await this.sessions.replace((released) => {
+        const next: Key = { apiKey: key, projectId: project };
+        const browser = this.provider(next);
+        // The key that made a session still running is kept until it has ended, since a new one, even for the same
+        // project, may not work. Each project's Context stays with it.
         if (released === "running" || this.keyNeeded) {
           this.endFirst = true;
           return null;
         }
-        // Every session that may still be running stays, for a key from its own project to end. The old account's
-        // Context leaves the disk before the new key reaches it, so a crash between the two never pairs them.
-        const context = this.sessions.contextId;
-        if (!this.sessions.keepContext(null) || !this.keep({ apiKey: key, projectId: project })) {
-          this.problem = NOT_SAVED;
-          this.sessions.keepContext(context);
-          return null;
-        }
-        return { browser: this.provider(this.key) };
+        return this.keep(next) ? { browser } : null;
       });
     }
     this.changed();
@@ -185,6 +189,7 @@ export class CloudTabs implements ChatCloud {
   }
 
   async forget(): Promise<CloudState> {
+    if (this.unreadable) return this.state;
     this.letGoOfTabs();
     this.problem = null;
     this.endFirst = false;
@@ -312,9 +317,18 @@ export class CloudTabs implements ChatCloud {
     return true;
   }
 
-  // On disk first. A key that couldn't be saved isn't used, so the disk never pairs a Context with another account's key.
+  // What an app before this one kept leaves `cloud.json` only once it's in the sessions' file.
+  private keepIds(ids: CloudIds): boolean {
+    this.ids = ids;
+    if (this.unreadable || !writeCloudIds(sessionsFile(this.file), ids)) return false;
+    if (this.before) this.before = !forgetBefore(this.file);
+    return true;
+  }
+
+  // On disk first, and only once what came from before is in the sessions' file, since this writes over `cloud.json`. A
+  // key that couldn't be saved isn't used.
   private keep(key: Key): boolean {
-    if (!writeCloudKey(this.file, key)) {
+    if (this.unreadable || (this.before && !this.keepIds(this.ids)) || !writeCloudKey(this.file, key)) {
       this.problem = NOT_SAVED;
       return false;
     }

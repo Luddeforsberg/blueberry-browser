@@ -3,14 +3,18 @@ import { KeyRefused, type CloudBrowser, type CloudIds, type CreateHooks, type Ha
 
 // What is kept of the cloud's sessions so each can be ended: a handle for every session that may be running, from before
 // it's asked for until there's proof it isn't. Proof is the provider confirming it ended or refusing outright to make it.
-// A list that doesn't show it never is, since its create may land afterwards. The deadline only says when a handle may
-// be forgotten: past it, after one more try at ending it, or at once for another provider's, which nothing here can
-// try. It never stops a try, since ending a session that has gone does no harm. A handle is released only through the
-// provider and project that made it, and a new key never drops one. Plain Node, like `CloudLife`, which owns one.
+// A list that doesn't show it never is, since its create may land afterwards, and a release that failed never is. The
+// deadline only says when a handle may be forgotten: once it's further past than any session lasts, so a clock that's
+// wrong by less than that loses nothing. It never stops a try, since ending a session that has gone does no harm. A
+// handle is released only through the provider and project that made it, and a new key never drops one, or another
+// project's Context. Plain Node, like `CloudLife`, which owns one.
 
 const NOT_KEPT = "The cloud settings couldn't be saved, so no cloud session was started.";
 // So the file stays small. Every handle in it is kept, so the limit is on asking for more.
 const MAX_KEPT = 100;
+// How far past its deadline a handle is kept: Browserbase's longest session, six hours, which covers any clock that's
+// that much ahead.
+const FORGET_AFTER_MS = 6 * 60 * 60_000;
 const TOO_MANY =
   "Too many cloud sessions from before haven't confirmed they ended, so no new one was started. Press End in Settings > Cloud to end them first.";
 
@@ -44,6 +48,12 @@ export class CloudHandles {
     return this.ids;
   }
 
+  // This provider's Context.
+  get contextId(): string | null {
+    const origin = this.browser()?.origin;
+    return origin ? (this.ids.contexts[origin] ?? null) : null;
+  }
+
   // The handles this provider can end, past their deadline or not. Another's stay saved, untouched, for that one.
   mine(): Handle[] {
     const origin = this.browser()?.origin;
@@ -69,8 +79,7 @@ export class CloudHandles {
 
   // Whether a session from `origin` may still be running, which only a browser from there can end.
   keptBy(origin: string): boolean {
-    const now = Date.now();
-    return this.ids.handles.some(({ by, until }) => by === origin && until > now);
+    return this.ids.handles.some(({ by }) => by === origin);
   }
 
   // Releases still on their way, which Quit waits for.
@@ -84,16 +93,10 @@ export class CloudHandles {
     return known[known.length - 1]?.id ?? null;
   }
 
-  // False if it couldn't be saved.
-  keepContext(contextId: string | null): boolean {
-    return this.set({ ...this.ids, contextId });
-  }
-
-  // A new provider or key, so what the last one said about its releases no longer holds. Every handle stays.
-  reset(contextId: string | null): void {
+  // A new provider or key, so what the last one said about its releases no longer holds. Every handle and Context stays.
+  reset(): void {
     this.failed.clear();
     this.refused.clear();
-    this.set({ ...this.ids, contextId });
   }
 
   // Connected to, so it's certainly running, and kept.
@@ -107,11 +110,10 @@ export class CloudHandles {
     return this.hooks.onIds?.(this.ids) ?? true;
   }
 
-  // Without another provider's handles that are past their deadline, which only that provider could have tried to end.
+  // Without the handles further past their deadline than any session lasts.
   private pruned(ids: CloudIds): CloudIds {
-    const origin = this.browser()?.origin;
     const now = Date.now();
-    return { ...ids, handles: ids.handles.filter(({ by, until }) => by === origin || until > now) };
+    return { ...ids, handles: ids.handles.filter(({ until }) => until + FORGET_AFTER_MS > now) };
   }
 
   private without(tag: string): void {
@@ -129,7 +131,7 @@ export class CloudHandles {
     const tags: string[] = [];
     const hooks: Omit<CreateHooks, "wanted"> = {
       tag: (until) => {
-        const before = this.ids;
+        const before = this.pruned(this.ids);
         if (before.handles.length >= MAX_KEPT) throw new Error(TOO_MANY);
         const handle: Handle = { tag: randomUUID(), id: null, by: browser.origin, until };
         if (!this.set({ ...before, handles: [...before.handles, handle] })) {
@@ -146,7 +148,8 @@ export class CloudHandles {
         this.without(tag);
       },
       context: (id) => {
-        if (current() && !this.ids.contextId) this.set({ ...this.ids, contextId: id });
+        const { contexts } = this.ids;
+        if (current() && !contexts[browser.origin]) this.set({ ...this.ids, contexts: { ...contexts, [browser.origin]: id } });
       },
       // With the provider's own deadline, once it has said it.
       made: (tag, id, until) => {
@@ -165,7 +168,7 @@ export class CloudHandles {
       unnamed.forEach(({ tag }) => void this.releaseOne(tag));
       this.hooks.changed();
     };
-    return { ids: { contextId: this.ids.contextId, sessionId: this.reusable }, hooks, answered };
+    return { ids: { contextId: this.ids.contexts[browser.origin] ?? null, sessionId: this.reusable }, hooks, answered };
   }
 
   // Every handle this provider can end that `only` picks, but one whose create is still on its way with no id yet, and
@@ -183,10 +186,8 @@ export class CloudHandles {
     const browser = this.browser();
     const handle = this.ids.handles.find((one) => one.tag === tag);
     if (!browser || !handle || handle.by !== browser.origin) return Promise.resolve();
-    const { id, until } = handle;
-    const asked = id
-      ? browser.release(id).then(() => true)
-      : browser.releaseTagged(tag).then((found) => found === "ended" || until <= Date.now());
+    const { id } = handle;
+    const asked = id ? browser.release(id).then(() => true) : browser.releaseTagged(tag).then((found) => found === "ended");
     const sent = asked
       .then(
         (proven) => {
@@ -200,8 +201,6 @@ export class CloudHandles {
           this.failed.add(tag);
           if (error instanceof KeyRefused) this.refused.add(tag);
           else this.refused.delete(tag);
-          // Past its deadline it has ended anyway.
-          if (until <= Date.now()) this.without(tag);
         },
       )
       .finally(() => {

@@ -10,6 +10,7 @@ import { pushConfig, pusher } from "./push";
 import { quietConsole } from "./quietConsole";
 import { RelayAddress, relayConfig, startRelay } from "./relay";
 import { startDueRoutines } from "./routines";
+import { Sweeps } from "./sweeps";
 
 quietConsole();
 
@@ -55,17 +56,20 @@ const hosted = (job?: string) => browserbase({ apiKey: apiKey!, projectId: proje
 const sweeper = local ? null : hosted();
 const localBrowser = local ? localChrome({ executable: localExecutable, endpoint: localEndpoint }) : null;
 // A new session each job, ended with it.
-const jobSessions = (jobId: string, contextId: string | null): CloudSessions =>
-  new CloudSessions(
-    localBrowser ?? hosted(jobId),
-    { ...NO_IDS, contextId: contextId ?? ownContext },
+const jobSessions = (jobId: string, contextId: string | null): CloudSessions => {
+  const browser = localBrowser ?? hosted(jobId);
+  const context = contextId ?? ownContext;
+  return new CloudSessions(
+    browser,
+    { ...NO_IDS, contexts: context ? { [browser.origin]: context } : {} },
     {
       onIds: (ids) => {
-        if (!contextId) ownContext = ids.contextId;
+        if (!contextId) ownContext = ids.contexts[browser.origin] ?? null;
         return true;
       },
     },
   );
+};
 
 const settings = config as Exclude<typeof config, string>;
 const db = supabaseDb(settings, runnerSession(settings));
@@ -97,12 +101,16 @@ if (relaySettings) {
 const unreleased = new UnreleasedBrowsers();
 const shutdown = new AbortController();
 let working: Promise<unknown> | null = null;
+let sweeps: Sweeps | null = null;
 const quit = () => {
   if (shutdown.signal.aborted) return;
   console.log("Shutting down.");
   shutdown.abort();
-  // One last try at anything left running at the provider.
-  void (working ?? Promise.resolve()).then(() => unreleased.retry()).finally(() => process.exit(0));
+  // The job, and a sweep that may be about to end a session left from a runner that stopped, finish first, then one last
+  // try at anything left running at the provider.
+  void Promise.allSettled([working, sweeps?.inFlight])
+    .then(() => unreleased.retry())
+    .finally(() => process.exit(0));
 };
 process.on("SIGTERM", quit);
 process.on("SIGINT", quit);
@@ -194,31 +202,13 @@ const loop = async () => {
   }
 };
 
-// How often it looks for sessions left from jobs that are over, and how soon it looks again after a look failed.
-const SWEEP_MS = 5 * 60_000;
-const SWEEP_RETRY_MS = 30_000;
-
-// On a timer of its own, so a long job or an approval wait never holds it up, and one look at a time, since each waits
-// for the last. Only while linked, since only the server can say which jobs are over.
-const sweeps = async () => {
-  if (!sweeper) return;
-  let failing = false;
-  while (!shutdown.signal.aborted) {
-    if (!linked) {
-      await sleep(LINK_RETRY_MS);
-      continue;
-    }
-    const swept = await sweeper
-      .releaseMarked((jobs) => db.liveJobs(jobs))
-      .then(
-        () => true,
-        () => false,
-      );
-    if (!swept && !failing) console.error("Couldn't end the cloud sessions left from jobs that are over. Trying again.");
-    failing = !swept;
-    await sleep(swept ? SWEEP_MS : SWEEP_RETRY_MS);
-  }
-};
-
 void loop();
-void sweeps();
+if (sweeper) {
+  sweeps = new Sweeps({
+    sweep: () => sweeper.releaseMarked((jobs) => db.liveJobs(jobs)),
+    linked: () => linked,
+    stop: shutdown.signal,
+    sleep,
+  });
+  void sweeps.run();
+}

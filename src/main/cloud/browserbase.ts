@@ -1,6 +1,6 @@
 import type { CdpTab } from "../tools/CdpTab";
 import { fieldsOf } from "../../shared/fields";
-import { connectOverCdp, KeyRefused, NOT_WANTED, type CloudBrowser, type CreateHooks, type MadeSession } from "./cloudProvider";
+import { connectOverCdp, KeyRefused, NOT_WANTED, stoppable, type CloudBrowser, type CreateHooks, type MadeSession } from "./cloudProvider";
 
 // Browserbase, from its REST API (docs.browserbase.com/reference/api) and connected to over CDP. One persistent Context
 // keeps the profile between sessions, and a session is kept alive between jobs, ended a few minutes after the last one, by the user, or after an hour.
@@ -12,9 +12,10 @@ export const BROWSERBASE_REGION = "eu-central-1";
 // Seconds. A kept-alive session runs, and costs, until this or until it's released. Sent with every create, so each has a
 // deadline the app knows.
 const SESSION_TIMEOUT_S = 3600;
-// How late a create may land after it's sent and still start its clock. Its answer is waited on for far less. Only a
-// session whose answer never came is held to it: one that answered says its own deadline.
-const LANDING_MS = 10 * 60_000;
+// The longest `timeout` Browserbase takes, six hours, which even a kept-alive session ends at. Nobody knows how late a
+// create whose answer never came may land, so its deadline is this from when it was sent, the most any could have been
+// given. One that answered says its own.
+const LONGEST_MS = 21_600 * 1000;
 // Added to Browserbase's deadline, in case this computer's clock is behind its own.
 const CLOCK_MS = 5 * 60_000;
 const deadlineOf = (expiresAt: unknown): number | undefined => {
@@ -133,7 +134,7 @@ export const browserbase = ({
     }
     const contextId = ids.contextId || (await newContext(hooks));
     if (!hooks.wanted()) throw new Error(NOT_WANTED);
-    const tag = hooks.tag(Date.now() + SESSION_TIMEOUT_S * 1000 + LANDING_MS);
+    const tag = hooks.tag(Date.now() + LONGEST_MS + CLOCK_MS);
     let made: Record<string, unknown>;
     try {
       made = fieldsOf(
@@ -209,9 +210,16 @@ export const browserbase = ({
       return {
         id,
         // A connection that comes back after its life ended is closed by `CloudLife`, and the session released by its id.
-        connect: async () => {
-          const browser = await connect(connectUrl);
-          const context = browser.contexts()[0] ?? (await browser.newContext());
+        connect: async (stop) => {
+          const opening = connect(connectUrl).then(async (browser) => {
+            try {
+              return { browser, context: browser.contexts()[0] ?? (await browser.newContext()) };
+            } catch (error) {
+              void browser.close().catch(() => {});
+              throw error;
+            }
+          });
+          const { browser, context } = await stoppable(opening, stop, (late) => void late.browser.close().catch(() => {}));
           return {
             context,
             liveView: async (page: CdpTab) => {
@@ -222,8 +230,9 @@ export const browserbase = ({
               const url = typeof match?.debuggerFullscreenUrl === "string" ? match.debuggerFullscreenUrl : live.debuggerFullscreenUrl;
               return typeof url === "string" && url ? withoutNavbar(url) : null;
             },
+            // Released by its id, so nothing waits for the connection to close.
             close: async () => {
-              await browser.close().catch(() => {});
+              void browser.close().catch(() => {});
             },
           };
         },

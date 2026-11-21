@@ -41,16 +41,30 @@ const read = (files: Files, name: string) => {
     return {};
   }
 };
-// Where the Context and handles are: their own file, or the key's in code that keeps them there.
-const idsOf = (files: Files) => read(files, files.has(SESSIONS_FILE) ? SESSIONS_FILE : KEY_FILE);
+// The handles saved, and the one session an app before this one kept in the key's file, for that key's project.
+const handlesIn = (files: Files): Record<string, unknown>[] => {
+  const { entries } = entriesOf(read(files, SESSIONS_FILE).handles, (one) => fieldsOf(one));
+  const { sessionId, projectId } = read(files, KEY_FILE);
+  const project = unseal(projectId);
+  return typeof sessionId === "string" && project ? [...entries, { id: sessionId, by: `browserbase:${project}` }] : entries;
+};
+
+// Each Context saved, with the project it's kept for.
+const contextsIn = (files: Files): [string, string][] => {
+  const kept = Object.entries(read(files, SESSIONS_FILE).contexts ?? {}).flatMap(([by, id]): [string, string][] =>
+    typeof id === "string" ? [[id, by.replace(/^browserbase:/, "")]] : [],
+  );
+  const { contextId, projectId } = read(files, KEY_FILE);
+  const project = unseal(projectId);
+  return typeof contextId === "string" && project ? [...kept, [contextId, project]] : kept;
+};
 
 // Whether a session can still be found from what's saved, by its id or the tag it was asked for with, through the
 // provider and project that made it.
 const findable = (files: Files, world: CloudWorld, id: string): boolean => {
   const tag = world.tagOf(id);
   const by = `browserbase:${world.projectOf(id)}`;
-  const { entries } = entriesOf(idsOf(files).handles, (one) => fieldsOf(one));
-  return entries.some((one) => one.by === by && (one.id === id || (tag !== undefined && one.tag === tag)));
+  return handlesIn(files).some((one) => one.by === by && (one.id === id || (tag !== undefined && one.tag === tag)));
 };
 
 // What's saved at the start of a run: a key, sealed.
@@ -65,22 +79,25 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
   vi.stubGlobal("fetch", world.fetch);
   disk.files = FIRST();
   disk.failsFor = 0;
+  disk.readFails = new Set();
+  disk.unread = false;
   const trace: string[] = [];
   let broken: string | null = null;
   const breaks = (rule: string, why: string) => {
     if (!IGNORED.includes(rule)) broken ??= `${rule}: ${why}`;
   };
   disk.onWrite = (name, text) => {
+    // A launch that couldn't read a file that's there writes neither.
+    if (disk.unread) breaks("wrote-unread", `${name} was written by a launch that couldn't read what was saved`);
     const next = new Map(disk.files).set(name, text);
     // Nothing running at Browserbase becomes impossible to find from the disk, even one whose key it no longer takes.
     for (const id of world.appRunning)
       if (findable(disk.files, world, id) && !findable(next, world, id))
         breaks("dropped-running-id", `${id} could no longer be found from the disk while it was still running`);
-    // The Context kept is one of the saved key's project.
-    const { contextId } = idsOf(next);
-    const projectId = unseal(read(next, KEY_FILE).projectId);
-    if (typeof contextId === "string" && projectId && world.contexts.get(contextId) !== projectId)
-      breaks("context-crossed-account", `${contextId}, made in ${world.contexts.get(contextId)}, was kept for ${projectId}`);
+    // Each Context is kept for the project it was made in.
+    for (const [contextId, projectId] of contextsIn(next))
+      if (world.contexts.get(contextId) !== projectId)
+        breaks("context-crossed-account", `${contextId}, made in ${world.contexts.get(contextId)}, was kept for ${projectId}`);
   };
   let count = 0;
   const next = () => ++count;
@@ -103,9 +120,11 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
 
   // The app is gone, with whatever it asked for unanswered, and launches again from what's on the disk. A Chrome it
   // started goes with it.
-  const relaunch = async (local: boolean) => {
+  const relaunch = async (local: boolean, readFails: string[] = []) => {
     await flush();
     world.lose();
+    disk.unread = false;
+    disk.readFails = new Set(readFails);
     // Its timers go with it. Clearing them puts the clock back too, so it's set again.
     const now = Date.now();
     vi.clearAllTimers();
@@ -113,8 +132,36 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
     app.win.close();
     world.localRunning.forEach((name) => world.local.set(name, false));
     app = new Launch(local, { world, breaks, makeCloud });
-    trace.push(`the app launches again${local ? ", with a Chrome on this computer standing in" : ""}`);
+    disk.readFails.clear();
+    const how = readFails.length
+      ? `, and couldn't read ${readFails.join(" or ")}`
+      : local
+        ? ", with a Chrome on this computer standing in"
+        : "";
+    trace.push(`the app launches again${how}`);
     await flush();
+  };
+
+  // An app before this one is opened, with this key or one for another project, makes a session and a Context, keeps
+  // them in the key's file as it did, and stops without ending it. Then this one is opened again.
+  const downgrade = async ({ b }: Action) => {
+    if (app.local) return;
+    trace.push("the app stops without quitting");
+    await flush();
+    world.lose();
+    // The key on the disk, which the app before this one opens, whatever this one could read.
+    const saved = read(disk.files, KEY_FILE);
+    const held = unseal(saved.apiKey);
+    const key = b % 2 === 0 ? (held ?? "key-0") : `key-${next()}`;
+    const was = held ? world.projectOfKey(held) : undefined;
+    if (!world.projectOfKey(key)) world.accept(key, "proj-2");
+    const { id, context } = world.before(key, saved.sessionId);
+    const project = world.projectOfKey(key) ?? "";
+    if (was && was !== project) world.unheld.add(was);
+    else if (held && held !== key) world.replaced.set(held, key);
+    disk.files.set(KEY_FILE, JSON.stringify({ apiKey: seal(key), projectId: seal(project), contextId: context, sessionId: id }));
+    trace.push(`the app before this one, with ${key} for ${project}, makes ${id} and keeps it, and stops`);
+    await relaunch(false);
   };
 
   // The saved key can't be opened any more, as when the system's keychain changed, and the app launches again without
@@ -192,8 +239,18 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
   };
 
   // Once the steps are over: every answer comes back, nobody uses it for a while, and then everyone lets go.
+  // A launch that couldn't read what was saved changes nothing, so the user opens it again.
+  const reopen = async () => {
+    if (!disk.unread) return;
+    trace.push("Quit, and open it again");
+    quietly(app.cloud.quit());
+    await drain();
+    await relaunch(false);
+  };
+
   const afterwards = async () => {
     disk.failsFor = 0;
+    await reopen();
     trace.push("every answer comes back, and the user confirms what's waiting");
     app.win.confirms.forEach((answer) => answer(true));
     app.win.confirms.clear();
@@ -236,6 +293,13 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
     if (!broken) await works();
   };
 
+  // A project the app has a key for again can end its sessions again.
+  const holding = () => {
+    const key = unseal(read(disk.files, KEY_FILE).apiKey);
+    const project = key ? world.projectOfKey(key) : undefined;
+    if (project) world.unheld.delete(project);
+  };
+
   const outcome = (): Outcome => ({ broken: broken && WANTED && !WANTED.test(`${broken}\n${trace.join("\n")}`) ? null : broken, trace });
   for (const action of actions) {
     if (action.op === "quit") {
@@ -247,11 +311,17 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
       await relaunch(action.a % 3 === 0);
     } else if (action.op === "keyDamaged") {
       await keyDamaged();
+    } else if (action.op === "readFails") {
+      trace.push("the app stops without quitting");
+      await relaunch(false, [[KEY_FILE], [SESSIONS_FILE], [KEY_FILE, SESSIONS_FILE]][action.a % 3]);
+    } else if (action.op === "downgrade") {
+      await downgrade(action);
     } else {
       const said = NEEDS_WINDOW.includes(action.op) && !app.win.open ? null : await steps[action.op](action);
       await flush();
       if (said) trace.push(said);
     }
+    holding();
     if (broken) return outcome();
   }
   await afterwards();

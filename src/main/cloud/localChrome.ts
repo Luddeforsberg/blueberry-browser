@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { connectOverCdp, type CloudBrowser, type CloudSession } from "./cloudProvider";
+import { connectOverCdp, stoppable, type CloudBrowser, type CloudSession } from "./cloudProvider";
 
 // A Chrome on this computer standing in for the cloud, for tests and development: launched headless with a throwaway
 // profile, or one already running with `--remote-debugging-port`. There's no live view, so the window shows pictures.
@@ -116,24 +116,23 @@ const killNow = async ({ process: child, profile }: Launched): Promise<void> => 
 };
 
 // Connects to `endpoint`, a browser already running here, or launches one from `executable` or the usual place. One it
-// launched is killed as soon as `stop` aborts, however far it got.
+// launched is killed as soon as `stop` aborts, however far it got, and nothing waits for a connection after that.
 const start = async (endpoint: string | undefined, executable: string | undefined, stop: AbortSignal): Promise<CloudSession> => {
   if (endpoint && !isLocalEndpoint(endpoint)) throw new Error("A local browser has to be on 127.0.0.1.");
   const path = executable ?? findChrome();
   if (!endpoint && !path) throw new Error("No Chrome or Chromium was found on this computer.");
   const launched = endpoint ? null : await launch(path!, stop);
-  const stopped = () => void (launched && kill(launched));
-  stop.addEventListener("abort", stopped, { once: true });
-  const browser = await connectOverCdp(endpoint ?? launched!.endpoint)
-    .catch(async (error: unknown) => {
+  const browser = await stoppable(connectOverCdp(endpoint ?? launched!.endpoint), stop, (late) => void late.close().catch(() => {})).catch(
+    async (error: unknown) => {
       if (launched) await kill(launched);
       throw error;
-    })
-    .finally(() => stop.removeEventListener("abort", stopped));
-  // The browser it launched is killed while the connection closes, never after, so a close that stalls can't keep it
-  // running past Quit.
+    },
+  );
+  // The browser it launched is killed while the connection closes, never after, and the close isn't waited for, so one
+  // that stalls can't hold up Quit.
   const shut = async () => {
-    await Promise.all([browser.close().catch(() => {}), launched && kill(launched)]);
+    void browser.close().catch(() => {});
+    if (launched) await kill(launched);
   };
   if (stop.aborted) {
     await shut();

@@ -29,7 +29,7 @@ const chrome = vi.hoisted(() => {
 const connecting = vi.hoisted(() => ({ connect: vi.fn(() => new Promise(() => {})) }));
 
 vi.mock("node:child_process", () => ({ spawn: chrome.spawn }));
-vi.mock("./cloudProvider", () => ({ connectOverCdp: connecting.connect }));
+vi.mock("./cloudProvider", async (original) => ({ ...(await original<object>()), connectOverCdp: connecting.connect }));
 
 const started = async (stop: AbortSignal) => {
   const made = await localChrome({ executable: "chrome" }).create({ contextId: null, sessionId: null }, {} as never);

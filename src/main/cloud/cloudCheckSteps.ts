@@ -23,7 +23,9 @@ export interface StepContext {
 
 type Step = (action: Action) => string | null | Promise<string | null>;
 
-export const runningSteps = (context: StepContext): Record<Exclude<Op, "quit" | "crash" | "keyDamaged">, Step> => ({
+export const runningSteps = (
+  context: StepContext,
+): Record<Exclude<Op, "quit" | "crash" | "keyDamaged" | "readFails" | "downgrade">, Step> => ({
   ...appSteps(context),
   ...worldSteps(context),
 });

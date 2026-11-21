@@ -28,9 +28,16 @@ interface Making {
 // What the test file mocks, so that each run can point it at its own world, and how it makes the cloud.
 export interface Setup {
   net: { connect: (url: string) => Promise<unknown>; attach: (id: string) => Promise<unknown> };
-  // The cloud's files by name, read and written by the app's own code. `failsFor` is how many of the next saves fail, and
-  // `onWrite` hears each file's new text just before it replaces the old.
-  disk: { files: Map<string, string>; onWrite: (name: string, text: string) => void; failsFor: number };
+  // The cloud's files by name, read and written by the app's own code. `failsFor` is how many of the next saves fail,
+  // `readFails` the files whose next read fails if they're there, which sets `unread`, and `onWrite` hears each file's new
+  // text just before it replaces the old.
+  disk: {
+    files: Map<string, string>;
+    onWrite: (name: string, text: string) => void;
+    failsFor: number;
+    readFails: Set<string>;
+    unread: boolean;
+  };
   makeCloud: (making: Making) => CloudUnderTest;
   // Before each run: nothing left on disk from the last.
   reset: () => void;

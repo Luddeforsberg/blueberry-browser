@@ -20,7 +20,7 @@ const net = vi.hoisted((): Setup["net"] => ({
 }));
 // The cloud's files, read and written by the app's own cloudFile.ts, on a disk of their own whose saves can fail. A key
 // is sealed as "sealed:" and the key, and anything else can't be opened, as a damaged one can't.
-const disk = vi.hoisted((): Setup["disk"] => ({ files: new Map(), onWrite: () => {}, failsFor: 0 }));
+const disk = vi.hoisted((): Setup["disk"] => ({ files: new Map(), onWrite: () => {}, failsFor: 0, readFails: new Set(), unread: false }));
 
 vi.mock("electron", () => ({
   safeStorage: {
@@ -52,6 +52,10 @@ vi.mock("fs", async (original) => {
       if (!name) return fs.readFileSync(path, options as BufferEncoding);
       const text = disk.files.get(name);
       if (text === undefined) throw missing();
+      if (disk.readFails.delete(name)) {
+        disk.unread = true;
+        throw new Error("EIO: i/o error, read");
+      }
       return text;
     },
     writeFileSync: (path: string, data: string, options?: unknown) => {

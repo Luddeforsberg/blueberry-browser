@@ -53,7 +53,12 @@ export const provider = (
 // A signal for a connection whose life never ends.
 export const going = (): AbortSignal => new AbortController().signal;
 
-export const at = (ids: Partial<CloudIds>): CloudIds => ({ ...NO_IDS, ...ids });
+// What's kept, with `contextId` as the Context of `provider`'s project.
+export const at = ({ contextId, ...ids }: Partial<CloudIds> & { contextId?: string }): CloudIds => ({
+  ...NO_IDS,
+  ...(contextId ? { contexts: { "browserbase:p": contextId } } : {}),
+  ...ids,
+});
 
 // A session that may be running, made by `provider`'s project unless `by` says otherwise, an hour from its deadline.
 export const handle = (id: string | null, more: Partial<Handle> = {}): Handle => ({

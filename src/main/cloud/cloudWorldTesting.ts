@@ -8,8 +8,9 @@ import { FAILS, ODD, ownerOf, WorldBrowsers } from "./cloudWorldBrowsers";
 export { FAILS, LOCAL, WORKS, type LocalSession } from "./cloudWorldBrowsers";
 
 const API = "https://api.browserbase.com/v1";
-// How late a create can land, as browserbase.ts assumes: the one thing here not from Browserbase's docs.
-const LANDING_MS = 10 * 60_000;
+// How late a create can land: Browserbase's longest timeout, as browserbase.ts assumes, the one thing here not from its
+// docs.
+const LANDING_MS = 6 * 60 * 60_000;
 
 // The parts of a fetch `Response` browserbase.ts reads.
 interface Answer {
@@ -49,6 +50,14 @@ export class CloudWorld extends WorldBrowsers {
   // Sessions a release was refused for, because Browserbase no longer took the key it came with, and keys it refused.
   readonly refused = new Set<string>();
   private readonly refusedKeys = new Set<string>();
+  // Projects the app has no key for, since an app before this one replaced it with one for another, until the app saves
+  // one again. Their sessions can only end on their own, though they must still be found from the disk.
+  readonly unheld = new Set<string>();
+  // Sessions an app before this one lost track of itself, by saving another key over their id.
+  readonly lostBefore = new Set<string>();
+  // Keys an app before this one replaced with another for the same project, and the key that replaced each. A session
+  // from one is ended through the last key in that line, so once that's refused, nothing the app holds can end it.
+  readonly replaced = new Map<string, string>();
   // Every release asked for, by session id, in order.
   readonly releases: string[] = [];
   // Told of every release that lands, with the key that asked, before it ends the session.
@@ -83,13 +92,19 @@ export class CloudWorld extends WorldBrowsers {
   // with a key it has since been refused for, may be another account's, and ends on its own.
   get running(): string[] {
     const endable = ([id, session]: [string, Session]) =>
-      this.isRunning(id) && isApp(session) && !this.refused.has(id) && !this.refusedKeys.has(session.key);
+      this.isRunning(id) &&
+      isApp(session) &&
+      !this.refused.has(id) &&
+      !this.refusedKeys.has(session.key) &&
+      !this.unheld.has(session.project) &&
+      !this.lostBefore.has(id) &&
+      !this.stranded(session.key);
     return [...[...this.sessions].filter(endable).map(([id]) => id), ...this.localRunning];
   }
 
   // The app's sessions that still run at all, even those it can't end now.
   get appRunning(): string[] {
-    return [...this.sessions].filter(([id, session]) => this.isRunning(id) && isApp(session)).map(([id]) => id);
+    return [...this.sessions].filter(([id, session]) => this.isRunning(id) && isApp(session) && !this.lostBefore.has(id)).map(([id]) => id);
   }
 
   get anyRunning(): boolean {
@@ -115,6 +130,19 @@ export class CloudWorld extends WorldBrowsers {
   landBefore(ms: number, how: number): string[] {
     const due = this.pending.filter(({ kind, sent }) => kind === "land" && sent !== undefined && sent + LANDING_MS <= Date.now() + ms);
     return due.map((one) => this.answer(this.pending.indexOf(one), how));
+  }
+
+  // The session an app before this one uses with `key`, which it kept by its id alone, with a Context of its own: the
+  // one it kept, if that's still running for the same key, or a new one.
+  before(key: string, kept: unknown): { id: string; context: string } {
+    const project = this.projects.get(key) ?? "";
+    const context = `ctx-${++this.count}`;
+    this.contexts.set(context, project);
+    if (typeof kept === "string" && this.sessions.get(kept)?.key === key && this.isRunning(kept)) return { id: kept, context };
+    if (typeof kept === "string" && this.isRunning(kept)) this.lostBefore.add(kept);
+    const id = `sess-${++this.count}`;
+    this.sessions.set(id, { ended: false, until: Date.now() + 60 * 60_000, metadata: {}, key, project });
+    return { id, context };
   }
 
   isApp(id: string): boolean {
@@ -148,6 +176,12 @@ export class CloudWorld extends WorldBrowsers {
     if (method === "GET") return answered("lookup", (how) => this.lookUp(id, key, how));
     return this.release(id, key, said);
   };
+
+  private stranded(key: string): boolean {
+    let last = key;
+    for (let k = 0; k < this.replaced.size && this.replaced.has(last); k++) last = this.replaced.get(last) ?? last;
+    return last !== key && this.refusedKeys.has(last);
+  }
 
   private refuse(key: string): Answer {
     this.refusedKeys.add(key);

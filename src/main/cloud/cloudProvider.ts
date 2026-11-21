@@ -13,12 +13,13 @@ export interface CloudSession {
   // An address for an iframe showing this page live, which the user can work in. Null where there's none, as for a
   // local browser, which shows pictures instead.
   liveView(page: CdpTab): Promise<string | null>;
-  // Lets go of the connection, and ends a browser this computer started.
+  // Ends a browser this computer started, and settles once it has gone. The connection is let go of without waiting,
+  // since nothing costs once a paid session is released.
   close(): Promise<void>;
 }
 
 // One paid session a provider may be running, kept from before it's asked for until there's proof it isn't: the provider
-// confirmed it ended, refused to make it, or its own deadline has passed.
+// confirmed it ended or refused to make it. Past its deadline, by more than any session can last, it's forgotten too.
 export interface Handle {
   // Sent with its create, so it can be found without its id.
   tag: string;
@@ -30,13 +31,14 @@ export interface Handle {
   until: number;
 }
 
-// What is kept of the cloud: the Context the profile lives in, and every session that may still be running.
+// What is kept of the cloud: the Context the profile lives in for each provider and project, by `CloudBrowser.origin`,
+// and every session that may still be running.
 export interface CloudIds {
-  contextId: string | null;
+  contexts: Record<string, string>;
   handles: Handle[];
 }
 
-export const NO_IDS: CloudIds = { contextId: null, handles: [] };
+export const NO_IDS: CloudIds = { contexts: {}, handles: [] };
 
 // Told as a session is made, each the moment the provider has it.
 export interface CreateHooks {
@@ -56,7 +58,8 @@ export interface CreateHooks {
 export interface MadeSession {
   // Null where closing the connection ends it, as for a browser on this computer.
   readonly id: string | null;
-  // `stop` aborts when its life ends, so a browser this computer is still starting is killed rather than left running.
+  // `stop` aborts when its life ends, and it settles then, once a browser this computer is still starting has been
+  // killed, without waiting for a connection on its way.
   connect(stop: AbortSignal): Promise<CloudSession>;
 }
 
@@ -81,6 +84,26 @@ export class KeyRefused extends Error {}
 export type Released = "ended" | "running" | "refused";
 
 export const NOT_WANTED = "The cloud browser is ending, so no new session was started.";
+const STOPPED = "The cloud browser was stopped while it started.";
+
+// `work`, unless `stop` aborts first, which rejects at once. What comes after that goes to `late`, to let go of.
+export const stoppable = <T>(work: Promise<T>, stop: AbortSignal, late: (value: T) => void): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    const stopped = () => reject(new Error(STOPPED));
+    if (stop.aborted) stopped();
+    else stop.addEventListener("abort", stopped, { once: true });
+    work.then(
+      (value) => {
+        stop.removeEventListener("abort", stopped);
+        if (stop.aborted) late(value);
+        else resolve(value);
+      },
+      (error: unknown) => {
+        stop.removeEventListener("abort", stopped);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      },
+    );
+  });
 
 // Playwright loads only when a cloud browser is first used, so startup never waits for it.
 export const connectOverCdp = async (endpoint: string): Promise<Browser> => {

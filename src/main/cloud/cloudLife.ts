@@ -108,13 +108,7 @@ export abstract class CloudLife {
   }
 
   get contextId(): string | null {
-    return this.handles.current.contextId;
-  }
-
-  // The Context to keep, as when a new key is being saved and the old account's must leave the disk before it does.
-  // False if it couldn't be saved.
-  keepContext(id: string | null): boolean {
-    return this.handles.keepContext(id);
+    return this.handles.contextId;
   }
 
   get account(): object {
@@ -311,8 +305,8 @@ export abstract class CloudLife {
       if (!next) return before;
       this.browser = next.browser;
       this._account = {};
-      // A new key may be a new account, without the old Context.
-      this.handles.reset(null);
+      // A new key may be another project, whose own Context it then uses.
+      this.handles.reset();
       await this.handles.releaseKept();
       return this.outcome();
     });
