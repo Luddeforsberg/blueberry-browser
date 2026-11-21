@@ -76,6 +76,7 @@ describe("a mascot's limits at the edges", () => {
 describe("registrableSite", () => {
   it.each<[string, string]>([
     ["www.shop.example.co.uk", "example.co.uk"],
+    ["www.localhost", "www.localhost"],
     ["old.reddit.com", "reddit.com"],
     ["myshop.herokuapp.com", "myshop.herokuapp.com"],
     ["someone.github.io", "someone.github.io"],

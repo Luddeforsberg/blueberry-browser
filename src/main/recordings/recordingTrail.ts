@@ -30,7 +30,7 @@ const TOKEN_SEGMENT = /^(?=.*\d)[A-Za-z0-9_-]{24,}$/;
 // A name right under a country's own com, co, org and the like, such as alice.com.uk, is often sold to a stranger by
 // whoever holds com.uk, and the Public Suffix List doesn't know every one. It stays whole, so a routine there never
 // reaches its neighbours.
-const RESOLD_UNDER = /^(co|com|org|net|ac|gov|edu|or|ne)\.[a-z]{2}$/;
+const RESOLD_UNDER = /^(co|com|org|net|ac|gov|edu|or|ne)\.[^.]{2}$/;
 // One company runs many unrelated products on these, so docs.google.com is a site of its own, and a routine on it can't
 // reach mail.google.com.
 const MANY_PRODUCTS = [

@@ -42,6 +42,9 @@ describe("addresses", () => {
     // Never wider than a name under a country's com or co, which the list may not have.
     expect(siteOfHost("shop.alice.com.uk")).toBe("alice.com.uk");
     expect(siteOfHost("alice.co.se")).toBe("alice.co.se");
+    expect(siteOfHost("alice.co.a1")).toBe("alice.co.a1");
+    // Only one "www." is taken off.
+    expect(siteOfHost("www.www.localhost")).toBe("www.localhost");
   });
 
   it("keeps the whole host where one company runs many products", () => {
