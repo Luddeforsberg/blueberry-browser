@@ -193,6 +193,45 @@ describe("TelegramChannel", () => {
     vi.unstubAllGlobals();
   });
 
+  it("names the chat a message went to, even when another chat is paired before the send answers", async () => {
+    const file = join(folder(), "phone.json");
+    writeFileSync(file, JSON.stringify({ token: Buffer.from(B).toString("base64"), botName: "bot_b", chatId: 7 }));
+    const held: { finish: (() => void) | null } = { finish: null };
+    const pairing: { text: string | null; polls: number } = { text: null, polls: 0 };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.endsWith("/getMe")) return Response.json({ ok: true, result: { username: "bot_b" } });
+        if (url.endsWith("/sendMessage")) {
+          if (held.finish === null) await new Promise<void>((resolve) => (held.finish = resolve));
+          return Response.json({ ok: true, result: { message_id: 42 } });
+        }
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        pairing.polls += 1;
+        const { text } = pairing;
+        pairing.text = null;
+        const result = text ? [{ update_id: 1, message: { message_id: 1, chat: { id: 8, type: "private" }, from: { id: 8 }, text } }] : [];
+        return Response.json({ ok: true, result });
+      }),
+    );
+    const channel = new TelegramChannel(file, () => {}, "http://127.0.0.1:1");
+    channel.start();
+    const sending = channel.send("Berry needs you");
+    await vi.waitFor(() => expect(held.finish).not.toBeNull());
+    // Disconnected and paired with another chat while the message to chat 7 is still out.
+    channel.disconnect();
+    const link = (await channel.connect(B)).pairLink;
+    // The first look after connecting only catches up, and what it finds is never handled.
+    const after = pairing.polls;
+    await vi.waitFor(() => expect(pairing.polls).toBeGreaterThan(after));
+    pairing.text = `/start ${link?.split("start=")[1] ?? ""}`;
+    await vi.waitFor(() => expect(channel.state.status).toBe("connected"));
+    held.finish?.();
+    expect(await sending).toBe("7:42");
+    channel.close();
+    vi.unstubAllGlobals();
+  });
+
   it("edits a message only in the chat it was sent to", async () => {
     const file = join(folder(), "phone.json");
     writeFileSync(file, JSON.stringify({ token: Buffer.from(B).toString("base64"), botName: "bot_b", chatId: 7 }));

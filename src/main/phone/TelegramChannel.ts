@@ -211,10 +211,10 @@ export class TelegramChannel implements PhoneChannel {
 
   async send(text: string, choices: PhoneChoice[] = []): Promise<string | null> {
     if (!this.ready) return null;
-    const on = this.connection;
+    const { connection: on, chatId } = this;
     try {
       const sent = await this.call("sendMessage", {
-        chat_id: this.chatId,
+        chat_id: chatId,
         text,
         // Telegram's servers would fetch any address in the message for a preview, and it may be one with data in it.
         link_preview_options: { is_disabled: true },
@@ -224,7 +224,7 @@ export class TelegramChannel implements PhoneChannel {
       });
       if (on?.current && this.problem === CANT_MESSAGE) this.setProblem(null);
       const id = sentId(sent);
-      return id === null ? null : messageHandle(this.chatId, id);
+      return id === null ? null : messageHandle(chatId, id);
     } catch (error) {
       if (error instanceof TelegramError && error.status === 403) {
         if (on?.current) this.setProblem(CANT_MESSAGE);
