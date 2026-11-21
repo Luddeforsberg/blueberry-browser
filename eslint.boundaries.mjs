@@ -319,7 +319,15 @@ const rules = [
   onlyFrom(
     "the cloud's settings and live view",
     file("CloudTabs"),
-    ["cloud/CloudTabs.test.ts", "index.ts", "window/Window.ts", "window/WindowParts.ts", "window/makeCloud.ts"],
+    [
+      "cloud/CloudTabs.test.ts",
+      "cloud/cloudLifetime.test.ts",
+      "cloud/cloudCheckTesting.ts",
+      "index.ts",
+      "window/Window.ts",
+      "window/WindowParts.ts",
+      "window/makeCloud.ts",
+    ],
     "The cloud's key and live view go to the chrome only, never to a tool or a chat.",
   ),
   onlyFrom(

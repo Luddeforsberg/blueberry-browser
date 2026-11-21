@@ -2,7 +2,10 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import type { CdpTab } from "../tools/CdpTab";
+import type { BrowserContext } from "playwright-core";
+import { CdpTab } from "../tools/CdpTab";
+import { KeyRefused, type CloudBrowser } from "./cloudProvider";
+import type { CloudTabsHooks } from "./CloudTabs";
 
 const encryption = vi.hoisted(() => ({ available: false }));
 vi.mock("electron", () => ({
@@ -17,28 +20,97 @@ vi.mock("electron", () => ({
 const { CloudSessions } = await import("./cloudBrowser");
 const { CloudTabs } = await import("./CloudTabs");
 
-const makeTabs = (file = join(mkdtempSync(join(tmpdir(), "cloud-tabs-")), "cloud.json")) =>
-  new CloudTabs(
-    file,
-    {
-      chrome: () => ({ isDestroyed: () => true }) as never,
-      openTab: () => "tab-1",
-      updateTab: () => {},
-      closeTab: () => {},
-      takenOver: () => {},
-      showTab: () => {},
-      confirmLogin: async () => true,
-      readCookies: async () => [],
-    },
-    { endpoint: "http://127.0.0.1:1" },
-  );
+// Makes the cloud browser for a key, as makeCloud.ts does.
+type Provider = ConstructorParameters<typeof CloudTabs>[1];
+
+// How long a session nobody uses stays open.
+const IDLE = 3 * 60_000;
+
+const tempFile = () => join(mkdtempSync(join(tmpdir(), "cloud-tabs-")), "cloud.json");
+
+// A browser whose pages open when `opened` says so, standing in for the local one.
+const fakeLocal = () => {
+  let opened: Promise<void> = Promise.resolve();
+  const context = {
+    route: async () => {},
+    on: () => {},
+    browser: () => null,
+    newPage: async () => (await opened, { on: () => {}, close: async () => {} }),
+  };
+  const browser: CloudBrowser = {
+    name: "local",
+    release: async () => {},
+    create: async () => ({
+      id: null,
+      connect: async () => ({ context: context as unknown as BrowserContext, liveView: async () => null, close: async () => {} }),
+    }),
+  };
+  return { browser, holdPages: (until: Promise<void>) => void (opened = until) };
+};
+
+const attachTabs = () => {
+  const tabs = new Map<string, { close: ReturnType<typeof vi.fn> }>();
+  vi.spyOn(CdpTab, "attach").mockImplementation(async (id) => {
+    const tab = {
+      id,
+      url: "https://example.com/",
+      title: "",
+      isClosed: false,
+      loadURL: async () => {},
+      settled: async () => {},
+      close: vi.fn(async () => {}),
+    };
+    tabs.set(id, tab);
+    return tab as unknown as CdpTab;
+  });
+  return tabs;
+};
+
+const hooks = (over: Partial<CloudTabsHooks> = {}): CloudTabsHooks => ({
+  chrome: () => ({ isDestroyed: () => true }) as never,
+  openTab: () => "tab-1",
+  updateTab: () => {},
+  closeTab: () => {},
+  takenOver: () => {},
+  showTab: () => {},
+  confirmLogin: async () => true,
+  ...over,
+});
+
+const makeTabs = (file = tempFile(), provider: Provider = () => fakeLocal().browser, over: Partial<CloudTabsHooks> = {}) => {
+  const tabs = new CloudTabs(file, provider, async () => []);
+  tabs.attach(hooks(over));
+  return tabs;
+};
+
+// Sealed as the mocked safeStorage seals, which is no more than base64.
+const sealed = (text: string) => Buffer.from(text).toString("base64");
+const OLD = { apiKey: sealed("bb_old"), projectId: sealed("proj"), contextId: "ctx-1", sessionId: "sess-1" };
+
+// Browserbase as far as releasing goes, answering as `answer.now` says, and noting the key each release used.
+const releasing = () => {
+  const answer: { now: "ok" | "fails" | "refused" } = { now: "fails" };
+  const calls: string[] = [];
+  const provider: Provider = ({ apiKey }) =>
+    apiKey
+      ? {
+          name: "browserbase",
+          create: async () => Promise.reject(new Error("Not in this test.")),
+          release: async (id) => {
+            calls.push(`${apiKey} ${id}`);
+            if (answer.now === "fails") throw new Error("Browserbase answered 500.");
+            if (answer.now === "refused") throw new KeyRefused("Browserbase refused the API key.");
+          },
+        }
+      : null;
+  return { answer, calls, provider };
+};
 
 describe("CloudTabs", () => {
   it("fits a cloud tab's page to the size the chrome shows it at, within limits, and ignores anything else", async () => {
     const fitTo = vi.fn(async () => {});
     vi.spyOn(CloudSessions.prototype, "page").mockImplementation((id) => (id === "tab-1" ? ({ id, fitTo } as unknown as CdpTab) : null));
     const tabs = makeTabs();
-    tabs.start();
 
     await tabs.fit("tab-1", 1227.6, 902.2);
     expect(fitTo).toHaveBeenLastCalledWith(1228, 902);
@@ -65,7 +137,6 @@ describe("CloudTabs", () => {
       working = null;
     });
     const tabs = makeTabs();
-    tabs.start();
 
     await tabs.fit("tab-1", 800, 600);
     await tabs.fit("tab-1", 1000, 700);
@@ -97,7 +168,6 @@ describe("CloudTabs", () => {
     );
     vi.spyOn(CloudSessions.prototype, "page").mockImplementation((id) => (pages.get(id) ?? null) as unknown as CdpTab);
     const tabs = makeTabs();
-    tabs.start();
     await tabs.watch("tab-a");
     // A to B waits for A's picture to stop, and the user is on C before it has.
     const toB = tabs.watch("tab-b");
@@ -114,7 +184,6 @@ describe("CloudTabs", () => {
     watch.mockResolvedValue();
     vi.spyOn(CloudSessions.prototype, "page").mockReturnValue({ id: "tab-a", watch } as unknown as CdpTab);
     const tabs = makeTabs();
-    tabs.start();
     await tabs.watch("tab-a");
     await tabs.watch("tab-a");
     expect(watch.mock.calls.filter(([onFrame]) => onFrame)).toHaveLength(2);
@@ -123,105 +192,114 @@ describe("CloudTabs", () => {
 
   it("keeps the key, and the session's id, until the session it may still be running on has ended", async () => {
     encryption.available = true;
-    const file = join(mkdtempSync(join(tmpdir(), "cloud-tabs-")), "cloud.json");
-    // Sealed as the mocked safeStorage seals, which is no more than base64.
-    const sealed = (text: string) => Buffer.from(text).toString("base64");
-    writeFileSync(file, JSON.stringify({ apiKey: sealed("bb_old"), projectId: sealed("proj"), contextId: "ctx-1", sessionId: "sess-1" }));
+    const file = tempFile();
+    writeFileSync(file, JSON.stringify(OLD));
     const saved = () => JSON.parse(readFileSync(file, "utf8")) as Record<string, string | null>;
-    vi.spyOn(CloudSessions.prototype, "end").mockResolvedValue();
-    const unreleased = vi.spyOn(CloudSessions.prototype, "unreleased", "get").mockReturnValue(true);
-    const tabs = makeTabs(file);
-    tabs.start();
+    const { answer, calls, provider } = releasing();
+    const tabs = makeTabs(file, provider);
     expect((await tabs.saveKey("bb_new", "proj")).problem).toMatch(/didn't confirm it ended/);
     expect((await tabs.forget()).problem).toMatch(/didn't confirm it ended/);
-    expect(saved()).toEqual({ apiKey: sealed("bb_old"), projectId: sealed("proj"), contextId: "ctx-1", sessionId: "sess-1" });
+    expect(saved()).toEqual(OLD);
 
-    unreleased.mockReturnValue(false);
+    answer.now = "ok";
     expect((await tabs.saveKey("bb_new", "proj")).problem).toBeNull();
     expect(saved()).toEqual({ apiKey: sealed("bb_new"), projectId: sealed("proj"), contextId: null, sessionId: null });
-    vi.restoreAllMocks();
+    expect(calls).toEqual(["bb_old sess-1", "bb_old sess-1", "bb_old sess-1"]);
     encryption.available = false;
   });
 
   it("takes a new key, or forgets one, when Browserbase no longer takes the old one, keeping its session for the new key", async () => {
     encryption.available = true;
-    const file = join(mkdtempSync(join(tmpdir(), "cloud-tabs-")), "cloud.json");
-    const sealed = (text: string) => Buffer.from(text).toString("base64");
-    writeFileSync(file, JSON.stringify({ apiKey: sealed("bb_old"), projectId: sealed("proj"), contextId: "ctx-1", sessionId: "sess-1" }));
+    const file = tempFile();
+    writeFileSync(file, JSON.stringify(OLD));
     const saved = () => JSON.parse(readFileSync(file, "utf8")) as Record<string, string | null>;
-    const ended = vi.spyOn(CloudSessions.prototype, "end").mockResolvedValue();
-    vi.spyOn(CloudSessions.prototype, "unreleased", "get").mockReturnValue(true);
-    vi.spyOn(CloudSessions.prototype, "keyRefused", "get").mockReturnValue(true);
-    const tabs = makeTabs(file);
-    tabs.start();
+    const { answer, calls, provider } = releasing();
+    answer.now = "refused";
+    const tabs = makeTabs(file, provider);
     await tabs.saveKey("bb_new", "proj");
     expect(saved()).toEqual({ apiKey: sealed("bb_new"), projectId: sealed("proj"), contextId: null, sessionId: "sess-1" });
     // Ended once more, with the new key.
-    expect(ended).toHaveBeenCalledTimes(2);
+    expect(calls).toEqual(["bb_old sess-1", "bb_new sess-1"]);
     expect((await tabs.forget()).problem).toMatch(/ends on its own within an hour/);
     expect(saved()).toEqual({ apiKey: null, projectId: null, contextId: null, sessionId: null });
-    vi.restoreAllMocks();
     encryption.available = false;
   });
 
   it("lets the session wind down only once the last tab the user has there closes", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    attachTabs();
     let opened = 0;
-    vi.spyOn(CloudSessions.prototype, "openForUser").mockImplementation(async (id) => ({ id, url: "https://example.com/" }) as CdpTab);
-    vi.spyOn(CloudSessions.prototype, "close").mockResolvedValue();
-    const winding = vi.spyOn(CloudSessions.prototype, "endWhenIdle").mockImplementation(() => {});
-    const tabs = new CloudTabs(
-      join(mkdtempSync(join(tmpdir(), "cloud-tabs-")), "cloud.json"),
-      {
-        chrome: () => ({ isDestroyed: () => true }) as never,
-        openTab: () => `tab-${++opened}`,
-        updateTab: () => {},
-        closeTab: () => {},
-        takenOver: () => {},
-        showTab: () => {},
-        confirmLogin: async () => true,
-        readCookies: async () => [],
-      },
-      { endpoint: "http://127.0.0.1:1" },
-    );
-    tabs.start();
+    const tabs = makeTabs(tempFile(), undefined, { openTab: () => `tab-${++opened}` });
     expect(await tabs.checkLogin("example.com")).toBeNull();
     expect(await tabs.checkLogin("github.com")).toBeNull();
 
     tabs.tabClosed("tab-1");
-    expect(winding).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(IDLE);
+    expect(tabs.state.status).toBe("running");
     tabs.tabClosed("tab-2");
-    expect(winding).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(IDLE);
+    expect(tabs.state.status).toBe("ended");
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("keeps a sign-in check only while its window and the session it opened in are still there", async () => {
+    const pages = attachTabs();
+    const local = fakeLocal();
+    let opened = () => {};
+    local.holdPages(new Promise((resolve) => (opened = resolve)));
+    const tabs = makeTabs(tempFile(), () => local.browser);
+    // The window closes while it opens, and the next one attaches.
+    const checking = tabs.checkLogin("example.com");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await tabs.detach();
+    tabs.attach(hooks());
+    opened();
+    expect(await checking).toBe("The cloud browser couldn't open it.");
+    // Nothing of it is in the next window's cloud.
+    expect(await tabs.view("tab-1")).toEqual({ kind: "gone" });
+    expect(tabs.takeOver("tab-1")).toBe(false);
+    expect(pages.size).toBe(0);
+    vi.restoreAllMocks();
+  });
+
+  it("closes a sign-in check's page when its tab is closed while it opens, and lets the session wind down", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const pages = attachTabs();
+    const local = fakeLocal();
+    let opened = () => {};
+    local.holdPages(new Promise((resolve) => (opened = resolve)));
+    const tabs = makeTabs(tempFile(), () => local.browser);
+    const checking = tabs.checkLogin("example.com");
+    await vi.advanceTimersByTimeAsync(0);
+    const closedBefore = pages.get("tab-1")?.close.mock.calls.length ?? 0;
+    tabs.tabClosed("tab-1");
+    opened();
+    expect(await checking).toBeNull();
+
+    expect(pages.get("tab-1")?.close.mock.calls.length).toBe(closedBefore + 1);
+    expect(tabs.takeOver("tab-1")).toBe(false);
+    await vi.advanceTimersByTimeAsync(IDLE);
+    expect(tabs.state.status).toBe("ended");
+    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it("gives Quit one promise to wait for, which ends once the session has, and never closes a tab on the way", async () => {
     let ended = () => {};
-    const ending = vi.spyOn(CloudSessions.prototype, "end").mockImplementation(() => new Promise<void>((resolve) => (ended = resolve)));
+    const quitting = vi.spyOn(CloudSessions.prototype, "quit").mockImplementation(() => new Promise<void>((resolve) => (ended = resolve)));
     const closeTab = vi.fn();
-    const tabs = new CloudTabs(
-      join(mkdtempSync(join(tmpdir(), "cloud-tabs-")), "cloud.json"),
-      {
-        chrome: () => ({ isDestroyed: () => true }) as never,
-        openTab: () => "tab-1",
-        updateTab: () => {},
-        closeTab,
-        takenOver: () => {},
-        showTab: () => {},
-        confirmLogin: async () => true,
-        readCookies: async () => [],
-      },
-      { endpoint: "http://127.0.0.1:1" },
-    );
-    tabs.start();
-    // As when the window closes, and then Quit asks again.
-    const closing = tabs.destroy();
-    expect(tabs.destroy()).toBe(closing);
+    const tabs = makeTabs(tempFile(), undefined, { closeTab });
+    const closing = tabs.quit();
+    expect(tabs.quit()).toBe(closing);
     let done = false;
     void closing.then(() => (done = true));
     await new Promise((resolve) => setTimeout(resolve, 10));
-    expect(ending).toHaveBeenCalledTimes(1);
+    expect(quitting).toHaveBeenCalledTimes(1);
     expect(done).toBe(false);
     ended();
     await closing;
     expect(closeTab).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
   });
 });

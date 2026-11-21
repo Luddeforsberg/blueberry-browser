@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Browser } from "playwright-core";
-import { browserbase, BROWSERBASE_REGION, type BrowserbaseSaved } from "./browserbase";
+import { browserbase, BROWSERBASE_REGION } from "./browserbase";
 import type { CdpTab } from "../tools/CdpTab";
-import { CloudSessions, KeyRefused } from "./cloudBrowser";
+import { CloudSessions } from "./cloudBrowser";
+import { KeyRefused, type CloudBrowser, type CloudIds } from "./cloudProvider";
 import { defined } from "../../shared/testing";
 
 // Against a stubbed fetch, shaped from Browserbase's API reference. Nothing here has talked to the real service.
@@ -39,20 +40,26 @@ const stub = (answers: Record<string, { status?: number; body: unknown }>) => {
 
 const fakeBrowser = () => {
   let closed = false;
-  const browser = { contexts: () => [{ name: "context" }], close: async () => void (closed = true) } as unknown as Browser;
+  const context = { name: "context", route: async () => {}, on: () => {}, browser: () => null };
+  const browser = { contexts: () => [context], close: async () => void (closed = true) } as unknown as Browser;
   return { browser, closed: () => closed };
 };
 
-// A provider with a saved Context and the session id given, keeping what it's told to save.
-const provider = (send: typeof fetch, sessionId: string | null, kept: BrowserbaseSaved[] = []) =>
-  browserbase({
-    apiKey: "k",
-    projectId: "p",
-    saved: { contextId: "ctx", sessionId },
-    onSaved: (saved) => kept.push(saved),
-    fetch: send,
-    connect: async () => fakeBrowser().browser,
-  });
+const provider = (send: typeof fetch, connect: (url: string) => Promise<Browser> = async () => fakeBrowser().browser) =>
+  browserbase({ apiKey: "k", projectId: "p", fetch: send, connect });
+
+// Made and connected, keeping each change to the ids it's told about.
+const start = async (browser: CloudBrowser, ids: CloudIds, kept: CloudIds[] = []) =>
+  (
+    await browser.create(
+      ids,
+      (next) => kept.push(next),
+      () => true,
+    )
+  ).connect();
+
+const releases = (calls: Call[], id: string) =>
+  calls.filter(({ method, url, body }) => method === "POST" && url.endsWith(`/sessions/${id}`) && body?.status === "REQUEST_RELEASE");
 
 describe("Browserbase", () => {
   it("makes a context and a kept-alive session in one region, connects, and keeps both for next time", async () => {
@@ -63,21 +70,19 @@ describe("Browserbase", () => {
         body: { id: "sess-1", status: "RUNNING", connectUrl: "wss://connect.browserbase.com?signingKey=x" },
       },
     });
-    const kept: BrowserbaseSaved[] = [];
+    const kept: CloudIds[] = [];
     const connected: string[] = [];
     const { browser } = fakeBrowser();
-    const provider = browserbase({
+    const bb = browserbase({
       apiKey: "bb_test",
       projectId: "proj",
-      saved: { contextId: null, sessionId: null },
-      onSaved: (saved) => kept.push(saved),
       fetch: send,
       connect: async (url) => {
         connected.push(url);
         return browser;
       },
     });
-    const session = await provider.start();
+    const session = await start(bb, { contextId: null, sessionId: null }, kept);
     expect(calls.map(({ method, url }) => `${method} ${url}`)).toEqual([
       "POST https://api.browserbase.com/v1/contexts",
       "POST https://api.browserbase.com/v1/sessions",
@@ -91,7 +96,7 @@ describe("Browserbase", () => {
     });
     expect(connected).toEqual(["wss://connect.browserbase.com?signingKey=x"]);
     expect(kept.at(-1)).toEqual({ contextId: "ctx-1", sessionId: "sess-1" });
-    expect(session.context).toEqual({ name: "context" });
+    expect(session.context).toMatchObject({ name: "context" });
   });
 
   it("reuses a session that's still running, and makes a new one in the same context if not", async () => {
@@ -101,14 +106,7 @@ describe("Browserbase", () => {
       connected.push(url);
       return fakeBrowser().browser;
     };
-    await browserbase({
-      apiKey: "k",
-      projectId: "p",
-      saved: { contextId: "ctx-1", sessionId: "sess-1" },
-      onSaved: () => {},
-      fetch: running.send,
-      connect,
-    }).start();
+    await start(provider(running.send, connect), { contextId: "ctx-1", sessionId: "sess-1" });
     expect(running.calls).toHaveLength(1);
     expect(connected).toEqual(["wss://one"]);
 
@@ -116,19 +114,24 @@ describe("Browserbase", () => {
       "GET /sessions/sess-1": { body: { id: "sess-1", status: "COMPLETED" } },
       "POST /sessions": { status: 201, body: { id: "sess-2", status: "RUNNING", connectUrl: "wss://two" } },
     });
-    await browserbase({
-      apiKey: "k",
-      projectId: "p",
-      saved: { contextId: "ctx-1", sessionId: "sess-1" },
-      onSaved: () => {},
-      fetch: gone.send,
-      connect,
-    }).start();
+    await start(provider(gone.send, connect), { contextId: "ctx-1", sessionId: "sess-1" });
     expect(gone.calls.map(({ method, url }) => `${method} ${url}`)).toEqual([
       "GET https://api.browserbase.com/v1/sessions/sess-1",
       "POST https://api.browserbase.com/v1/sessions",
     ]);
     expect(defined(gone.calls[1]).body).toMatchObject({ browserSettings: { context: { id: "ctx-1" } } });
+  });
+
+  it("makes nothing new once it isn't wanted any more", async () => {
+    const { calls, send } = stub({ "POST /contexts": { status: 201, body: { id: "ctx-1" } } });
+    let wanted = true;
+    const making = provider(send).create(
+      { contextId: null, sessionId: null },
+      () => (wanted = false),
+      () => wanted,
+    );
+    await expect(making).rejects.toThrow("ending");
+    expect(calls.map(({ method, url }) => `${method} ${url}`)).toEqual(["POST https://api.browserbase.com/v1/contexts"]);
   });
 
   it("finds the live view for a page, without Browserbase's navbar", async () => {
@@ -144,77 +147,54 @@ describe("Browserbase", () => {
         },
       },
     });
-    const session = await browserbase({
-      apiKey: "k",
-      projectId: "p",
-      saved: { contextId: "ctx", sessionId: null },
-      onSaved: () => {},
-      fetch: send,
-      connect: async () => fakeBrowser().browser,
-    }).start();
+    const session = await start(provider(send), { contextId: "ctx", sessionId: null });
     expect(await session.liveView({ targetId: "TARGET", url: "https://b.test/" } as CdpTab)).toBe("https://live/mine?wss=b&navbar=false");
     expect(await session.liveView({ targetId: "NEW", url: "https://c.test/" } as CdpTab)).toBe(
       "https://www.browserbase.com/devtools-fullscreen/inspector.html?wss=all&navbar=false",
     );
   });
 
-  it("ends the session at Browserbase before letting go of the connection, so it stops costing", async () => {
+  it("ends the session at Browserbase by its id, and lets go of the connection, so it stops costing", async () => {
     const { calls, send } = stub({
       "POST /sessions": { status: 201, body: { id: "sess-1", status: "RUNNING", connectUrl: "wss://x" } },
       "POST /sessions/sess-1": { body: { id: "sess-1", status: "COMPLETED" } },
     });
     const fake = fakeBrowser();
-    const kept: BrowserbaseSaved[] = [];
-    const provider = browserbase({
-      apiKey: "k",
-      projectId: "p",
-      saved: { contextId: "ctx", sessionId: null },
-      onSaved: (saved) => kept.push(saved),
-      fetch: send,
-      connect: async () => fake.browser,
-    });
-    const session = await provider.start();
-    expect(provider.hasSession).toBe(true);
-    await provider.release();
-    await session.close();
-    expect(fake.closed()).toBe(true);
-    expect(calls.at(-1)).toMatchObject({
-      method: "POST",
-      url: "https://api.browserbase.com/v1/sessions/sess-1",
-      body: { status: "REQUEST_RELEASE" },
-    });
+    const kept: CloudIds[] = [];
+    const sessions = new CloudSessions(
+      provider(send, async () => fake.browser),
+      { contextId: "ctx", sessionId: null },
+      { onIds: (ids) => kept.push(ids) },
+    );
+    await sessions.withContext(async () => {});
+    expect(sessions.canEnd).toBe(true);
+    expect(await sessions.end()).toBe("ended");
+    expect(releases(calls, "sess-1")).toHaveLength(1);
+    await expect.poll(() => fake.closed()).toBe(true);
     expect(kept.at(-1)).toEqual({ contextId: "ctx", sessionId: null });
-    expect(provider.hasSession).toBe(false);
+    expect(sessions.canEnd).toBe(false);
   });
 
   it("ends a session nobody has used for a while, and not one a job or the user picked up again", async () => {
     const { calls, send } = stub({ "POST /sessions/sess-1": { body: { id: "sess-1", status: "COMPLETED" } } });
-    const provider = browserbase({
-      apiKey: "k",
-      projectId: "p",
-      saved: { contextId: "ctx", sessionId: "sess-1" },
-      onSaved: () => {},
-      fetch: send,
-      connect: async () => fakeBrowser().browser,
-    });
-    const sessions = new CloudSessions(provider, () => {}, 20);
-    const released = () => calls.filter(({ url, body }) => url.endsWith("/sessions/sess-1") && body?.status === "REQUEST_RELEASE").length;
+    const sessions = new CloudSessions(provider(send), { contextId: "ctx", sessionId: "sess-1" }, {}, 20);
 
     sessions.claim("job-1");
     sessions.release("job-1");
     sessions.claim("job-2");
     await new Promise((resolve) => setTimeout(resolve, 60));
-    expect(released()).toBe(0);
+    expect(releases(calls, "sess-1")).toHaveLength(0);
 
     sessions.release("job-2");
-    sessions.keepOpen();
+    sessions.holdForUser("tab-1");
     await new Promise((resolve) => setTimeout(resolve, 60));
-    expect(released()).toBe(0);
+    expect(releases(calls, "sess-1")).toHaveLength(0);
 
+    sessions.letGo("tab-1");
     sessions.claim("job-3");
     sessions.release("job-3");
     await new Promise((resolve) => setTimeout(resolve, 60));
-    expect(released()).toBe(1);
+    expect(releases(calls, "sess-1")).toHaveLength(1);
     expect(sessions.canEnd).toBe(false);
   });
 
@@ -228,14 +208,14 @@ describe("Browserbase", () => {
       { body: { id: "sess-1", status: "PENDING" } },
     ]) {
       const { calls, send } = stub({ "GET /sessions/sess-1": answer, "POST /sessions": made });
-      const kept: BrowserbaseSaved[] = [];
-      await expect(provider(send, "sess-1", kept).start()).rejects.toThrow();
+      const kept: CloudIds[] = [];
+      await expect(start(provider(send), { contextId: "ctx", sessionId: "sess-1" }, kept)).rejects.toThrow();
       expect(calls.map(({ method }) => method)).toEqual(["GET"]);
       expect(kept).toEqual([]);
     }
     // One Browserbase has never heard of is gone.
     const { calls, send } = stub({ "POST /sessions": made });
-    await provider(send, "sess-1").start();
+    await start(provider(send), { contextId: "ctx", sessionId: "sess-1" });
     expect(calls.map(({ method }) => method)).toEqual(["GET", "POST"]);
   });
 
@@ -244,12 +224,12 @@ describe("Browserbase", () => {
       "POST /sessions": { status: 201, body: { id: "sess-1", status: "RUNNING" } },
       "POST /sessions/sess-1": { body: { id: "sess-1", status: "COMPLETED" } },
     });
-    const kept: BrowserbaseSaved[] = [];
-    const sessions = new CloudSessions(provider(send, null, kept));
+    const kept: CloudIds[] = [];
+    const sessions = new CloudSessions(provider(send), { contextId: "ctx", sessionId: null }, { onIds: (ids) => kept.push(ids) });
     sessions.claim("job");
     await expect(sessions.open("job", "cloud-1", "https://example.com/", { onChange: () => {} })).rejects.toThrow("how to connect");
     expect(kept[0]).toEqual({ contextId: "ctx", sessionId: "sess-1" });
-    expect(calls.at(-1)).toMatchObject({ method: "POST", url: "https://api.browserbase.com/v1/sessions/sess-1" });
+    expect(releases(calls, "sess-1")).toHaveLength(1);
     expect(sessions.canEnd).toBe(false);
   });
 
@@ -258,23 +238,17 @@ describe("Browserbase", () => {
       "POST /sessions": { status: 201, body: { id: "sess-1", status: "RUNNING", connectUrl: "wss://x" } },
       "POST /sessions/sess-1": { body: { id: "sess-1", status: "COMPLETED" } },
     });
-    const provider = browserbase({
-      apiKey: "k",
-      projectId: "p",
-      saved: { contextId: "ctx", sessionId: null },
-      onSaved: () => {},
-      fetch: send,
-      connect: async () => Promise.reject(new Error("no connection")),
-    });
-    const sessions = new CloudSessions(provider);
+    const sessions = new CloudSessions(
+      provider(send, async () => Promise.reject(new Error("no connection"))),
+      {
+        contextId: "ctx",
+        sessionId: null,
+      },
+    );
     sessions.claim("job");
     await expect(sessions.open("job", "cloud-1", "https://example.com/", { onChange: () => {} })).rejects.toThrow("no connection");
-    expect(calls.at(-1)).toMatchObject({
-      method: "POST",
-      url: "https://api.browserbase.com/v1/sessions/sess-1",
-      body: { status: "REQUEST_RELEASE" },
-    });
-    expect(sessions.canEnd).toBe(false);
+    await expect.poll(() => releases(calls, "sess-1").length).toBe(1);
+    await expect.poll(() => sessions.canEnd).toBe(false);
   });
 
   it("ends a session from last time with no connection to it, and says so until Browserbase confirms", async () => {
@@ -283,31 +257,23 @@ describe("Browserbase", () => {
       "GET /sessions/sess-1": { body: { id: "sess-1", status: "RUNNING" } },
     };
     const { calls, send } = stub(answers);
-    const provider = browserbase({
-      apiKey: "k",
-      projectId: "p",
-      saved: { contextId: "ctx", sessionId: "sess-1" },
-      onSaved: () => {},
-      fetch: send,
-      connect: async () => fakeBrowser().browser,
-    });
-    const sessions = new CloudSessions(provider);
+    const sessions = new CloudSessions(provider(send), { contextId: "ctx", sessionId: "sess-1" });
     expect(sessions.canEnd).toBe(true);
 
-    await sessions.end();
+    expect(await sessions.end()).toBe("running");
     expect(sessions.unreleased).toBe(true);
     expect(sessions.problem).toMatch(/may still be running, and costing/);
     expect(sessions.canEnd).toBe(true);
 
     answers["POST /sessions/sess-1"] = { body: { id: "sess-1", status: "COMPLETED" } };
-    await sessions.end();
-    expect(calls.filter(({ method, url }) => method === "POST" && url.endsWith("/sessions/sess-1"))).toHaveLength(2);
+    expect(await sessions.end()).toBe("ended");
+    expect(releases(calls, "sess-1")).toHaveLength(2);
     expect(sessions.unreleased).toBe(false);
     expect(sessions.problem).toBeNull();
     expect(sessions.canEnd).toBe(false);
   });
 
-  it("releases a session by its saved id at once, even while connecting to it never finishes", async () => {
+  it("releases a session by its id at once, even while connecting to it never finishes", async () => {
     const { calls, send } = stub({
       "POST /sessions": { status: 201, body: { id: "sess-1", status: "RUNNING", connectUrl: "wss://x" } },
       "POST /sessions/sess-1": { body: { id: "sess-1", status: "COMPLETED" } },
@@ -315,47 +281,33 @@ describe("Browserbase", () => {
     let connected = () => {};
     const fake = fakeBrowser();
     const connect = () => new Promise<Browser>((resolve) => (connected = () => resolve(fake.browser)));
-    const provider = browserbase({
-      apiKey: "k",
-      projectId: "p",
-      saved: { contextId: "ctx", sessionId: null },
-      onSaved: () => {},
-      fetch: send,
-      connect,
-    });
-    const sessions = new CloudSessions(provider);
+    const kept: CloudIds[] = [];
+    const sessions = new CloudSessions(provider(send, connect), { contextId: "ctx", sessionId: null }, { onIds: (ids) => kept.push(ids) });
     sessions.claim("job");
     const opening = sessions.open("job", "cloud-1", "https://example.com/", { onChange: () => {} }).catch(() => null);
-    await expect.poll(() => provider.hasSession).toBe(true);
-    const ending = sessions.end();
-    const released = () =>
-      calls.filter(({ method, url, body }) => method === "POST" && url.endsWith("/sessions/sess-1") && body?.status === "REQUEST_RELEASE");
-    await expect.poll(() => released().length).toBe(1);
-    expect(provider.hasSession).toBe(false);
+    await expect.poll(() => kept.at(-1)?.sessionId).toBe("sess-1");
+    expect(await sessions.end()).toBe("ended");
+    expect(releases(calls, "sess-1")).toHaveLength(1);
+    // The connection that arrives afterwards is closed.
     connected();
-    await ending;
-    await opening;
+    expect(await opening).toBeNull();
+    await expect.poll(() => fake.closed()).toBe(true);
     expect(sessions.canEnd).toBe(false);
   });
 
   it("keeps a session it couldn't release or look up, and counts one Browserbase has never heard of as released", async () => {
     const failing = provider(
       stub({ "POST /sessions/sess-1": { status: 500, body: {} }, "GET /sessions/sess-1": { status: 502, body: {} } }).send,
-      "sess-1",
     );
-    await expect(failing.release()).rejects.toThrow();
-    expect(failing.hasSession).toBe(true);
+    await expect(failing.release("sess-1")).rejects.toThrow();
     // A key Browserbase no longer takes says so, since it can't end anything.
     const refused = provider(
       stub({ "POST /sessions/sess-1": { status: 401, body: {} }, "GET /sessions/sess-1": { status: 401, body: {} } }).send,
-      "sess-1",
     );
-    await expect(refused.release()).rejects.toBeInstanceOf(KeyRefused);
-    expect(refused.hasSession).toBe(true);
+    await expect(refused.release("sess-1")).rejects.toBeInstanceOf(KeyRefused);
 
-    const forgotten = provider(stub({ "POST /sessions/sess-1": { status: 404, body: {} } }).send, "sess-1");
-    await forgotten.release();
-    expect(forgotten.hasSession).toBe(false);
+    const forgotten = provider(stub({ "POST /sessions/sess-1": { status: 404, body: {} } }).send);
+    await expect(forgotten.release("sess-1")).resolves.toBeUndefined();
   });
 
   it("counts a session that has already ended as released", async () => {
@@ -363,28 +315,12 @@ describe("Browserbase", () => {
       "POST /sessions/sess-1": { status: 400, body: {} },
       "GET /sessions/sess-1": { body: { id: "sess-1", status: "TIMED_OUT" } },
     });
-    const provider = browserbase({
-      apiKey: "k",
-      projectId: "p",
-      saved: { contextId: "ctx", sessionId: "sess-1" },
-      onSaved: () => {},
-      fetch: send,
-      connect: async () => fakeBrowser().browser,
-    });
-    await provider.release();
-    expect(provider.hasSession).toBe(false);
+    await expect(provider(send).release("sess-1")).resolves.toBeUndefined();
   });
 
   it("says plainly when the key is refused", async () => {
     const { send } = stub({ "POST /sessions": { status: 401, body: {} } });
-    const start = browserbase({
-      apiKey: "bad",
-      projectId: "p",
-      saved: { contextId: "ctx", sessionId: null },
-      onSaved: () => {},
-      fetch: send,
-      connect: async () => fakeBrowser().browser,
-    }).start();
-    await expect(start).rejects.toThrow("Browserbase refused the API key");
+    const bb = browserbase({ apiKey: "bad", projectId: "p", fetch: send, connect: async () => fakeBrowser().browser });
+    await expect(start(bb, { contextId: "ctx", sessionId: null })).rejects.toThrow("Browserbase refused the API key");
   });
 });

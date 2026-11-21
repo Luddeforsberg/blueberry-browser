@@ -1,5 +1,5 @@
 import type { CdpTab } from "../tools/CdpTab";
-import { connectOverCdp, KeyRefused, type CloudBrowser, type CloudSession } from "./cloudBrowser";
+import { connectOverCdp, KeyRefused, NOT_WANTED, type CloudBrowser, type CloudIds, type MadeSession } from "./cloudProvider";
 
 // Browserbase, from its REST API (docs.browserbase.com/reference/api) and connected to over CDP. One persistent Context
 // keeps the profile between sessions, and a session is kept alive between jobs, ended a few minutes after the last one, by the user, or after an hour.
@@ -14,17 +14,9 @@ const SESSION_TIMEOUT_S = 3600;
 const ENDED = ["COMPLETED", "ERROR", "TIMED_OUT"];
 const NOT_YET = "The last cloud session hasn't said whether it's still running, so no new one was started. Try again in a moment.";
 
-export interface BrowserbaseSaved {
-  contextId: string | null;
-  sessionId: string | null;
-}
-
 export interface BrowserbaseOptions {
   apiKey: string;
   projectId: string;
-  saved: BrowserbaseSaved;
-  // Told about a new context or session, to keep for next time.
-  onSaved: (saved: BrowserbaseSaved) => void;
   fetch?: typeof fetch;
   connect?: typeof connectOverCdp;
 }
@@ -59,14 +51,8 @@ class BrowserbaseError extends Error {
 // The navbar is Browserbase's, and the tab in Blueberry already says where it is.
 const withoutNavbar = (url: string) => `${url}${url.includes("?") ? "&" : "?"}navbar=false`;
 
-export const browserbase = ({
-  apiKey,
-  projectId,
-  saved,
-  onSaved,
-  fetch: send = fetch,
-  connect = connectOverCdp,
-}: BrowserbaseOptions): CloudBrowser => {
+// Keeps nothing itself: the ids are `CloudSessions`', told about each the moment Browserbase gives it.
+export const browserbase = ({ apiKey, projectId, fetch: send = fetch, connect = connectOverCdp }: BrowserbaseOptions): CloudBrowser => {
   const call = async <T>(method: "GET" | "POST", path: string, body?: object): Promise<T> => {
     const response = await send(`${API}${path}`, {
       method,
@@ -93,23 +79,25 @@ export const browserbase = ({
     return { id, status: known.status, ...(typeof known.connectUrl === "string" ? { connectUrl: known.connectUrl } : {}) };
   };
 
-  const context = async (): Promise<string> => {
-    if (saved.contextId) return saved.contextId;
-    const { id } = await call<{ id: string }>("POST", "/contexts", { projectId });
-    saved = { ...saved, contextId: id };
-    onSaved(saved);
-    return id;
-  };
-
   // The kept-alive session from last time if it's still running, or a new one. Its id is the only way to release it, so
   // it's replaced only once Browserbase says it has ended, never on a lookup that failed.
-  const session = async (): Promise<Session & { connectUrl: string }> => {
-    if (saved.sessionId) {
-      const known = await lookUp(saved.sessionId);
+  const session = async (
+    ids: CloudIds,
+    onIds: (ids: CloudIds) => void,
+    wanted: () => boolean,
+  ): Promise<Session & { connectUrl: string }> => {
+    if (ids.sessionId) {
+      const known = await lookUp(ids.sessionId);
       if (known?.status === "RUNNING" && known.connectUrl) return { ...known, connectUrl: known.connectUrl };
       if (known && !ENDED.includes(known.status)) throw new Error(NOT_YET);
     }
-    const contextId = await context();
+    let { contextId } = ids;
+    if (!contextId) {
+      if (!wanted()) throw new Error(NOT_WANTED);
+      ({ id: contextId } = await call<{ id: string }>("POST", "/contexts", { projectId }));
+      onIds({ ...ids, contextId });
+    }
+    if (!wanted()) throw new Error(NOT_WANTED);
     const made = await call<Session>("POST", "/sessions", {
       projectId,
       keepAlive: true,
@@ -119,21 +107,15 @@ export const browserbase = ({
     });
     if (typeof made.id !== "string" || !made.id) throw new Error("Browserbase didn't say which session it made.");
     // Kept before anything else about it is checked, so it can be released whatever comes next.
-    saved = { ...saved, sessionId: made.id };
-    onSaved(saved);
+    onIds({ contextId, sessionId: made.id });
     if (!made.connectUrl) throw new Error("Browserbase didn't say how to connect to the session.");
     return { ...made, connectUrl: made.connectUrl };
   };
 
   return {
     name: "browserbase",
-    get hasSession() {
-      return saved.sessionId !== null;
-    },
-    // Needs only the saved id, so a session whose connection was lost, or never made, still ends and stops costing.
-    release: async () => {
-      const id = saved.sessionId;
-      if (!id) return;
+    // Needs only the id, so a session whose connection was lost, or never made, still ends and stops costing.
+    release: async (id) => {
       try {
         await call("POST", `/sessions/${encodeURIComponent(id)}`, { status: "REQUEST_RELEASE" });
       } catch (error) {
@@ -141,24 +123,27 @@ export const browserbase = ({
         const known = await lookUp(id).catch(() => undefined);
         if (known === undefined || (known && !ENDED.includes(known.status))) throw error;
       }
-      saved = { ...saved, sessionId: null };
-      onSaved(saved);
     },
-    start: async (): Promise<CloudSession> => {
-      const { id, connectUrl } = await session();
-      const browser = await connect(connectUrl);
-      const context = browser.contexts()[0] ?? (await browser.newContext());
+    create: async (ids, onIds, wanted): Promise<MadeSession> => {
+      const { id, connectUrl } = await session(ids, onIds, wanted);
       return {
-        context,
-        liveView: async (page: CdpTab) => {
-          const live = await call<LiveUrls>("GET", `/sessions/${encodeURIComponent(id)}/debug`);
-          // Each tab has its own live view. Matched by target, then by address, then the session's own.
-          const match = live.pages?.find((one) => one.id === page.targetId) ?? live.pages?.find((one) => one.url === page.url);
-          const url = match?.debuggerFullscreenUrl ?? live.debuggerFullscreenUrl;
-          return url ? withoutNavbar(url) : null;
-        },
-        close: async () => {
-          await browser.close().catch(() => {});
+        id,
+        connect: async () => {
+          const browser = await connect(connectUrl);
+          const context = browser.contexts()[0] ?? (await browser.newContext());
+          return {
+            context,
+            liveView: async (page: CdpTab) => {
+              const live = await call<LiveUrls>("GET", `/sessions/${encodeURIComponent(id)}/debug`);
+              // Each tab has its own live view. Matched by target, then by address, then the session's own.
+              const match = live.pages?.find((one) => one.id === page.targetId) ?? live.pages?.find((one) => one.url === page.url);
+              const url = match?.debuggerFullscreenUrl ?? live.debuggerFullscreenUrl;
+              return url ? withoutNavbar(url) : null;
+            },
+            close: async () => {
+              await browser.close().catch(() => {});
+            },
+          };
         },
       };
     },

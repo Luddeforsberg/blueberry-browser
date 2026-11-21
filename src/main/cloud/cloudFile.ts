@@ -1,14 +1,14 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { dirname } from "path";
 import { safeStorage } from "electron";
-import type { BrowserbaseSaved } from "./browserbase";
+import type { CloudIds } from "./cloudProvider";
 
 // Where Settings > Cloud keeps the Browserbase key and project id, sealed with `safeStorage`, and the ids of the
 // Context and session it last had. Only CloudTabs reads or writes it.
 
 export const MAX_FIELD_LENGTH = 200;
 
-export interface Saved extends BrowserbaseSaved {
+export interface Saved extends CloudIds {
   apiKey: string | null;
   projectId: string | null;
 }

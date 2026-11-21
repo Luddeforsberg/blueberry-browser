@@ -1,6 +1,6 @@
 import { modelConfig } from "../../src/main/chats/agent";
 import { browserbase } from "../../src/main/cloud/browserbase";
-import { CloudSessions, type CloudBrowser } from "../../src/main/cloud/cloudBrowser";
+import { CloudSessions } from "../../src/main/cloud/cloudBrowser";
 import { isLocalEndpoint, localChrome } from "../../src/main/cloud/localChrome";
 import { DbError, dbConfig, runnerSession, supabaseDb, type ClaimedJob } from "./db";
 import { runJob, sessionBrowser, UnreleasedBrowsers } from "./job";
@@ -42,18 +42,20 @@ if (!local && (!apiKey || !projectId)) fail("Set BROWSERBASE_API_KEY and BROWSER
 // The user's Context comes with each job, from the app. Without one, the runner makes one for itself and keeps it while
 // it runs, so jobs at least share theirs.
 let ownContext: string | null = process.env.BROWSERBASE_CONTEXT_ID || null;
-const cloudBrowser = (contextId: string | null): CloudBrowser =>
-  local
-    ? localChrome({ executable: localExecutable, endpoint: localEndpoint })
-    : browserbase({
-        apiKey: apiKey!,
-        projectId: projectId!,
-        // A new session each job, ended with it.
-        saved: { contextId: contextId ?? ownContext, sessionId: null },
-        onSaved: (saved) => {
-          if (!contextId) ownContext = saved.contextId;
-        },
-      });
+const cloudBrowser = local
+  ? localChrome({ executable: localExecutable, endpoint: localEndpoint })
+  : browserbase({ apiKey: apiKey!, projectId: projectId! });
+// A new session each job, ended with it.
+const jobSessions = (contextId: string | null): CloudSessions =>
+  new CloudSessions(
+    cloudBrowser,
+    { contextId: contextId ?? ownContext, sessionId: null },
+    {
+      onIds: (ids) => {
+        if (!contextId) ownContext = ids.contextId;
+      },
+    },
+  );
 
 const settings = config as Exclude<typeof config, string>;
 const db = supabaseDb(settings, runnerSession(settings));
@@ -172,7 +174,7 @@ const loop = async () => {
     working = runJob(job, {
       db,
       claimedAt,
-      browser: (contextId) => sessionBrowser(new CloudSessions(cloudBrowser(contextId))),
+      browser: (contextId) => sessionBrowser(jobSessions(contextId)),
       signal: shutdown.signal,
       unreleased,
       notify,

@@ -48,7 +48,7 @@ describe.skipIf(!findChrome())("clicking when real input is slow", () => {
   }, 90_000);
 
   afterAll(async () => {
-    await cloud?.end();
+    await cloud?.quit();
     server?.close();
   });
 
