@@ -213,9 +213,10 @@ export class Replies {
       }
     }
     // Finished while the user was somewhere else, so the sidebar shows it as done until they open it.
-    if (!run.controller.signal.aborted && this.browser.chatInFront && !this.browser.chatInFront(chatId)) {
-      carryOn("mark a reply unseen", () => this.store.setSeen(chatId, false));
-    }
+    carryOn("mark a reply unseen", () => {
+      if (!run.controller.signal.aborted && this.browser.chatInFront && !this.browser.chatInFront(chatId))
+        this.store.setSeen(chatId, false);
+    });
   }
 
   private lookBack(chatId: string, run: Run, error: string | null): void {
