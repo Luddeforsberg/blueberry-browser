@@ -1,55 +1,93 @@
 # Blueberry
 
-Blueberry is an AI browser that can do jobs in your tabs. Ask Berry to research a question, compare sites or follow a process you repeat. Watch it work beside the chat and step in when it needs you.
+An AI browser that works on your behalf. Make mascots for the jobs you repeat, and it notices what you do and offers to take it over.
 
-![Berry compares GitHub and GitLab plans while the GitHub pricing page is visible beside the chat](docs/images/working-view.webp)
+![The new tab page suggests turning CI incidents into a Linear action plan, preparing a weekly release-readiness brief, and setting up a mascot to watch for launch blockers](docs/images/new-tab.webp)
 
 ## What it does
 
-### Browse and work in the same window
+Blueberry is a full web browser, one you can use every day even without the AI: tabs, history, bookmarks, downloads, find, zoom and site permissions, in a quiet light-grey window with white sheets for pages. Berry, a blueberry, does jobs in the browser when you ask, and you can make a small family of berries beside it, each with its own name, look, instructions and limits.
 
-Blueberry has tabs, history, bookmarks, downloads, find, zoom and site permissions. Choose a vertical sidebar or horizontal tabs, and a light or dark appearance. Small grids of dots show what a mascot is doing and when it needs you.
-
-The new tab page is where you type an address or ask a mascot to do something. It shows jobs waiting for you and suggests chats to pick up, jobs to try, or routines and mascots based on your recent activity. Import history from Chrome, Brave or Edge to help it get started. On macOS you can also import from Arc.
-
-![The new tab page suggests comparing GitHub and GitLab and checking weekly updates from GitHub Status and Linear](docs/images/new-tab.webp)
+Strawberry has all of that too. The sections below are where Blueberry tries to do better than Strawberry does today, each starting from what's missing there. What I say about Strawberry is how I understand it as of November 2026.
 
 ### Jobs that keep going when you leave
 
-A job can open tabs behind yours. The working view shows live pictures of the tabs it uses, so you can follow along without leaving the chat. Save a job as a routine to run it on a schedule.
+Strawberry's routines run on your own computer, so they only run while it's open and awake. The Monday 08:00 report doesn't happen if the laptop is closed in your bag, and a long job means leaving the lid open with the browser busy until it's done. You end up working around your computer's schedule.
 
-With a cloud browser and a runner set up, cloud jobs and routines keep going while your computer is off. You can bring along sign-ins for sites you choose. The phone page lets you start cloud jobs, review approvals and take over when a site needs you. For jobs running on your computer, you can connect your own Telegram bot to answer from your phone.
+In Blueberry, a job or scheduled routine can run in a browser in the cloud instead. With the runner set up, close the laptop on the train and the job keeps going. The morning routine runs at 08:00 whether the Mac is on or not, and the summary is there when you open it. The job gets its own browser on Browserbase, signed in to the sites you chose to bring along, so it never takes over your tabs or slows your computer down. A small runner on Railway starts and follows it with the Mac off, as the same mascot with the same limits and the same approvals as at your desk. You can start one from the phone app, or from ChatGPT or Claude, wherever you are.
 
-### Your mascots and the Gallery
+![Berry compares larger runners in a cloud chat with GitHub Docs visible in the working view](docs/images/cloud-chat.webp)
 
-Berry is the built-in blueberry mascot. A profile that starts with only Berry also gets four starters from the Gallery. They are Plain Words, Competitor Watch, Meeting Prep and Newsletter Builder. The Gallery also includes Prospector, Follow-up, Lead Qualifier, Talent Scout and Pipeline Tidy.
+### Answering from your phone
 
-Make your own mascot with a name, a berry look, instructions and limits on its sites and tools. A mascot can suggest remembering a preference after a job. You choose what it keeps and can remove it later.
+Strawberry marks a chat that needs you, for a sign-in or anything else, but only on the computer. That's where agents lose most of their time: not doing the work, but waiting for you. Start four jobs before lunch, one stops for a 2FA code and another for a yes, and you come back an hour later to two jobs that never moved.
 
-You can review a Gallery mascot's instructions and permissions before adding it. With publishing set up, you can share a mascot's public page. Open in Blueberry takes the reader to that mascot's review.
+In Blueberry, you can answer job approvals and questions from your phone. With notifications on, it buzzes at the table, you tap Allow or type the code, and the job carries on while you eat. You come back to finished work instead of a queue of questions, so the hour away still counted. Jobs in the cloud show up in the phone app, which you add to your home screen, and where you can start a new job on the way back too. Jobs on your Mac come through your own Telegram bot. On either you can allow or refuse a step or answer a question. For a cloud sign-in you type the code into the live page, and for a job on your Mac the Telegram bot can pass the code to the held tab without giving it to the model. With several cloud jobs running at once, it's one list on your phone for all of them, so none of them sits idle waiting for you. Telegram is a channel behind a small interface, so WhatsApp or iMessage could come next.
 
-![Your mascots in dark mode, with Berry and the four starters added to a new profile](docs/images/your-mascots.webp)
+![A cloud job on the phone asks to open filtered GitHub issues, with Allow and Don't allow](docs/images/phone-approval.webp)
+
+### Your mascots, from ChatGPT and Claude
+
+Strawberry lets you connect MCP servers to it, but it isn't one itself, so nothing else can use it. Most people will keep ChatGPT or Claude open next to whatever browser they use, so Blueberry doesn't try to replace them. It gives them your browser. Claude Code and Claude Desktop on the same computer can hand whole jobs to your mascots over MCP, enabled in Settings > Connections > Claude and other apps, and with the runner and relay set up, so can ChatGPT and Claude on the web. The chat keeps its threads and plans, and the mascot brings your logins and what it sees in the browser. Plan outreach in ChatGPT, then ask it to have a mascot find the twenty leads, and it does it in your browser, signed in. You get something out of Blueberry without switching browsers all at once, which also fits where Strawberry seems to be heading, as an agent platform rather than only a browser.
+
+![A chat from Claude Code shows Berry’s runner migration brief](docs/images/claude-code.webp)
 
 ### Show Berry how
 
-Open Show Berry how from Routines, do the job once in the browser and press **Done**. Read the notes, leave out any steps you don't need, and turn what's left into a draft routine. It watches the tab in front while recording and keeps passwords out of the notes.
+Strawberry's advice for making a routine is to talk it through with your companion, which still means describing the job well enough in words, and that's harder than doing it. It has no built-in way to just show it. In Blueberry you press Show Berry how, do the job once, and press **Done**. Berry writes up what it saw as notes you can read and trim, and a cheap model turns them into a routine with numbered steps and the values that might change. It watches only the tab in front, only between start and **Done**, and never keeps what's typed into a password or payment field.
 
-![The What I watched page shows the steps Berry recorded while researching hosted runners and a button to turn the notes into a routine](docs/images/show-berry-how.webp)
+![The recording review shows seven steps for researching larger runners before turning them into a routine](docs/images/show-berry-how.webp)
 
-### Use Blueberry from other apps
+### The Gallery
 
-You can turn on Berry on the desktop and start a browser job from another app. The desktop mascot works in Blueberry's tabs.
+Strawberry gives each companion a public page you can send to someone, and nine official companions to pick from, but there's nowhere to browse what other people made. That's a real gap: a new user often can't see why they'd want more than one assistant. The Gallery shows them: browse the mascots other people use for sales, recruiting or research, and add one before you've even thought of the job yourself. It also doubles as marketing, since people share their mascots and see how often they're added. It has starter mascots for work, such as Prospector, Meeting Prep and Competitor Watch, and, with a server set up, the mascots other people published. Every entry shows its instructions and permissions word for word before you add it, and the copy is yours from then on. Each published mascot also has a public page you can send to a colleague, whose Open in Blueberry button opens its review in the app through a `blueberry://` link. A link never adds or runs anything.
 
-Claude Code and Claude Desktop can hand jobs to Blueberry through the local MCP connection. With the cloud relay set up, ChatGPT and Claude can start jobs too. You can also opt in to running relay jobs on your Mac while Blueberry is open.
+![The Gallery shows the starter mascots and what each one is for](docs/images/gallery.webp)
+
+### Suggestions that keep coming
+
+The hard part of a new agent is knowing what to ask it. Strawberry uses onboarding to make its first suggestions. Its companion reads your imported history and what you tell it, then suggests your role, apps to connect and a first task, and the Routines page offers routine ideas such as a morning summary or industry news. Strawberry also offers personalized ideas in its Knowledge hub. I haven't seen it suggest a new companion based on repeated browsing. In Blueberry, suggestions on the new tab page keep coming from what you actually do. At most about once an hour, a cheap model reads a digest of your recent browsing, chats and routine runs and proposes a prompt, a routine or a new mascot, and code checks each one against what it cites before it shows. They change as your week does. On the first day, Blueberry can bring in the last 90 days of history from Chrome, Brave or Edge, or from Arc on a Mac, in Settings > Privacy > Bring in history, so the first suggestions are already about you.
+
+![Berry compares GitHub and GitLab plans with the GitHub pricing page beside the chat](docs/images/working-view.webp)
+
+### Berry on the desktop
+
+In Strawberry, work starts inside the browser, but most work happens in other apps. You're in Slack or Mail, see something worth looking into, and hand it to Berry with `Alt+Space` (`⌥Space` on a Mac) without switching apps. Turned on in Settings > Mascots > On your desktop, Berry waits tucked behind an edge of the screen, above every app. The job runs in the browser where you're signed in. It never reads the screen, the clipboard or another app. Later it could work on the desktop itself.
+
+![Berry’s desktop composer is open at the edge of the Windows screen](docs/images/desktop-berry.webp)
+
+### Next: Nests, instead of chat threads
+
+Work with AI agents still happens in chat threads. Each thread starts from zero, so you explain the job again every time you open a new one, and five jobs running at once means five threads to scroll through. I'm trying a different shape on the [`nest`](https://github.com/Luddeforsberg/blueberry-browser/tree/nest) branch. A Nest is a board where each card is one mascot's chat. A line from one card to the next means the second continues from the first, with everything the cards before it found. Ask for something bigger and Berry lays it out as cards you can change before anything runs. A card with a table can run once for each row, and the board keeps growing over days rather than finishing. It's still being built, so it isn't on `main` yet.
+
+To try it: `git checkout nest`, then follow [Running it](#running-it).
+
+### The rest
+
+Your mascots, routines on a schedule, jobs that work in tabs behind yours with a live picture of them beside the chat, and mascots that keep a habit only when you say yes and show every word they keep. Strawberry has all of these, and they work much the same here. Blueberry needs them because everything above is built on them. The same goes for the safety rules below, which every AI browser needs.
+
+The Your mascots page starts with Berry, Plain Words, Competitor Watch, Meeting Prep and Newsletter Builder on a fresh profile.
+
+![Your mascots shows Berry and the four starter mascots with their limits in dark mode](docs/images/your-mascots.webp)
+
+## How it grows
+
+Three of the features above are also how Blueberry gets users and keeps them.
+
+- **Every shared mascot is a landing page.** A published mascot gets a public page showing what it's told, what it's allowed to do, and an Open in Blueberry button. People share the mascots they make, the add count tells the next person it's worth trying, and each share brings someone new to Blueberry.
+- **It starts where people already are.** Through the relay, people in ChatGPT and Claude can use your mascots without switching browsers. They get something out of Blueberry first and switch later.
+- **It keeps giving people a reason to come back.** Most people drop a new agent because they don't know what to use it for. Strawberry uses onboarding preferences for new-tab suggestions. In Blueberry they keep coming from what you actually do, including new mascots for the jobs you repeat, so a week in there's still something new worth handing over. Importing your history means even the first ones are about you.
 
 ## Safety
 
-- By default, a mascot asks before taking an action the app marks as risky. The approval card shows the exact action and why it needs permission. If the page changes after you allow it, the action is canceled. Cloud runner jobs ask at least as often as the default setting.
-- Blueberry enforces a mascot's site and tool limits in the browser tools.
-- A mascot hands over the tab for a sign-in, code or CAPTCHA and waits until you give it back. Only you can approve an action or complete a handoff.
-- The working view sends its pictures only to the browser window.
+- By default, a mascot stops before anything risky on an approval card with the exact sentence of what will happen, and does nothing if the page changed after you allowed it. A job on the cloud runner never asks less than that.
+- Blueberry enforces a mascot's limits in the tool layer, where they can only narrow what it can do.
+- A mascot never asks for a password or code. A sign-in, code or captcha is handed to you in its tab, which no job can reach until you're done, and a code sent through Telegram for a local job is typed by code the model can't call. The model is only told that a code went in.
+- Only you can answer an approval. No MCP app, relay client or cloud runner can.
+- The working view's pictures go only to the window, never to the model or the disk, and a cloud live view never goes to the model.
+- No service key is in the repo, the app or the runner. Everything uses Supabase's publishable key and a signed-in user's session.
 
-![Berry asks permission to open a GitHub search, with the full address shown on the card](docs/images/approval.webp)
+![An approval card gives the full address Berry wants to open on GitHub](docs/images/approval.webp)
 
 ## How it's built
 
@@ -73,9 +111,9 @@ cp .env.example .env    # set LLM_PROVIDER and one key, OPENAI_API_KEY or ANTHRO
 pnpm dev
 ```
 
-You can also enter an AI key during first run or in Settings > Connections > AI service. If you use an environment file with a packaged app (`pnpm exec electron-builder --dir`), place it in the app's user data folder. On a Mac that is `~/Library/Application Support/blueberry-browser/`.
+A packaged app (`pnpm exec electron-builder --dir`) doesn't bundle `.env`. It reads it from its user data folder, `~/Library/Application Support/blueberry-browser/.env` on a Mac, so copy it there.
 
-Accounts, publishing and remote jobs need additional setup.
+That's the whole browser, with Berry, Your mascots, routines, Suggestions, Show Berry how, Needs you and the bundled Gallery. The rest needs something set up:
 
 - **Accounts and publishing to the Gallery** need a Supabase project with the migrations in `supabase/migrations`, and `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` in `.env`.
 - **The public mascot pages and the phone page** are in `site/`, deployed to Netlify with `pnpm run site:deploy` after setting `site/config.js`.
@@ -87,7 +125,6 @@ Accounts, publishing and remote jobs need additional setup.
 | `pnpm install` | Install dependencies |
 | `pnpm dev` | Run the app with hot reload |
 | `pnpm run typecheck` | Typecheck main, preload, tests and renderers |
-| `pnpm run format:check` | Check formatting with Prettier |
 | `pnpm run lint` | Lint. Any warning or error fails, and a comment can't turn a rule off: change it in `eslint.config.mjs` |
 | `pnpm run test` | Run unit tests in `src/` with Vitest |
 | `pnpm exec electron-vite build` | Build into `out/` |
