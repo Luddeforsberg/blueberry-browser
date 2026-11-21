@@ -2,13 +2,14 @@ import type { OwnMenuItem } from "../menus/ownMenu";
 import type { ChromeRegion } from "../../shared/ipc";
 import type { SavedSiteList } from "../../shared/library";
 import type { Saved } from "../library/savedFile";
-import type { WindowParts, WindowStores } from "./WindowParts";
+import type { WindowParts } from "./WindowParts";
+import type { AppStores } from "../app/appStores";
 
 // Pinned sites and bookmarks: the star, Keep on Top, moving a site between the lists and a saved site's menu.
 export class SavedSites {
   constructor(
     private readonly w: WindowParts,
-    private readonly stores: WindowStores,
+    private readonly stores: AppStores,
   ) {}
 
   // A favourite is a bookmark kept on top, so the star counts both, and taking it off takes the site away from both.

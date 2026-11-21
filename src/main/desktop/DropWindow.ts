@@ -1,5 +1,6 @@
 import { screen, type Display } from "electron";
 import type { Rect } from "../window/Layout";
+import type { LibrarySnapshot } from "../../shared/library";
 import {
   DESKTOP_DEFAULT_SPOT,
   desktopHit,
@@ -204,7 +205,7 @@ export class DropWindow {
 
   press(part: DesktopDropPart): void {
     if (!this.d.window || !DROP_PARTS.includes(part)) return;
-    const facts = this.d.news.facts;
+    const facts = this.d.news.factsOf(this.d.host.library());
     if (part === "answer") {
       const [first] = facts.needsYou;
       if (first) this.d.composer.openAsk(first, false);
@@ -282,9 +283,9 @@ export class DropWindow {
     this.d.menus.open(items, { ...point, width: 0, height: 0 }, { label: "Mascots", mac: process.platform === "darwin" });
   }
 
-  get state(): DesktopDropState {
+  stateOf(library: LibrarySnapshot): DesktopDropState {
     const { showBerry } = this.d.host.settings();
-    const facts = this.d.news.facts;
+    const facts = this.d.news.factsOf(library);
     const pointed = this.hovering && !this.d.composer.panelOpen;
     if (pointed && facts.running.length === 1) facts.running = facts.running.map((job) => this.d.news.withProgress(job));
     const { faces, working, says } = desktopDrop(facts, { pointed, announcing: this.d.news.announcing, shortcut: this.d.registered });

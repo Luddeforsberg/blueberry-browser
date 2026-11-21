@@ -1,25 +1,12 @@
-import { app, BaseWindow, globalShortcut, session, shell } from "electron";
+import { app, BaseWindow, globalShortcut } from "electron";
 import { electronApp } from "@electron-toolkit/utils";
 import { Window } from "./window/Window";
-import { AppMenu } from "./menus/Menu";
+import { setAppMenu } from "./menus/Menu";
 import { EventManager } from "./window/EventManager";
-import { SettingsStore } from "./settings/SettingsStore";
-import { BookmarkStore } from "./library/BookmarkStore";
-import { ChatStore } from "./chats/ChatStore";
-import { RoutineStore } from "./routines/RoutineStore";
-import { MascotStore } from "./mascots/MascotStore";
-import { addStarters } from "./mascots/starters";
-import { Downloads } from "./library/Downloads";
-import { SitePermissions } from "./settings/SitePermissions";
-import { installSessionHandlers } from "./settings/sessionHandlers";
-import { HistoryStore } from "./library/HistoryStore";
-import { SessionStore } from "./tabs/Session";
-import type { AiKey } from "./settings/AiKey";
-import { appAiKey } from "./window/makeAccount";
-import { openStore, type StoreProblem } from "./library/database";
+import { AppServices } from "./app/AppServices";
+import { openAppStores } from "./app/appStores";
+import type { StoreProblem } from "./library/database";
 import { holdQuit } from "./window/holdQuit";
-import type { CloudTabs } from "./cloud/CloudTabs";
-import { createCloud } from "./window/makeCloud";
 import { LINK_SCHEME, mascotFromArgs, mascotFromLink } from "./mascots/mascotLink";
 import { loadAhead } from "./chats/agent";
 import { join } from "path";
@@ -40,17 +27,8 @@ else app.setAsDefaultProtocolClient(LINK_SCHEME);
 
 let mainWindow: Window | null = null;
 let eventManager: EventManager | null = null;
-let menu: AppMenu | null = null;
-let settings: SettingsStore | null = null;
-let chatStore: ChatStore | null = null;
-let routineStore: RoutineStore | null = null;
-let mascotStore: MascotStore | null = null;
-let downloads: Downloads | null = null;
-let sitePermissions: SitePermissions | null = null;
-let historyStore: HistoryStore | null = null;
-let aiKey: AiKey | null = null;
-// One for the app, whichever window is open, so Quit can wait for its session to end.
-let cloud: CloudTabs | null = null;
+// Made with the first window and kept for as long as the app runs, so a Mac's window can close and open again on it.
+let services: AppServices | null = null;
 // Said once, after the window it sits on is open.
 let storeNotices: string[] = [];
 
@@ -75,60 +53,16 @@ const showStoreNotices = (window: Window): void => {
 };
 
 const createWindow = (): Window => {
-  settings ??= new SettingsStore(join(app.getPath("userData"), "settings.json"));
-  chatStore ??= openStore(join(app.getPath("userData"), "chats.db"), (file) => new ChatStore(file), storeNotice("Your saved chats", "are"));
-  historyStore ??= openStore(
-    join(app.getPath("userData"), "history.db"),
-    (file) => new HistoryStore(file),
-    storeNotice("Your browsing history", "is"),
-  );
-  const bookmarks = new BookmarkStore(app.getPath("userData"));
-  routineStore ??= openStore(
-    join(app.getPath("userData"), "routines.db"),
-    (file, recovered) => new RoutineStore(file, recovered),
-    storeNotice("Your routines", "are"),
-  );
-  mascotStore ??= new MascotStore(join(app.getPath("userData"), "mascots.json"));
-  try {
-    addStarters(mascotStore, settings);
-  } catch (error) {
-    // Tried again on the next launch, since it was never marked done.
-    console.error("Failed to add the starter mascots:", error);
-  }
-  const savedSettings = settings;
-  if (!downloads || !sitePermissions) {
-    downloads = new Downloads(join(app.getPath("userData"), "downloads.json"), {
-      settings: () => savedSettings.get(),
-      systemFolder: () => app.getPath("downloads"),
-      openPath: (path) => shell.openPath(path),
-      showItemInFolder: (path) => shell.showItemInFolder(path),
-    });
-    sitePermissions = new SitePermissions(join(app.getPath("userData"), "site-permissions.json"));
-    installSessionHandlers(session.defaultSession, sitePermissions, downloads);
-  }
-  const sessionStore = new SessionStore(join(app.getPath("userData"), "session.json"));
-  aiKey ??= appAiKey();
-  cloud ??= createCloud();
-  const window = new Window(
-    {
-      settingsStore: settings,
-      chatStore,
-      bookmarkStore: bookmarks,
-      mascotStore,
-      history: historyStore,
-      sessionStore,
-      aiKey,
-      cloud,
-    },
-    routineStore,
-    downloads,
-    sitePermissions,
-  );
+  const folder = app.getPath("userData");
+  services ??= new AppServices(openAppStores(folder, storeNotice), folder);
+  const window = new Window(services);
   showStoreNotices(window);
-  menu = new AppMenu(window);
+  setAppMenu(window, openWindow);
   eventManager = new EventManager(window);
   return window;
 };
+
+const openWindow = (): Window => (mainWindow = createWindow());
 
 // A Gallery entry a link asked for before there was a window to show it in. Windows and Linux start with it in argv.
 let linkedMascot: string | null = mascotFromArgs(process.argv);
@@ -181,8 +115,7 @@ void app.whenReady().then(() => {
   });
 });
 
-// A cloud session left running costs until it times out, and a local test browser would be left behind.
-holdQuit(app, () => cloud?.quit());
+holdQuit(app, () => services?.quit());
 
 app.on("will-quit", () => globalShortcut.unregisterAll());
 
@@ -192,13 +125,9 @@ app.on("window-all-closed", () => {
     eventManager = null;
   }
 
-  // Clean up references
-  if (mainWindow) {
-    mainWindow = null;
-  }
-  if (menu) {
-    menu = null;
-  }
+  mainWindow = null;
+  // A Mac keeps the menu bar with no window, so nothing in it may hold the one that closed.
+  setAppMenu(null, openWindow);
 
   if (process.platform !== "darwin") {
     app.quit();

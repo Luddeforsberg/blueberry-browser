@@ -187,6 +187,26 @@ const fences = [
       "Read Enter with isEnter from @common/lib/keys, which leaves an input method's Enter to the text, or sendOnEnter in a prompt box (eslint.fences.mjs).",
   },
   {
+    // A window that closes and opens again, as on a Mac, would make a second copy of anything it made over the same file
+    // or account, and work the first copy started could still write over the second's.
+    name: "app",
+    in: ["src/main/**/*.ts"],
+    allowed: {
+      "src/main/app": "AppServices and the stores, made once for the app.",
+      "src/main/index.ts": "Finds the user data folder for AppServices, and the packaged app's .env there.",
+    },
+    rules: {
+      "no-restricted-syntax": [
+        'CallExpression[callee.property.name="getPath"][arguments.0.value="userData"]',
+        "NewExpression[callee.name=/^(AppServices|Account|AiKey|Gallery|TelegramChannel|MemoryStore|CloudTabs|RunnerJobs|Chats|Suggestions|McpConnector|SettingsStore|ChatStore|BookmarkStore|MascotStore|HistoryStore|SessionStore|RoutineStore|Downloads|SitePermissions)$/]",
+        // The factories in src/main/app, which make the same services.
+        "CallExpression[callee.name=/^(openAppStores|createAccount|createGallery|createTelegram|createMemory|createChats|createCloud|createRunnerJobs|createSuggestions|createMcp)$/]",
+      ],
+    },
+    message:
+      "What keeps a file in the user data folder, or the account, or work that outlives a window, is made once in src/main/app (AppServices or appStores.ts). A window reaches it through w.app or w.stores and makes only what draws or lives in it (docs/ARCHITECTURE.md, eslint.fences.mjs).",
+  },
+  {
     name: "kit",
     in: ["src/renderer/**/*.tsx"],
     allowed: { "src/renderer/common/components": "The kit itself." },

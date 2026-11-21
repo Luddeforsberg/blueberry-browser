@@ -3,27 +3,46 @@ import { HORIZONTAL_TABS_MENU_ID, WEB_PAGE_MENU_IDS, type Window } from "../wind
 import { toElectronMenu, type OwnMenuItem } from "./ownMenu";
 import { SHORTCUTS } from "../../shared/shortcuts";
 
+type Page = Parameters<Window["openPage"]>[0];
+
 // The app's menu: the Mac's menu bar, the keys it holds everywhere, and off a Mac the ☰ menu, which our menu view draws
-// from this same description, read again each time it opens.
-export const appMenuItems = (mainWindow: Window): OwnMenuItem[] => {
+// from this same description, read again each time it opens. With no window, as on a Mac once the last one has closed,
+// a page opens in a new window, and anything that acts on a window or its tabs is off.
+export const appMenuItems = (mainWindow: Window | null, openWindow: () => Window): OwnMenuItem[] => {
   const mac = process.platform === "darwin";
-  const pageOnly = (id: string) => ({ id, enabled: !WEB_PAGE_MENU_IDS.includes(id) || mainWindow.activeTab !== null });
+  const opens = (page: Page) => ({ click: () => void (mainWindow ?? openWindow()).openPage(page) });
+  const on = (act: (window: Window) => void, enabled = true) => ({
+    enabled: enabled && mainWindow !== null,
+    click: () => {
+      if (mainWindow) act(mainWindow);
+    },
+  });
+  const pageOnly = (id: string, act: (window: Window) => void) => ({
+    id,
+    ...on(act, !WEB_PAGE_MENU_IDS.includes(id) || mainWindow?.activeTab != null),
+  });
   return [
     {
       label: "File",
       submenu: [
-        { label: "Settings…", accelerator: SHORTCUTS.settings, click: () => mainWindow.openPage("settings") },
-        ...(mac ? [{ label: "Hide Blueberry", accelerator: "Command+H", click: () => mainWindow.hideBlueberry() }] : []),
-        { label: "Downloads", accelerator: SHORTCUTS.downloads, click: () => mainWindow.openPage("downloads") },
-        { label: "Open Location", accelerator: "CmdOrCtrl+L", click: () => mainWindow.focusAddressBar() },
-        { label: "New Tab", icon: "new-tab", accelerator: SHORTCUTS.newTab, click: () => mainWindow.createTab() },
-        { label: "Reopen Closed Tab", accelerator: "CmdOrCtrl+Shift+T", click: () => mainWindow.reopenClosedTab() },
-        { label: "Bookmark This Page", icon: "bookmark", accelerator: SHORTCUTS.bookmark, click: () => mainWindow.toggleBookmark() },
-        { label: "Keep This Page on Top", icon: "pin", click: () => mainWindow.keepOnTop() },
+        ...(mainWindow ? [] : [{ label: "New Window", accelerator: "CmdOrCtrl+N", click: () => void openWindow() }]),
+        { label: "Settings…", accelerator: SHORTCUTS.settings, ...opens("settings") },
+        ...(mac ? [{ label: "Hide Blueberry", accelerator: "Command+H", ...on((w) => w.hideBlueberry()) }] : []),
+        { label: "Downloads", accelerator: SHORTCUTS.downloads, ...opens("downloads") },
+        { label: "Open Location", accelerator: "CmdOrCtrl+L", ...on((w) => w.focusAddressBar()) },
+        {
+          label: "New Tab",
+          icon: "new-tab",
+          accelerator: SHORTCUTS.newTab,
+          click: () => (mainWindow ? mainWindow.createTab() : void openWindow()),
+        },
+        { label: "Reopen Closed Tab", accelerator: "CmdOrCtrl+Shift+T", ...on((w) => w.reopenClosedTab()) },
+        { label: "Bookmark This Page", icon: "bookmark", accelerator: SHORTCUTS.bookmark, ...on((w) => w.toggleBookmark()) },
+        { label: "Keep This Page on Top", icon: "pin", ...on((w) => w.keepOnTop()) },
         // Any tab closes, including internal pages, which have no web view.
-        { label: "Close Tab", accelerator: SHORTCUTS.closeTab, click: () => closeTab(mainWindow) },
+        { label: "Close Tab", accelerator: SHORTCUTS.closeTab, ...on(closeTab) },
         { type: "separator" },
-        { ...pageOnly("print"), label: "Print…", icon: "print", accelerator: "CmdOrCtrl+P", click: () => mainWindow.printActiveTab() },
+        { ...pageOnly("print", (w) => w.printActiveTab()), label: "Print…", icon: "print", accelerator: "CmdOrCtrl+P" },
         { type: "separator" },
         { label: "Quit", accelerator: mac ? "Cmd+Q" : "Ctrl+Q", click: () => app.quit() },
       ],
@@ -39,63 +58,61 @@ export const appMenuItems = (mainWindow: Window): OwnMenuItem[] => {
         { label: "Paste", icon: "paste", accelerator: "CmdOrCtrl+V", role: "paste" },
         { label: "Select All", icon: "select-all", accelerator: "CmdOrCtrl+A", role: "selectAll" },
         { type: "separator" },
-        { label: "Find…", accelerator: "CmdOrCtrl+F", click: () => mainWindow.openFindBar() },
-        { label: "Find Next", accelerator: "CmdOrCtrl+G", click: () => mainWindow.findStep(true) },
-        { label: "Find Previous", accelerator: "CmdOrCtrl+Shift+G", click: () => mainWindow.findStep(false) },
+        { label: "Find…", accelerator: "CmdOrCtrl+F", ...on((w) => w.openFindBar()) },
+        { label: "Find Next", accelerator: "CmdOrCtrl+G", ...on((w) => w.findStep(true)) },
+        { label: "Find Previous", accelerator: "CmdOrCtrl+Shift+G", ...on((w) => w.findStep(false)) },
       ],
     },
     {
       label: "View",
       submenu: [
-        { label: "Reload", icon: "reload", accelerator: SHORTCUTS.reload, click: () => mainWindow.activeTab?.reload() },
+        { label: "Reload", icon: "reload", accelerator: SHORTCUTS.reload, ...on((w) => w.activeTab?.reload()) },
         {
           label: "Force Reload",
           accelerator: "CmdOrCtrl+Shift+R",
-          click: () => {
-            const tab = mainWindow.activeTab;
+          ...on((w) => {
+            const tab = w.activeTab;
             if (tab?.loadError) tab.reload();
             else tab?.webContents.reloadIgnoringCache();
-          },
+          }),
         },
         { type: "separator" },
-        { ...pageOnly("zoom-reset"), label: "Actual Size", accelerator: "CmdOrCtrl+0", click: () => mainWindow.resetActiveTabZoom() },
-        { ...pageOnly("zoom-in"), label: "Zoom In", accelerator: "CmdOrCtrl+Plus", click: () => mainWindow.zoomActiveTab(1) },
+        { ...pageOnly("zoom-reset", (w) => w.resetActiveTabZoom()), label: "Actual Size", accelerator: "CmdOrCtrl+0" },
+        { ...pageOnly("zoom-in", (w) => w.zoomActiveTab(1)), label: "Zoom In", accelerator: "CmdOrCtrl+Plus" },
         // On US keyboards + is Shift and =, and people press it without the Shift.
         {
-          ...pageOnly("zoom-in-equals"),
+          ...pageOnly("zoom-in-equals", (w) => w.zoomActiveTab(1)),
           label: "Zoom In",
           accelerator: "CmdOrCtrl+=",
           visible: false,
-          click: () => mainWindow.zoomActiveTab(1),
         },
-        { ...pageOnly("zoom-out"), label: "Zoom Out", accelerator: "CmdOrCtrl+-", click: () => mainWindow.zoomActiveTab(-1) },
+        { ...pageOnly("zoom-out", (w) => w.zoomActiveTab(-1)), label: "Zoom Out", accelerator: "CmdOrCtrl+-" },
         { type: "separator" },
-        { label: "Toggle Sidebar", accelerator: SHORTCUTS.sidebar, click: () => mainWindow.toggleSidebar() },
-        { label: "Toggle Chat", accelerator: SHORTCUTS.chat, click: () => mainWindow.toggleChat() },
+        { label: "Toggle Sidebar", accelerator: SHORTCUTS.sidebar, ...on((w) => w.toggleSidebar()) },
+        { label: "Toggle Chat", accelerator: SHORTCUTS.chat, ...on((w) => w.toggleChat()) },
         {
           id: HORIZONTAL_TABS_MENU_ID,
           label: "Horizontal Tabs",
           type: "checkbox",
-          checked: mainWindow.settings.layoutMode === "horizontal",
-          click: () =>
-            mainWindow.updateSettings({ layoutMode: mainWindow.settings.layoutMode === "horizontal" ? "vertical" : "horizontal" }),
+          checked: mainWindow?.settings.layoutMode === "horizontal",
+          ...on((w) => w.updateSettings({ layoutMode: w.settings.layoutMode === "horizontal" ? "vertical" : "horizontal" })),
         },
         { type: "separator" },
         // For working on Blueberry itself, so a packaged app leaves them out.
         ...(app.isPackaged
           ? []
           : [
-              { label: "Component Gallery", click: () => mainWindow.openPage("gallery") },
+              { label: "Component Gallery", ...opens("gallery") },
               {
                 label: "Toggle Developer Tools",
                 accelerator: mac ? "Alt+Command+I" : "Ctrl+Shift+I",
-                click: () => mainWindow.activeTab?.webContents.toggleDevTools(),
+                ...on((w) => w.activeTab?.webContents.toggleDevTools()),
               },
             ]),
         {
           label: "Toggle Fullscreen",
           accelerator: mac ? "Ctrl+Command+F" : "F11",
-          click: () => mainWindow.baseWindow.setFullScreen(!mainWindow.baseWindow.isFullScreen()),
+          ...on((w) => w.baseWindow.setFullScreen(!w.baseWindow.isFullScreen())),
         },
       ],
     },
@@ -106,23 +123,23 @@ export const appMenuItems = (mainWindow: Window): OwnMenuItem[] => {
           label: "Back",
           icon: "back",
           accelerator: SHORTCUTS.back,
-          click: () => {
-            const tab = mainWindow.activeEntry;
-            if (tab) mainWindow.goBack(tab.id);
-          },
+          ...on((w) => {
+            const tab = w.activeEntry;
+            if (tab) w.goBack(tab.id);
+          }),
         },
-        { label: "Forward", icon: "forward", accelerator: SHORTCUTS.forward, click: () => mainWindow.activeTab?.goForward() },
+        { label: "Forward", icon: "forward", accelerator: SHORTCUTS.forward, ...on((w) => w.activeTab?.goForward()) },
         { type: "separator" },
-        { label: "History", accelerator: SHORTCUTS.history, click: () => mainWindow.openPage("history") },
-        { label: "Routines", click: () => mainWindow.openPage("routines") },
-        { label: "Your Mascots", click: () => mainWindow.openPage("mascots") },
-        { label: "Gallery", click: () => mainWindow.openPage("mascot-gallery") },
+        { label: "History", accelerator: SHORTCUTS.history, ...opens("history") },
+        { label: "Routines", ...opens("routines") },
+        { label: "Your Mascots", ...opens("mascots") },
+        { label: "Gallery", ...opens("mascot-gallery") },
         {
           label: "Show Berry How",
           icon: "show-how",
-          click: () => void (mainWindow.recordings.isRecording ? mainWindow.recordings.stop() : mainWindow.recordings.start()),
+          ...on((w) => void (w.recordings.isRecording ? w.recordings.stop() : w.recordings.start())),
         },
-        { label: "Needs You", click: () => mainWindow.openPage("needs-you") },
+        { label: "Needs You", ...opens("needs-you") },
       ],
     },
   ];
@@ -133,9 +150,9 @@ const closeTab = (mainWindow: Window): void => {
   if (tab) mainWindow.closeTab(tab.id);
 };
 
-export class AppMenu {
-  constructor(private readonly mainWindow: Window) {
-    Menu.setApplicationMenu(Menu.buildFromTemplate(toElectronMenu(appMenuItems(mainWindow))));
-    this.mainWindow.syncMenu();
-  }
-}
+// The Mac's menu bar, for the window that's open or for none. Installed again each time a window opens or the last one
+// closes, so nothing in it holds a window that has gone.
+export const setAppMenu = (mainWindow: Window | null, openWindow: () => Window): void => {
+  Menu.setApplicationMenu(Menu.buildFromTemplate(toElectronMenu(appMenuItems(mainWindow, openWindow))));
+  mainWindow?.syncMenu();
+};

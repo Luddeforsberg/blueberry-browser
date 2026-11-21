@@ -3,7 +3,8 @@ import { InternalTab } from "../tabs/InternalTab";
 import { computeLayout, type Layout } from "./Layout";
 import { sendToRenderer } from "./ipc";
 import type { Popover } from "../../shared/ipc";
-import type { WindowParts, WindowStores } from "./WindowParts";
+import type { WindowParts } from "./WindowParts";
+import type { AppStores } from "../app/appStores";
 import { fieldsOf } from "../../shared/fields";
 
 // What's open around the page, the sidebar, the chat panel and what floats over the page in the overlay view, and where
@@ -20,7 +21,7 @@ export class Panels {
 
   constructor(
     private readonly w: WindowParts,
-    private readonly stores: WindowStores,
+    private readonly stores: AppStores,
   ) {}
 
   isChatInFront(chatId: string): boolean {
@@ -35,7 +36,7 @@ export class Panels {
 
   seePanelChat(): void {
     const chatId = this.panelChatShowing;
-    if (chatId) this.w.chats.markSeen(chatId);
+    if (chatId) this.w.app.chats.markSeen(chatId);
   }
 
   panelShows(chatId: string | null): void {

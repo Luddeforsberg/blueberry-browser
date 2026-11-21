@@ -12,7 +12,6 @@ import type { Chats } from "../chats/Chats";
 import type { Attachments } from "../chats/Attachments";
 import type { Recordings } from "../recordings/Recordings";
 import type { TelegramChannel } from "../phone/TelegramChannel";
-import type { RoutineStore } from "../routines/RoutineStore";
 import type { Routines } from "../routines/Routines";
 import type { Gallery } from "../mascots/Gallery";
 import type { Account } from "../account/Account";
@@ -31,8 +30,9 @@ import type { AppIcon } from "./AppIcon";
 import type { Layout } from "./Layout";
 import { isMac } from "./windowFrame";
 import type { BrowserTab, Popup } from "./TabStrip";
-import { WindowParts, type WindowStores } from "./WindowParts";
-import { cloudLoginSuggestions } from "./makeCloud";
+import { WindowParts } from "./WindowParts";
+import { cloudLoginSuggestions } from "../app/makeCloud";
+import type { AppServices } from "../app/AppServices";
 import type { FirstJob } from "../../shared/firstRun";
 import type {
   ChromeRegion,
@@ -57,13 +57,15 @@ export { WEB_PAGE_MENU_IDS } from "./PageCommands";
 // The window as callers see it: each method hands the call to a part in `WindowParts`, which never come through here.
 export class Window {
   private readonly parts: WindowParts;
-  constructor(
-    stores: WindowStores,
-    routineStore: RoutineStore,
-    readonly downloads: Downloads,
-    readonly sitePermissions: SitePermissions,
-  ) {
-    this.parts = new WindowParts(stores, routineStore, downloads, sitePermissions);
+  constructor(app: AppServices) {
+    this.parts = new WindowParts(app);
+  }
+
+  get downloads(): Downloads {
+    return this.parts.stores.downloads;
+  }
+  get sitePermissions(): SitePermissions {
+    return this.parts.stores.sitePermissions;
   }
 
   // The window itself, its views and what's wired to them.
@@ -104,19 +106,19 @@ export class Window {
     return this.parts.appIcon;
   }
   get telegram(): TelegramChannel {
-    return this.parts.telegram;
+    return this.parts.app.telegram;
   }
   get account(): Account {
-    return this.parts.account;
+    return this.parts.app.account;
   }
   get aiKey(): AiKey {
-    return this.parts.aiKey;
+    return this.parts.stores.aiKey;
   }
   get gallery(): Gallery {
-    return this.parts.gallery;
+    return this.parts.app.gallery;
   }
   get chats(): Chats {
-    return this.parts.chats;
+    return this.parts.app.chats;
   }
   get workViews(): WorkViews {
     return this.parts.workViews;
@@ -131,22 +133,22 @@ export class Window {
     return this.parts.routines;
   }
   get suggestions(): Suggestions {
-    return this.parts.suggestions;
+    return this.parts.app.suggestions;
   }
   get desktopBerry(): DesktopBerry {
     return this.parts.desktopBerry;
   }
   get memory(): MemoryStore {
-    return this.parts.memory;
+    return this.parts.app.memory;
   }
   get mcp(): McpConnector {
-    return this.parts.mcp;
+    return this.parts.app.mcp;
   }
   get cloud(): CloudTabs {
-    return this.parts.cloud;
+    return this.parts.app.cloud;
   }
   get runnerJobs(): RunnerJobs {
-    return this.parts.runnerJobs;
+    return this.parts.app.runnerJobs;
   }
   get settings(): Settings {
     return this.parts.settings;
@@ -303,7 +305,8 @@ export class Window {
   showAppMenu(): void {
     const { menuButton } = this.layout;
     if (menuButton.width === 0) return;
-    this.menus.open(appMenuItems(this), menuButton, { label: "Menu", mac: isMac() });
+    const items = appMenuItems(this, () => this);
+    this.menus.open(items, menuButton, { label: "Menu", mac: isMac() });
   }
 
   // History.
@@ -329,7 +332,7 @@ export class Window {
     return this.parts.browsing.suggestHistory(text);
   }
   cloudLoginSuggestions(): string[] {
-    return cloudLoginSuggestions(this.parts.stores, this.parts.cloud);
+    return cloudLoginSuggestions(this.parts.stores, this.parts.app.cloud);
   }
 
   // Settings, and the First jobs they keep.

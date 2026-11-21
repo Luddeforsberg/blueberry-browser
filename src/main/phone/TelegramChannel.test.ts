@@ -1,8 +1,18 @@
 import { getEventListeners } from "node:events";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { sleep, telegramApiBase } from "./TelegramChannel";
+import { sleep, TelegramChannel, telegramApiBase } from "./TelegramChannel";
 
-vi.mock("electron", () => ({ app: { isPackaged: true }, safeStorage: {} }));
+vi.mock("electron", () => ({
+  app: { isPackaged: true },
+  safeStorage: {
+    isEncryptionAvailable: () => true,
+    encryptString: (text: string) => Buffer.from(text),
+    decryptString: (bytes: Buffer) => bytes.toString(),
+  },
+}));
 
 const LIVE = "https://api.telegram.org";
 
@@ -28,5 +38,121 @@ describe("sleep", () => {
     polling.abort();
     await waiting;
     expect(getEventListeners(polling.signal, "abort")).toHaveLength(0);
+  });
+});
+
+describe("TelegramChannel", () => {
+  const A = "111111:AAAAAAAAAAAAAAAAAAAAAAAAAA";
+  const B = "222222:BBBBBBBBBBBBBBBBBBBBBBBBBB";
+  // Telegram, with each bot's own name, and A's check held until `answerA`.
+  const fakeTelegram = () => {
+    let answerA = () => {};
+    const heldA = new Promise<void>((resolve) => (answerA = resolve));
+    const fetch = vi.fn(async (url: string, { signal }: RequestInit) => {
+      if (url.endsWith("/getMe")) {
+        if (url.includes(A)) await heldA;
+        return Response.json({ ok: true, result: { username: url.includes(A) ? "bot_a" : "bot_b" } });
+      }
+      // Polling waits until it's stopped.
+      return new Promise<Response>((_, reject) => signal?.addEventListener("abort", () => reject(new Error("stopped"))));
+    });
+    vi.stubGlobal("fetch", fetch);
+    return { answerA, polls: () => fetch.mock.calls.filter(([url]) => url.endsWith("/getUpdates")).length };
+  };
+  const folder = () => mkdtempSync(join(tmpdir(), "phone-"));
+
+  it("keeps nothing from a token check that answers after the window closed, even once the next one has a bot", async () => {
+    const telegram = fakeTelegram();
+    const channel = new TelegramChannel(join(folder(), "phone.json"), () => {}, "http://127.0.0.1:1");
+    const first = channel.connect(A);
+    channel.close();
+    channel.start();
+    expect((await channel.connect(B)).botName).toBe("bot_b");
+    telegram.answerA();
+    await first;
+    expect(channel.state.botName).toBe("bot_b");
+    channel.close();
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps nothing from a token check that answers after Disconnect, and says how things are now", async () => {
+    const telegram = fakeTelegram();
+    const channel = new TelegramChannel(join(folder(), "phone.json"), () => {}, "http://127.0.0.1:1");
+    const checking = channel.connect(A);
+    channel.disconnect();
+    telegram.answerA();
+    expect(await checking).toMatchObject({ status: "off", botName: null, problem: null });
+    expect(channel.state.botName).toBeNull();
+    expect(telegram.polls()).toBe(0);
+    vi.unstubAllGlobals();
+  });
+
+  it("gives a check that failed after a newer one connected the newer one's state, not its failure", async () => {
+    let failA = () => {};
+    const heldA = new Promise<void>((resolve) => (failA = resolve));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, { signal }: RequestInit) => {
+        if (url.endsWith("/getMe")) {
+          if (url.includes(A)) {
+            await heldA;
+            return Response.json({ ok: false }, { status: 401 });
+          }
+          return Response.json({ ok: true, result: { username: "bot_b" } });
+        }
+        return new Promise<Response>((_, reject) => signal?.addEventListener("abort", () => reject(new Error("stopped"))));
+      }),
+    );
+    const channel = new TelegramChannel(join(folder(), "phone.json"), () => {}, "http://127.0.0.1:1");
+    const first = channel.connect(A);
+    expect((await channel.connect(B)).botName).toBe("bot_b");
+    failA();
+    expect(await first).toMatchObject({ status: "pairing", botName: "bot_b", problem: null });
+    channel.close();
+    vi.unstubAllGlobals();
+  });
+
+  it("listens again in the next window for a bot whose file couldn't be written", async () => {
+    const telegram = fakeTelegram();
+    // A file where its folder should be, so nothing can be saved there.
+    const blocked = join(folder(), "blocked");
+    writeFileSync(blocked, "");
+    const channel = new TelegramChannel(join(blocked, "phone.json"), () => {}, "http://127.0.0.1:1");
+    expect((await channel.connect(B)).status).toBe("pairing");
+    channel.close();
+    const before = telegram.polls();
+    channel.start();
+    await vi.waitFor(() => expect(telegram.polls()).toBeGreaterThan(before));
+    channel.close();
+    vi.unstubAllGlobals();
+  });
+
+  it("says nothing about a connection that has closed when a message sent on it fails", async () => {
+    const file = join(folder(), "phone.json");
+    // Sealed as the mocked safeStorage seals, which is no more than base64.
+    writeFileSync(file, JSON.stringify({ token: Buffer.from(B).toString("base64"), botName: "bot_b", chatId: 7 }));
+    const held: { fail: (() => void) | null } = { fail: null };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, { signal }: RequestInit) => {
+        if (url.endsWith("/sendMessage")) {
+          await new Promise<void>((resolve) => (held.fail = resolve));
+          throw new Error("offline");
+        }
+        return new Promise<Response>((_, reject) => signal?.addEventListener("abort", () => reject(new Error("stopped"))));
+      }),
+    );
+    const channel = new TelegramChannel(file, () => {}, "http://127.0.0.1:1");
+    channel.start();
+    const sending = channel.send("Berry needs you");
+    await vi.waitFor(() => expect(held.fail).not.toBeNull());
+    // The window closes, and the next one connects again before the old message fails.
+    channel.close();
+    channel.start();
+    held.fail?.();
+    expect(await sending).toBeNull();
+    expect(channel.state.problem).toBeNull();
+    channel.close();
+    vi.unstubAllGlobals();
   });
 });

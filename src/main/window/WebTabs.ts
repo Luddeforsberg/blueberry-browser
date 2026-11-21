@@ -4,14 +4,15 @@ import type { SavedWebTab } from "../tabs/Session";
 import { attachPageMenu } from "../menus/pageMenu";
 import { isMac } from "./windowFrame";
 import type { Popup } from "./TabStrip";
-import type { WindowParts, WindowStores } from "./WindowParts";
+import type { WindowParts } from "./WindowParts";
+import type { AppStores } from "../app/appStores";
 
 // A web page in this window: making its tab, wiring what it tells us to the window, what happens when it opens another
 // page with `window.open`, and closing its tab when the page closes itself or leaves nothing but a download.
 export class WebTabs {
   constructor(
     private readonly w: WindowParts,
-    private readonly stores: WindowStores,
+    private readonly stores: AppStores,
   ) {}
 
   createWebTab(tabId: string, url: string, restored?: SavedWebTab, popup?: Popup): Tab {
@@ -24,7 +25,7 @@ export class WebTabs {
         onChange: () => this.w.tabs.notifyTabs(),
         // The title at this point is still the last page's, so the new page's arrives through `onDetails`.
         onNavigate: (address) => this.w.tabs.saveVisit(tabId, () => this.stores.history.record(address, "", null)),
-        onUserInput: () => this.w.chats.releaseTab(tabId),
+        onUserInput: () => this.w.app.chats.releaseTab(tabId),
         onPlacingChanged: () => {
           if (this.w.baseWindow.isDestroyed()) return;
           if (tab) this.w.panels.placeTab(tab, this.w.panels.layout);
@@ -89,7 +90,7 @@ export class WebTabs {
       if (opener.refusesNavigation(url)) return { action: "deny" };
       // A page behind the current one, perhaps one Berry is using, doesn't get to come to the front.
       // Nor does one Berry opened, even with the user watching. If they had clicked here, it would be theirs by now.
-      const behind = opener.id !== this.w.tabs.activeId || this.w.chats.isOwnTab(opener.id);
+      const behind = opener.id !== this.w.tabs.activeId || this.w.app.chats.isOwnTab(opener.id);
       // A real popup, so the page that opened it can talk to it, as a sign-in with Google needs. It's a tab with a
       // tab's preferences, its size is ignored, and it stays when its opener goes, like any tab.
       return {
@@ -103,7 +104,7 @@ export class WebTabs {
           const popup = { page, opener };
           const tab = behind ? this.w.tabs.createBackgroundTab(url, popup) : this.w.tabs.createTab(url, popup);
           tab.limitFirstLoadLike(opener);
-          if (behind) this.w.chats.notePopup(opener.id, tab.id);
+          if (behind) this.w.app.chats.notePopup(opener.id, tab.id);
           return tab.webContents;
         },
       };

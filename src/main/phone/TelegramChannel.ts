@@ -2,9 +2,10 @@ import { randomBytes } from "crypto";
 import { app, safeStorage, shell } from "electron";
 import type { PhoneState } from "../../shared/ipc";
 import type { IncomingChoice, IncomingReply, PhoneChannel, PhoneChoice } from "./Phone";
-import { readTelegramFile, writeTelegramFile, type SavedBot } from "./telegramFile";
+import { readTelegramFile, writeTelegramFile } from "./telegramFile";
 import { removeFile } from "../library/savedFile";
 import { botUsername, envelopeOf, sentId, updatesOf, type Message, type Update } from "./telegramAnswers";
+import { Latest, type Turn } from "../../shared/lateWork";
 
 // The user's own Telegram bot, reached from here with long polling, so no server of ours is involved. The token only
 // ever goes in the address of these requests and, encrypted, into one file. Nothing logs either, and no error from a
@@ -77,7 +78,12 @@ export class TelegramChannel implements PhoneChannel {
   // Replaced on every start, so stopping ends the one poller there is, and starting can't make a second.
   private polling: AbortController | null = null;
   private waitUntil = 0;
-  private closed = false;
+  // The newest token check. Closing ends it, so a check that answers after the window closed, or after a newer one
+  // began, keeps nothing.
+  private readonly checks = new Latest();
+  // The connection now, one for each poller. What a call sent on it found out counts only while it's still the one.
+  private readonly connections = new Latest();
+  private connection: Turn | null = null;
   private notSaved = false;
   private onReply: (reply: IncomingReply) => void = () => {};
   private onChoice: (choice: IncomingChoice) => void = () => {};
@@ -107,13 +113,16 @@ export class TelegramChannel implements PhoneChannel {
     };
   }
 
-  // Off until a token has been saved, so this does nothing at all for most people.
+  // Off until a token has been saved, so this does nothing at all for most people. A bot connected since launch is the
+  // one, even if its file couldn't be written.
   start(): void {
-    const saved = this.load();
-    if (!saved) return;
-    this.token = saved.token;
-    this.botName = saved.botName;
-    this.chatId = saved.chatId;
+    const saved = this.token === null ? readTelegramFile(this.file) : null;
+    if (saved) {
+      this.token = saved.token;
+      this.botName = saved.botName;
+      this.chatId = saved.chatId;
+    }
+    if (this.token === null) return;
     if (this.chatId === null) this.newLink();
     this.startPolling();
   }
@@ -121,11 +130,13 @@ export class TelegramChannel implements PhoneChannel {
   stop(): void {
     this.polling?.abort();
     this.polling = null;
+    this.connections.end();
+    this.connection = null;
   }
 
-  // For good. A token still being checked when the window closes doesn't start a poller nobody can stop.
+  // Until the next start. A token still being checked when the window closes doesn't start a poller nobody can stop.
   close(): void {
-    this.closed = true;
+    this.checks.end();
     this.stop();
   }
 
@@ -135,16 +146,24 @@ export class TelegramChannel implements PhoneChannel {
     const refuse = (problem: string) => ({ ...this.state, status: "off" as const, problem });
     if (!TOKEN_SHAPE.test(token)) return refuse("That doesn’t look like a bot token. BotFather gives you one like 123456:ABC-DEF…");
     if (!safeStorage.isEncryptionAvailable()) return refuse("This computer has no safe place to keep the token, so it wasn’t saved.");
+    const turn = this.checks.next();
     let username: string | undefined;
+    let failed: unknown = null;
     try {
       username = botUsername(await this.request(token, "getMe", {}, AbortSignal.timeout(CALL_ABORT_MS)));
     } catch (error) {
+      failed = error;
+    }
+    // Passed by a newer check, a close or Disconnect, so it changes nothing and says only how things are now.
+    if (!turn.current) return this.state;
+    if (failed !== null) {
       return refuse(
-        error instanceof TelegramError ? "Telegram didn’t accept that token." : "Couldn’t reach Telegram, so nothing was saved. Try again.",
+        failed instanceof TelegramError
+          ? "Telegram didn’t accept that token."
+          : "Couldn’t reach Telegram, so nothing was saved. Try again.",
       );
     }
     if (!username) return refuse("Telegram didn’t say what this bot is called.");
-    if (this.closed) return this.state;
 
     this.stop();
     this.token = token;
@@ -159,6 +178,7 @@ export class TelegramChannel implements PhoneChannel {
   }
 
   disconnect(): PhoneState {
+    this.checks.end();
     this.stop();
     this.token = null;
     this.botName = null;
@@ -187,6 +207,7 @@ export class TelegramChannel implements PhoneChannel {
 
   async send(text: string, choices: PhoneChoice[] = []): Promise<string | null> {
     if (!this.ready) return null;
+    const on = this.connection;
     try {
       const sent = await this.call("sendMessage", {
         chat_id: this.chatId,
@@ -197,11 +218,12 @@ export class TelegramChannel implements PhoneChannel {
           ? { reply_markup: { inline_keyboard: [choices.map(({ label, data }) => ({ text: label, callback_data: data }))] } }
           : {}),
       });
-      if (this.problem === CANT_MESSAGE) this.setProblem(null);
+      if (on?.current && this.problem === CANT_MESSAGE) this.setProblem(null);
       return sentId(sent);
     } catch (error) {
-      if (error instanceof TelegramError && error.status === 403) this.setProblem(CANT_MESSAGE);
-      else this.noteFailure(error);
+      if (error instanceof TelegramError && error.status === 403) {
+        if (on?.current) this.setProblem(CANT_MESSAGE);
+      } else this.noteFailure(error, on);
       return null;
     }
   }
@@ -209,12 +231,13 @@ export class TelegramChannel implements PhoneChannel {
   // Without a keyboard, so the buttons go.
   async edit(handle: string, text: string): Promise<void> {
     if (!this.ready) return;
+    const on = this.connection;
     await this.call("editMessageText", {
       chat_id: this.chatId,
       message_id: Number(handle),
       text,
       link_preview_options: { is_disabled: true },
-    }).catch((error) => this.noteFailure(error));
+    }).catch((error) => this.noteFailure(error, on));
   }
 
   async deleteIncoming(ref: string): Promise<boolean> {
@@ -229,6 +252,7 @@ export class TelegramChannel implements PhoneChannel {
     this.stop();
     const polling = new AbortController();
     this.polling = polling;
+    this.connection = this.connections.next();
     void this.poll(polling.signal);
   }
 
@@ -275,12 +299,13 @@ export class TelegramChannel implements PhoneChannel {
     if (message) this.handleMessage(message);
     // A private chat has one other person in it, so that chat and that person are the same id.
     if (choice && this.chatId !== null && choice.from.id === this.chatId && choice.message?.chat.id === this.chatId && choice.data) {
+      const on = this.connection;
       this.onChoice({
         handle: String(choice.message.message_id),
         data: choice.data,
         acknowledge: (note) => {
           void this.call("answerCallbackQuery", { callback_query_id: choice.id, ...(note ? { text: note } : {}) }).catch((error) =>
-            this.noteFailure(error),
+            this.noteFailure(error, on),
           );
         },
       });
@@ -316,7 +341,9 @@ export class TelegramChannel implements PhoneChannel {
     this.onChange();
   }
 
-  private noteFailure(error: unknown): void {
+  // Only for the connection the call went out on, while it's still the one.
+  private noteFailure(error: unknown, on: Turn | null): void {
+    if (!on?.current) return;
     if (error instanceof TelegramError && (error.status === 401 || error.status === 404)) this.setProblem(TOKEN_REJECTED);
     else if (!(error instanceof TelegramError)) this.setProblem(NO_NETWORK);
   }
@@ -356,10 +383,6 @@ export class TelegramChannel implements PhoneChannel {
     const { ok, result, retryAfter } = envelopeOf(body);
     if (!ok) throw new TelegramError(response.status, retryAfter);
     return result;
-  }
-
-  private load(): SavedBot | null {
-    return readTelegramFile(this.file);
   }
 
   private save(): void {

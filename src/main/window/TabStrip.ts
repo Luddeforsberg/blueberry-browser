@@ -5,7 +5,8 @@ import type { SavedTab } from "../tabs/Session";
 import { withTabAt } from "./tabOrder";
 import type { InternalPage, TabInfo } from "../../shared/ipc";
 import type { ChatThread } from "../../shared/library";
-import type { WindowParts, WindowStores } from "./WindowParts";
+import type { WindowParts } from "./WindowParts";
+import type { AppStores } from "../app/appStores";
 
 export type BrowserTab = Tab | InternalTab;
 
@@ -29,7 +30,6 @@ const SINGLE_INSTANCE_PAGES: InternalPage[] = [
 export class TabStrip {
   private tabsMap: Map<string, BrowserTab> = new Map();
   private activeTabId: string | null = null;
-  private tabCounter: number = 0;
   // For Reopen Closed Tab, newest last.
   closedTabs: TabInfo[] = [];
   // Tabs Berry opened behind the chat. Where it goes in them isn't the user's history until they go there too.
@@ -40,7 +40,7 @@ export class TabStrip {
 
   constructor(
     private readonly w: WindowParts,
-    private readonly stores: WindowStores,
+    private readonly stores: AppStores,
   ) {}
 
   get activeId(): string | null {
@@ -100,7 +100,7 @@ export class TabStrip {
       isLoading: tab.isLoading,
       berryWorking: tab.berryWorking,
       workingMascotId: tab.workingMascotId,
-      jobChatId: this.w.chats.jobChatOf(tab.id),
+      jobChatId: this.w.app.chats.jobChatOf(tab.id),
       canGoBack: tab.canGoBack,
       canGoForward: tab.canGoForward,
       zoomPercent: tab instanceof Tab ? this.w.siteZoom.percent(tab.url) : 100,
@@ -116,7 +116,7 @@ export class TabStrip {
   createTab(url?: string, popup?: Popup): BrowserTab;
   createTab(url?: string, popup?: Popup): BrowserTab {
     if (!url) return this.openPage("new-tab");
-    const tab = this.w.webTabs.createWebTab(`tab-${++this.tabCounter}`, url, undefined, popup);
+    const tab = this.w.webTabs.createWebTab(this.w.app.nextTabId(), url, undefined, popup);
     this.tabsMap.set(tab.id, tab);
     this.switchActiveTab(tab.id);
     return tab;
@@ -124,7 +124,7 @@ export class TabStrip {
 
   // A web tab waits to load until it's first needed. A chat may have been deleted since, so it has no tab.
   restoreTab(saved: SavedTab): string | null {
-    const id = `tab-${++this.tabCounter}`;
+    const id = this.w.app.nextTabId();
     if ("url" in saved) {
       this.tabsMap.set(id, this.w.webTabs.createWebTab(id, saved.url, saved));
       return id;
@@ -139,7 +139,7 @@ export class TabStrip {
   }
 
   createBackgroundTab(url: string, popup?: Popup): Tab {
-    const id = `tab-${++this.tabCounter}`;
+    const id = this.w.app.nextTabId();
     this.backgroundTabs.add(id);
     const tab = this.w.webTabs.createWebTab(id, url, undefined, popup);
     // Berry never makes a sound. Going to the tab turns it back on.
@@ -158,7 +158,8 @@ export class TabStrip {
 
   // A page in the cloud browser, shown by the chrome. Opened behind the user, like any tab a job opens.
   openCloudTab(title: string): string {
-    const id = `tab-${++this.tabCounter}`;
+    const id = this.w.app.nextTabId();
+    this.backgroundTabs.add(id);
     this.tabsMap.set(id, new InternalTab(id, "cloud", id, title));
     this.notifyTabs();
     return id;
@@ -185,9 +186,9 @@ export class TabStrip {
 
     // The chat's own title, whoever asked, or the tab says "Chat" until the thread next changes.
     const chatTitle = page === "chat" && param ? this.stores.chatStore.chat(param)?.title : undefined;
-    const tab = new InternalTab(`tab-${++this.tabCounter}`, page, param, chatTitle ?? options.title);
+    const tab = new InternalTab(this.w.app.nextTabId(), page, param, chatTitle ?? options.title);
     // A job's tabs go under its chat, even one it opened before the chat's own tab opened.
-    const firstOfJob = this.entries.findIndex((entry) => page === "chat" && this.w.chats.jobChatOf(entry.id) === param);
+    const firstOfJob = this.entries.findIndex((entry) => page === "chat" && this.w.app.chats.jobChatOf(entry.id) === param);
     this.tabsMap = withTabAt(this.tabsMap, tab, firstOfJob === -1 ? this.tabCount : firstOfJob);
     this.switchActiveTab(tab.id);
     return tab;
@@ -199,7 +200,7 @@ export class TabStrip {
     if (!entry) return false;
     if (entry instanceof Tab) {
       // Only the address bar comes here, so the user has taken this tab from any job that opened it.
-      this.w.chats.releaseTab(tabId);
+      this.w.app.chats.releaseTab(tabId);
       this.w.recordings.addressBarUsed(tabId);
       await entry.loadURL(url);
       return true;
@@ -208,9 +209,9 @@ export class TabStrip {
     this.w.recordings.addressBarUsed(tabId);
     // A cloud tab goes there in the cloud, and the user typing an address has taken it from the job.
     if (entry instanceof InternalTab && entry.page === "cloud") {
-      const page = this.w.cloud.page(tabId);
+      const page = this.w.app.cloud.page(tabId);
       if (!page) return false;
-      this.w.cloud.takeOver(tabId);
+      this.w.app.cloud.takeOver(tabId);
       await page.loadURL(url).catch(() => {});
       return true;
     }
@@ -245,7 +246,7 @@ export class TabStrip {
     const tab = this.closedTabs.pop();
     if (!tab) return;
     if (tab.page) {
-      const chat = tab.page === "chat" && tab.pageParam ? this.w.chats.thread(tab.pageParam) : null;
+      const chat = tab.page === "chat" && tab.pageParam ? this.w.app.chats.thread(tab.pageParam) : null;
       this.openPage(tab.page, { param: tab.pageParam ?? undefined, title: chat?.title ?? tab.title });
     } else {
       this.createTab(tab.url);
@@ -261,7 +262,7 @@ export class TabStrip {
     // Leaving the review is the same as throwing it away, so a trail never outlasts the page showing it.
     if (tab instanceof InternalTab && tab.page === "recording") this.w.recordings.discard();
     const isCloud = tab instanceof InternalTab && tab.page === "cloud";
-    if (isCloud) this.w.cloud.tabClosed(tabId);
+    if (isCloud) this.w.app.cloud.tabClosed(tabId);
     if (remember && !isCloud && !(tab instanceof InternalTab && tab.page === "recording")) this.closedTabs.push(this.tabInfo(tab));
     if (tab instanceof Tab && tab.existingView) this.w.baseWindow.contentView.removeChildView(tab.existingView);
     tab.destroy();
@@ -269,15 +270,16 @@ export class TabStrip {
     this.w.previews.forget(tabId);
     this.backgroundTabs.delete(tabId);
     this.unvisitedTabs.delete(tabId);
-    this.w.chats.tabClosed(tabId);
+    this.w.app.chats.tabClosed(tabId);
     this.w.workViews.sync();
 
     if (this.activeTabId === tabId) {
       this.activeTabId = null;
-      const [firstTab] = this.tabsMap.keys();
-      if (firstTab !== undefined) {
-        this.switchActiveTab(firstTab);
-      }
+      // The user's own tab comes to the front. A tab Berry is working in behind them stays behind, since going to one
+      // makes it theirs: their history, their session and its sound. With only those left, a new tab opens.
+      const next = [...this.tabsMap.keys()].find((id) => !this.backgroundTabs.has(id) && !this.w.app.chats.isOwnTab(id));
+      if (next !== undefined) this.switchActiveTab(next);
+      else if (this.tabsMap.size > 0) this.openPage("new-tab");
     }
 
     if (this.tabsMap.size === 0) {
@@ -305,7 +307,7 @@ export class TabStrip {
     // Opening anything from Chats or a card is done with it, even the tab already in front.
     this.w.panels.closePopover(false);
     this.activeTabId = tabId;
-    if (tab instanceof InternalTab && tab.page === "chat" && tab.param) this.w.chats.markSeen(tab.param);
+    if (tab instanceof InternalTab && tab.page === "chat" && tab.param) this.w.app.chats.markSeen(tab.param);
     this.w.panels.seePanelChat();
     if (tab instanceof Tab) tab.webContents.setAudioMuted(false);
     const unvisited = this.unvisitedTabs.delete(tabId);
@@ -373,9 +375,12 @@ export class TabStrip {
     this.w.session.saveSessionSoon();
   }
 
-  // When the window has closed.
+  // The window has closed. The app's chats outlive it, so they let go of its tabs as if each had closed.
   destroyAll(): void {
-    this.tabsMap.forEach((tab) => tab.destroy());
+    this.tabsMap.forEach((tab, id) => {
+      tab.destroy();
+      this.w.app.chats.tabClosed(id);
+    });
     this.tabsMap.clear();
   }
 }

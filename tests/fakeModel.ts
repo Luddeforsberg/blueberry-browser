@@ -31,10 +31,23 @@ export const startFakeModel = async () => {
   let memory = '{"facts":[]}';
   const memoryRequests: FakeModelRequest[] = [];
   let suggest: ((digest: string) => string) | null = null;
+  let holdSuggestion: Promise<void> | null = null;
   const suggestionRequests: FakeModelRequest[] = [];
   // The keys each request came with, and the ones it turns down, as the real service would.
   const keys: string[] = [];
   const refused = new Set<string>();
+
+  // What the cheap model says: a title, what to remember, or suggestions, which wait while held.
+  const cheapAnswer = async (parsed: FakeModelRequest) => {
+    const asksWhatToRemember = JSON.stringify(parsed.messages[0]).includes("offer to remember");
+    const human = parsed.messages.at(-1)?.content;
+    const asksForSuggestions = typeof human === "string" && human.startsWith("<browsing_digest>");
+    (asksWhatToRemember ? memoryRequests : asksForSuggestions ? suggestionRequests : titleRequests).push(parsed);
+    if (asksWhatToRemember) return memory;
+    if (!asksForSuggestions) return title;
+    await holdSuggestion;
+    return suggest?.(human) ?? '{"cards":[]}';
+  };
 
   const respond = async (request: IncomingMessage, response: ServerResponse) => {
     if (request.method !== "POST" || !request.url?.endsWith("/chat/completions")) {
@@ -54,10 +67,7 @@ export const startFakeModel = async () => {
     }
 
     if (parsed.model === TITLE_MODEL) {
-      const asksWhatToRemember = JSON.stringify(parsed.messages[0]).includes("offer to remember");
-      const human = parsed.messages.at(-1)?.content;
-      const asksForSuggestions = typeof human === "string" && human.startsWith("<browsing_digest>");
-      (asksWhatToRemember ? memoryRequests : asksForSuggestions ? suggestionRequests : titleRequests).push(parsed);
+      const content = await cheapAnswer(parsed);
       response.setHeader("content-type", "application/json");
       response.end(
         JSON.stringify({
@@ -70,7 +80,7 @@ export const startFakeModel = async () => {
               index: 0,
               message: {
                 role: "assistant",
-                content: asksWhatToRemember ? memory : asksForSuggestions ? (suggest?.(human) ?? '{"cards":[]}') : title,
+                content,
               },
               finish_reason: "stop",
             },
@@ -140,6 +150,7 @@ export const startFakeModel = async () => {
       requests.length = 0;
       titleRequests.length = 0;
       suggest = null;
+      holdSuggestion = null;
       suggestionRequests.length = 0;
     },
     // What the title model answers. NONE means the chat has no topic yet.
@@ -149,6 +160,12 @@ export const startFakeModel = async () => {
     // What the cheap model proposes for the new tab, worked out from the digest it was sent.
     suggestFrom(next: (digest: string) => string) {
       suggest = next;
+    },
+    // Suggestions are answered only once the returned function is called.
+    holdSuggestions() {
+      let release = () => {};
+      holdSuggestion = new Promise<void>((resolve) => (release = resolve));
+      return () => release();
     },
     // What the cheap model proposes for a mascot to remember.
     proposeMemory(...facts: Array<{ text: string; site: string | null }>) {

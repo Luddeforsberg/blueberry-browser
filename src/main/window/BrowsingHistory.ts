@@ -1,7 +1,8 @@
 import { app } from "electron";
 import { browserDataFor, findBrowsers, readBrowserHistory } from "../library/browserHistory";
 import type { HistoryCursor, HistoryImportResult, HistoryPage, ImportSource, VisitedPage } from "../../shared/ipc";
-import type { WindowParts, WindowStores } from "./WindowParts";
+import type { WindowParts } from "./WindowParts";
+import type { AppStores } from "../app/appStores";
 
 // What the address field sends to look up in the history, at most.
 const MAX_SUGGEST_TEXT = 200;
@@ -11,7 +12,7 @@ const MAX_SUGGEST_TEXT = 200;
 export class BrowsingHistory {
   constructor(
     private readonly w: WindowParts,
-    private readonly stores: WindowStores,
+    private readonly stores: AppStores,
   ) {}
 
   searchHistory(options: { query?: string; before?: HistoryCursor | undefined }): HistoryPage {
@@ -48,18 +49,20 @@ export class BrowsingHistory {
   async importHistory(sourceId: string): Promise<HistoryImportResult> {
     const visits = await readBrowserHistory(this.browserData, sourceId);
     if (!visits) return { ok: false };
+    let added: number;
     try {
-      const added = this.stores.history.importVisits(visits);
-      this.w.settingsChanges.firstJobDone("history");
-      if (added > 0) {
-        this.w.suggestions.historyImported();
-        this.w.library.publishSuggestions();
-      }
-      return { ok: true, added };
+      added = this.stores.history.importVisits(visits);
     } catch (error) {
       console.error("Failed to save imported history:", (error as Error).message);
       return { ok: false };
     }
+    // Saved, so it says so, even if the window closed during the read. What's the window's happens only while it's open.
+    if (added > 0) this.w.app.suggestions.historyImported();
+    if (this.w.app.window === this.w) {
+      this.w.settingsChanges.firstJobDone("history");
+      if (added > 0) this.w.library.publishSuggestions();
+    }
+    return { ok: true, added };
   }
 
   async clearHistory(): Promise<boolean> {

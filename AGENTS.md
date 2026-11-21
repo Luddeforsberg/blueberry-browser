@@ -45,7 +45,7 @@ CI runs typecheck, the format check, lint, knip, unit tests and build on macOS a
 
 Each line is a section of [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md), in the same order. Read the section before changing its area: it says what the area must never do.
 
-- `src/main/window/` and `menus/`: the window and its views. Read `Window.ts`, then `WindowParts.ts`. `Layout.ts` places every region.
+- `src/main/app/`, `src/main/window/` and `menus/`: what the app has one of, and the window and its views. Read `AppServices.ts`, then `Window.ts` and `WindowParts.ts`. `Layout.ts` places every region.
 - `src/shared/ipc/`, `src/preload/chrome.ts` and `src/main/window/EventManager.ts`: the IPC contract. A new invoke channel goes in `ipc/invoke.ts`, then `CHANNEL_REGIONS` in `src/main/window/ipc.ts`, then the preload. An event goes in `ipc/events.ts`.
 - `src/main/tabs/`, `library/` and `settings/SitePermissions.ts`: tabs, the session, history, bookmarks, downloads and site permissions. Read `Tab.ts`.
 - `src/main/chats/`: every chat and job, attachments too. Read `Chats.ts`, then `agent.ts`.
