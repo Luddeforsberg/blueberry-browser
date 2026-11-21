@@ -18,30 +18,66 @@ const net = vi.hoisted((): Setup["net"] => ({
   connect: () => Promise.reject(new Error("No world.")),
   attach: () => Promise.reject(new Error("No world.")),
 }));
-// In the shape of now, and the one from before, so the checker runs against both.
-const EMPTY = vi.hoisted(() => ({ apiKey: null, projectId: null, contextId: null, handles: [], sessionId: null, tags: [], madeBy: null }));
-const disk = vi.hoisted((): Setup["disk"] => ({ saved: { ...EMPTY }, onWrite: () => {}, failsFor: 0 }));
+// The cloud's files, read and written by the app's own cloudFile.ts, on a disk of their own whose saves can fail. A key
+// is sealed as "sealed:" and the key, and anything else can't be opened, as a damaged one can't.
+const disk = vi.hoisted((): Setup["disk"] => ({ files: new Map(), onWrite: () => {}, failsFor: 0 }));
 
-vi.mock("electron", () => ({ safeStorage: { isEncryptionAvailable: () => true }, app: { isPackaged: true } }));
-vi.mock("playwright-core", () => ({ chromium: { connectOverCDP: (url: string) => net.connect(url) } }));
-vi.mock("./cloudFile", () => ({
-  EMPTY,
-  MAX_FIELD_LENGTH: 200,
-  readCloudFile: () => ({ ...disk.saved }),
-  writeCloudFile: (_file: string, saved: Setup["disk"]["saved"]) => {
-    if (disk.failsFor > 0) {
-      disk.failsFor--;
-      return false;
-    }
-    disk.onWrite(saved);
-    disk.saved = { ...saved };
-    return true;
+vi.mock("electron", () => ({
+  safeStorage: {
+    isEncryptionAvailable: () => true,
+    encryptString: (text: string) => Buffer.from(`sealed:${text}`),
+    decryptString: (sealed: Buffer) => {
+      const text = sealed.toString();
+      if (!text.startsWith("sealed:")) throw new Error("It can't be opened.");
+      return text.slice("sealed:".length);
+    },
   },
+  app: { isPackaged: true },
 }));
+vi.mock("playwright-core", () => ({ chromium: { connectOverCDP: (url: string) => net.connect(url) } }));
+vi.mock("fs", async (original) => {
+  const fs = await original<typeof import("fs")>();
+  // Only the cloud's own files, and their temporary copies. The list of sign-ins goes to the real disk.
+  const ours = (path: unknown) =>
+    typeof path === "string" && /cloud(-sessions)?\.json(\.tmp)?$/.test(path) ? path.split(/[\\/]/).pop() : null;
+  const missing = () => Object.assign(new Error("ENOENT: no such file"), { code: "ENOENT" });
+  return {
+    ...fs,
+    existsSync: (path: string) => {
+      const name = ours(path);
+      return name ? disk.files.has(name) : fs.existsSync(path);
+    },
+    readFileSync: (path: string, options?: unknown) => {
+      const name = ours(path);
+      if (!name) return fs.readFileSync(path, options as BufferEncoding);
+      const text = disk.files.get(name);
+      if (text === undefined) throw missing();
+      return text;
+    },
+    writeFileSync: (path: string, data: string, options?: unknown) => {
+      const name = ours(path);
+      if (!name) return fs.writeFileSync(path, data, options as BufferEncoding);
+      if (disk.failsFor > 0) {
+        disk.failsFor--;
+        throw new Error("ENOSPC: no space left on device");
+      }
+      disk.files.set(name, data);
+    },
+    renameSync: (from: string, to: string) => {
+      const [source, name] = [ours(from), ours(to)];
+      if (!source || !name) return fs.renameSync(from, to);
+      const text = disk.files.get(source);
+      if (text === undefined) throw missing();
+      disk.files.delete(source);
+      disk.onWrite(name, text);
+      disk.files.set(name, text);
+    },
+  };
+});
 
 const RUNS = Number(process.env.CLOUD_RUNS) || 5_000;
 const FIRST_SEED = 1;
-// Where the list of sign-ins goes, beside the cloud's own file, which never reaches the disk here.
+// Where the list of sign-ins goes, beside the cloud's own files, which never reach the real disk.
 const folder = mkdtempSync(join(tmpdir(), "cloud-lifetime-"));
 
 // The one place that knows how this version of the cloud is made and attached.
@@ -62,8 +98,9 @@ const setup: Setup = {
       ({ apiKey, projectId }) => (local ? standIn : apiKey && projectId ? browserbase({ apiKey, projectId }) : null),
       readCookies,
     );
-    // What it holds, which only it knows when a save has failed.
-    const key = () => (tabs as unknown as { saved: { apiKey: string | null } }).saved.apiKey;
+    // What it holds, which only it knows when a save has failed, as this code keeps it and as the code before did.
+    const held = tabs as unknown as { key?: { apiKey: string | null }; saved?: { apiKey: string | null } };
+    const key = () => (held.key ?? held.saved)?.apiKey ?? null;
     return { tabs, key, windowOpened: (hooks) => tabs.attach(hooks), windowClosed: () => tabs.detach(), quit: () => tabs.quit() };
   },
   // Each run starts with no sign-ins brought along.

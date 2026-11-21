@@ -26,6 +26,8 @@ interface Pending {
   owner: Owner;
   // The session a release is for.
   id?: string;
+  // When it was sent, for a create's landing.
+  sent?: number;
   // Gives the answer, and says what it was, for the trace.
   answer: (how: number) => string;
 }
@@ -116,8 +118,8 @@ export abstract class WorldBrowsers {
     return `${one.id} crashed`;
   }
 
-  protected push(kind: Kind, owner: Owner, answer: (how: number) => string, id?: string): Pending {
-    const item: Pending = { kind, owner, answer, ...(id ? { id } : {}) };
+  protected push(kind: Kind, owner: Owner, answer: (how: number) => string, more: Pick<Pending, "id" | "sent"> = {}): Pending {
+    const item: Pending = { kind, owner, answer, ...more };
     this.pending.push(item);
     return item;
   }
@@ -128,7 +130,7 @@ export abstract class WorldBrowsers {
     answer: (how: number, resolve: (value: T) => void, reject: (error: Error) => void) => string,
     id?: string,
   ): Promise<T> {
-    return new Promise<T>((resolve, reject) => this.push(kind, owner, (how) => answer(how, resolve, reject), id));
+    return new Promise<T>((resolve, reject) => this.push(kind, owner, (how) => answer(how, resolve, reject), id ? { id } : {}));
   }
 
   // Playwright's `connectOverCDP`, to a session's address. The connection is the key's that gave the address.

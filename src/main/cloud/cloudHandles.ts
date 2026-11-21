@@ -2,12 +2,17 @@ import { randomUUID } from "node:crypto";
 import { KeyRefused, type CloudBrowser, type CloudIds, type CreateHooks, type Handle } from "./cloudProvider";
 
 // What is kept of the cloud's sessions so each can be ended: a handle for every session that may be running, from before
-// it's asked for until there's proof it isn't. Proof is the provider confirming it ended, refusing outright to make it,
-// or its deadline passing. A list that doesn't show it never is, since its create may land afterwards. A handle is
-// released only through the provider and project that made it, and a new key never drops one. Plain Node, like
-// `CloudLife`, which owns one.
+// it's asked for until there's proof it isn't. Proof is the provider confirming it ended or refusing outright to make it.
+// A list that doesn't show it never is, since its create may land afterwards. The deadline only says when a handle may
+// be forgotten: past it, after one more try at ending it, or at once for another provider's, which nothing here can
+// try. It never stops a try, since ending a session that has gone does no harm. A handle is released only through the
+// provider and project that made it, and a new key never drops one. Plain Node, like `CloudLife`, which owns one.
 
 const NOT_KEPT = "The cloud settings couldn't be saved, so no cloud session was started.";
+// So the file stays small. Every handle in it is kept, so the limit is on asking for more.
+const MAX_KEPT = 100;
+const TOO_MANY =
+  "Too many cloud sessions from before haven't confirmed they ended, so no new one was started. Press End in Settings > Cloud to end them first.";
 
 export interface HandlesHooks {
   // Told each time the ids change, to keep for next time. False if they couldn't be kept.
@@ -32,19 +37,17 @@ export class CloudHandles {
     private readonly browser: () => CloudBrowser | null,
     private readonly hooks: HandlesHooks,
   ) {
-    // Past its deadline, a session has ended on its own, so it isn't kept, here or in `set`.
-    this.ids = { ...ids, handles: ids.handles.filter(({ until }) => until > Date.now()) };
+    this.ids = this.pruned(ids);
   }
 
   get current(): CloudIds {
     return this.ids;
   }
 
-  // The handles this provider can end. Another's stay saved, untouched, for that one.
+  // The handles this provider can end, past their deadline or not. Another's stay saved, untouched, for that one.
   mine(): Handle[] {
     const origin = this.browser()?.origin;
-    const now = Date.now();
-    return origin ? this.ids.handles.filter(({ by, until }) => by === origin && until > now) : [];
+    return origin ? this.ids.handles.filter(({ by }) => by === origin) : [];
   }
 
   kept(): string[] {
@@ -81,6 +84,11 @@ export class CloudHandles {
     return known[known.length - 1]?.id ?? null;
   }
 
+  // False if it couldn't be saved.
+  keepContext(contextId: string | null): boolean {
+    return this.set({ ...this.ids, contextId });
+  }
+
   // A new provider or key, so what the last one said about its releases no longer holds. Every handle stays.
   reset(contextId: string | null): void {
     this.failed.clear();
@@ -95,9 +103,15 @@ export class CloudHandles {
   }
 
   private set(ids: CloudIds): boolean {
-    const now = Date.now();
-    this.ids = { ...ids, handles: ids.handles.filter(({ until }) => until > now) };
+    this.ids = this.pruned(ids);
     return this.hooks.onIds?.(this.ids) ?? true;
+  }
+
+  // Without another provider's handles that are past their deadline, which only that provider could have tried to end.
+  private pruned(ids: CloudIds): CloudIds {
+    const origin = this.browser()?.origin;
+    const now = Date.now();
+    return { ...ids, handles: ids.handles.filter(({ by, until }) => by === origin || until > now) };
   }
 
   private without(tag: string): void {
@@ -115,8 +129,9 @@ export class CloudHandles {
     const tags: string[] = [];
     const hooks: Omit<CreateHooks, "wanted"> = {
       tag: (until) => {
-        const handle: Handle = { tag: randomUUID(), id: null, by: browser.origin, until };
         const before = this.ids;
+        if (before.handles.length >= MAX_KEPT) throw new Error(TOO_MANY);
+        const handle: Handle = { tag: randomUUID(), id: null, by: browser.origin, until };
         if (!this.set({ ...before, handles: [...before.handles, handle] })) {
           this.set(before);
           throw new Error(NOT_KEPT);
@@ -133,9 +148,13 @@ export class CloudHandles {
       context: (id) => {
         if (current() && !this.ids.contextId) this.set({ ...this.ids, contextId: id });
       },
-      made: (tag, id) => {
+      // With the provider's own deadline, once it has said it.
+      made: (tag, id, until) => {
         if (!tags.includes(tag)) return;
-        this.set({ ...this.ids, handles: this.ids.handles.map((one) => (one.tag === tag ? { ...one, id } : one)) });
+        this.set({
+          ...this.ids,
+          handles: this.ids.handles.map((one) => (one.tag === tag ? { ...one, id, until: until ?? one.until } : one)),
+        });
         if (!current()) void this.releaseOne(tag);
       },
     };

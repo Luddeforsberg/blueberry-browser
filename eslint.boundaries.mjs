@@ -111,10 +111,11 @@ const rules = [
   },
   onlyFrom(
     "the cookie code",
-    file("cloudLogins", "cloudLoginAccess"),
+    file("cloudLogins", "cloudLoginAccess", "signedInTo"),
     [
       "cloud/CloudTabs.ts",
       "cloud/cloudLoginAccess.ts",
+      "cloud/signedInTo.ts",
       "cloud/cloudLogins.test.ts",
       "cloud/cloudLoginAccess.test.ts",
       "window/makeCloud.ts",
@@ -321,6 +322,7 @@ const rules = [
     file("CloudTabs"),
     [
       "cloud/CloudTabs.test.ts",
+      "cloud/cloudTabsTesting.ts",
       "cloud/cloudLifetime.test.ts",
       "cloud/cloudCheckTesting.ts",
       "cloud/cloudCheckApp.ts",

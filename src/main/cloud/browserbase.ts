@@ -11,8 +11,15 @@ export const BROWSERBASE_REGION = "eu-central-1";
 // Seconds. A kept-alive session runs, and costs, until this or until it's released. Sent with every create, so each has a
 // deadline the app knows.
 const SESSION_TIMEOUT_S = 3600;
-// How late a create may land after it's sent and still start its clock. Its answer is waited on for far less.
+// How late a create may land after it's sent and still start its clock. Its answer is waited on for far less. Only a
+// session whose answer never came is held to it: one that answered says its own deadline.
 const LANDING_MS = 10 * 60_000;
+// Added to Browserbase's deadline, in case this computer's clock is behind its own.
+const CLOCK_MS = 5 * 60_000;
+const deadlineOf = (expiresAt: unknown): number | undefined => {
+  const expires = typeof expiresAt === "string" ? Date.parse(expiresAt) : NaN;
+  return Number.isFinite(expires) ? expires + CLOCK_MS : undefined;
+};
 // What Browserbase says of a session that has stopped, and costs nothing more.
 const ENDED = ["COMPLETED", "ERROR", "TIMED_OUT"];
 const NOT_YET = "The last cloud session hasn't said whether it's still running, so no new one was started. Try again in a moment.";
@@ -34,6 +41,8 @@ interface Session {
   id: string;
   status: string;
   connectUrl?: string;
+  // When Browserbase ends it on its own, by its clock.
+  expiresAt?: unknown;
 }
 
 // What a listing says of each session.
@@ -152,7 +161,7 @@ export const browserbase = ({
     }
     if (typeof made.id !== "string" || !made.id) throw new Error("Browserbase didn't say which session it made.");
     // Kept before anything else about it is checked, so it can be released whatever comes next.
-    hooks.made(tag, made.id);
+    hooks.made(tag, made.id, deadlineOf(made.expiresAt));
     if (!made.connectUrl) throw new Error("Browserbase didn't say how to connect to the session.");
     return { ...made, connectUrl: made.connectUrl };
   };

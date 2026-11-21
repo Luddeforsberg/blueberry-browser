@@ -3,6 +3,7 @@ import {
   actionApprovalFromRow,
   fitJobUpdate,
   historyFromRow,
+  liveJobsOf,
   type ApprovalToAsk,
   type CloudJobStatus,
 } from "../../src/main/remoteJobs/cloudJobs";
@@ -18,7 +19,6 @@ import type { DueRoutine, RoutineDb } from "./routines";
 // refuses it too. No error passes on anything from a reply but its status.
 
 const CALL_ABORT_MS = 15_000;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const REFRESH_BEFORE_MS = 60_000;
 
 export interface ClaimedJob {
@@ -184,12 +184,8 @@ export const supabaseDb = (
   };
 
   return {
-    // Which of these jobs a runner may still be working on, by the server's clock. One it can't ask about counts as live.
-    liveJobs: async (jobs) => {
-      const asked = jobs.filter((id) => UUID.test(id));
-      const live = asked.length ? ((await rpc<unknown[]>("runner_live_jobs", { p_jobs: asked })) ?? []) : [];
-      return new Set([...jobs.filter((id) => !UUID.test(id)), ...live.filter((id): id is string => typeof id === "string")]);
-    },
+    // Which of these jobs a runner may still be working on, by the server's clock.
+    liveJobs: (jobs) => liveJobsOf(jobs, (ids) => rpc("runner_live_jobs", { p_jobs: ids })),
     // Takes up the link the owner made in Blueberry. False until they have.
     accept: async () => (await rpc("accept_cloud_runner_link", { p_owner_email: owner })) === true,
     // Where ChatGPT and Claude connect, for the owner to see in Settings. Null when the relay is off.

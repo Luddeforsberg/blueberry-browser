@@ -48,7 +48,8 @@ export interface CreateHooks {
   // The provider refused that ask outright, so nothing was made with the tag.
   unused(tag: string): void;
   context(id: string): void;
-  made(tag: string, id: string): void;
+  // `until` is the provider's own deadline for it, when it says one.
+  made(tag: string, id: string, until?: number): void;
 }
 
 // A session the provider has made, or found still running, before anything has connected to it.

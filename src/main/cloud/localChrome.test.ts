@@ -52,6 +52,15 @@ describe("localChrome", () => {
     expect(connecting.connect).not.toHaveBeenCalled();
   });
 
+  it("kills the browser it launched while the connection closes, so a close that stalls can't keep it running", async () => {
+    connecting.connect.mockResolvedValueOnce({ close: () => new Promise(() => {}), contexts: () => [{}] });
+    const starting = started(new AbortController().signal);
+    await expect.poll(() => chrome.made.length).toBe(1);
+    chrome.made[0]?.listening();
+    void (await starting).close();
+    await expect.poll(() => chrome.made[0]?.kill.mock.calls.length).toBe(1);
+  });
+
   it("kills a browser stopped while it's being connected to", async () => {
     const stop = new AbortController();
     void started(stop.signal).catch(() => {});

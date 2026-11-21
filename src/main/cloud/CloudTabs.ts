@@ -2,12 +2,13 @@ import { dirname, join } from "path";
 import { safeStorage, type WebContents } from "electron";
 import type { CloudState, CloudView } from "../../shared/ipc";
 import { browserbaseOrigin, isLiveView } from "./browserbase";
-import { EMPTY, MAX_FIELD_LENGTH, readCloudFile, writeCloudFile, type Saved } from "./cloudFile";
+import { MAX_FIELD_LENGTH, NO_KEY, readCloudIds, readCloudKey, sessionsFile, writeCloudIds, writeCloudKey, type Key } from "./cloudFile";
 import type { CdpTab } from "../tools/CdpTab";
 import type { ChatCloud } from "../chats/Chats";
 import { CloudSessions } from "./cloudBrowser";
 import type { CloudBrowser, Released } from "./cloudProvider";
-import { CloudLogins, loginSite, type StoredCookie } from "./cloudLogins";
+import type { StoredCookie } from "./cloudLogins";
+import { SignedInTo } from "./signedInTo";
 import { sendToRenderer } from "../window/ipc";
 import { CloudPictures } from "./cloudPictures";
 
@@ -45,45 +46,44 @@ export interface CloudTabsHooks {
 type Attachment = { hooks: CloudTabsHooks };
 
 export class CloudTabs implements ChatCloud {
-  private saved: Saved;
+  private key: Key;
   private readonly sessions: CloudSessions;
   private attached: Attachment | null = null;
   private problem: string | null = null;
   // Forget or a new key kept the key, for a session the provider didn't confirm had ended or another provider made.
   private endFirst = false;
   private readonly pictures: CloudPictures;
-  // Tabs the user opened to see whether they're signed in, and the site each is for. No job can reach them.
-  private readonly checking = new Map<string, string>();
-  private readonly logins: CloudLogins;
+  // Settings > Cloud > Signed in to, and the tabs open to check it.
+  readonly signedIn: SignedInTo;
   private quitting: Promise<void> | null = null;
 
   constructor(
     private readonly file: string,
     // The browser a saved key makes: Browserbase, a Chrome on this computer where an unpackaged app asked for one, or none.
-    private readonly provider: (saved: Saved) => CloudBrowser | null,
+    private readonly provider: (key: Key) => CloudBrowser | null,
     // That one site's cookies from this browser's own session. Nothing else.
     readCookies: (site: string) => Promise<StoredCookie[]>,
   ) {
-    this.saved = readCloudFile(file);
-    const { contextId, handles } = this.saved;
-    this.sessions = new CloudSessions(
-      provider(this.saved),
-      { contextId, handles },
-      {
-        onChange: () => this.changed(),
-        onIds: (ids) => {
-          this.saved = { ...this.saved, ...ids };
-          return this.save();
-        },
-      },
-    );
+    this.key = readCloudKey(file);
+    const idsFile = sessionsFile(file);
+    const { ids, moved } = readCloudIds(idsFile, file);
+    if (moved) writeCloudIds(idsFile, ids);
+    this.sessions = new CloudSessions(provider(this.key), ids, {
+      onChange: () => this.changed(),
+      onIds: (next) => writeCloudIds(idsFile, next),
+    });
     this.pictures = new CloudPictures({
       page: (id) => this.page(id),
       working: (id) => !!this.sessions.usedBy(id) && !this.sessions.heldByUser(id),
       chrome: () => this.hooks?.chrome() ?? null,
     });
-    this.logins = new CloudLogins(join(dirname(file), "cloud-logins.json"), {
-      jar: () => (this.sessions.provider ? this.sessions : null),
+    this.signedIn = new SignedInTo(join(dirname(file), "cloud-logins.json"), {
+      sessions: this.sessions,
+      window: () => {
+        const at = this.attached;
+        return at && { ...at.hooks, still: () => this.still(at) !== null, retitle: (id) => this.retitle(at, id) };
+      },
+      page: (id) => this.page(id),
       confirm: (site) => this.hooks?.confirmLogin(site) ?? Promise.resolve(false),
       readCookies,
       onChange: () => this.changed(),
@@ -122,13 +122,13 @@ export class CloudTabs implements ChatCloud {
     const { sessions } = this;
     return {
       provider: sessions.provider,
-      configured: !!this.saved.apiKey && !!this.saved.projectId,
+      configured: !!this.key.apiKey && !!this.key.projectId,
       status: sessions.provider ? sessions.status : "off",
       busy: !!sessions.busyWith,
       canEnd: sessions.canEnd,
       unreleased: sessions.unreleased,
       problem: this.problem ?? this.waitedFor ?? sessions.problem,
-      logins: this.logins.logins,
+      logins: this.signedIn.list,
     };
   }
 
@@ -142,7 +142,7 @@ export class CloudTabs implements ChatCloud {
   // Whether the saved key is the only way to end a session the browser now can't, as when a Chrome on this computer
   // stands in for Browserbase.
   private get keyNeeded(): boolean {
-    const origin = this.saved.projectId ? browserbaseOrigin(this.saved.projectId) : null;
+    const origin = this.key.projectId ? browserbaseOrigin(this.key.projectId) : null;
     return origin !== null && origin !== this.sessions.origin && this.sessions.keptBy(origin);
   }
 
@@ -169,9 +169,15 @@ export class CloudTabs implements ChatCloud {
           this.endFirst = true;
           return null;
         }
-        // Every session that may still be running stays, for a key from its own project to end.
-        this.saved = { ...this.saved, apiKey: key, projectId: project, contextId: null };
-        return { browser: this.provider(this.saved) };
+        // Every session that may still be running stays, for a key from its own project to end. The old account's
+        // Context leaves the disk before the new key reaches it, so a crash between the two never pairs them.
+        const context = this.sessions.contextId;
+        if (!this.sessions.keepContext(null) || !this.keep({ apiKey: key, projectId: project })) {
+          this.problem = NOT_SAVED;
+          this.sessions.keepContext(context);
+          return null;
+        }
+        return { browser: this.provider(this.key) };
       });
     }
     this.changed();
@@ -185,9 +191,8 @@ export class CloudTabs implements ChatCloud {
     await this.sessions.replace((released) => {
       this.endFirst = released === "running" || this.keyNeeded;
       this.problem = released === "refused" ? LEFT_RUNNING : null;
-      if (this.endFirst) return null;
-      this.saved = { ...EMPTY, handles: this.saved.handles };
-      return { browser: this.provider(this.saved) };
+      if (this.endFirst || !this.keep(NO_KEY)) return null;
+      return { browser: this.provider(this.key) };
     });
     this.changed();
     return this.state;
@@ -208,9 +213,8 @@ export class CloudTabs implements ChatCloud {
 
   // Everything here that isn't the session: a copy waiting on the user copies nothing, and the pictures stop.
   private stopWork(): void {
-    this.logins.cancelPending();
+    this.signedIn.stop();
     this.pictures.stop();
-    this.checking.clear();
   }
 
   // ChatCloud
@@ -272,7 +276,7 @@ export class CloudTabs implements ChatCloud {
 
   // The window closed the tab, so the page goes too, and the user has let go of it.
   tabClosed(id: string): void {
-    this.checking.delete(id);
+    this.signedIn.closed(id);
     this.pictures.forget(id);
     this.sessions.letGo(id);
     void this.sessions.close(id);
@@ -285,7 +289,7 @@ export class CloudTabs implements ChatCloud {
     if (!page) return { kind: "gone" };
     const takenOver = this.sessions.heldByUser(page.id);
     const live = await this.sessions.liveView(page.id);
-    const checking = this.checking.get(page.id) ?? null;
+    const checking = this.signedIn.siteOf(page.id);
     if (live === null) return { kind: "frames", takenOver, checking };
     // The chrome puts this in a frame, so it's only ever Browserbase's own page.
     return isLiveView(live) ? { kind: "live", url: live, takenOver, checking } : { kind: "gone" };
@@ -308,76 +312,14 @@ export class CloudTabs implements ChatCloud {
     return true;
   }
 
-  // Signed in to: only from Settings, so only the user starts any of it. `input` is what they picked or typed, which
-  // may be a whole address to open for the check.
-
-  async bringLogin(input: unknown): Promise<string | null> {
-    const site = loginSite(input);
-    if (!site) return "That isn't a site's address.";
-    const at = this.attached;
-    const problem = await this.logins.bring(site);
-    // The check opens in the window it was asked from, or nowhere.
-    return problem ?? (at && this.still(at) ? await this.checkLogin(input) : NO_WINDOW);
-  }
-
-  // Opens the site in a cloud tab in front, for the user to see whether they're signed in there.
-  async checkLogin(input: unknown): Promise<string | null> {
-    const site = loginSite(input);
-    if (!site) return "That isn't a site's address.";
-    if (!this.sessions.provider) return "The cloud browser is off.";
-    const at = this.attached;
-    if (!at) return NO_WINDOW;
-    const url = typeof input === "string" && /^https?:\/\//i.test(input.trim()) ? input.trim() : `https://${site}/`;
-    const id = at.hooks.openTab(site);
-    // Noted before it opens, so the tab is the check's while it does.
-    this.checking.set(id, site);
-    try {
-      // The user's from the start. Null if they closed the tab while it opened.
-      if (!(await this.sessions.openForUser(id, url, { onChange: () => this.retitle(at, id) }))) return null;
-    } catch {
-      // A window that has closed took the tab and the check with it, and the next one's may have the same id.
-      if (this.still(at)) {
-        this.checking.delete(id);
-        at.hooks.closeTab(id);
-      }
-      return "The cloud browser couldn't open it.";
+  // On disk first. A key that couldn't be saved isn't used, so the disk never pairs a Context with another account's key.
+  private keep(key: Key): boolean {
+    if (!writeCloudKey(this.file, key)) {
+      this.problem = NOT_SAVED;
+      return false;
     }
-    this.still(at)?.showTab(id);
-    this.changed();
-    return null;
-  }
-
-  markLogin(input: unknown, signedIn: unknown): void {
-    const site = loginSite(input);
-    if (site) this.logins.mark(site, signedIn === true);
-  }
-
-  // A tab open to check that site loads again, so the user sees it signed out.
-  async revokeLogin(input: unknown): Promise<string | null> {
-    const site = loginSite(input);
-    if (!site) return "That isn't a site's address.";
-    const problem = await this.logins.revoke(site);
-    if (!problem) this.reloadChecks((checked) => checked === site);
-    return problem;
-  }
-
-  async forgetLogins(): Promise<string | null> {
-    const problem = await this.logins.forgetAll();
-    if (!problem) this.reloadChecks(() => true);
-    return problem;
-  }
-
-  private reloadChecks(which: (site: string) => boolean): void {
-    this.checking.forEach((site, id) => {
-      const page = this.page(id);
-      if (page && which(site)) void page.loadURL(page.url).catch(() => {});
-    });
-  }
-
-  private save(): boolean {
-    const saved = writeCloudFile(this.file, this.saved);
-    if (!saved) this.problem = NOT_SAVED;
-    return saved;
+    this.key = key;
+    return true;
   }
 
   // The app is quitting. The session ends at the provider, from its saved id, without waiting for a connection, and a

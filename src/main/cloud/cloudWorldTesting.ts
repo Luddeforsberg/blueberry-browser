@@ -1,12 +1,15 @@
 // A fake Browserbase for the cloud's model checker, with the browsers and pages behind it in cloudWorldBrowsers.ts. A
 // create lands on its own, apart from its answer: the session is made, and costs, when it lands, which can come after
-// its answer timed out and even after the app that sent it has gone. Each key belongs to a project and sees only that
-// project's sessions, and each session ends on its own at the timeout it was asked with.
-import { FAILS, ODD, ownerOf, WORKS, WorldBrowsers } from "./cloudWorldBrowsers";
+// its answer timed out and even after the app that sent it has gone, but within `LANDING_MS` of being sent or never.
+// Each key belongs to a project and sees only that project's sessions, and each session ends on its own at the timeout
+// it was asked with, which its answer says as `expiresAt`.
+import { FAILS, ODD, ownerOf, WorldBrowsers } from "./cloudWorldBrowsers";
 
-export { LOCAL, WORKS, type LocalSession } from "./cloudWorldBrowsers";
+export { FAILS, LOCAL, WORKS, type LocalSession } from "./cloudWorldBrowsers";
 
 const API = "https://api.browserbase.com/v1";
+// How late a create can land, as browserbase.ts assumes: the one thing here not from Browserbase's docs.
+const LANDING_MS = 10 * 60_000;
 
 // The parts of a fetch `Response` browserbase.ts reads.
 interface Answer {
@@ -107,11 +110,11 @@ export class CloudWorld extends WorldBrowsers {
     return this.sessions.get(id)?.project;
   }
 
-  // Every create on its way lands, as each does within a minute or so of being sent, or never.
-  landAll(): string[] {
-    const landed: string[] = [];
-    for (let said = this.answerOf(["land"], 0, WORKS); said; said = this.answerOf(["land"], 0, WORKS)) landed.push(said);
-    return landed;
+  // Before the clock moves on by `ms`: every create on its way that would by then be more than `LANDING_MS` old lands,
+  // or never does, as `how` says. Any other stays on its way.
+  landBefore(ms: number, how: number): string[] {
+    const due = this.pending.filter(({ kind, sent }) => kind === "land" && sent !== undefined && sent + LANDING_MS <= Date.now() + ms);
+    return due.map((one) => this.answer(this.pending.indexOf(one), how));
   }
 
   isApp(id: string): boolean {
@@ -165,21 +168,27 @@ export class CloudWorld extends WorldBrowsers {
     if (!this.accepted.has(key) || project === undefined)
       return this.wait("create", owner, (_how, resolve) => (resolve(this.refuse(key)), `${said} → 401, the key is refused`));
     let id: string | null = null;
-    this.push("land", owner, (how) => {
-      if (how === FAILS) return `${said} never reaches Browserbase`;
-      id = `sess-${++this.count}`;
-      const until = Date.now() + (sent.timeout ?? 300) * 1000;
-      this.sessions.set(id, { ended: false, until, metadata: { ...sent.userMetadata }, key, project });
-      return `${said} lands, making ${id}`;
-    });
+    this.push(
+      "land",
+      owner,
+      (how) => {
+        if (how === FAILS) return `${said} never reaches Browserbase`;
+        id = `sess-${++this.count}`;
+        const until = Date.now() + (sent.timeout ?? 300) * 1000;
+        this.sessions.set(id, { ended: false, until, metadata: { ...sent.userMetadata }, key, project });
+        return `${said} lands, making ${id}`;
+      },
+      { sent: Date.now() },
+    );
     return this.wait("create", owner, (how, resolve, reject) => {
       if (id === null) {
         reject(new Error("The operation timed out."));
         return `${said} → timed out, with nothing made yet`;
       }
       if (how === FAILS) return (resolve(reply(500)), `${said} → the answer for ${id} was lost`);
-      if (how === ODD) return (resolve(reply(201, { id, status: "RUNNING" })), `${said} → ${id}, with no address to connect to`);
-      resolve(reply(201, { id, status: "RUNNING", connectUrl: this.address(id, key) }));
+      const expiresAt = new Date(this.sessions.get(id)?.until ?? 0).toISOString();
+      if (how === ODD) return (resolve(reply(201, { id, status: "RUNNING", expiresAt })), `${said} → ${id}, with no address to connect to`);
+      resolve(reply(201, { id, status: "RUNNING", expiresAt, connectUrl: this.address(id, key) }));
       return `${said} → ${id}`;
     });
   }

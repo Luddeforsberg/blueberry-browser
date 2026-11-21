@@ -1,54 +1,16 @@
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import type { BrowserContext } from "playwright-core";
 import { CdpTab } from "../tools/CdpTab";
-import { KeyRefused, type CloudBrowser } from "./cloudProvider";
-import type { CloudTabsHooks } from "./CloudTabs";
 
-const encryption = vi.hoisted(() => ({ available: false }));
 vi.mock("electron", () => ({
-  safeStorage: {
-    isEncryptionAvailable: () => encryption.available,
-    encryptString: (text: string) => Buffer.from(text),
-    decryptString: (sealed: Buffer) => sealed.toString(),
-  },
+  safeStorage: { isEncryptionAvailable: () => false, encryptString: Buffer.from, decryptString: String },
   app: { isPackaged: true },
 }));
 
 const { CloudSessions } = await import("./cloudBrowser");
-const { CloudTabs } = await import("./CloudTabs");
-
-// Makes the cloud browser for a key, as makeCloud.ts does.
-type Provider = ConstructorParameters<typeof CloudTabs>[1];
+const { fakeLocal, hooks, makeTabs, tempFile } = await import("./cloudTabsTesting");
 
 // How long a session nobody uses stays open.
 const IDLE = 3 * 60_000;
-
-const tempFile = () => join(mkdtempSync(join(tmpdir(), "cloud-tabs-")), "cloud.json");
-
-// A browser whose pages open when `opened` says so, standing in for the local one.
-const fakeLocal = () => {
-  let opened: Promise<void> = Promise.resolve();
-  const context = {
-    route: async () => {},
-    on: () => {},
-    browser: () => null,
-    newPage: async () => (await opened, { on: () => {}, close: async () => {} }),
-  };
-  const browser: CloudBrowser = {
-    name: "local",
-    origin: "local",
-    release: async () => {},
-    releaseTagged: async () => "none",
-    create: async () => ({
-      id: null,
-      connect: async () => ({ context: context as unknown as BrowserContext, liveView: async () => null, close: async () => {} }),
-    }),
-  };
-  return { browser, holdPages: (until: Promise<void>) => void (opened = until) };
-};
 
 const attachTabs = () => {
   const tabs = new Map<string, { close: ReturnType<typeof vi.fn> }>();
@@ -66,51 +28,6 @@ const attachTabs = () => {
     return tab as unknown as CdpTab;
   });
   return tabs;
-};
-
-const hooks = (over: Partial<CloudTabsHooks> = {}): CloudTabsHooks => ({
-  chrome: () => ({ isDestroyed: () => true }) as never,
-  openTab: () => "tab-1",
-  updateTab: () => {},
-  closeTab: () => {},
-  takenOver: () => {},
-  showTab: () => {},
-  confirmLogin: async () => true,
-  ...over,
-});
-
-const makeTabs = (file = tempFile(), provider: Provider = () => fakeLocal().browser, over: Partial<CloudTabsHooks> = {}) => {
-  const tabs = new CloudTabs(file, provider, async () => []);
-  tabs.attach(hooks(over));
-  return tabs;
-};
-
-// Sealed as the mocked safeStorage seals, which is no more than base64.
-const sealed = (text: string) => Buffer.from(text).toString("base64");
-// As the app before handles saved it, with only the session's id.
-const OLD = { apiKey: sealed("bb_old"), projectId: sealed("proj"), contextId: "ctx-1", sessionId: "sess-1" };
-// That session, as it's kept now.
-const OLD_SESSION = { tag: "before-sess-1", id: "sess-1", by: "browserbase:proj" };
-
-// Browserbase as far as releasing goes, answering as `answer.now` says, and noting the key each release used.
-const releasing = () => {
-  const answer: { now: "ok" | "fails" | "refused" } = { now: "fails" };
-  const calls: string[] = [];
-  const provider: Provider = ({ apiKey, projectId }) =>
-    apiKey
-      ? {
-          name: "browserbase",
-          origin: `browserbase:${projectId}`,
-          create: async () => Promise.reject(new Error("Not in this test.")),
-          releaseTagged: async () => Promise.reject(new Error("Not in this test.")),
-          release: async (id) => {
-            calls.push(`${apiKey} ${id}`);
-            if (answer.now === "fails") throw new Error("Browserbase answered 500.");
-            if (answer.now === "refused") throw new KeyRefused("Browserbase refused the API key.");
-          },
-        }
-      : null;
-  return { answer, calls, provider };
 };
 
 describe("CloudTabs", () => {
@@ -197,75 +114,6 @@ describe("CloudTabs", () => {
     vi.restoreAllMocks();
   });
 
-  it("keeps the key, and the session's id, until the session it may still be running on has ended", async () => {
-    encryption.available = true;
-    const file = tempFile();
-    writeFileSync(file, JSON.stringify(OLD));
-    const saved = () => JSON.parse(readFileSync(file, "utf8")) as Record<string, string | null>;
-    const { answer, calls, provider } = releasing();
-    const tabs = makeTabs(file, provider);
-    expect((await tabs.saveKey("bb_new", "proj")).problem).toMatch(/didn't confirm it ended/);
-    expect((await tabs.forget()).problem).toMatch(/didn't confirm it ended/);
-    expect(saved()).toEqual(OLD);
-
-    answer.now = "ok";
-    expect((await tabs.saveKey("bb_new", "proj")).problem).toBeNull();
-    expect(saved()).toEqual({ apiKey: sealed("bb_new"), projectId: sealed("proj"), contextId: null, handles: [] });
-    expect(calls).toEqual(["bb_old sess-1", "bb_old sess-1", "bb_old sess-1"]);
-    encryption.available = false;
-  });
-
-  it("takes a new key, or forgets one, when Browserbase no longer takes the old one, keeping its session until it's ended", async () => {
-    encryption.available = true;
-    const file = tempFile();
-    writeFileSync(file, JSON.stringify(OLD));
-    const saved = () => JSON.parse(readFileSync(file, "utf8")) as Record<string, string | null>;
-    const { answer, calls, provider } = releasing();
-    answer.now = "refused";
-    const tabs = makeTabs(file, provider);
-    await tabs.saveKey("bb_new", "proj");
-    expect(saved()).toMatchObject({ apiKey: sealed("bb_new"), projectId: sealed("proj"), contextId: null, handles: [OLD_SESSION] });
-    // Ended once more, with the new key, which is for the same project.
-    expect(calls).toEqual(["bb_old sess-1", "bb_new sess-1"]);
-    expect((await tabs.forget()).problem).toMatch(/ends on its own within an hour/);
-    expect(saved()).toMatchObject({ apiKey: null, projectId: null, contextId: null, handles: [OLD_SESSION] });
-    encryption.available = false;
-  });
-
-  it("never ends, or forgets, a session through a key for another project", async () => {
-    encryption.available = true;
-    const file = tempFile();
-    writeFileSync(file, JSON.stringify(OLD));
-    const saved = () => JSON.parse(readFileSync(file, "utf8")) as Record<string, string | null>;
-    const { answer, calls, provider } = releasing();
-    answer.now = "refused";
-    const tabs = makeTabs(file, provider);
-    await tabs.saveKey("bb_other", "proj-2");
-    answer.now = "ok";
-    await tabs.end();
-    expect(calls).toEqual(["bb_old sess-1"]);
-    expect(saved()).toMatchObject({ projectId: sealed("proj-2"), handles: [OLD_SESSION] });
-    // A key for its own project ends it.
-    await tabs.saveKey("bb_again", "proj");
-    expect(calls).toEqual(["bb_old sess-1", "bb_again sess-1"]);
-    expect(saved()).toMatchObject({ handles: [] });
-    encryption.available = false;
-  });
-
-  it("says to press End again only while there's still something to end", async () => {
-    encryption.available = true;
-    const file = tempFile();
-    writeFileSync(file, JSON.stringify(OLD));
-    const { answer, provider } = releasing();
-    const tabs = makeTabs(file, provider);
-    expect((await tabs.saveKey("bb_new", "proj")).problem).toMatch(/Press End again first/);
-    answer.now = "ok";
-    const ended = await tabs.end();
-    expect(ended.canEnd).toBe(false);
-    expect(ended.problem).toBeNull();
-    encryption.available = false;
-  });
-
   it("leaves the next window's tabs alone when a page for the last one finishes late, though their ids are the same", async () => {
     attachTabs();
     const local = fakeLocal();
@@ -275,7 +123,7 @@ describe("CloudTabs", () => {
     const tabs = makeTabs(tempFile(), () => local.browser, { openTab: () => `tab-${++count}` });
     expect(tabs.claim("job-1")).toBe(true);
     const opening = tabs.open("job-1", "https://example.com/").catch(() => null);
-    const checking = tabs.checkLogin("github.com");
+    const checking = tabs.signedIn.check("github.com");
     await new Promise((resolve) => setTimeout(resolve, 0));
     await tabs.detach();
     // The next window's tab ids start again, so its own tab-1 and tab-2 are the user's.
@@ -295,8 +143,8 @@ describe("CloudTabs", () => {
     attachTabs();
     let opened = 0;
     const tabs = makeTabs(tempFile(), undefined, { openTab: () => `tab-${++opened}` });
-    expect(await tabs.checkLogin("example.com")).toBeNull();
-    expect(await tabs.checkLogin("github.com")).toBeNull();
+    expect(await tabs.signedIn.check("example.com")).toBeNull();
+    expect(await tabs.signedIn.check("github.com")).toBeNull();
 
     tabs.tabClosed("tab-1");
     await vi.advanceTimersByTimeAsync(IDLE);
@@ -315,7 +163,7 @@ describe("CloudTabs", () => {
     local.holdPages(new Promise((resolve) => (opened = resolve)));
     const tabs = makeTabs(tempFile(), () => local.browser);
     // The window closes while it opens, and the next one attaches.
-    const checking = tabs.checkLogin("example.com");
+    const checking = tabs.signedIn.check("example.com");
     await new Promise((resolve) => setTimeout(resolve, 0));
     await tabs.detach();
     tabs.attach(hooks());
@@ -335,7 +183,7 @@ describe("CloudTabs", () => {
     let opened = () => {};
     local.holdPages(new Promise((resolve) => (opened = resolve)));
     const tabs = makeTabs(tempFile(), () => local.browser);
-    const checking = tabs.checkLogin("example.com");
+    const checking = tabs.signedIn.check("example.com");
     await vi.advanceTimersByTimeAsync(0);
     const closedBefore = pages.get("tab-1")?.close.mock.calls.length ?? 0;
     tabs.tabClosed("tab-1");

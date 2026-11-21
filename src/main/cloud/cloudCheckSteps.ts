@@ -4,7 +4,7 @@ import { vi } from "vitest";
 import type { Breaks, Launch, Setup } from "./cloudCheckApp";
 import { flush, nth, quietly, type Action, type Op } from "./cloudCheckPlan";
 import type { Runners } from "./cloudCheckRunners";
-import type { CloudWorld } from "./cloudWorldTesting";
+import { FAILS, WORKS, type CloudWorld } from "./cloudWorldTesting";
 
 export const IDLE = 3 * 60_000;
 const HOUR = 61 * 60_000;
@@ -23,7 +23,7 @@ export interface StepContext {
 
 type Step = (action: Action) => string | null | Promise<string | null>;
 
-export const runningSteps = (context: StepContext): Record<Exclude<Op, "quit" | "crash">, Step> => ({
+export const runningSteps = (context: StepContext): Record<Exclude<Op, "quit" | "crash" | "keyDamaged">, Step> => ({
   ...appSteps(context),
   ...worldSteps(context),
 });
@@ -50,7 +50,7 @@ const appSteps = ({ app, world, breaks, next }: StepContext) => ({
     const launch = app();
     const { win } = launch;
     const before = new Set(win.tabs.keys());
-    const opening = launch.cloud.tabs.checkLogin("example.com");
+    const opening = launch.cloud.tabs.signedIn.check("example.com");
     const id = [...win.tabs.keys()].find((one) => !before.has(one));
     if (id) launch.checking.add(id);
     quietly(
@@ -110,7 +110,7 @@ const appSteps = ({ app, world, breaks, next }: StepContext) => ({
     const launch = app();
     const work = next();
     launch.cookieWork.add(work);
-    quietly(launch.cloud.tabs.revokeLogin("example.com").finally(() => launch.cookieWork.delete(work)));
+    quietly(launch.cloud.tabs.signedIn.revoke("example.com").finally(() => launch.cookieWork.delete(work)));
     return "Settings: remove a sign-in";
   },
   // Each site its own, so the checker can tell which confirm a sign-in went in with.
@@ -120,7 +120,7 @@ const appSteps = ({ app, world, breaks, next }: StepContext) => ({
     const site = `s${next()}.example.com`;
     launch.transfers.set(site, launch.account);
     quietly(
-      launch.cloud.tabs.bringLogin(site).then((problem) => {
+      launch.cloud.tabs.signedIn.bring(site).then((problem) => {
         const id = launch.tabTitled(site);
         if (problem === null && id && launch.win === win) launch.held.add(id);
       }),
@@ -140,9 +140,9 @@ const appSteps = ({ app, world, breaks, next }: StepContext) => ({
 
 // Time, the network, the disk and the runners.
 const worldSteps = ({ app, world, disk, runners, breaks, deliver, next }: StepContext) => {
-  // Every create on its way lands first, as each does within a minute or so, and then the idle timers run.
-  const pass = async (ms: number, words: string) => {
-    const landed = world.landAll();
+  // Time moves on with creates and answers still on their way, but a create lands within its time or never, as `b` says.
+  const pass = async ({ b }: Action, ms: number, words: string) => {
+    const landed = world.landBefore(ms, b % 2 === 0 ? WORKS : FAILS);
     const sent = world.releases.length;
     const local = world.localRunning;
     vi.advanceTimersByTime(ms);
@@ -156,10 +156,10 @@ const worldSteps = ({ app, world, disk, runners, breaks, deliver, next }: StepCo
   };
   return {
     answer: ({ a, b }: Action) => deliver(a, b % 4),
-    time: () => pass(IDLE, "three minutes pass"),
-    hour: () => pass(HOUR, "an hour passes"),
+    time: (action: Action) => pass(action, IDLE, "three minutes pass"),
+    hour: (action: Action) => pass(action, HOUR, "an hour passes"),
     revokeKey: () => {
-      const key = disk.saved.apiKey;
+      const key = app().cloud.key();
       if (!key || app().local) return null;
       world.accepted.delete(key);
       return `Browserbase stops taking ${key}`;
@@ -183,6 +183,6 @@ const worldSteps = ({ app, world, disk, runners, breaks, deliver, next }: StepCo
     runnerTakes: () => runners.take(next()),
     runnerFinishes: ({ a }: Action) => runners.finish(a),
     runnerStops: ({ a }: Action) => runners.stop(a),
-    runnerStarts: () => runners.sweep(),
+    runnerStarts: ({ a }: Action) => runners.sweep(a),
   };
 };

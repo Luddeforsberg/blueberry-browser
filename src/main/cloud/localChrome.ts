@@ -130,19 +130,20 @@ const start = async (endpoint: string | undefined, executable: string | undefine
       throw error;
     })
     .finally(() => stop.removeEventListener("abort", stopped));
+  // The browser it launched is killed while the connection closes, never after, so a close that stalls can't keep it
+  // running past Quit.
+  const shut = async () => {
+    await Promise.all([browser.close().catch(() => {}), launched && kill(launched)]);
+  };
   if (stop.aborted) {
-    await browser.close().catch(() => {});
-    if (launched) await kill(launched);
+    await shut();
     throw new Error(STOPPED);
   }
   const context = browser.contexts()[0] ?? (await browser.newContext());
   return {
     context,
     liveView: async () => null,
-    close: async () => {
-      await browser.close().catch(() => {});
-      if (launched) await kill(launched);
-    },
+    close: shut,
   };
 };
 

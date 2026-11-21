@@ -30,6 +30,7 @@ const WEIGHTS = [
   ["runnerStops", 1],
   ["runnerStarts", 2],
   ["crash", 1],
+  ["keyDamaged", 1],
   ["quit", 1],
 ] as const;
 

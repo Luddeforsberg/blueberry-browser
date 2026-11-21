@@ -5,25 +5,11 @@ import type { CloudTabs, CloudTabsHooks } from "./CloudTabs";
 import { quietly } from "./cloudCheckPlan";
 import { LOCAL, type CloudWorld, type LocalSession } from "./cloudWorldTesting";
 
-type Saved = Parameters<ConstructorParameters<typeof CloudTabs>[1]>[0];
-
 // What the checker drives. The test file says how this version of the cloud is made and attached.
 export interface CloudUnderTest {
   tabs: Pick<
     CloudTabs,
-    | "claim"
-    | "release"
-    | "open"
-    | "tabClosed"
-    | "takeOver"
-    | "watch"
-    | "end"
-    | "forget"
-    | "saveKey"
-    | "checkLogin"
-    | "bringLogin"
-    | "revokeLogin"
-    | "state"
+    "claim" | "release" | "open" | "tabClosed" | "takeOver" | "watch" | "end" | "forget" | "saveKey" | "signedIn" | "state"
   >;
   // The key it has now.
   key(): string | null;
@@ -42,8 +28,9 @@ interface Making {
 // What the test file mocks, so that each run can point it at its own world, and how it makes the cloud.
 export interface Setup {
   net: { connect: (url: string) => Promise<unknown>; attach: (id: string) => Promise<unknown> };
-  // `failsFor` is how many of the next saves fail.
-  disk: { saved: Saved; onWrite: (next: Saved) => void; failsFor: number };
+  // The cloud's files by name, read and written by the app's own code. `failsFor` is how many of the next saves fail, and
+  // `onWrite` hears each file's new text just before it replaces the old.
+  disk: { files: Map<string, string>; onWrite: (name: string, text: string) => void; failsFor: number };
   makeCloud: (making: Making) => CloudUnderTest;
   // Before each run: nothing left on disk from the last.
   reset: () => void;

@@ -109,24 +109,6 @@ process.on("SIGINT", quit);
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// How often it looks for sessions left from jobs that are over, once it has looked without a problem.
-const SWEEP_MS = 5 * 60_000;
-let sweepAt = 0;
-let sweepFailing = false;
-// Each time round until a look works, before any job of its own, and every few minutes after.
-const sweep = async (): Promise<void> => {
-  if (!sweeper || Date.now() < sweepAt) return;
-  const swept = await sweeper
-    .releaseMarked((jobs) => db.liveJobs(jobs))
-    .then(
-      () => true,
-      () => false,
-    );
-  sweepAt = swept ? Date.now() + SWEEP_MS : 0;
-  if (!swept && !sweepFailing) console.error("Couldn't end the cloud sessions left from jobs that are over. Trying again.");
-  sweepFailing = !swept;
-};
-
 // Until the owner has linked this runner in Blueberry, there's nothing it may do.
 const LINK_RETRY_MS = 30_000;
 const NOT_LINKED =
@@ -164,8 +146,6 @@ const loop = async () => {
         continue;
       }
     }
-    // Only once linked, since only the server can say which jobs are over.
-    await sweep();
     // Tried every round until Blueberry has the relay's address, as it is now. Nothing else depends on it.
     const shared = await relayAddress.share();
     if (!shared && !addressFailing) console.error("Couldn't share the relay's address with Blueberry. Trying again.");
@@ -214,4 +194,31 @@ const loop = async () => {
   }
 };
 
+// How often it looks for sessions left from jobs that are over, and how soon it looks again after a look failed.
+const SWEEP_MS = 5 * 60_000;
+const SWEEP_RETRY_MS = 30_000;
+
+// On a timer of its own, so a long job or an approval wait never holds it up, and one look at a time, since each waits
+// for the last. Only while linked, since only the server can say which jobs are over.
+const sweeps = async () => {
+  if (!sweeper) return;
+  let failing = false;
+  while (!shutdown.signal.aborted) {
+    if (!linked) {
+      await sleep(LINK_RETRY_MS);
+      continue;
+    }
+    const swept = await sweeper
+      .releaseMarked((jobs) => db.liveJobs(jobs))
+      .then(
+        () => true,
+        () => false,
+      );
+    if (!swept && !failing) console.error("Couldn't end the cloud sessions left from jobs that are over. Trying again.");
+    failing = !swept;
+    await sleep(swept ? SWEEP_MS : SWEEP_RETRY_MS);
+  }
+};
+
 void loop();
+void sweeps();

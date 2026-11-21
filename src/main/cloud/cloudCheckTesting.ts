@@ -8,17 +8,12 @@ import { Launch, type Setup } from "./cloudCheckApp";
 import { flush, NEEDS_WINDOW, quietly, type Action } from "./cloudCheckPlan";
 import { Runners } from "./cloudCheckRunners";
 import { IDLE, runningSteps } from "./cloudCheckSteps";
-import { NO_IDS } from "./cloudProvider";
+import { entriesOf, fieldsOf } from "../../shared/fields";
 import { CloudWorld, WORKS } from "./cloudWorldTesting";
 
-type Saved = Setup["disk"]["saved"];
-// What a file from before handles kept instead, so the checker can run against that code too.
-interface Before {
-  handles?: { tag: string; id: string | null; by: string }[];
-  sessionId?: string | null;
-  tags?: string[];
-  madeBy?: string | null;
-}
+type Files = Setup["disk"]["files"];
+const KEY_FILE = "cloud.json";
+const SESSIONS_FILE = "cloud-sessions.json";
 
 interface Outcome {
   broken: string | null;
@@ -33,21 +28,33 @@ const WANTED = process.env.CLOUD_WANT ? new RegExp(process.env.CLOUD_WANT) : nul
 // What Settings says while a session may still be running.
 const STILL_RUNNING = /may still be running|End again/;
 
+// As the fake `safeStorage` in cloudLifetime.test.ts seals a key.
+const seal = (text: string) => Buffer.from(`sealed:${text}`).toString("base64");
+const unseal = (value: unknown) => {
+  const text = typeof value === "string" ? Buffer.from(value, "base64").toString() : "";
+  return text.startsWith("sealed:") ? text.slice("sealed:".length) : null;
+};
+const read = (files: Files, name: string) => {
+  try {
+    return fieldsOf(JSON.parse(files.get(name) ?? ""));
+  } catch {
+    return {};
+  }
+};
+// Where the Context and handles are: their own file, or the key's in code that keeps them there.
+const idsOf = (files: Files) => read(files, files.has(SESSIONS_FILE) ? SESSIONS_FILE : KEY_FILE);
+
 // Whether a session can still be found from what's saved, by its id or the tag it was asked for with, through the
 // provider and project that made it.
-const findable = (saved: Saved, world: CloudWorld, id: string): boolean => {
+const findable = (files: Files, world: CloudWorld, id: string): boolean => {
   const tag = world.tagOf(id);
-  const { handles, sessionId, tags, madeBy } = saved as Saved & Before;
   const by = `browserbase:${world.projectOf(id)}`;
-  if (HANDLES) return (handles ?? []).some((one) => one.by === by && (one.id === id || (tag !== undefined && one.tag === tag)));
-  return madeBy !== "local" && (sessionId === id || (tag !== undefined && (tags ?? []).includes(tag)));
+  const { entries } = entriesOf(idsOf(files).handles, (one) => fieldsOf(one));
+  return entries.some((one) => one.by === by && (one.id === id || (tag !== undefined && one.tag === tag)));
 };
 
-// Whether the code under test keeps handles, or the ids and tags from before.
-const HANDLES = "handles" in NO_IDS;
-
-// What's saved at the start of a run, in both the shape of now and the one from before.
-const FIRST = { apiKey: "key-0", projectId: "proj", contextId: null, handles: [], sessionId: null, tags: [], madeBy: null };
+// What's saved at the start of a run: a key, sealed.
+const FIRST = (): Files => new Map([[KEY_FILE, JSON.stringify({ apiKey: seal("key-0"), projectId: seal("proj") })]]);
 
 export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Setup): Promise<Outcome> => {
   vi.clearAllTimers();
@@ -56,21 +63,23 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
   net.connect = world.connect;
   net.attach = world.attach;
   vi.stubGlobal("fetch", world.fetch);
-  disk.saved = { ...FIRST } as Saved;
+  disk.files = FIRST();
   disk.failsFor = 0;
   const trace: string[] = [];
   let broken: string | null = null;
   const breaks = (rule: string, why: string) => {
     if (!IGNORED.includes(rule)) broken ??= `${rule}: ${why}`;
   };
-  disk.onWrite = (next) => {
+  disk.onWrite = (name, text) => {
+    const next = new Map(disk.files).set(name, text);
     // Nothing running at Browserbase becomes impossible to find from the disk, even one whose key it no longer takes.
     for (const id of world.appRunning)
-      if (findable(disk.saved, world, id) && !findable(next, world, id))
+      if (findable(disk.files, world, id) && !findable(next, world, id))
         breaks("dropped-running-id", `${id} could no longer be found from the disk while it was still running`);
     // The Context kept is one of the saved key's project.
-    const { contextId, projectId } = next;
-    if (contextId && projectId && world.contexts.get(contextId) !== projectId)
+    const { contextId } = idsOf(next);
+    const projectId = unseal(read(next, KEY_FILE).projectId);
+    if (typeof contextId === "string" && projectId && world.contexts.get(contextId) !== projectId)
       breaks("context-crossed-account", `${contextId}, made in ${world.contexts.get(contextId)}, was kept for ${projectId}`);
   };
   let count = 0;
@@ -106,6 +115,22 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
     app = new Launch(local, { world, breaks, makeCloud });
     trace.push(`the app launches again${local ? ", with a Chrome on this computer standing in" : ""}`);
     await flush();
+  };
+
+  // The saved key can't be opened any more, as when the system's keychain changed, and the app launches again without
+  // it. The user saves the same key again, as often as it takes while saves fail.
+  const keyDamaged = async () => {
+    const key = app.cloud.key();
+    const project = key ? world.projectOfKey(key) : undefined;
+    if (app.local || !key || !project || !disk.files.has(KEY_FILE)) return;
+    disk.files.set(KEY_FILE, JSON.stringify({ ...read(disk.files, KEY_FILE), apiKey: "ZGFtYWdlZA==" }));
+    trace.push("the saved key is damaged, and the app stops without quitting");
+    await relaunch(false);
+    for (let tries = 0; tries < 4 && app.cloud.key() !== key; tries++) {
+      trace.push(`Settings: save ${key} again`);
+      app.ending(app.cloud.tabs.saveKey(key, project));
+      await flush();
+    }
   };
 
   // Every answer, each one working, until there are none left.
@@ -182,7 +207,7 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
       await drain();
     }
     for (const id of world.appRunning)
-      if (!findable(disk.saved, world, id)) breaks("orphan", `${id} is running and nothing has its id or tag, so it can never be released`);
+      if (!findable(disk.files, world, id)) breaks("orphan", `${id} is running and nothing has its id or tag, so it can never be released`);
     trace.push("a runner starts, and every answer comes back");
     runners.sweep();
     await drain();
@@ -220,6 +245,8 @@ export const run = async (actions: Action[], { net, disk, makeCloud, reset }: Se
     if (action.op === "crash") {
       trace.push("the app stops without quitting");
       await relaunch(action.a % 3 === 0);
+    } else if (action.op === "keyDamaged") {
+      await keyDamaged();
     } else {
       const said = NEEDS_WINDOW.includes(action.op) && !app.win.open ? null : await steps[action.op](action);
       await flush();

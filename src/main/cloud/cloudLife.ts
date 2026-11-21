@@ -111,6 +111,12 @@ export abstract class CloudLife {
     return this.handles.current.contextId;
   }
 
+  // The Context to keep, as when a new key is being saved and the old account's must leave the disk before it does.
+  // False if it couldn't be saved.
+  keepContext(id: string | null): boolean {
+    return this.handles.keepContext(id);
+  }
+
   get account(): object {
     return this._account;
   }

@@ -211,6 +211,36 @@ describe("CloudSessions at Browserbase", () => {
     expect(sessions.keptBy("browserbase:other")).toBe(true);
   });
 
+  it("asks for no new session while a hundred may still be running, and says why", async () => {
+    const { calls, send } = stub({ "GET /sessions?q=*": { body: [] } });
+    const kept = Array.from({ length: 100 }, (_, i) => handle(null, { tag: `t-${i}` }));
+    const sessions = new CloudSessions(provider(send), at({ contextId: "ctx", handles: kept }));
+    await expect(sessions.withContext(async () => {})).rejects.toThrow(/Too many cloud sessions/);
+    expect(calls.filter(({ method, url }) => method === "POST" && url.endsWith("/sessions"))).toEqual([]);
+  });
+
+  it("keeps Browserbase's own deadline once it says it", async () => {
+    const expiresAt = "2030-01-01T00:00:00.000Z";
+    const { send } = stub({
+      "POST /sessions": { status: 201, body: { id: "sess-1", status: "RUNNING", connectUrl: "wss://x", expiresAt } },
+    });
+    const kept: CloudIds[] = [];
+    const sessions = new CloudSessions(provider(send), at({ contextId: "ctx" }), { onIds: keeping(kept) });
+    await sessions.withContext(async () => {});
+    // With five minutes more, in case this computer's clock is behind Browserbase's.
+    expect(kept.at(-1)?.handles).toEqual([expect.objectContaining({ id: "sess-1", until: Date.parse(expiresAt) + 5 * 60_000 })]);
+  });
+
+  it("still ends a session past its deadline, since this computer's clock may be wrong, and forgets it only then", async () => {
+    const { calls, send } = stub({ "POST /sessions/sess-1": { body: { id: "sess-1", status: "COMPLETED" } } });
+    const kept: CloudIds[] = [];
+    const late = handle("sess-1", { until: Date.now() - 60_000 });
+    const sessions = new CloudSessions(provider(send), at({ handles: [late] }), { onIds: keeping(kept) });
+    await sessions.end();
+    expect(releases(calls, "sess-1")).toHaveLength(1);
+    expect(kept.at(-1)?.handles).toEqual([]);
+  });
+
   it("releases a session whose answer comes after it was ended, at once", async () => {
     let answer = () => {};
     const released: string[] = [];
