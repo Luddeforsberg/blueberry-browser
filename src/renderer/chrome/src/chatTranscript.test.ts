@@ -17,6 +17,7 @@ const thread = (overrides: Partial<ChatThread> = {}): ChatThread => ({
   approval: null,
   error: null,
   memoryIds: [],
+  queued: [],
   ...overrides,
 });
 
@@ -29,8 +30,8 @@ const shape = (t: ChatThread) => {
 
 describe("transcriptOf", () => {
   it("is empty with no chat, and for a chat with nothing in it", () => {
-    expect(transcriptOf(null)).toEqual({ entries: [], running: false, error: null });
-    expect(transcriptOf(thread())).toEqual({ entries: [], running: false, error: null });
+    expect(transcriptOf(null)).toEqual({ entries: [], running: false, error: null, queued: [] });
+    expect(transcriptOf(thread())).toEqual({ entries: [], running: false, error: null, queued: [] });
   });
 
   it("puts the reply being written where it will be saved, thinking before it has anything to show", () => {

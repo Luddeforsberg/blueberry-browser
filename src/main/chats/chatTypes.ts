@@ -76,6 +76,22 @@ export interface EndedRun {
   readonly unsaved?: ChatThreadMessage;
 }
 
+// What `Chats.send` takes with a message, but the files, which only Chats.ts may name.
+export interface MessageOptions {
+  seePage: boolean;
+  mascotId?: string | null | undefined;
+  from?: string | null;
+  sites?: string[];
+  tools?: string[];
+  askAtLeast?: ActionApproval;
+  onEnd?: (ended: EndedReply) => void;
+  cloud?: boolean;
+  runner?: boolean;
+  userPresent?: boolean;
+  // The ids of the user's tabs attached in the prompt box.
+  tabs?: readonly string[];
+}
+
 // How one reply ended, for whoever started it.
 export interface EndedReply {
   reply: string;

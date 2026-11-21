@@ -27,7 +27,7 @@ export const ChatComposer: React.FC<{
   onDraftTaken?: () => void;
   mascot?: MascotProfile;
   onChooseMascot?: ((id: string) => void) | undefined;
-  // A question waits, so sending answers it, and Send shows over Stop once there's an answer to send.
+  // A question waits, so sending answers it.
   answering?: boolean;
 }> = ({
   onSend,
@@ -101,7 +101,7 @@ export const ChatComposer: React.FC<{
       onFiles={attach && attach.place !== "runner" ? (files) => void box.addFiles(files) : undefined}
       canSend={!disabled && value.trim().length > 0}
       onSend={send}
-      onStop={answering && value.trim() ? undefined : onStop}
+      onStop={onStop}
       mascot={mascot}
       onChooseMascot={onChooseMascot}
     />

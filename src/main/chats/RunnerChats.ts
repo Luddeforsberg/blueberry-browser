@@ -55,6 +55,7 @@ export class RunnerChats {
       error: this.errors.get(chat.id) ?? null,
       memoryIds: [],
       runner: true,
+      queued: [],
     };
   }
 

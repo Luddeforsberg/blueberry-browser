@@ -26,6 +26,8 @@ export interface ChatContextType {
   // Text waiting to go into the panel's composer, which may only just be opening.
   draft: string | null;
   takeDraft: () => void;
+  // Words to put in the panel's prompt box, as Edit on a message waiting to be sent does.
+  putInBox: (text: string) => void;
 }
 
 // One saved chat, kept current while its reply streams.

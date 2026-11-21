@@ -125,6 +125,15 @@ export interface ChatThread extends ChatThreadSummary {
   memoryIds: string[];
   // Its replies come from the cloud runner, which keeps going with this computer off.
   runner?: boolean;
+  // What the user sent while a reply ran, oldest first. Each goes once the reply before it ends. Kept only while the app
+  // is open.
+  queued: QueuedMessage[];
+}
+
+export interface QueuedMessage {
+  id: string;
+  content: string;
+  attached?: SentAttachment[];
 }
 
 // Whether a tab in a job's working view has a picture, and why not if it doesn't.
