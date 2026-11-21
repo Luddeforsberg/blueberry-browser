@@ -1,6 +1,7 @@
 import type { RoutineFormValues } from "../../routinesView";
 import React from "react";
 import { AssistantMessage, ChatError, StepTrail, UserMessage, WentWrong } from "../../components/ChatMessage";
+import { QueuedMessages } from "../../components/QueuedMessages";
 import { ChatComposer } from "../../components/ChatComposer";
 import { PageChip } from "../../components/AttachmentChips";
 import { ChatRow } from "../../components/Sidebar";
@@ -27,6 +28,15 @@ export const ChatSections: React.FC<{
     <Section title="Chat">
       <div className="max-w-xl flex flex-col gap-5">
         <UserMessage content="What did the Monday digest find?" />
+        <QueuedMessages
+          chatId="gallery"
+          queued={[
+            { id: "a", content: "Only braided ones, and under 100 kr" },
+            { id: "b", content: "Then put it in my cart" },
+          ]}
+          running
+          onEdit={() => undefined}
+        />
         <AssistantMessage
           content="Two things changed: **flight prices** and the studio invoice."
           origin={{ words: "in the cloud", cloud: true }}

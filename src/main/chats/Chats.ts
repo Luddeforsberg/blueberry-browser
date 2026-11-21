@@ -1,6 +1,5 @@
 import type { GenerateTitle, ReplyMessage, StreamReply } from "./agent";
 import { siteName, siteOf } from "../../shared/sites";
-import type { ActionApproval } from "../../shared/ipc";
 import type { StoredChat } from "./ChatStore";
 import type { Tab } from "../tabs/Tab";
 import { REPLY_NOT_SAVED, type ChatStep, type ChatThread, type MascotProfile, type WorkOutcome } from "../../shared/library";
@@ -17,12 +16,13 @@ import type {
   ChatParts,
   ChatRunner,
   ChatStoreLike,
-  EndedReply,
+  MessageOptions,
   Run,
   TaskProgress,
   TaskResult,
   WaitingRun,
 } from "./chatTypes";
+import { FollowUps } from "./FollowUps";
 import { Handoffs } from "./Handoffs";
 import { JobMemory, type ChatMemory } from "./jobMemory";
 import { Jobs } from "./Jobs";
@@ -37,6 +37,9 @@ import { WorkView } from "./WorkView";
 export type { ChatCloud, ChatEvents, ChatRunner, ChatStoreLike, EndedReply, RunnerJobInput } from "./chatTypes";
 export type { RunnerProgress, TaskProgress, TaskResult, WaitingRun } from "./chatTypes";
 export type { ChatMemory } from "./jobMemory";
+
+// What `send` takes with a message, and what a message waiting for a reply keeps. With them, files main read and checked.
+export type SendOptions = MessageOptions & { files?: readonly PreparedFile[] };
 
 // Every conversation with the model, whichever screen it's on. Replies are saved once they end. Each job here has a
 // part of its own, which `Chats` makes and hands the same state: `Replies` runs a reply, `JobTools` gives it its tools,
@@ -56,6 +59,12 @@ export class Chats {
   private readonly workView: WorkView;
   private readonly runnerChats: RunnerChats;
   private readonly replies: Replies;
+  private readonly followUps = new FollowUps<SendOptions>({
+    send: (chatId, text, options) => this.send(chatId, text, options),
+    stop: (chatId) => this.stop(chatId),
+    isRunning: (chatId) => this.isRunning(chatId),
+    changed: (chatId) => this.notify(chatId),
+  });
 
   constructor(
     private readonly store: ChatStoreLike,
@@ -172,6 +181,7 @@ export class Chats {
       approval: run?.approval ? publicApproval(run.approval) : null,
       error: this.errors.get(chat.id) ?? null,
       memoryIds: run?.memoryIds ?? [],
+      queued: this.followUps.list(chat.id),
     };
   }
 
@@ -189,42 +199,14 @@ export class Chats {
   // `tools` and `askAtLeast` can only narrow what this reply may do, on top of the mascot's own and the setting.
   // `onEnd` hears how this reply ended, and nothing of a later one. `userPresent` is only for a message the user typed in
   // one of Blueberry's own composers, where they're there to answer a question before it starts.
-  send(
-    chatId: string | null,
-    text: string,
-    {
-      seePage,
-      mascotId,
-      from = null,
-      sites = [],
-      tools,
-      askAtLeast,
-      onEnd,
-      cloud = false,
-      runner = false,
-      userPresent = false,
-      files = [],
-      tabs: tabIds = [],
-    }: {
-      seePage: boolean;
-      mascotId?: string | null | undefined;
-      from?: string | null;
-      sites?: string[];
-      tools?: string[];
-      askAtLeast?: ActionApproval;
-      onEnd?: (ended: EndedReply) => void;
-      cloud?: boolean;
-      runner?: boolean;
-      userPresent?: boolean;
-      // What the user attached in the prompt box: files main read and checked, and the ids of their tabs.
-      files?: readonly PreparedFile[];
-      tabs?: readonly string[];
-    },
-  ): ChatThread | null {
+  send(chatId: string | null, text: string, options: SendOptions): ChatThread | null {
+    const { seePage, mascotId, from = null, sites = [], tools, askAtLeast, onEnd, cloud = false, runner = false } = options;
+    const { userPresent = false, files = [], tabs: tabIds = [] } = options;
     const message = text.trim();
     if (!message) return null;
-    if (chatId && (!this.store.chat(chatId) || this.isRunning(chatId))) return null;
     if (files.length > MAX_FILES || tabIds.length > MAX_TABS || new Set(tabIds).size !== tabIds.length) return null;
+    if (chatId && !this.store.chat(chatId)) return null;
+    if (chatId && this.isRunning(chatId)) return this.waitForReply(chatId, message, options);
     if (chatId) this.saveUnsaved(chatId);
     const attaching = files.length > 0 || tabIds.length > 0;
     // Only the user starts one there, from this window, so not an app and never with a page. What's attached would go
@@ -258,7 +240,8 @@ export class Chats {
     this.finished.delete(id);
     this.memory?.dropOffers(id);
 
-    const run = newRun({ mascot, earlierSites: new Set(earlier?.beenTo), cloud: inCloud, askAtLeast, onEnd, userPresent });
+    const ended = this.followUps.after(id, onEnd);
+    const run = newRun({ mascot, earlierSites: new Set(earlier?.beenTo), cloud: inCloud, askAtLeast, onEnd: ended, userPresent });
     if (inCloud) this.cloudChats.add(id);
     this.runs.set(id, run);
     // A page in this window never goes with a job in the cloud.
@@ -266,6 +249,13 @@ export class Chats {
 
     this.notify(id);
     return this.thread(id);
+  }
+
+  // Typed in Blueberry while a reply runs here, a message waits for that reply. Anything else is refused while one runs.
+  private waitForReply(chatId: string, message: string, options: SendOptions): ChatThread | null {
+    if (!options.userPresent || this.runner?.has(chatId)) return null;
+    this.followUps.add(chatId, message, options, (options.files ?? []).map(sentAttachment));
+    return this.thread(chatId);
   }
 
   // An answer that couldn't be saved goes in before the next message, wherever that runs, so the model reads it. If it
@@ -314,7 +304,13 @@ export class Chats {
     return true;
   }
 
+  // Send now or Remove on a message waiting for the reply before it.
+  followUp(chatId: string, id: string, action: "send-now" | "remove"): boolean {
+    return this.followUps.act(chatId, id, action);
+  }
+
   delete(chatId: string): boolean {
+    this.followUps.forget(chatId);
     this.stop(chatId);
     this.runs.delete(chatId);
     this.publishWorkingTabs();

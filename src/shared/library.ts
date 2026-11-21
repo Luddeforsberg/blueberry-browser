@@ -11,6 +11,7 @@ export type {
   ChatApproval,
   ChatStep,
   ChatThread,
+  QueuedMessage,
   ChatThreadMessage,
   ChatThreadSummary,
   HandoffNeed,

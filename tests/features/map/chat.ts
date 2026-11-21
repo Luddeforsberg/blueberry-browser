@@ -103,6 +103,22 @@ export const chatFeatures: Feature[] = [
             .waitFor();
         },
       },
+      // Sent while it works: each waits for the reply before it.
+      queued: {
+        open: async (drive) => {
+          drive.model.callTools({ name: "open_tab", args: { url: drive.site.url("shop.example") } });
+          drive.model.holdBeforeFirstToken();
+          await startChat(drive, "Find the cheapest USB-C cable on shop.example");
+          const box = drive.chrome.getByRole("textbox", { name: "Message" });
+          for (const words of ["Only braided ones, and under 100 kr", "Then put it in my cart"]) {
+            await box.fill(words);
+            await box.press("Enter");
+          }
+          await drive.chrome.getByRole("list", { name: "Waiting to send" }).getByText("Then put it in my cart").waitFor();
+          // A third, still being written, so Stop shows beside Send.
+          await box.fill("And check the reviews");
+        },
+      },
       approval: {
         open: async (drive) => {
           drive.model.callTools({ name: "open_tab", args: { url: drive.site.url("shop.example", "/cart?item=usb-c-1m") } });

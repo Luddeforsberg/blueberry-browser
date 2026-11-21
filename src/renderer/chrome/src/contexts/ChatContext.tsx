@@ -63,6 +63,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearChat,
     draft,
     takeDraft,
+    putInBox: setDraft,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

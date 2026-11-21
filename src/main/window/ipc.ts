@@ -87,6 +87,7 @@ export const CHANNEL_REGIONS: {
   "attachments:discard": ["chrome"],
   "attachments:tabs": ["chrome"],
   "chat:stop": ["chrome"],
+  "chat:follow-up": ["chrome"],
   "chat:panel-shows": ["chrome"],
   "chat:decide": BOTH,
   "chat:rename": BOTH,
