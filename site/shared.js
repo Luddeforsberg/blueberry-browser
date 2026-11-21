@@ -251,7 +251,6 @@ var conversationsOf = (jobs) => {
 };
 var STATUSES = ["queued", "running", "waiting", "done", "failed", "stopped"];
 var isStatus = (value) => STATUSES.some((status) => status === value);
-var MAX_PHONE_STEPS = 200;
 var textOr = (value, otherwise) => typeof value === "string" ? value : otherwise;
 var phoneJobFromRow = (input) => {
   const row = fieldsOf(input);
@@ -266,10 +265,11 @@ var phoneJobFromRow = (input) => {
     updated_at: textOr(row.updated_at, createdAt),
     status: isStatus(status) ? status : "stopped",
     mascot: { id: textOr(who.id, ""), name: textOr(who.name, "") },
+    // Every one, since a follow-up's history notes them all. The server holds a job to 500.
     steps: (Array.isArray(steps) ? steps : []).flatMap((step) => {
       const { text, done, kind } = fieldsOf(step);
       return typeof text === "string" ? [{ text, done: done === true, kind: textOr(kind, null) }] : [];
-    }).slice(-MAX_PHONE_STEPS),
+    }),
     reply: textOr(row.reply, ""),
     error: textOr(row.error, null),
     live_view_url: textOr(row.live_view_url, null),

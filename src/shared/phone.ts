@@ -156,8 +156,6 @@ export const conversationsOf = <T extends ConversationJob>(jobs: readonly T[]): 
 export type PhoneJobStatus = "queued" | "running" | "waiting" | "done" | "failed" | "stopped";
 const STATUSES: readonly PhoneJobStatus[] = ["queued", "running", "waiting", "done", "failed", "stopped"];
 const isStatus = (value: unknown): value is PhoneJobStatus => STATUSES.some((status) => status === value);
-// The most of a job's steps the page keeps.
-const MAX_PHONE_STEPS = 200;
 
 export interface PhoneStep {
   text: string;
@@ -194,7 +192,7 @@ export interface PhoneJob extends ConversationJob {
 const textOr = <T>(value: unknown, otherwise: T): string | T => (typeof value === "string" ? value : otherwise);
 
 // A row the page can't place in a conversation is left out. Anything else that isn't what it should be reads as
-// nothing: a status the page doesn't know as stopped, and only steps with words.
+// nothing: a status the page doesn't know as stopped, and only steps with words, done only when they say so.
 export const phoneJobFromRow = (input: unknown): PhoneJob | null => {
   const row = fieldsOf(input);
   const { id, prompt, created_at: createdAt, status, mascot, steps, history } = row;
@@ -208,12 +206,11 @@ export const phoneJobFromRow = (input: unknown): PhoneJob | null => {
     updated_at: textOr(row.updated_at, createdAt),
     status: isStatus(status) ? status : "stopped",
     mascot: { id: textOr(who.id, ""), name: textOr(who.name, "") },
-    steps: (Array.isArray(steps) ? steps : [])
-      .flatMap((step: unknown) => {
-        const { text, done, kind } = fieldsOf(step);
-        return typeof text === "string" ? [{ text, done: done === true, kind: textOr(kind, null) }] : [];
-      })
-      .slice(-MAX_PHONE_STEPS),
+    // Every one, since a follow-up's history notes them all. The server holds a job to 500.
+    steps: (Array.isArray(steps) ? steps : []).flatMap((step: unknown) => {
+      const { text, done, kind } = fieldsOf(step);
+      return typeof text === "string" ? [{ text, done: done === true, kind: textOr(kind, null) }] : [];
+    }),
     reply: textOr(row.reply, ""),
     error: textOr(row.error, null),
     live_view_url: textOr(row.live_view_url, null),

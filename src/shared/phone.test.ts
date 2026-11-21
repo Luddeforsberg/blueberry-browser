@@ -223,12 +223,12 @@ describe("a job row as the phone reads it", () => {
     expect("history" in job).toBe(false);
   });
 
-  it("keeps the newest 200 steps", () => {
-    const steps = Array.from({ length: 201 }, (_, at) => ({ text: `Step ${at}` }));
-    const kept = read({ ...ROW, steps }).steps;
-    expect(kept).toHaveLength(200);
-    expect(kept[0]?.text).toBe("Step 1");
-    expect(read({ ...ROW, steps: steps.slice(0, 200) }).steps).toHaveLength(200);
+  it("keeps every step, up to the 500 a row holds, so a follow-up's history notes the first one too", () => {
+    const steps = Array.from({ length: 500 }, (_, at) => ({ text: `Step ${at}`, done: true }));
+    const job = read({ ...ROW, steps });
+    expect(job.steps).toHaveLength(500);
+    expect(followUpHistory(job).at(-1)?.content).toContain("- Step 0\n");
+    expect(read({ ...ROW, steps: steps.slice(0, 1) }).steps).toHaveLength(1);
     expect(read({ ...ROW, steps: [] }).steps).toEqual([]);
   });
 

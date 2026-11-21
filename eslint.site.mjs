@@ -19,8 +19,8 @@ const noJsdocCast = {
       Program() {
         for (const comment of sourceCode.getAllComments()) {
           if (comment.type !== "Block" || !/@(type|satisfies)\b/.test(comment.value)) continue;
-          const after = sourceCode.text.slice(comment.range[1]).trimStart();
-          if (after.startsWith("("))
+          // The next token, past any other comment, since TypeScript reads the cast through them.
+          if (sourceCode.getTokenAfter(comment)?.value === "(")
             context.report({
               loc: comment.loc,
               message:

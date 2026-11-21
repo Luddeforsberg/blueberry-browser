@@ -31,8 +31,14 @@ export const turnOn = async () => {
     userVisibleOnly: true,
     applicationServerKey: keyBytes(VAPID_PUBLIC_KEY),
   });
-  const { endpoint, keys = {} } = subscription.toJSON();
-  const saved = await rpc("save_push_subscription", { p_endpoint: endpoint, p_p256dh: keys.p256dh, p_auth: keys.auth }).catch(() => false);
+  const { endpoint, keys } = subscription.toJSON();
+  const p256dh = keys?.p256dh;
+  const auth = keys?.auth;
+  // One without its keys can't be sent to, so it isn't saved.
+  const saved =
+    endpoint && p256dh && auth
+      ? await rpc("save_push_subscription", { p_endpoint: endpoint, p_p256dh: p256dh, p_auth: auth }).catch(() => false)
+      : false;
   // Not saved, so nothing would ever arrive: this browser shouldn't say it's on.
   if (saved !== true) await subscription.unsubscribe().catch(() => {});
   return saved === true;
