@@ -1,4 +1,4 @@
-import { NOWHERE, siteAllowed } from "../../shared/mascots";
+import { siteAllowed } from "../../shared/mascots";
 import { isWebAddress, siteOf } from "../../shared/sites";
 import type { AskReason, AskWhy } from "../../shared/asking";
 import type { PageTarget } from "./pageTarget";
@@ -66,14 +66,13 @@ const isSearchPage = ({ hostname, pathname }: URL): boolean => {
   return (SEARCH_PAGES.get(hostname) ?? SEARCH_PAGES.get(`www.${hostname}`)) === pathname;
 };
 
+// Whether an address is on one of these sites. None is none here, where a mascot's empty list means anywhere.
+const onOneOf = (url: string, sites: readonly string[]): boolean => sites.length > 0 && siteAllowed(url, sites);
+
 // A subdomain of a site the job has only been to, and wasn't sent to.
 const isNewSubdomain = (url: string, chosen: readonly string[], visited: readonly string[]): boolean => {
   const host = siteOf(url);
-  return (
-    !siteAllowed(url, chosen.length > 0 ? chosen : [NOWHERE]) &&
-    (host === null || !visited.includes(host)) &&
-    siteAllowed(url, visited.length > 0 ? visited : [NOWHERE])
-  );
+  return !onOneOf(url, chosen) && (host === null || !visited.includes(host)) && onOneOf(url, visited);
 };
 
 // In the default mode, going somewhere asks unless it's plainly safe: an address the user gave, a short search on a
@@ -99,6 +98,5 @@ export const whyCardFor =
     if (looksLikeData(address.hostname)) return because("looks-like-data", shownHost);
     if (looksLikeData(address.pathname)) return because("looks-like-data", path);
     if (isNewSubdomain(url, chosen, visited)) return because("new-subdomain", shownHost);
-    const sites = [...chosen, ...visited];
-    return siteAllowed(url, sites.length > 0 ? sites : [NOWHERE]) ? null : because("new-site", shownHost);
+    return onOneOf(url, [...chosen, ...visited]) ? null : because("new-site", shownHost);
   };

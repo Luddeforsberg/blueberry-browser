@@ -39,6 +39,9 @@ describe("addresses", () => {
     expect(siteOfHost("myshop.herokuapp.com")).toBe("myshop.herokuapp.com");
     expect(siteOfHost("www.someone.github.io")).toBe("someone.github.io");
     expect(siteOfHost("example.tokyo.jp")).toBe("example.tokyo.jp");
+    // Never wider than a name under a country's com or co, which the list may not have.
+    expect(siteOfHost("shop.alice.com.uk")).toBe("alice.com.uk");
+    expect(siteOfHost("alice.co.se")).toBe("alice.co.se");
   });
 
   it("keeps the whole host where one company runs many products", () => {

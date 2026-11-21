@@ -244,6 +244,13 @@ describe("whether an address with no query asks in the default mode", () => {
     ["a page no tab is on", "https://elsewhere.example/", { open: "about:blank" }, true, host("new-site", "elsewhere.example")],
     // A page with no site of its own gives no reason to be anywhere, whatever its address calls itself.
     ["a host named like the internal page it's on", "http://new-tab/", { open: "blueberry://new-tab" }, true, host("new-site", "new-tab")],
+    [
+      "a page with no site, and nowhere else to be",
+      "https://nowhere.invalid/",
+      { open: "about:blank" },
+      true,
+      host("new-site", "nowhere.invalid"),
+    ],
     ["after an address with no name", "https://example.com./", { asked: "Open https://www./" }, true, host("new-site", "example.com.")],
   ])("%s", async (_, url, options, expected, why) => {
     expect((await asks(url, options)) !== null).toBe(expected);

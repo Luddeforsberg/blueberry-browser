@@ -197,7 +197,7 @@ const fences = [
         // /^www\./, /^(?:www\.)?/ and the like.
         "Literal[regex.pattern=/^\\^\\(?(\\?:)?www/]",
         // .replace("www.", ""), .startsWith("www.").
-        "CallExpression[callee.property.name=/^(replace|replaceAll|startsWith)$/] > Literal[value=/^www\\./]",
+        'CallExpression[callee.property.name=/^(replace|replaceAll|startsWith)$/][arguments.0.value="www."]',
       ],
     },
     message:

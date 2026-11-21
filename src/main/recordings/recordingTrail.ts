@@ -27,6 +27,10 @@ const MAX_CHANGE_LABEL = 40;
 const SEARCH_PARAMS = /^(q|query|p|s|k|search|searchstring|search_query|keyword|keywords|term|text|wd)$/i;
 // One segment like this in a path is a token rather than a place.
 const TOKEN_SEGMENT = /^(?=.*\d)[A-Za-z0-9_-]{24,}$/;
+// A name right under a country's own com, co, org and the like, such as alice.com.uk, is often sold to a stranger by
+// whoever holds com.uk, and the Public Suffix List doesn't know every one. It stays whole, so a routine there never
+// reaches its neighbours.
+const RESOLD_UNDER = /^(co|com|org|net|ac|gov|edu|or|ne)\.[a-z]{2}$/;
 // One company runs many unrelated products on these, so docs.google.com is a site of its own, and a routine on it can't
 // reach mail.google.com.
 const MANY_PRODUCTS = [
@@ -49,8 +53,10 @@ const clean = (text: unknown, max: number): string => {
 // A site as a person means it, so www.shop.example.co.uk is example.co.uk, but docs.google.com stays as it is. It's what a
 // routine stays on, along with its subdomains, and an address it can't read as a site gets no site at all.
 export const siteOfHost = (hostname: string): string => {
-  const site = registrableSite(hostname);
-  return MANY_PRODUCTS.includes(site) ? stripWww(hostname.toLowerCase()) : site;
+  const host = stripWww(hostname.toLowerCase());
+  const whole = registrableSite(host);
+  const site = RESOLD_UNDER.test(whole) ? host.replace(/\.$/, "").split(".").slice(-3).join(".") : whole;
+  return MANY_PRODUCTS.includes(site) ? host : site;
 };
 
 export interface TrailAddress {
