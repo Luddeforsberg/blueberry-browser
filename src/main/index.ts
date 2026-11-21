@@ -24,9 +24,9 @@ import { loadAhead } from "./chats/agent";
 import { join } from "path";
 import * as dotenv from "dotenv";
 
-// A packaged app leaves `.env` out of its bundle, so it reads one from the user data folder instead, for the model and the
-// Gallery server. Both are read only once the window opens, after this.
-if (app.isPackaged) dotenv.config({ path: join(app.getPath("userData"), ".env"), quiet: true });
+// The one place `.env` is read, for the model and the Gallery server, which read it only once the window opens, after
+// this. A packaged app leaves it out of its bundle, so it reads one from the user data folder instead.
+dotenv.config({ path: app.isPackaged ? join(app.getPath("userData"), ".env") : join(__dirname, "../../.env"), quiet: true });
 
 // One copy per profile, so a link or a second launch goes to the window that's already open.
 const firstCopy = app.requestSingleInstanceLock();
@@ -167,8 +167,6 @@ void app.whenReady().then(() => {
   linkedMascot = null;
 
   app.on("activate", () => {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
     if (BaseWindow.getAllWindows().length === 0) {
       mainWindow = createWindow();
     } else if (mainWindow && !mainWindow.baseWindow.isVisible() && !mainWindow.baseWindow.isMinimized()) {

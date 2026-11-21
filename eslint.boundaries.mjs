@@ -334,6 +334,7 @@ const rules = [
     ["remoteJobs"],
     "Everything outside remoteJobs/ goes through RunnerJobs, which holds the runner's link and whose session each call goes out with.",
   ),
+  onlyFrom("dotenv", "^dotenv(/|$)", ["index.ts"], "`.env` is read once, at startup, so no module reads a file just by being imported."),
 ];
 
 // ESLint keeps one setting of a rule per file, the last block's, so rules can't simply be stacked. Every folder or file
