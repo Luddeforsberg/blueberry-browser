@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { CloudLogin, CloudLoginStatus } from "../../shared/ipc";
+import { fieldsOf } from "../../shared/fields";
 import { Latest } from "../../shared/lateWork";
 
 // Sites the user has brought into the cloud browser, signed in. Plain Node, so a runner without a window can use it.
@@ -129,8 +130,7 @@ export const parseLogins = (data: unknown): CloudLogin[] => {
   if (!Array.isArray(data)) return [];
   const seen = new Set<string>();
   return data.slice(0, MAX_SITES).flatMap((entry): CloudLogin[] => {
-    if (typeof entry !== "object" || entry === null) return [];
-    const { site: rawSite, addedAt, checkedAt, status } = entry as Record<string, unknown>;
+    const { site: rawSite, addedAt, checkedAt, status } = fieldsOf(entry);
     const site = loginSite(rawSite);
     const added = time(addedAt);
     if (!site || site !== rawSite || !added || seen.has(site)) return [];

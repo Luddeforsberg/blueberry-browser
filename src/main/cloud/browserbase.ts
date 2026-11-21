@@ -1,4 +1,5 @@
 import type { CdpTab } from "../tools/CdpTab";
+import { fieldsOf } from "../../shared/fields";
 import { connectOverCdp, KeyRefused, NOT_WANTED, type CloudBrowser, type CreateHooks, type MadeSession } from "./cloudProvider";
 
 // Browserbase, from its REST API (docs.browserbase.com/reference/api) and connected to over CDP. One persistent Context
@@ -41,16 +42,6 @@ interface Session {
   id: string;
   status: string;
   connectUrl?: string;
-  // When Browserbase ends it on its own, by its clock.
-  expiresAt?: unknown;
-}
-
-// What a listing says of each session.
-interface Listed {
-  id?: unknown;
-  status?: unknown;
-  projectId?: unknown;
-  userMetadata?: Record<string, unknown>;
 }
 
 export type Browserbase = CloudBrowser & {
@@ -61,11 +52,6 @@ export type Browserbase = CloudBrowser & {
 
 // Which sessions a key for that project can end.
 export const browserbaseOrigin = (projectId: string): string => `browserbase:${projectId}`;
-
-interface LiveUrls {
-  debuggerFullscreenUrl?: string;
-  pages?: { id: string; url: string; debuggerFullscreenUrl?: string }[];
-}
 
 // Whether an address is Browserbase's own page, the only kind a live view may show in a frame.
 export const isLiveView = (url: string): boolean => {
@@ -98,7 +84,8 @@ export const browserbase = ({
   fetch: send = fetch,
   connect = connectOverCdp,
 }: BrowserbaseOptions): Browserbase => {
-  const call = async <T>(method: "GET" | "POST", path: string, body?: object): Promise<T> => {
+  // What Browserbase answered, to be checked where it's used.
+  const call = async (method: "GET" | "POST", path: string, body?: object): Promise<unknown> => {
     const response = await send(`${API}${path}`, {
       method,
       headers: { "X-BB-API-Key": apiKey, ...(body ? { "Content-Type": "application/json" } : {}) },
@@ -108,62 +95,68 @@ export const browserbase = ({
     if (response.status === 401 || response.status === 403)
       throw new KeyRefused("Browserbase refused the API key. Check it in Settings > Cloud.");
     if (!response.ok) throw new BrowserbaseError(response.status);
-    return (await response.json()) as T;
+    return response.json();
   };
 
   // Null only when Browserbase says there's no such session. A lookup that fails, or answers with no status, says nothing
   // about it, so it throws.
   const lookUp = async (id: string): Promise<Session | null> => {
-    let known: Partial<Session> | null;
+    let known: Record<string, unknown>;
     try {
-      known = await call<Partial<Session> | null>("GET", `/sessions/${encodeURIComponent(id)}`);
+      known = fieldsOf(await call("GET", `/sessions/${encodeURIComponent(id)}`));
     } catch (error) {
       if (error instanceof BrowserbaseError && error.status === 404) return null;
       throw error;
     }
-    if (typeof known?.status !== "string") throw new Error("Browserbase didn't say how the session is.");
+    if (typeof known.status !== "string") throw new Error("Browserbase didn't say how the session is.");
     return { id, status: known.status, ...(typeof known.connectUrl === "string" ? { connectUrl: known.connectUrl } : {}) };
+  };
+
+  // A Context for a key that has none yet, kept only for what still wants it. A key saved meanwhile may be another account's.
+  const newContext = async (hooks: CreateHooks): Promise<string> => {
+    if (!hooks.wanted()) throw new Error(NOT_WANTED);
+    const { id } = fieldsOf(await call("POST", "/contexts", { projectId }));
+    if (typeof id !== "string" || !id) throw new Error("Browserbase didn't say which Context it made.");
+    if (!hooks.wanted()) throw new Error(NOT_WANTED);
+    hooks.context(id);
+    return id;
   };
 
   // The kept-alive session from last time if it's still running, or a new one. Its id is the only way to release it, so
   // it's replaced only once Browserbase says it has ended, never on a lookup that failed. A new one goes out with a tag
   // that's already kept, so it can be found and ended even if its answer never comes.
-  const session = async (ids: Parameters<CloudBrowser["create"]>[0], hooks: CreateHooks): Promise<Session & { connectUrl: string }> => {
+  const session = async (ids: Parameters<CloudBrowser["create"]>[0], hooks: CreateHooks): Promise<{ id: string; connectUrl: string }> => {
     if (ids.sessionId) {
       const known = await lookUp(ids.sessionId);
       if (known?.status === "RUNNING" && known.connectUrl) return { ...known, connectUrl: known.connectUrl };
       if (known && !ENDED.includes(known.status)) throw new Error(NOT_YET);
     }
-    let { contextId } = ids;
-    if (!contextId) {
-      if (!hooks.wanted()) throw new Error(NOT_WANTED);
-      ({ id: contextId } = await call<{ id: string }>("POST", "/contexts", { projectId }));
-      // Only for what still wants it. A key saved meanwhile may be another account's.
-      if (!hooks.wanted()) throw new Error(NOT_WANTED);
-      hooks.context(contextId);
-    }
+    const contextId = ids.contextId || (await newContext(hooks));
     if (!hooks.wanted()) throw new Error(NOT_WANTED);
     const tag = hooks.tag(Date.now() + SESSION_TIMEOUT_S * 1000 + LANDING_MS);
-    let made: Session;
+    let made: Record<string, unknown>;
     try {
-      made = await call<Session>("POST", "/sessions", {
-        projectId,
-        keepAlive: true,
-        region: BROWSERBASE_REGION,
-        timeout: SESSION_TIMEOUT_S,
-        browserSettings: { context: { id: contextId, persist: true } },
-        userMetadata: { blueberry: tag, ...(mark ? { blueberryMark: mark } : {}), ...(job ? { blueberryJob: job } : {}) },
-      });
+      made = fieldsOf(
+        await call("POST", "/sessions", {
+          projectId,
+          keepAlive: true,
+          region: BROWSERBASE_REGION,
+          timeout: SESSION_TIMEOUT_S,
+          browserSettings: { context: { id: contextId, persist: true } },
+          userMetadata: { blueberry: tag, ...(mark ? { blueberryMark: mark } : {}), ...(job ? { blueberryJob: job } : {}) },
+        }),
+      );
     } catch (error) {
       // An answer that refuses the ask means nothing was made. Any other failure may come after the session was.
       if (error instanceof KeyRefused || (error instanceof BrowserbaseError && error.status < 500)) hooks.unused(tag);
       throw error;
     }
-    if (typeof made.id !== "string" || !made.id) throw new Error("Browserbase didn't say which session it made.");
+    const { id, connectUrl, expiresAt } = made;
+    if (typeof id !== "string" || !id) throw new Error("Browserbase didn't say which session it made.");
     // Kept before anything else about it is checked, so it can be released whatever comes next.
-    hooks.made(tag, made.id, deadlineOf(made.expiresAt));
-    if (!made.connectUrl) throw new Error("Browserbase didn't say how to connect to the session.");
-    return { ...made, connectUrl: made.connectUrl };
+    hooks.made(tag, id, deadlineOf(expiresAt));
+    if (typeof connectUrl !== "string" || !connectUrl) throw new Error("Browserbase didn't say how to connect to the session.");
+    return { id, connectUrl };
   };
 
   // Needs only the id, so a session whose connection was lost, or never made, still ends and stops costing.
@@ -179,11 +172,12 @@ export const browserbase = ({
 
   // The sessions of this project Browserbase lists for that metadata.
   const listed = async (field: string, value: string): Promise<{ id: string; running: boolean; job: string | null }[]> => {
-    const found = await call<Listed[]>("GET", byMetadata(field, value));
+    const found = await call("GET", byMetadata(field, value));
     if (!Array.isArray(found)) throw new Error("Browserbase didn't list the sessions.");
-    return found.flatMap(({ id, status, projectId: project, userMetadata }) => {
+    return found.flatMap((one) => {
+      const { id, status, projectId: project, userMetadata } = fieldsOf(one);
       if (typeof id !== "string" || (project !== undefined && project !== projectId)) return [];
-      const job = userMetadata?.blueberryJob;
+      const job = fieldsOf(userMetadata).blueberryJob;
       return [{ id, running: !ENDED.includes(String(status)), job: typeof job === "string" ? job : null }];
     });
   };
@@ -221,11 +215,12 @@ export const browserbase = ({
           return {
             context,
             liveView: async (page: CdpTab) => {
-              const live = await call<LiveUrls>("GET", `/sessions/${encodeURIComponent(id)}/debug`);
+              const live = fieldsOf(await call("GET", `/sessions/${encodeURIComponent(id)}/debug`));
+              const pages = Array.isArray(live.pages) ? live.pages.map(fieldsOf) : [];
               // Each tab has its own live view. Matched by target, then by address, then the session's own.
-              const match = live.pages?.find((one) => one.id === page.targetId) ?? live.pages?.find((one) => one.url === page.url);
-              const url = match?.debuggerFullscreenUrl ?? live.debuggerFullscreenUrl;
-              return url ? withoutNavbar(url) : null;
+              const match = pages.find((one) => one.id === page.targetId) ?? pages.find((one) => one.url === page.url);
+              const url = typeof match?.debuggerFullscreenUrl === "string" ? match.debuggerFullscreenUrl : live.debuggerFullscreenUrl;
+              return typeof url === "string" && url ? withoutNavbar(url) : null;
             },
             close: async () => {
               await browser.close().catch(() => {});

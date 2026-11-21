@@ -108,10 +108,6 @@ const fences = [
     // anything else. fieldsOf gives each field as `unknown`, from an object or from nothing, so it's checked before use.
     name: "fields",
     in: ["src/**/*.{ts,tsx}", "runner/src/**/*.ts"],
-    heldBack: {
-      "src/main/cloud/cloudFile.ts": "Being rewritten in #170, and moves onto fieldsOf after it.",
-      "src/main/cloud/cloudLogins.ts": "Being rewritten in #170, and moves onto fieldsOf after it.",
-    },
     rules: {
       "no-restricted-syntax": [
         // `as Record<string, unknown>`, alone, in a list or a union, or inside another type.
