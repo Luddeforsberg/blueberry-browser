@@ -288,11 +288,11 @@ export class GalleryServer {
     );
   }
 
-  // Every job of one conversation, oldest first, with what each asked and how it went, a page at a time.
+  // Every job of one conversation in its turns, the latest last, with what each asked and how it went, a page at a time.
   async cloudConversation(token: string, id: string): Promise<Record<string, unknown>[]> {
     const rows: Record<string, unknown>[] = [];
     for (let page = 0; page < CONVERSATION_PAGES; page++) {
-      const path = `/rest/v1/cloud_jobs?select=id,prompt,mascot,status,steps,reply,error,created_at&conversation_id=eq.${encodeURIComponent(id)}&order=created_at.asc&limit=${CONVERSATION_PAGE}&offset=${page * CONVERSATION_PAGE}`;
+      const path = `/rest/v1/cloud_jobs?select=id,prompt,mascot,status,steps,reply,error,created_at&conversation_id=eq.${encodeURIComponent(id)}&order=turn.asc&limit=${CONVERSATION_PAGE}&offset=${page * CONVERSATION_PAGE}`;
       const batch = await this.rows(path, { token });
       rows.push(...batch);
       if (batch.length < CONVERSATION_PAGE) break;

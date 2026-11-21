@@ -242,7 +242,7 @@ var followUpHistory = (last) => {
 var conversationIdOf = (job) => job.conversation_id || job.id;
 var conversationsOf = (jobs) => {
   const groups = /* @__PURE__ */ new Map();
-  for (const job of [...jobs].sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))) {
+  for (const job of [...jobs].sort((a, b) => a.turn - b.turn)) {
     const id = conversationIdOf(job);
     groups.set(id, [...groups.get(id) ?? [], job]);
   }

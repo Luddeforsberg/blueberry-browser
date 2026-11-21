@@ -90,6 +90,11 @@ describe("conversations in the cloud", () => {
     prompt: `Prompt ${id}`,
     ...more,
   });
+  const inTurn = (id: string, at: string, conversation: string | null, turn: number) => ({
+    ...job(id, at),
+    conversation_id: conversation,
+    turn,
+  });
 
   it("follows up with the job before's history, then its prompt and its reply with notes of its steps", () => {
     const earlier = [
@@ -146,12 +151,12 @@ describe("conversations in the cloud", () => {
     expect(fitHistory("nope")).toEqual([]);
   });
 
-  it("groups jobs into conversations, newest first, each oldest first, and a job from before conversations alone", () => {
+  it("groups jobs into conversations, newest first, each in its turns, and a job from before conversations alone", () => {
     const grouped = conversationsOf([
-      job("c1-2", "05", { conversation_id: "c1" }),
-      job("legacy", "02", { conversation_id: null }),
-      job("c1", "01", { conversation_id: "c1" }),
-      job("c2", "03", { conversation_id: "c2" }),
+      inTurn("c1-2", "05", "c1", 2),
+      inTurn("legacy", "02", null, 1),
+      inTurn("c1", "01", "c1", 1),
+      inTurn("c2", "03", "c2", 1),
     ]);
     expect(grouped.map(({ id, jobs, latest }) => [id, jobs.map((one) => one.id), latest.id])).toEqual([
       ["c1", ["c1", "c1-2"], "c1-2"],
@@ -159,5 +164,13 @@ describe("conversations in the cloud", () => {
       ["legacy", ["legacy"], "legacy"],
     ]);
     expect(conversationsOf([])).toEqual([]);
+  });
+
+  it("takes the latest job by its turn, whatever the clock said, as the server does", () => {
+    // Made in the same instant, the older with the higher id, and then a third that the clock put first.
+    const [one] = conversationsOf([inTurn("b", "01", "c", 1), inTurn("a", "01", "c", 2)]);
+    expect(one?.latest.id).toBe("a");
+    const [two] = conversationsOf([...defined(one).jobs, inTurn("z", "00", "c", 3)]);
+    expect(two?.jobs.map(({ id }) => id)).toEqual(["b", "a", "z"]);
   });
 });

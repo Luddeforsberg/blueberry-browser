@@ -59,6 +59,9 @@ describe("a conversation's jobs", () => {
     expect(rows.map(({ id }) => id)).toEqual(Array.from({ length: total }, (_, index) => `job-${index}`));
     // One more page than it fills, or just the one.
     expect(asked).toHaveLength(Math.floor(total / 100) + 1);
+    // In their turns, which no two jobs of a conversation share, so the pages neither skip nor repeat one and the last
+    // is the one the server builds a follow-up on. Two jobs can share a time.
+    expect(asked.map((url) => new URL(url).searchParams.get("order"))).toEqual(asked.map(() => "turn.asc"));
   });
 });
 
