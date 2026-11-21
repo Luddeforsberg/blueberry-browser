@@ -1,65 +1,34 @@
 import { describe, expect, it } from "vitest";
-import type { Browser } from "playwright-core";
 import { browserbase, BROWSERBASE_REGION } from "./browserbase";
 import type { CdpTab } from "../tools/CdpTab";
-import { CloudSessions } from "./cloudBrowser";
-import { KeyRefused, type CloudBrowser, type CloudIds } from "./cloudProvider";
+import { KeyRefused, type CloudBrowser, type CloudIds, type CreateHooks } from "./cloudProvider";
 import { defined } from "../../shared/testing";
+import { fakeBrowser, listing, provider, releases, stub } from "./browserbaseTesting";
 
 // Against a stubbed fetch, shaped from Browserbase's API reference. Nothing here has talked to the real service.
 
-interface Call {
-  method: string;
-  url: string;
-  key: string | null;
-  body: Record<string, unknown> | null;
-}
+type Asked = Pick<CloudIds, "contextId" | "sessionId" | "tags">;
 
-// Every request with a body sends it as JSON text, so anything else fails the test.
-const jsonText = (body: BodyInit): string => {
-  if (typeof body !== "string") throw new Error("Expected a JSON string body");
-  return body;
+// The hooks a create is told through, keeping what it was told.
+const told = (wanted = () => true) => {
+  const seen: Asked = { contextId: null, sessionId: null, tags: [] };
+  const hooks: CreateHooks = {
+    wanted,
+    tag: () => {
+      const tag = `tag-${seen.tags.length + 1}`;
+      seen.tags.push(tag);
+      return tag;
+    },
+    unused: (tag) => void (seen.tags = seen.tags.filter((one) => one !== tag)),
+    context: (id) => void (seen.contextId = id),
+    made: (id) => void (seen.sessionId = id),
+  };
+  return { seen, hooks };
 };
 
-const stub = (answers: Record<string, { status?: number; body: unknown }>) => {
-  const calls: Call[] = [];
-  const send = (async (url: string, init: RequestInit) => {
-    const method = init.method ?? "GET";
-    calls.push({
-      method,
-      url,
-      key: new Headers(init.headers).get("X-BB-API-Key"),
-      body: init.body ? JSON.parse(jsonText(init.body)) : null,
-    });
-    const answer = answers[`${method} ${url.replace("https://api.browserbase.com/v1", "")}`];
-    if (!answer) return new Response("{}", { status: 404 });
-    return new Response(JSON.stringify(answer.body), { status: answer.status ?? 200 });
-  }) as typeof fetch;
-  return { calls, send };
-};
-
-const fakeBrowser = () => {
-  let closed = false;
-  const context = { name: "context", route: async () => {}, on: () => {}, browser: () => null };
-  const browser = { contexts: () => [context], close: async () => void (closed = true) } as unknown as Browser;
-  return { browser, closed: () => closed };
-};
-
-const provider = (send: typeof fetch, connect: (url: string) => Promise<Browser> = async () => fakeBrowser().browser) =>
-  browserbase({ apiKey: "k", projectId: "p", fetch: send, connect });
-
-// Made and connected, keeping each change to the ids it's told about.
-const start = async (browser: CloudBrowser, ids: CloudIds, kept: CloudIds[] = []) =>
-  (
-    await browser.create(
-      ids,
-      (next) => kept.push(next),
-      () => true,
-    )
-  ).connect();
-
-const releases = (calls: Call[], id: string) =>
-  calls.filter(({ method, url, body }) => method === "POST" && url.endsWith(`/sessions/${id}`) && body?.status === "REQUEST_RELEASE");
+// Made and connected.
+const start = async (browser: CloudBrowser, ids: Pick<CloudIds, "contextId" | "sessionId">, { hooks } = told()) =>
+  (await browser.create(ids, hooks)).connect();
 
 describe("Browserbase", () => {
   it("makes a context and a kept-alive session in one region, connects, and keeps both for next time", async () => {
@@ -70,7 +39,7 @@ describe("Browserbase", () => {
         body: { id: "sess-1", status: "RUNNING", connectUrl: "wss://connect.browserbase.com?signingKey=x" },
       },
     });
-    const kept: CloudIds[] = [];
+    const asked = told();
     const connected: string[] = [];
     const { browser } = fakeBrowser();
     const bb = browserbase({
@@ -82,7 +51,7 @@ describe("Browserbase", () => {
         return browser;
       },
     });
-    const session = await start(bb, { contextId: null, sessionId: null }, kept);
+    const session = await start(bb, { contextId: null, sessionId: null }, asked);
     expect(calls.map(({ method, url }) => `${method} ${url}`)).toEqual([
       "POST https://api.browserbase.com/v1/contexts",
       "POST https://api.browserbase.com/v1/sessions",
@@ -93,9 +62,10 @@ describe("Browserbase", () => {
       keepAlive: true,
       region: BROWSERBASE_REGION,
       browserSettings: { context: { id: "ctx-1", persist: true } },
+      userMetadata: { blueberry: "tag-1" },
     });
     expect(connected).toEqual(["wss://connect.browserbase.com?signingKey=x"]);
-    expect(kept.at(-1)).toEqual({ contextId: "ctx-1", sessionId: "sess-1" });
+    expect(asked.seen).toEqual({ contextId: "ctx-1", sessionId: "sess-1", tags: ["tag-1"] });
     expect(session.context).toMatchObject({ name: "context" });
   });
 
@@ -125,13 +95,11 @@ describe("Browserbase", () => {
   it("makes nothing new once it isn't wanted any more", async () => {
     const { calls, send } = stub({ "POST /contexts": { status: 201, body: { id: "ctx-1" } } });
     let wanted = true;
-    const making = provider(send).create(
-      { contextId: null, sessionId: null },
-      () => (wanted = false),
-      () => wanted,
-    );
+    const { seen, hooks } = told(() => wanted);
+    const making = provider(send).create({ contextId: null, sessionId: null }, { ...hooks, context: () => (wanted = false) });
     await expect(making).rejects.toThrow("ending");
     expect(calls.map(({ method, url }) => `${method} ${url}`)).toEqual(["POST https://api.browserbase.com/v1/contexts"]);
+    expect(seen.tags).toEqual([]);
   });
 
   it("finds the live view for a page, without Browserbase's navbar", async () => {
@@ -154,50 +122,6 @@ describe("Browserbase", () => {
     );
   });
 
-  it("ends the session at Browserbase by its id, and lets go of the connection, so it stops costing", async () => {
-    const { calls, send } = stub({
-      "POST /sessions": { status: 201, body: { id: "sess-1", status: "RUNNING", connectUrl: "wss://x" } },
-      "POST /sessions/sess-1": { body: { id: "sess-1", status: "COMPLETED" } },
-    });
-    const fake = fakeBrowser();
-    const kept: CloudIds[] = [];
-    const sessions = new CloudSessions(
-      provider(send, async () => fake.browser),
-      { contextId: "ctx", sessionId: null },
-      { onIds: (ids) => kept.push(ids) },
-    );
-    await sessions.withContext(async () => {});
-    expect(sessions.canEnd).toBe(true);
-    expect(await sessions.end()).toBe("ended");
-    expect(releases(calls, "sess-1")).toHaveLength(1);
-    await expect.poll(() => fake.closed()).toBe(true);
-    expect(kept.at(-1)).toEqual({ contextId: "ctx", sessionId: null });
-    expect(sessions.canEnd).toBe(false);
-  });
-
-  it("ends a session nobody has used for a while, and not one a job or the user picked up again", async () => {
-    const { calls, send } = stub({ "POST /sessions/sess-1": { body: { id: "sess-1", status: "COMPLETED" } } });
-    const sessions = new CloudSessions(provider(send), { contextId: "ctx", sessionId: "sess-1" }, {}, 20);
-
-    sessions.claim("job-1");
-    sessions.release("job-1");
-    sessions.claim("job-2");
-    await new Promise((resolve) => setTimeout(resolve, 60));
-    expect(releases(calls, "sess-1")).toHaveLength(0);
-
-    sessions.release("job-2");
-    sessions.holdForUser("tab-1");
-    await new Promise((resolve) => setTimeout(resolve, 60));
-    expect(releases(calls, "sess-1")).toHaveLength(0);
-
-    sessions.letGo("tab-1");
-    sessions.claim("job-3");
-    sessions.release("job-3");
-    await new Promise((resolve) => setTimeout(resolve, 60));
-    expect(releases(calls, "sess-1")).toHaveLength(1);
-    expect(sessions.canEnd).toBe(false);
-  });
-
   it("never replaces a session it couldn't look up, or one that hasn't ended, so its id isn't lost", async () => {
     const made = { status: 201, body: { id: "sess-2", status: "RUNNING", connectUrl: "wss://two" } };
     // A lookup that failed, one that came back with nothing in it, and a session still starting.
@@ -208,91 +132,15 @@ describe("Browserbase", () => {
       { body: { id: "sess-1", status: "PENDING" } },
     ]) {
       const { calls, send } = stub({ "GET /sessions/sess-1": answer, "POST /sessions": made });
-      const kept: CloudIds[] = [];
-      await expect(start(provider(send), { contextId: "ctx", sessionId: "sess-1" }, kept)).rejects.toThrow();
+      const asked = told();
+      await expect(start(provider(send), { contextId: "ctx", sessionId: "sess-1" }, asked)).rejects.toThrow();
       expect(calls.map(({ method }) => method)).toEqual(["GET"]);
-      expect(kept).toEqual([]);
+      expect(asked.seen).toEqual({ contextId: null, sessionId: null, tags: [] });
     }
     // One Browserbase has never heard of is gone.
     const { calls, send } = stub({ "POST /sessions": made });
     await start(provider(send), { contextId: "ctx", sessionId: "sess-1" });
     expect(calls.map(({ method }) => method)).toEqual(["GET", "POST"]);
-  });
-
-  it("keeps a session it made even when Browserbase didn't say how to connect, and releases it", async () => {
-    const { calls, send } = stub({
-      "POST /sessions": { status: 201, body: { id: "sess-1", status: "RUNNING" } },
-      "POST /sessions/sess-1": { body: { id: "sess-1", status: "COMPLETED" } },
-    });
-    const kept: CloudIds[] = [];
-    const sessions = new CloudSessions(provider(send), { contextId: "ctx", sessionId: null }, { onIds: (ids) => kept.push(ids) });
-    sessions.claim("job");
-    await expect(sessions.open("job", "cloud-1", "https://example.com/", { onChange: () => {} })).rejects.toThrow("how to connect");
-    expect(kept[0]).toEqual({ contextId: "ctx", sessionId: "sess-1" });
-    expect(releases(calls, "sess-1")).toHaveLength(1);
-    expect(sessions.canEnd).toBe(false);
-  });
-
-  it("releases a session it made even when connecting to it failed", async () => {
-    const { calls, send } = stub({
-      "POST /sessions": { status: 201, body: { id: "sess-1", status: "RUNNING", connectUrl: "wss://x" } },
-      "POST /sessions/sess-1": { body: { id: "sess-1", status: "COMPLETED" } },
-    });
-    const sessions = new CloudSessions(
-      provider(send, async () => Promise.reject(new Error("no connection"))),
-      {
-        contextId: "ctx",
-        sessionId: null,
-      },
-    );
-    sessions.claim("job");
-    await expect(sessions.open("job", "cloud-1", "https://example.com/", { onChange: () => {} })).rejects.toThrow("no connection");
-    await expect.poll(() => releases(calls, "sess-1").length).toBe(1);
-    await expect.poll(() => sessions.canEnd).toBe(false);
-  });
-
-  it("ends a session from last time with no connection to it, and says so until Browserbase confirms", async () => {
-    const answers: Record<string, { status?: number; body: unknown }> = {
-      "POST /sessions/sess-1": { status: 500, body: {} },
-      "GET /sessions/sess-1": { body: { id: "sess-1", status: "RUNNING" } },
-    };
-    const { calls, send } = stub(answers);
-    const sessions = new CloudSessions(provider(send), { contextId: "ctx", sessionId: "sess-1" });
-    expect(sessions.canEnd).toBe(true);
-
-    expect(await sessions.end()).toBe("running");
-    expect(sessions.unreleased).toBe(true);
-    expect(sessions.problem).toMatch(/may still be running, and costing/);
-    expect(sessions.canEnd).toBe(true);
-
-    answers["POST /sessions/sess-1"] = { body: { id: "sess-1", status: "COMPLETED" } };
-    expect(await sessions.end()).toBe("ended");
-    expect(releases(calls, "sess-1")).toHaveLength(2);
-    expect(sessions.unreleased).toBe(false);
-    expect(sessions.problem).toBeNull();
-    expect(sessions.canEnd).toBe(false);
-  });
-
-  it("releases a session by its id at once, even while connecting to it never finishes", async () => {
-    const { calls, send } = stub({
-      "POST /sessions": { status: 201, body: { id: "sess-1", status: "RUNNING", connectUrl: "wss://x" } },
-      "POST /sessions/sess-1": { body: { id: "sess-1", status: "COMPLETED" } },
-    });
-    let connected = () => {};
-    const fake = fakeBrowser();
-    const connect = () => new Promise<Browser>((resolve) => (connected = () => resolve(fake.browser)));
-    const kept: CloudIds[] = [];
-    const sessions = new CloudSessions(provider(send, connect), { contextId: "ctx", sessionId: null }, { onIds: (ids) => kept.push(ids) });
-    sessions.claim("job");
-    const opening = sessions.open("job", "cloud-1", "https://example.com/", { onChange: () => {} }).catch(() => null);
-    await expect.poll(() => kept.at(-1)?.sessionId).toBe("sess-1");
-    expect(await sessions.end()).toBe("ended");
-    expect(releases(calls, "sess-1")).toHaveLength(1);
-    // The connection that arrives afterwards is closed.
-    connected();
-    expect(await opening).toBeNull();
-    await expect.poll(() => fake.closed()).toBe(true);
-    expect(sessions.canEnd).toBe(false);
   });
 
   it("keeps a session it couldn't release or look up, and counts one Browserbase has never heard of as released", async () => {
@@ -318,9 +166,48 @@ describe("Browserbase", () => {
     await expect(provider(send).release("sess-1")).resolves.toBeUndefined();
   });
 
-  it("says plainly when the key is refused", async () => {
+  it("releases by tag only once every session listed has ended, and by its mark only with one", async () => {
+    const failing = stub({
+      [listing("t")]: {
+        body: [
+          { id: "a", status: "RUNNING" },
+          { id: "b", status: "RUNNING" },
+        ],
+      },
+      "POST /sessions/a": { body: {} },
+      "POST /sessions/b": { status: 500, body: {} },
+      "GET /sessions/b": { body: { id: "b", status: "RUNNING" } },
+    });
+    await expect(provider(failing.send).releaseTagged("t")).rejects.toThrow("500");
+    expect(releases(failing.calls, "a")).toHaveLength(1);
+    await expect(provider(stub({ [listing("t")]: { body: {} } }).send).releaseTagged("t")).rejects.toThrow("didn't list");
+
+    const marked = stub({
+      [listing("runner-1", "blueberryMark")]: { body: [{ id: "c", status: "RUNNING" }] },
+      "POST /sessions/c": { body: {} },
+    });
+    await provider(marked.send, undefined, "runner-1").releaseMarked();
+    expect(releases(marked.calls, "c")).toHaveLength(1);
+    const unmarked = stub({});
+    await provider(unmarked.send).releaseMarked();
+    expect(unmarked.calls).toEqual([]);
+
+    const making = stub({ "POST /sessions": { status: 201, body: { id: "s", status: "RUNNING", connectUrl: "wss://x" } } });
+    await start(provider(making.send, undefined, "runner-1"), { contextId: "ctx", sessionId: null });
+    expect(defined(making.calls[0]).body).toMatchObject({ userMetadata: { blueberry: "tag-1", blueberryMark: "runner-1" } });
+  });
+
+  it("says plainly when the key is refused, and lets go of the tag of a session it refused to make", async () => {
     const { send } = stub({ "POST /sessions": { status: 401, body: {} } });
     const bb = browserbase({ apiKey: "bad", projectId: "p", fetch: send, connect: async () => fakeBrowser().browser });
-    await expect(start(bb, { contextId: "ctx", sessionId: null })).rejects.toThrow("Browserbase refused the API key");
+    const refused = told();
+    await expect(start(bb, { contextId: "ctx", sessionId: null }, refused)).rejects.toThrow("Browserbase refused the API key");
+    expect(refused.seen.tags).toEqual([]);
+    // A failure that may come after the session was made keeps it.
+    const failed = told();
+    await expect(
+      start(provider(stub({ "POST /sessions": { status: 500, body: {} } }).send), { contextId: "ctx", sessionId: null }, failed),
+    ).rejects.toThrow("500");
+    expect(failed.seen.tags).toEqual(["tag-1"]);
   });
 });

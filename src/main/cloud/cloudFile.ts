@@ -1,19 +1,22 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { dirname } from "path";
 import { safeStorage } from "electron";
-import type { CloudIds } from "./cloudProvider";
+import { NO_IDS, type CloudIds } from "./cloudProvider";
 
 // Where Settings > Cloud keeps the Browserbase key and project id, sealed with `safeStorage`, and the ids of the
-// Context and session it last had. Only CloudTabs reads or writes it.
+// Context and session it last had, with the tags of sessions asked for that no id came back for. Only CloudTabs reads
+// or writes it.
 
 export const MAX_FIELD_LENGTH = 200;
+// More than any run of failed asks, so none is dropped, but a damaged file can't grow without end.
+const MAX_TAGS = 100;
 
 export interface Saved extends CloudIds {
   apiKey: string | null;
   projectId: string | null;
 }
 
-export const EMPTY: Saved = { apiKey: null, projectId: null, contextId: null, sessionId: null };
+export const EMPTY: Saved = { apiKey: null, projectId: null, ...NO_IDS };
 
 export const readCloudFile = (file: string): Saved => {
   try {
@@ -21,12 +24,11 @@ export const readCloudFile = (file: string): Saved => {
     const open = (value: unknown) =>
       typeof value === "string" && safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(Buffer.from(value, "base64")) : null;
     const text = (value: unknown) => (typeof value === "string" && value.length <= MAX_FIELD_LENGTH ? value : null);
-    return {
-      apiKey: open(saved.apiKey),
-      projectId: open(saved.projectId),
-      contextId: text(saved.contextId),
-      sessionId: text(saved.sessionId),
-    };
+    const sessionId = text(saved.sessionId);
+    const tags = Array.isArray(saved.tags) ? saved.tags.flatMap((tag) => (text(tag) ? [tag as string] : [])).slice(0, MAX_TAGS) : [];
+    // A file from before tags only ever had Browserbase's session in it.
+    const madeBy = saved.madeBy === "local" ? "local" : sessionId || tags.length ? "browserbase" : null;
+    return { apiKey: open(saved.apiKey), projectId: open(saved.projectId), contextId: text(saved.contextId), sessionId, tags, madeBy };
   } catch {
     return EMPTY;
   }
@@ -38,8 +40,10 @@ export const writeCloudFile = (file: string, saved: Saved): boolean => {
     mkdirSync(dirname(file), { recursive: true });
     const seal = (value: string | null) => value && safeStorage.encryptString(value).toString("base64");
     const temp = `${file}.tmp`;
-    const { apiKey, projectId, contextId, sessionId } = saved;
-    writeFileSync(temp, JSON.stringify({ apiKey: seal(apiKey), projectId: seal(projectId), contextId, sessionId }), { mode: 0o600 });
+    const { apiKey, projectId, contextId, sessionId, tags, madeBy } = saved;
+    writeFileSync(temp, JSON.stringify({ apiKey: seal(apiKey), projectId: seal(projectId), contextId, sessionId, tags, madeBy }), {
+      mode: 0o600,
+    });
     renameSync(temp, file);
     return true;
   } catch {

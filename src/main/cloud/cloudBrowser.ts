@@ -1,7 +1,7 @@
 import type { BrowserContext, Page } from "playwright-core";
 import { CdpTab, type CdpTabEvents } from "../tools/CdpTab";
 import { CloudLife, ENDED_MEANWHILE, type CloudLifeHooks } from "./cloudLife";
-import type { CloudBrowser, CloudIds } from "./cloudProvider";
+import { NO_IDS, type CloudBrowser, type CloudIds } from "./cloudProvider";
 import { closePopups } from "./cloudPopups";
 
 // A browser somewhere else, reached over CDP, for a mascot to work in, and who is using it: one job at a time, and the
@@ -10,32 +10,31 @@ import { closePopups } from "./cloudPopups";
 
 export class CloudSessions extends CloudLife {
   private owner: string | null = null;
-  // Whoever else is using it, so it doesn't wind down under them: the user in a page, or main changing its cookies.
-  private readonly users = new Set<unknown>();
+  // Main changing its cookies, so it doesn't wind down meanwhile.
+  private readonly users = new Set<symbol>();
+  // Pages the user holds, by tab, each with the hold that took it, so a late call can only let go of its own.
+  private readonly held = new Map<string, object>();
   private readonly pages = new Map<string, { tab: CdpTab; jobId: string }>();
   // Every page made here. Anything else in the context is a popup a page opened.
   private readonly ours = new WeakSet<Page>();
   private opening: Promise<unknown> = Promise.resolve();
 
-  constructor(
-    browser: CloudBrowser | null,
-    ids: CloudIds = { contextId: null, sessionId: null },
-    hooks: CloudLifeHooks = {},
-    idleMs?: number,
-  ) {
+  constructor(browser: CloudBrowser | null, ids: CloudIds = NO_IDS, hooks: CloudLifeHooks = {}, idleMs?: number) {
     super(browser, ids, hooks, idleMs);
     // A session left running last time ends too, unless something wants it first. Here, once who uses it is known.
     this.settle();
+    this.recover();
   }
 
   protected inUse(): boolean {
-    return this.owner !== null || this.users.size > 0;
+    return this.owner !== null || this.users.size > 0 || this.held.size > 0;
   }
 
   protected dropAll(): void {
     this.pages.clear();
     this.owner = null;
     this.users.clear();
+    this.held.clear();
   }
 
   protected dropPages(): void {
@@ -71,17 +70,22 @@ export class CloudSessions extends CloudLife {
   }
 
   // The user has a page here, such as one they took over or opened to check a sign-in. It stays open while they do.
-  holdForUser(id: string): void {
-    this.users.add(id);
+  holdForUser(id: string): object {
+    const hold = {};
+    this.held.set(id, hold);
+    this.settle();
+    return hold;
+  }
+
+  // Lets go of the page, or only of `hold` if that's still what holds it.
+  letGo(id: string, hold?: object): void {
+    if (!this.held.has(id) || (hold && this.held.get(id) !== hold)) return;
+    this.held.delete(id);
     this.settle();
   }
 
-  letGo(id: string): void {
-    if (this.users.delete(id)) this.settle();
-  }
-
   heldByUser(id: string): boolean {
-    return this.users.has(id);
+    return this.held.has(id);
   }
 
   // A new page for the job that has claimed the session. `id` is what the tools and the window call it. `allows` is a
@@ -123,10 +127,10 @@ export class CloudSessions extends CloudLife {
   // A page the user opened themselves, such as a site to see whether they're signed in. It belongs to no job, and it's
   // the user's from the start. Null if they let go of it before it opened, which closes it.
   async openForUser(id: string, url: string, events: CdpTabEvents): Promise<CdpTab | null> {
-    this.holdForUser(id);
+    const hold = this.holdForUser(id);
     try {
       const tab = await this.newTab(id, "", events);
-      if (!this.users.has(id)) {
+      if (this.held.get(id) !== hold) {
         await this.close(id);
         return null;
       }
@@ -137,7 +141,7 @@ export class CloudSessions extends CloudLife {
       this.changed();
       return tab;
     } catch (error) {
-      this.letGo(id);
+      this.letGo(id, hold);
       throw error;
     }
   }

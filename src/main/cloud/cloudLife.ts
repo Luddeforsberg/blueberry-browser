@@ -1,11 +1,13 @@
 import type { BrowserContext } from "playwright-core";
 import { Latest, OneAtATime, type Turn } from "../../shared/lateWork";
-import { KeyRefused, type CloudBrowser, type CloudIds, type CloudSession, type MadeSession, type Released } from "./cloudProvider";
+import { CloudHandles } from "./cloudHandles";
+import type { CloudBrowser, CloudIds, CloudSession, MadeSession, Released } from "./cloudProvider";
 
 // A cloud session's life, from the provider making it to the provider confirming it ended, for as long as the app or the
 // runner's job runs. Everything that starts or ends a session, or changes the key, is a step in one queue, so each reads
-// what the one before it left. Connecting happens outside the queue, so an ending never waits for it: it releases the
-// session by its id at once, and a connection that arrives afterwards is closed. `CloudSessions` adds who uses it.
+// what the one before it left. Neither asking for a session nor connecting to it holds the queue once an ending comes:
+// the ending releases what is kept of it at once, by its id or the tag it was asked for with, and whatever arrives for
+// it afterwards is released or closed. What is kept of it is `CloudHandles`', and `CloudSessions` adds who uses it.
 
 export type CloudStatus = "idle" | "starting" | "running" | "ended";
 
@@ -17,35 +19,55 @@ export interface CloudLifeHooks {
 
 const IDLE_MS = 3 * 60_000;
 export const ENDED_MEANWHILE = "The cloud browser ended meanwhile.";
+const OFF = "The cloud browser is off.";
+const COULDNT_START = "The cloud browser couldn't start.";
+const UNRELEASED = "The cloud session may still be running, and costing, because the provider didn't confirm it ended. Try again.";
 
 const message = (error: unknown, otherwise: string): string => (error instanceof Error && error.message) || otherwise;
+
+// How asking the provider for a session went.
+type Asked = { made: MadeSession } | { error: unknown };
+
+// Settles when a life ends, so a step waiting on the provider for that life can stop waiting.
+const lifeEnd = () => {
+  let end = () => {};
+  const ended = new Promise<"ended">((resolve) => (end = () => resolve("ended")));
+  return { ended, end };
+};
 
 export abstract class CloudLife {
   private readonly steps = new OneAtATime();
   // One for each session's life. An ending starts the next, so whatever was on its way for the last one finds it stale.
   private readonly lives = new Latest();
   protected life: Turn = this.lives.next();
+  private ends = lifeEnd();
   protected session: CloudSession | null = null;
   private connecting: Promise<CloudSession> | null = null;
   // Endings queued or running. Nothing new starts or claims it until they're done.
   private ending = 0;
   private closed = false;
   private _status: CloudStatus = "idle";
+  // Why it last couldn't start.
   private _problem: string | null = null;
-  // The last release wasn't confirmed, so a paid session may still be running, and whether that was the key refused.
-  private _unreleased = false;
-  private _keyRefused = false;
   // A session nobody is using still costs, so it ends a while after the last one lets go: armed for one life only.
   private idle: { timer: ReturnType<typeof setTimeout>; life: Turn } | null = null;
-  // Connections on their way closed, which Quit waits for, since closing a local browser is what ends it.
-  private readonly closing = new Set<Promise<void>>();
+  // Asks of the provider and connections still on their way, and connections closing, which Quit waits for, since
+  // closing a local browser is what ends it.
+  private readonly asking = new Set<Promise<unknown>>();
+  private readonly starting = new Set<Promise<unknown>>();
+  private readonly closing = new Set<Promise<unknown>>();
+  // Who the provider is now. A new key or none is a new one, so work confirmed for the last one can tell.
+  private _account: object = {};
+  private readonly handles: CloudHandles;
 
   constructor(
     private browser: CloudBrowser | null,
-    private ids: CloudIds,
+    ids: CloudIds,
     private readonly hooks: CloudLifeHooks,
     private readonly idleMs = IDLE_MS,
-  ) {}
+  ) {
+    this.handles = new CloudHandles(ids, () => this.browser, { onIds: hooks.onIds, changed: () => this.changed() });
+  }
 
   // Whether a job or the user is using it.
   protected abstract inUse(): boolean;
@@ -61,20 +83,20 @@ export abstract class CloudLife {
   }
 
   get problem(): string | null {
-    return this._problem;
+    return this.unreleased ? UNRELEASED : this._problem;
   }
 
   get unreleased(): boolean {
-    return this._unreleased;
+    return this.handles.unreleased;
   }
 
   get keyRefused(): boolean {
-    return this._unreleased && this._keyRefused;
+    return this.handles.keyRefused;
   }
 
   // Whether End has anything to end, here or at the provider.
   get canEnd(): boolean {
-    return this.session !== null || this.connecting !== null || this.ids.sessionId !== null || this._unreleased;
+    return this.session !== null || this.connecting !== null || this.handles.kept().length > 0;
   }
 
   get provider(): CloudBrowser["name"] | null {
@@ -82,7 +104,16 @@ export abstract class CloudLife {
   }
 
   get contextId(): string | null {
-    return this.ids.contextId;
+    return this.handles.current.contextId;
+  }
+
+  get account(): object {
+    return this._account;
+  }
+
+  // Whether another provider's id or tags are kept, which only that one can end.
+  get othersKept(): boolean {
+    return this.handles.othersKept;
   }
 
   // Whether it will end on its own once the idle time is up.
@@ -93,7 +124,7 @@ export abstract class CloudLife {
   // Why nothing may start or claim it now, if anything.
   protected get refusal(): string | null {
     if (this.closed) return "Blueberry is quitting.";
-    if (!this.browser) return "The cloud browser is off.";
+    if (!this.browser) return OFF;
     if (this.ending > 0) return "The cloud browser is ending. Try again in a moment.";
     return null;
   }
@@ -101,7 +132,7 @@ export abstract class CloudLife {
   // The one rule for winding down: anything that may be running, with nobody using it, ends once the idle time is up.
   // A timer belongs to the life it was armed in, so it never ends one that came after.
   protected settle(): void {
-    const something = this.session !== null || this.connecting !== null || (this.ids.sessionId !== null && !this.keyRefused);
+    const something = this.session !== null || this.connecting !== null || this.handles.endable;
     if (this.inUse() || !something || this.refusal) {
       this.stopIdle();
       return;
@@ -130,9 +161,9 @@ export abstract class CloudLife {
     this.changed();
   }
 
-  private setIds(ids: CloudIds): void {
-    this.ids = { ...ids };
-    this.hooks.onIds?.(this.ids);
+  // Sessions left from last time with only a tag, no id, are found and ended as soon as it starts.
+  protected recover(): void {
+    if (this.handles.current.tags.length && this.handles.kept().length) void this.steps.run(() => this.releaseKept());
   }
 
   protected async ensure(): Promise<CloudSession> {
@@ -143,58 +174,72 @@ export abstract class CloudLife {
     return connecting;
   }
 
-  // In the queue: asks the provider for the session, and keeps its id the moment there is one. The connection is made
-  // after the step, so the next ending doesn't wait for it. Wrapped, so the queue doesn't wait for it either.
+  // In the queue: asks the provider for the session. The connection is made after the step, so the next ending doesn't
+  // wait for it, and an ending stops this step waiting on the provider too. Wrapped, so the queue doesn't wait for it.
   private async startStep(): Promise<{ connecting: Promise<CloudSession> }> {
     if (this.session) return { connecting: Promise.resolve(this.session) };
     if (this.connecting) return { connecting: this.connecting };
-    const { browser, refusal, life } = this;
-    if (refusal || !browser) throw new Error(refusal ?? "The cloud browser is off.");
+    const { browser, refusal, life, ends } = this;
+    if (refusal || !browser) throw new Error(refusal ?? OFF);
     this._status = "starting";
     this._problem = null;
     this.changed();
-    let made: MadeSession;
-    try {
-      made = await browser.create(
-        this.ids,
-        (ids) => this.setIds(ids),
-        () => this.refusal === null,
-      );
-    } catch (error) {
-      const problem = message(error, "The cloud browser couldn't start.");
-      // A session may have been made before it failed. An ending since then releases it, and otherwise nothing would.
-      if (life.current) {
-        this._status = "idle";
-        await this.releaseSaved();
-        this._problem ??= problem;
-      }
+    const asked = await Promise.race([this.ask(browser, life), ends.ended]);
+    if (asked === "ended" || !life.current) return { connecting: Promise.reject(new Error(ENDED_MEANWHILE)) };
+    if ("error" in asked) {
+      this._status = "idle";
+      // A session may have been made before it failed, and nothing else would end it.
+      await this.handles.releaseKept();
+      this._problem = message(asked.error, COULDNT_START);
       this.settled();
-      throw new Error(problem);
+      throw new Error(this._problem);
     }
-    // Ended while it was asked for: its id is saved, and the ending's step releases it.
-    if (!life.current) return { connecting: Promise.reject(new Error(ENDED_MEANWHILE)) };
-    const connecting = this.connect(made, life);
+    const connecting = this.connect(asked.made, life);
     this.connecting = connecting;
     this.settle();
     return { connecting };
   }
 
+  // Asks the provider for a session, keeping what it says of it as it says it, in `CloudHandles`.
+  private ask(browser: CloudBrowser, life: Turn): Promise<Asked> {
+    const { ids, hooks, answered } = this.handles.asking(browser, () => life.current);
+    const done = browser
+      .create(ids, { ...hooks, wanted: () => life.current && this.refusal === null })
+      .then(
+        (made): Asked => ({ made }),
+        (error: unknown): Asked => ({ error }),
+      )
+      .then((result) => {
+        answered();
+        return result;
+      });
+    this.track(this.asking, done);
+    return done;
+  }
+
+  private track(set: Set<Promise<unknown>>, work: Promise<unknown>): void {
+    const settled = work.catch(() => {});
+    set.add(settled);
+    void settled.then(() => set.delete(settled));
+  }
+
   private async connect(made: MadeSession, life: Turn): Promise<CloudSession> {
+    const connecting = made.connect();
+    this.track(this.starting, connecting);
     let session: CloudSession | null = null;
     try {
-      session = await made.connect();
+      session = await connecting;
       if (life.current) await this.prepare(session.context);
     } catch (error) {
       if (session) this.closeLater(session);
       if (!life.current) throw new Error(ENDED_MEANWHILE);
       this.connecting = null;
       this._status = "idle";
-      const problem = message(error, "The cloud browser couldn't start.");
-      this._problem = problem;
+      this._problem = message(error, COULDNT_START);
       // It may be running at the provider with nothing connected, and nothing else would end it.
-      if (made.id) void this.steps.run(() => this.releaseSaved().then(() => this.settled()));
+      if (made.id) void this.steps.run(() => this.releaseKept());
       this.settled();
-      throw new Error(problem);
+      throw new Error(this._problem);
     }
     if (!life.current) {
       this.closeLater(session);
@@ -204,6 +249,7 @@ export abstract class CloudLife {
     this.session = connected;
     this.connecting = null;
     this._status = "running";
+    if (made.id) this.handles.connected(made.id);
     connected.context.browser()?.on("disconnected", () => this.lost(connected));
     this.settled();
     return connected;
@@ -211,9 +257,7 @@ export abstract class CloudLife {
 
   // Closed without waiting, and Quit waits for it.
   private closeLater(session: CloudSession): void {
-    const closing = session.close().catch(() => {});
-    this.closing.add(closing);
-    void closing.then(() => this.closing.delete(closing));
+    this.track(this.closing, session.close());
   }
 
   // The connection went. A kept-alive session can still be running at the provider, and ends there once idle.
@@ -226,58 +270,67 @@ export abstract class CloudLife {
   }
 
   // Everything goes, at once: the connection, the pages, the job's claim, the user's, and anything still on its way for
-  // this life. The release for the saved id goes out at once too. The rest is a step, queued after whatever step is
-  // running, which may make a session this ending has to release as well. Nothing new starts or claims it until it's
-  // done. `only` is the idle timer's life, which ends nothing that came after it.
+  // this life. Releases for what is kept go out at once too. The rest is a step, queued after whatever step is running,
+  // which may have kept something more, released then. Nothing new starts or claims it until it's done. `only` is the
+  // idle timer's life, which ends nothing that came after it.
   end(only?: Turn): Promise<Released> {
     if (only && !only.current) return Promise.resolve("ended");
-    return this.ended((released) => released());
+    return this.ended(async () => this.outcome());
   }
 
   // A new key, or none, as one ending: the session it may be running on ends first, then `decide` says what's next from
-  // how that went, or null to keep everything. A session id kept for the new key is ended with it.
+  // how that went, or null to keep everything. Another provider's id and tags stay as they are, for that one.
   replace(decide: (released: Released) => { browser: CloudBrowser | null; ids: CloudIds } | null): Promise<Released> {
-    return this.ended(async (released) => {
-      const before = await released();
+    return this.ended(async () => {
+      const before = this.outcome();
       const next = decide(before);
       if (!next) return before;
+      const theirs = this.handles.theirs();
       this.browser = next.browser;
-      this._unreleased = false;
-      this.setIds(next.ids);
-      return next.ids.sessionId ? this.releaseSaved() : before;
+      this._account = {};
+      this.handles.reset(theirs ? { ...next.ids, ...theirs } : next.ids);
+      await this.handles.releaseKept();
+      return this.outcome();
     });
   }
 
-  // Quit: the last ending, and the connections still closing. Nothing starts or claims it after this.
-  async quit(): Promise<void> {
+  // Quit: the last ending, then whatever was still on its way, which is released or closed as it arrives.
+  async quit(): Promise<Released> {
     this.closed = true;
     await this.end();
+    await Promise.allSettled([...this.asking, ...this.starting]);
+    await Promise.allSettled(this.handles.sending);
     await Promise.allSettled([...this.closing]);
+    return this.outcome();
   }
 
-  // `step` runs in the queue, and `released` says how this ending's release went, releasing a session saved since.
-  private ended(step: (released: () => Promise<Released>) => Promise<Released>): Promise<Released> {
+  private outcome(): Released {
+    if (this.handles.kept().length === 0) return "ended";
+    return this.keyRefused ? "refused" : "running";
+  }
+
+  private ended(step: () => Promise<Released>): Promise<Released> {
     this.ending++;
     this.stopIdle();
+    this.ends.end();
+    this.ends = lifeEnd();
     this.life = this.lives.next();
     const { session } = this;
     this.session = null;
     this.connecting = null;
     this.dropAll();
     this._status = "ended";
-    // The release goes out before the connection is closed, and neither waits for the other, or for the step running.
-    const id = this.ids.sessionId;
-    const now = this.releaseSaved();
+    // The releases go out before the connection is closed, and neither waits for the other, or for the step running.
+    const sent = new Set(this.handles.kept());
+    const now = this.handles.releaseKept();
     if (session) this.closeLater(session);
     this.changed();
-    // A step before this one may have saved a new session, which this ending releases too.
-    const released = async (): Promise<Released> => {
-      const first = await now;
-      return this.ids.sessionId && this.ids.sessionId !== id ? this.releaseSaved() : first;
-    };
     return this.steps.run(async () => {
       try {
-        return await step(released);
+        await now;
+        // Anything a step before this one kept since.
+        await this.handles.releaseKept(sent);
+        return await step();
       } finally {
         this.ending--;
         this.settled();
@@ -285,28 +338,8 @@ export abstract class CloudLife {
     });
   }
 
-  // Whatever is saved now, unless the provider has confirmed it already.
-  private releaseSaved(): Promise<Released> {
-    return this.ids.sessionId ? this.releaseId(this.ids.sessionId) : Promise.resolve("ended");
-  }
-
-  // The saved id is cleared only once the provider has confirmed, and only if it's still this one, so a session made
-  // meanwhile keeps its own.
-  private async releaseId(id: string): Promise<Released> {
-    if (!this.browser) return "ended";
-    try {
-      await this.browser.release(id);
-      if (this.ids.sessionId === id) this.setIds({ ...this.ids, sessionId: null });
-      this._unreleased = false;
-      this._problem = null;
-      return "ended";
-    } catch (error) {
-      // Only that it failed, since this runs on the cloud runner too. Settings > Cloud says what to do.
-      console.error("Couldn't release the cloud session.");
-      this._unreleased = true;
-      this._keyRefused = error instanceof KeyRefused;
-      this._problem = "The cloud session may still be running, and costing, because the provider didn't confirm it ended. Try again.";
-      return this._keyRefused ? "refused" : "running";
-    }
+  // A step: releases what's kept, then winds down as the rule says.
+  private releaseKept(): Promise<void> {
+    return this.handles.releaseKept().then(() => this.settled());
   }
 }

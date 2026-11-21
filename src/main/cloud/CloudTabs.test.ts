@@ -40,6 +40,7 @@ const fakeLocal = () => {
   const browser: CloudBrowser = {
     name: "local",
     release: async () => {},
+    releaseTagged: async () => {},
     create: async () => ({
       id: null,
       connect: async () => ({ context: context as unknown as BrowserContext, liveView: async () => null, close: async () => {} }),
@@ -85,7 +86,14 @@ const makeTabs = (file = tempFile(), provider: Provider = () => fakeLocal().brow
 
 // Sealed as the mocked safeStorage seals, which is no more than base64.
 const sealed = (text: string) => Buffer.from(text).toString("base64");
-const OLD = { apiKey: sealed("bb_old"), projectId: sealed("proj"), contextId: "ctx-1", sessionId: "sess-1" };
+const OLD = {
+  apiKey: sealed("bb_old"),
+  projectId: sealed("proj"),
+  contextId: "ctx-1",
+  sessionId: "sess-1",
+  tags: [],
+  madeBy: "browserbase",
+};
 
 // Browserbase as far as releasing goes, answering as `answer.now` says, and noting the key each release used.
 const releasing = () => {
@@ -96,6 +104,7 @@ const releasing = () => {
       ? {
           name: "browserbase",
           create: async () => Promise.reject(new Error("Not in this test.")),
+          releaseTagged: async () => Promise.reject(new Error("Not in this test.")),
           release: async (id) => {
             calls.push(`${apiKey} ${id}`);
             if (answer.now === "fails") throw new Error("Browserbase answered 500.");
@@ -203,7 +212,14 @@ describe("CloudTabs", () => {
 
     answer.now = "ok";
     expect((await tabs.saveKey("bb_new", "proj")).problem).toBeNull();
-    expect(saved()).toEqual({ apiKey: sealed("bb_new"), projectId: sealed("proj"), contextId: null, sessionId: null });
+    expect(saved()).toEqual({
+      apiKey: sealed("bb_new"),
+      projectId: sealed("proj"),
+      contextId: null,
+      sessionId: null,
+      tags: [],
+      madeBy: null,
+    });
     expect(calls).toEqual(["bb_old sess-1", "bb_old sess-1", "bb_old sess-1"]);
     encryption.available = false;
   });
@@ -217,12 +233,57 @@ describe("CloudTabs", () => {
     answer.now = "refused";
     const tabs = makeTabs(file, provider);
     await tabs.saveKey("bb_new", "proj");
-    expect(saved()).toEqual({ apiKey: sealed("bb_new"), projectId: sealed("proj"), contextId: null, sessionId: "sess-1" });
+    expect(saved()).toEqual({
+      apiKey: sealed("bb_new"),
+      projectId: sealed("proj"),
+      contextId: null,
+      sessionId: "sess-1",
+      tags: [],
+      madeBy: "browserbase",
+    });
     // Ended once more, with the new key.
     expect(calls).toEqual(["bb_old sess-1", "bb_new sess-1"]);
     expect((await tabs.forget()).problem).toMatch(/ends on its own within an hour/);
-    expect(saved()).toEqual({ apiKey: null, projectId: null, contextId: null, sessionId: null });
+    expect(saved()).toEqual({ apiKey: null, projectId: null, contextId: null, sessionId: null, tags: [], madeBy: null });
     encryption.available = false;
+  });
+
+  it("says to press End again only while there's still something to end", async () => {
+    encryption.available = true;
+    const file = tempFile();
+    writeFileSync(file, JSON.stringify(OLD));
+    const { answer, provider } = releasing();
+    const tabs = makeTabs(file, provider);
+    expect((await tabs.saveKey("bb_new", "proj")).problem).toMatch(/Press End again first/);
+    answer.now = "ok";
+    const ended = await tabs.end();
+    expect(ended.canEnd).toBe(false);
+    expect(ended.problem).toBeNull();
+    encryption.available = false;
+  });
+
+  it("leaves the next window's tabs alone when a page for the last one finishes late, though their ids are the same", async () => {
+    attachTabs();
+    const local = fakeLocal();
+    let opened = () => {};
+    local.holdPages(new Promise((resolve) => (opened = resolve)));
+    let count = 0;
+    const tabs = makeTabs(tempFile(), () => local.browser, { openTab: () => `tab-${++count}` });
+    expect(tabs.claim("job-1")).toBe(true);
+    const opening = tabs.open("job-1", "https://example.com/").catch(() => null);
+    const checking = tabs.checkLogin("github.com");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await tabs.detach();
+    // The next window's tab ids start again, so its own tab-1 and tab-2 are the user's.
+    const next = { closeTab: vi.fn(), updateTab: vi.fn(), showTab: vi.fn() };
+    tabs.attach(hooks(next));
+    opened();
+    expect(await opening).toBeNull();
+    expect(await checking).toBe("The cloud browser couldn't open it.");
+    expect(next.closeTab).not.toHaveBeenCalled();
+    expect(next.updateTab).not.toHaveBeenCalled();
+    expect(next.showTab).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
   });
 
   it("lets the session wind down only once the last tab the user has there closes", async () => {
@@ -287,7 +348,9 @@ describe("CloudTabs", () => {
 
   it("gives Quit one promise to wait for, which ends once the session has, and never closes a tab on the way", async () => {
     let ended = () => {};
-    const quitting = vi.spyOn(CloudSessions.prototype, "quit").mockImplementation(() => new Promise<void>((resolve) => (ended = resolve)));
+    const quitting = vi
+      .spyOn(CloudSessions.prototype, "quit")
+      .mockImplementation(() => new Promise<"ended">((resolve) => (ended = () => resolve("ended"))));
     const closeTab = vi.fn();
     const tabs = makeTabs(tempFile(), undefined, { closeTab });
     const closing = tabs.quit();

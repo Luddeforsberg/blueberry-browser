@@ -139,9 +139,9 @@ const fakeContext = (): CookieJar & { cookies: CloudCookie[] } => {
   return context;
 };
 
-// The same jar every time, as `CloudSessions` is.
+// The same jar every time, for the same account, as `CloudSessions` is.
 const stable = (withContext: <T>(act: (jar: CookieJar) => Promise<T>) => Promise<T>) => {
-  const jar = { withContext };
+  const jar = { account: {}, withContext };
   return () => jar;
 };
 
@@ -245,12 +245,15 @@ describe("CloudLogins", () => {
   });
 
   it("copies nothing when the cloud browser ends, or its key changes, while the user is still confirming", async () => {
-    for (const change of ["replaced", "ended"] as const) {
+    // The same browser with a new key is a new account, though it's the same object.
+    for (const change of ["replaced", "ended", "new account"] as const) {
       const file = join(mkdtempSync(join(tmpdir(), "cloud-logins-")), "cloud-logins.json");
       const old = vi.fn(async () => {});
-      let current: { withContext: <T>(act: (jar: CookieJar) => Promise<T>) => Promise<T> } | null = {
-        withContext: (act) => act({ addCookies: old, clearCookies: async () => {} }),
+      const same = {
+        account: {},
+        withContext: <T>(act: (jar: CookieJar) => Promise<T>) => act({ addCookies: old, clearCookies: async () => {} }),
       };
+      let current: typeof same | null = same;
       let answer: (yes: boolean) => void = () => {};
       const logins = new CloudLogins(file, {
         jar: () => current,
@@ -261,7 +264,8 @@ describe("CloudLogins", () => {
       const pending = logins.bring("example.com");
       await Promise.resolve();
       if (change === "ended") logins.cancelPending();
-      else current = { withContext: (act) => act(fakeContext()) };
+      else if (change === "replaced") current = { account: {}, withContext: (act) => act(fakeContext()) };
+      else same.account = {};
       answer(true);
       expect(await pending).toMatch(/ended or its key changed/);
       expect(old).not.toHaveBeenCalled();

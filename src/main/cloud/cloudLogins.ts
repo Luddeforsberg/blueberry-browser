@@ -166,8 +166,9 @@ export interface CookieJar {
 }
 
 export interface CloudLoginsHooks {
-  // Runs `act` on the cloud browser's context, starting it if need be. Null while the cloud is off.
-  jar: () => { withContext<T>(act: (jar: CookieJar) => Promise<T>): Promise<T> } | null;
+  // Runs `act` on the cloud browser's context, starting it if need be. `account` is who the provider is, a new one with
+  // each key. Null while the cloud is off.
+  jar: () => { readonly account: object; withContext<T>(act: (jar: CookieJar) => Promise<T>): Promise<T> } | null;
   // Touch ID, or a plain confirm where there's none. Asked before any cookie is read.
   confirm: (site: string) => Promise<boolean>;
   // This site's cookies from the user's own browser, and nobody else's.
@@ -216,7 +217,9 @@ export class CloudLogins {
     // Every site on the list needs its Remove, so a full list takes no more until one comes off.
     if (this.list.length >= MAX_SITES && !this.list.some((login) => login.site === site))
       return `There are already ${MAX_SITES} sites in the cloud browser. Remove one first.`;
+    // What the user confirms is for this browser and this account, so nothing lands after either has changed.
     const { browser } = this;
+    const { account } = jar;
     return this.oneAtATime(async () => {
       if (!(await this.hooks.confirm(site))) return "Nothing was brought along, because it wasn't confirmed.";
       const stored = await this.hooks.readCookies(site).catch(() => null);
@@ -225,7 +228,7 @@ export class CloudLogins {
       if (cookies.length === 0)
         return `Blueberry isn't signed in to ${site}, so there's nothing to bring along. Sign in there in a tab first.`;
       // The user took a while to confirm, and the browser it was for may have gone meanwhile, even while it was starting.
-      const gone = () => !browser.current || this.hooks.jar() !== jar;
+      const gone = () => !browser.current || this.hooks.jar() !== jar || jar.account !== account;
       if (gone()) return BROWSER_GONE;
       try {
         const copied = await jar.withContext(async (context) => {

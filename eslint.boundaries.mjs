@@ -323,6 +323,7 @@ const rules = [
       "cloud/CloudTabs.test.ts",
       "cloud/cloudLifetime.test.ts",
       "cloud/cloudCheckTesting.ts",
+      "cloud/cloudCheckApp.ts",
       "index.ts",
       "window/Window.ts",
       "window/WindowParts.ts",

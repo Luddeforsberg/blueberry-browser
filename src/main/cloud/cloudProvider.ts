@@ -1,8 +1,11 @@
 import type { Browser, BrowserContext } from "playwright-core";
 import type { CdpTab } from "../tools/CdpTab";
 
-// What a cloud browser's provider does: make a session, connect to it, and end it by its id. Browserbase is one, and a
-// Chrome on this computer stands in for it in tests. Plain Node, so the runner uses the same code.
+// What a cloud browser's provider does: make a session, connect to it, and end it by its id or by the tag it was made
+// with. Browserbase is one, and a Chrome on this computer stands in for it in tests. Plain Node, so the runner uses the
+// same code.
+
+type ProviderName = "browserbase" | "local";
 
 // A running browser, from whichever provider.
 export interface CloudSession {
@@ -14,11 +17,29 @@ export interface CloudSession {
   close(): Promise<void>;
 }
 
-// What the provider knows a session by. The session's id is the only way to end it, so it's kept from the moment the
-// provider gives it until the provider confirms it ended.
+// What is kept of a cloud session, from the moment it's asked for until the provider confirms it ended.
 export interface CloudIds {
   contextId: string | null;
   sessionId: string | null;
+  // One for each session asked for whose answer hasn't come, or didn't say its id: such a session may be running with
+  // no id to end it by. Each went out with its session, so the provider can still find it.
+  tags: string[];
+  // The provider that made the session id and tags. Only that one can say they've ended.
+  madeBy: ProviderName | null;
+}
+
+export const NO_IDS: CloudIds = { contextId: null, sessionId: null, tags: [], madeBy: null };
+
+// Told as a session is made, each the moment the provider has it.
+export interface CreateHooks {
+  // False once nothing new should be made.
+  wanted(): boolean;
+  // A fresh tag for the session about to be asked for, already kept by the time it's returned.
+  tag(): string;
+  // The provider refused that ask outright, so nothing was made with the tag.
+  unused(tag: string): void;
+  context(id: string): void;
+  made(id: string): void;
 }
 
 // A session the provider has made, or found still running, before anything has connected to it.
@@ -29,13 +50,14 @@ export interface MadeSession {
 }
 
 export interface CloudBrowser {
-  readonly name: "browserbase" | "local";
-  // The saved session if it's still running, or a new one. `onIds` hears each new id as soon as the provider gives it,
-  // before anything else about it is checked. Nothing new is made once `wanted` says no.
-  create(ids: CloudIds, onIds: (ids: CloudIds) => void, wanted: () => boolean): Promise<MadeSession>;
+  readonly name: ProviderName;
+  // The saved session if it's still running, or a new one.
+  create(ids: Pick<CloudIds, "contextId" | "sessionId">, hooks: CreateHooks): Promise<MadeSession>;
   // Ends that session at the provider, from its id alone, so nothing keeps running or costing. Rejects if that wasn't
   // confirmed, with `KeyRefused` when the provider no longer takes the key, which then can't end it at all.
   release(id: string): Promise<void>;
+  // Ends every session made with that tag, and resolves once none of them is running. Rejects as `release` does.
+  releaseTagged(tag: string): Promise<void>;
 }
 
 export class KeyRefused extends Error {}

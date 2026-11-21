@@ -1,6 +1,8 @@
+import { createHash } from "node:crypto";
 import { modelConfig } from "../../src/main/chats/agent";
 import { browserbase } from "../../src/main/cloud/browserbase";
 import { CloudSessions } from "../../src/main/cloud/cloudBrowser";
+import { NO_IDS } from "../../src/main/cloud/cloudProvider";
 import { isLocalEndpoint, localChrome } from "../../src/main/cloud/localChrome";
 import { DbError, dbConfig, runnerSession, supabaseDb, type ClaimedJob } from "./db";
 import { runJob, sessionBrowser, UnreleasedBrowsers } from "./job";
@@ -42,14 +44,19 @@ if (!local && (!apiKey || !projectId)) fail("Set BROWSERBASE_API_KEY and BROWSER
 // The user's Context comes with each job, from the app. Without one, the runner makes one for itself and keeps it while
 // it runs, so jobs at least share theirs.
 let ownContext: string | null = process.env.BROWSERBASE_CONTEXT_ID || null;
-const cloudBrowser = local
-  ? localChrome({ executable: localExecutable, endpoint: localEndpoint })
-  : browserbase({ apiKey: apiKey!, projectId: projectId! });
+// Every session this runner makes carries its mark, so one left by a runner that stopped without ending it is found and
+// ended when it starts again. From the runner's own account, which is its alone, and never the address itself.
+const mark = `runner-${createHash("sha256")
+  .update(process.env.BLUEBERRY_RUNNER_EMAIL ?? "")
+  .digest("hex")
+  .slice(0, 16)}`;
+const hosted = local ? null : browserbase({ apiKey: apiKey!, projectId: projectId!, mark });
+const cloudBrowser = hosted ?? localChrome({ executable: localExecutable, endpoint: localEndpoint });
 // A new session each job, ended with it.
 const jobSessions = (contextId: string | null): CloudSessions =>
   new CloudSessions(
     cloudBrowser,
-    { contextId: contextId ?? ownContext, sessionId: null },
+    { ...NO_IDS, contextId: contextId ?? ownContext },
     {
       onIds: (ids) => {
         if (!contextId) ownContext = ids.contextId;
@@ -127,8 +134,17 @@ const loop = async () => {
   let unreachable = false;
   let routinesFailing = false;
   let addressFailing = false;
+  // Until Browserbase confirms none is left from before, it asks again each time round, before any job of its own.
+  let leftovers = hosted !== null;
   while (!shutdown.signal.aborted) {
     await unreleased.retry();
+    if (leftovers && hosted) {
+      leftovers = !(await hosted.releaseMarked().then(
+        () => true,
+        () => false,
+      ));
+      if (leftovers) console.error("Couldn't end the cloud sessions left from before. Trying again.");
+    }
     if (!linked) {
       await link();
       if (!linked) {

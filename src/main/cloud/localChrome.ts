@@ -72,15 +72,29 @@ const launch = (executable: string): Promise<{ endpoint: string; process: ChildP
   });
 };
 
+// How long a browser that was told to stop gets before its profile goes anyway.
+const STOP_MS = 5_000;
+
+// Kills a browser this computer started, and waits until it has gone, so nothing outlives the app or the runner.
+const stop = async ({ process: child, profile }: { process: ChildProcess; profile: string }): Promise<void> => {
+  if (child.exitCode === null && child.signalCode === null) {
+    const gone = new Promise((resolve) => child.once("exit", resolve));
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    child.kill();
+    await Promise.race([gone, new Promise((resolve) => (timer = setTimeout(resolve, STOP_MS)))]);
+    clearTimeout(timer);
+  }
+  rmSync(profile, { recursive: true, force: true });
+};
+
 // Connects to `endpoint`, a browser already running here, or launches one from `executable` or the usual place.
 const start = async (endpoint: string | undefined, executable: string | undefined): Promise<CloudSession> => {
   if (endpoint && !isLocalEndpoint(endpoint)) throw new Error("A local browser has to be on 127.0.0.1.");
   const path = executable ?? findChrome();
   if (!endpoint && !path) throw new Error("No Chrome or Chromium was found on this computer.");
   const launched = endpoint ? null : await launch(path!);
-  const browser = await connectOverCdp(endpoint ?? launched!.endpoint).catch((error) => {
-    launched?.process.kill();
-    if (launched) rmSync(launched.profile, { recursive: true, force: true });
+  const browser = await connectOverCdp(endpoint ?? launched!.endpoint).catch(async (error) => {
+    if (launched) await stop(launched);
     throw error;
   });
   const context = browser.contexts()[0] ?? (await browser.newContext());
@@ -89,10 +103,7 @@ const start = async (endpoint: string | undefined, executable: string | undefine
     liveView: async () => null,
     close: async () => {
       await browser.close().catch(() => {});
-      if (!launched) return;
-      launched.process.kill();
-      await new Promise((resolve) => setTimeout(resolve, 200));
-      rmSync(launched.profile, { recursive: true, force: true });
+      if (launched) await stop(launched);
     },
   };
 };
@@ -104,5 +115,7 @@ export const localChrome = ({
   name: "local",
   // Closing the session ends this browser, so there's no id, and nothing left at a provider to release.
   release: async () => {},
+  // It makes no tags, so there are none to end.
+  releaseTagged: async () => {},
   create: async () => ({ id: null, connect: () => start(endpoint, executable) }),
 });

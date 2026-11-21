@@ -1,10 +1,13 @@
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { CdpTab } from "../tools/CdpTab";
 import { browserbase } from "./browserbase";
-import { actionsFor, ruleOf, run, shrink, type Setup } from "./cloudCheckTesting";
+import type { Setup } from "./cloudCheckApp";
+import { actionsFor } from "./cloudCheckPlan";
+import { ruleOf, run, shrink } from "./cloudCheckTesting";
+import type { CloudBrowser, CloudSession } from "./cloudProvider";
 import { CloudTabs } from "./CloudTabs";
 
 // A model checker for the cloud session's life, driven by cloudCheckTesting.ts against a fake Browserbase, for thousands
@@ -16,14 +19,14 @@ const net = vi.hoisted((): Setup["net"] => ({
   attach: () => Promise.reject(new Error("No world.")),
 }));
 const disk = vi.hoisted((): Setup["disk"] => ({
-  saved: { apiKey: null, projectId: null, contextId: null, sessionId: null },
+  saved: { apiKey: null, projectId: null, contextId: null, sessionId: null, tags: [], madeBy: null },
   onWrite: () => {},
 }));
 
 vi.mock("electron", () => ({ safeStorage: { isEncryptionAvailable: () => true }, app: { isPackaged: true } }));
 vi.mock("playwright-core", () => ({ chromium: { connectOverCDP: (url: string) => net.connect(url) } }));
 vi.mock("./cloudFile", () => ({
-  EMPTY: { apiKey: null, projectId: null, contextId: null, sessionId: null },
+  EMPTY: { apiKey: null, projectId: null, contextId: null, sessionId: null, tags: [], madeBy: null },
   MAX_FIELD_LENGTH: 200,
   readCloudFile: () => ({ ...disk.saved }),
   writeCloudFile: (_file: string, saved: Setup["disk"]["saved"]) => {
@@ -42,14 +45,23 @@ const folder = mkdtempSync(join(tmpdir(), "cloud-lifetime-"));
 const setup: Setup = {
   net,
   disk,
-  makeCloud: (hooks) => {
+  makeCloud: ({ local, launchLocal, readCookies }) => {
+    // As localChrome.ts: closing the session is what ends it, so there's nothing to release.
+    const standIn: CloudBrowser = {
+      name: "local",
+      release: async () => {},
+      releaseTagged: async () => {},
+      create: async () => ({ id: null, connect: () => launchLocal() as Promise<CloudSession> }),
+    };
     const tabs = new CloudTabs(
       join(folder, "cloud.json"),
-      ({ apiKey, projectId }) => (apiKey && projectId ? browserbase({ apiKey, projectId }) : null),
-      async () => [],
+      ({ apiKey, projectId }) => (local ? standIn : apiKey && projectId ? browserbase({ apiKey, projectId }) : null),
+      readCookies,
     );
-    return { tabs, windowOpened: () => tabs.attach(hooks), windowClosed: () => tabs.detach(), quit: () => tabs.quit() };
+    return { tabs, windowOpened: (hooks) => tabs.attach(hooks), windowClosed: () => tabs.detach(), quit: () => tabs.quit() };
   },
+  // Each run starts with no sign-ins brought along.
+  reset: () => rmSync(join(folder, "cloud-logins.json"), { force: true }),
 };
 
 describe("the cloud session's life", () => {

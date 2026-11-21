@@ -6,10 +6,10 @@ import { EMPTY, MAX_FIELD_LENGTH, readCloudFile, writeCloudFile, type Saved } fr
 import type { CdpTab } from "../tools/CdpTab";
 import type { ChatCloud } from "../chats/Chats";
 import { CloudSessions } from "./cloudBrowser";
-import type { CloudBrowser, Released } from "./cloudProvider";
+import { NO_IDS, type CloudBrowser, type Released } from "./cloudProvider";
 import { CloudLogins, loginSite, type StoredCookie } from "./cloudLogins";
 import { sendToRenderer } from "../window/ipc";
-import { Latest } from "../../shared/lateWork";
+import { CloudPictures } from "./cloudPictures";
 
 // Settings > Cloud and the cloud tabs in the window. One for the app's whole life, whichever window is open, with one
 // `CloudSessions` that's never replaced. The Browserbase key and project id are kept with `safeStorage` and never leave
@@ -21,9 +21,8 @@ const NOT_SAFE = "This computer can't keep the key encrypted, so it wasn't saved
 const NOT_SAVED = "The key couldn't be saved.";
 // The session's id is the only way to end it, and it goes with the key, unless Browserbase no longer takes that key.
 const STILL_RUNNING = "The cloud session didn't confirm it ended, so the key was kept to end it with. Press End again first.";
+const KEPT_FOR_OTHER = "A Browserbase session from before may still be running, so its key was kept to end it with.";
 const LEFT_RUNNING = "Browserbase no longer takes that key, so its last session couldn't be ended. It ends on its own within an hour.";
-// What a cloud tab may ask its page's viewport to be, in pixels.
-const FIT = { min: { width: 320, height: 200 }, max: { width: 3840, height: 2160 } };
 
 // The open window's part.
 export interface CloudTabsHooks {
@@ -42,17 +41,20 @@ export interface CloudTabsHooks {
 
 const NO_WINDOW = "Blueberry has no window open.";
 
+// One window's time with the cloud. Anything that finishes late acts only through the one it started in, and only while
+// that window is still the one attached, since a reopened window's tabs have the same ids as the last one's.
+interface Attachment {
+  hooks: CloudTabsHooks;
+}
+
 export class CloudTabs implements ChatCloud {
   private saved: Saved;
   private readonly sessions: CloudSessions;
-  private hooks: CloudTabsHooks | null = null;
+  private attached: Attachment | null = null;
   private problem: string | null = null;
-  private watching: CdpTab | null = null;
-  // Stopping the last tab's picture takes a moment, and the user may have moved on again by then.
-  private readonly watches = new Latest();
-  // The size the chrome last asked for, for a page a job is working in. A job's input aims at fixed points, so the page
-  // only changes size once the job lets go of it.
-  private readonly pendingFits = new Map<string, { width: number; height: number }>();
+  // Forget or a new key kept the key, for a session the provider didn't confirm had ended or another provider made.
+  private endFirst = false;
+  private readonly pictures: CloudPictures;
   // Tabs the user opened to see whether they're signed in, and the site each is for. No job can reach them.
   private readonly checking = new Map<string, string>();
   private readonly logins: CloudLogins;
@@ -66,10 +68,10 @@ export class CloudTabs implements ChatCloud {
     readCookies: (site: string) => Promise<StoredCookie[]>,
   ) {
     this.saved = readCloudFile(file);
-    const { contextId, sessionId } = this.saved;
+    const { contextId, sessionId, tags, madeBy } = this.saved;
     this.sessions = new CloudSessions(
       provider(this.saved),
-      { contextId, sessionId },
+      { contextId, sessionId, tags, madeBy },
       {
         onChange: () => this.changed(),
         onIds: (ids) => {
@@ -78,6 +80,11 @@ export class CloudTabs implements ChatCloud {
         },
       },
     );
+    this.pictures = new CloudPictures({
+      page: (id) => this.page(id),
+      working: (id) => !!this.sessions.usedBy(id) && !this.sessions.heldByUser(id),
+      chrome: () => this.hooks?.chrome() ?? null,
+    });
     this.logins = new CloudLogins(join(dirname(file), "cloud-logins.json"), {
       jar: () => (this.sessions.provider ? this.sessions : null),
       confirm: (site) => this.hooks?.confirmLogin(site) ?? Promise.resolve(false),
@@ -88,14 +95,23 @@ export class CloudTabs implements ChatCloud {
 
   // A window opened. Its tabs show the cloud's pages, and its chrome hears about every change.
   attach(hooks: CloudTabsHooks): void {
-    this.hooks = hooks;
+    this.attached = { hooks };
     this.changed();
+  }
+
+  private get hooks(): CloudTabsHooks | null {
+    return this.attached?.hooks ?? null;
+  }
+
+  // The window `at` is, if it's still the one attached.
+  private still(at: Attachment): CloudTabsHooks | null {
+    return at === this.attached ? at.hooks : null;
   }
 
   // The window closed, so the session ends, at the provider from its saved id if need be. Nothing waits on a page or a
   // tab first, as they're gone with the window.
   detach(): Promise<Released> {
-    this.hooks = null;
+    this.attached = null;
     const ending = this.sessions.end();
     this.stopWork();
     return ending;
@@ -115,12 +131,21 @@ export class CloudTabs implements ChatCloud {
       busy: !!sessions.busyWith,
       canEnd: sessions.canEnd,
       unreleased: sessions.unreleased,
-      problem: this.problem ?? sessions.problem,
+      problem: this.problem ?? this.waitedFor ?? sessions.problem,
       logins: this.logins.logins,
     };
   }
 
+  // Why Forget or a new key kept the key, while that's still so.
+  private get waitedFor(): string | null {
+    if (!this.endFirst) return null;
+    if (this.sessions.canEnd) return STILL_RUNNING;
+    return this.sessions.othersKept ? KEPT_FOR_OTHER : null;
+  }
+
   private changed(): void {
+    // Once nothing is left to end, however it ended, there's nothing to wait for.
+    if (!this.waitedFor) this.endFirst = false;
     const chrome = this.hooks?.chrome();
     if (chrome && !chrome.isDestroyed()) sendToRenderer(chrome, "cloud:updated", this.state);
   }
@@ -129,6 +154,7 @@ export class CloudTabs implements ChatCloud {
     const key = typeof apiKey === "string" ? apiKey.trim() : "";
     const project = typeof projectId === "string" ? projectId.trim() : "";
     this.problem = null;
+    this.endFirst = false;
     if (!key || !project || key.length > MAX_FIELD_LENGTH || project.length > MAX_FIELD_LENGTH) {
       this.problem = "Both the API key and the project id are needed.";
     } else if (!safeStorage.isEncryptionAvailable()) {
@@ -136,14 +162,16 @@ export class CloudTabs implements ChatCloud {
     } else {
       this.letGoOfTabs();
       await this.sessions.replace((released) => {
-        if (released === "running") {
-          this.problem = STILL_RUNNING;
+        // Another provider's session ends only with the key it was made with, so that stays too.
+        if (released === "running" || this.sessions.othersKept) {
+          this.endFirst = true;
           return null;
         }
         // A new key may be a new account, without the old context. A session the old key couldn't end is kept for this one.
-        const kept = released === "refused" ? this.saved.sessionId : null;
-        this.saved = { apiKey: key, projectId: project, contextId: null, sessionId: kept };
-        return { browser: this.provider(this.saved), ids: { contextId: null, sessionId: kept } };
+        const { sessionId, tags, madeBy } = this.saved;
+        const ids = released === "refused" ? { ...NO_IDS, sessionId, tags, madeBy } : NO_IDS;
+        this.saved = { apiKey: key, projectId: project, ...ids };
+        return { browser: this.provider(this.saved), ids };
       });
     }
     this.changed();
@@ -152,11 +180,14 @@ export class CloudTabs implements ChatCloud {
 
   async forget(): Promise<CloudState> {
     this.letGoOfTabs();
+    this.problem = null;
+    this.endFirst = false;
     await this.sessions.replace((released) => {
-      this.problem = released === "running" ? STILL_RUNNING : released === "refused" ? LEFT_RUNNING : null;
-      if (released === "running") return null;
+      this.endFirst = released === "running" || this.sessions.othersKept;
+      this.problem = released === "refused" ? LEFT_RUNNING : null;
+      if (this.endFirst) return null;
       this.saved = EMPTY;
-      return { browser: this.provider(EMPTY), ids: { contextId: null, sessionId: null } };
+      return { browser: this.provider(EMPTY), ids: NO_IDS };
     });
     this.changed();
     return this.state;
@@ -178,18 +209,14 @@ export class CloudTabs implements ChatCloud {
   // Everything here that isn't the session: a copy waiting on the user copies nothing, and the pictures stop.
   private stopWork(): void {
     this.logins.cancelPending();
-    const was = this.watching;
-    this.watching = null;
-    this.watches.end();
-    void was?.watch(null).catch(() => {});
+    this.pictures.stop();
     this.checking.clear();
-    this.pendingFits.clear();
   }
 
   // ChatCloud
 
   available(): boolean {
-    return this.hooks !== null && this.sessions.provider !== null;
+    return this.attached !== null && this.sessions.provider !== null;
   }
 
   claim(jobId: string): boolean {
@@ -199,25 +226,26 @@ export class CloudTabs implements ChatCloud {
   release(jobId: string): void {
     const pages = this.sessions.pagesOf(jobId).map(({ id }) => id);
     this.sessions.release(jobId);
-    pages.forEach((id) => void this.applyFit(id));
+    pages.forEach((id) => void this.pictures.applyFit(id));
   }
 
   async open(jobId: string, url: string, allows?: (url: string) => boolean): Promise<CdpTab> {
-    if (!this.hooks) throw new Error(NO_WINDOW);
-    const id = this.hooks.openTab(hostOf(url));
+    const at = this.attached;
+    if (!at) throw new Error(NO_WINDOW);
+    const id = at.hooks.openTab(hostOf(url));
     try {
-      return await this.sessions.open(jobId, id, url, { onChange: () => this.retitle(id) }, allows);
+      return await this.sessions.open(jobId, id, url, { onChange: () => this.retitle(at, id) }, allows);
     } catch (error) {
-      // Only a tab that's still in the window: one that closed with it is gone.
-      this.hooks?.closeTab(id);
+      // Only a tab that's still in the window: one that closed with it is gone, and its id may be another tab's now.
+      this.still(at)?.closeTab(id);
       throw error;
     }
   }
 
   // The tab in the window says where its page is.
-  private retitle(id: string): void {
+  private retitle(at: Attachment, id: string): void {
     const page = this.sessions.page(id);
-    if (page) this.hooks?.updateTab(id, page.title || hostOf(page.url));
+    if (page) this.still(at)?.updateTab(id, page.title || hostOf(page.url));
   }
 
   // After a handoff the user said they were done with, the job may use the page again.
@@ -245,9 +273,8 @@ export class CloudTabs implements ChatCloud {
   // The window closed the tab, so the page goes too, and the user has let go of it.
   tabClosed(id: string): void {
     this.checking.delete(id);
-    this.pendingFits.delete(id);
+    this.pictures.forget(id);
     this.sessions.letGo(id);
-    if (this.watching?.id === id) void this.watch(null);
     void this.sessions.close(id);
   }
 
@@ -264,40 +291,12 @@ export class CloudTabs implements ChatCloud {
     return isLiveView(live) ? { kind: "live", url: live, takenOver, checking } : { kind: "gone" };
   }
 
-  async watch(id: unknown): Promise<void> {
-    const page = typeof id === "string" ? this.page(id) : null;
-    if (page === this.watching) return;
-    const was = this.watching;
-    this.watching = page;
-    const turn = this.watches.next();
-    await was?.watch(null);
-    if (!turn.current) return;
-    try {
-      await page?.watch((data) => {
-        const chrome = this.hooks?.chrome();
-        if (this.watching === page && chrome && !chrome.isDestroyed()) sendToRenderer(chrome, "cloud:frame", { tabId: page.id, data });
-      });
-    } catch {
-      // The browser wouldn't start the pictures, so it isn't watching, and the next ask for this tab tries again.
-      if (turn.current && this.watching === page) this.watching = null;
-    }
+  watch(id: unknown): Promise<void> {
+    return this.pictures.watch(id);
   }
 
-  // The chrome says how big the tab shows the page, and the page's viewport follows, as a window's own tab does on a resize.
-  async fit(id: unknown, width: unknown, height: unknown): Promise<void> {
-    const page = typeof id === "string" ? this.page(id) : null;
-    if (!page || typeof width !== "number" || typeof height !== "number" || !Number.isFinite(width) || !Number.isFinite(height)) return;
-    const within = (value: number, axis: "width" | "height") => Math.round(Math.min(Math.max(value, FIT.min[axis]), FIT.max[axis]));
-    this.pendingFits.set(page.id, { width: within(width, "width"), height: within(height, "height") });
-    await this.applyFit(page.id);
-  }
-
-  private async applyFit(id: string): Promise<void> {
-    const size = this.pendingFits.get(id);
-    const page = this.page(id);
-    if (!size || !page || (this.sessions.usedBy(id) && !this.sessions.heldByUser(id))) return;
-    this.pendingFits.delete(id);
-    await page.fitTo(size.width, size.height);
+  fit(id: unknown, width: unknown, height: unknown): Promise<void> {
+    return this.pictures.fit(id, width, height);
   }
 
   takeOver(id: unknown): boolean {
@@ -305,7 +304,7 @@ export class CloudTabs implements ChatCloud {
     this.sessions.holdForUser(id);
     this.hooks.takenOver(id);
     this.changed();
-    void this.applyFit(id);
+    void this.pictures.applyFit(id);
     return true;
   }
 
@@ -324,20 +323,24 @@ export class CloudTabs implements ChatCloud {
     const site = loginSite(input);
     if (!site) return "That isn't a site's address.";
     if (!this.sessions.provider) return "The cloud browser is off.";
-    if (!this.hooks) return NO_WINDOW;
+    const at = this.attached;
+    if (!at) return NO_WINDOW;
     const url = typeof input === "string" && /^https?:\/\//i.test(input.trim()) ? input.trim() : `https://${site}/`;
-    const id = this.hooks.openTab(site);
+    const id = at.hooks.openTab(site);
     // Noted before it opens, so the tab is the check's while it does.
     this.checking.set(id, site);
     try {
       // The user's from the start. Null if they closed the tab while it opened.
-      if (!(await this.sessions.openForUser(id, url, { onChange: () => this.retitle(id) }))) return null;
+      if (!(await this.sessions.openForUser(id, url, { onChange: () => this.retitle(at, id) }))) return null;
     } catch {
-      this.checking.delete(id);
-      this.hooks?.closeTab(id);
+      // A window that has closed took the tab and the check with it, and the next one's may have the same id.
+      if (this.still(at)) {
+        this.checking.delete(id);
+        at.hooks.closeTab(id);
+      }
       return "The cloud browser couldn't open it.";
     }
-    this.hooks?.showTab(id);
+    this.still(at)?.showTab(id);
     this.changed();
     return null;
   }
