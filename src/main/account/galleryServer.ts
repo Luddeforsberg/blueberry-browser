@@ -86,7 +86,10 @@ export interface ServerSession {
   email: string;
 }
 
+// Null only for an answer with no session in it, which a signup waiting on the email gives. One that isn't an answer at
+// all is the server failing, so a sign-in kept here isn't taken for one that has ended.
 const toSession = (body: unknown, email = ""): ServerSession | null => {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) throw new ServerError(500, "");
   const { access_token: accessToken, refresh_token: refreshToken, expires_in: expiresIn, user } = fieldsOf(body);
   if (typeof accessToken !== "string" || typeof refreshToken !== "string") return null;
   const { email: said } = fieldsOf(user);

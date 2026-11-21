@@ -25,20 +25,34 @@ const HELD_BACK = {
 const noCastToTypeParameter = {
   meta: { type: "problem", schema: false },
   create(context) {
-    const { visitorKeys } = context.sourceCode;
-    const inScope = (node) => {
-      const names = new Set();
-      for (let at = node.parent; at; at = at.parent) at.typeParameters?.params.forEach((param) => names.add(param.name.name));
-      return names;
+    const { sourceCode } = context;
+    const within = (node, outer) => {
+      for (let at = node; at; at = at.parent) if (at === outer) return true;
+      return false;
     };
-    const names = (type, scope) => {
+    // Whether a name, where it's written, is bound to a type parameter declared outside the cast, directly or through
+    // a type alias of its own that names one.
+    const isOuterParameter = (identifier, cast, seen) => {
+      for (let scope = sourceCode.getScope(identifier); scope; scope = scope.upper) {
+        const variable = scope.set.get(identifier.name);
+        if (!variable) continue;
+        return variable.defs.some(({ node }) => {
+          if (node.type === "TSTypeParameter") return !within(node, cast);
+          if (node.type !== "TSTypeAliasDeclaration" || seen.has(node)) return false;
+          seen.add(node);
+          return mentions(node.typeAnnotation, cast, seen);
+        });
+      }
+      return false;
+    };
+    const mentions = (type, cast, seen) => {
       if (!type || typeof type.type !== "string") return false;
-      if (type.type === "TSTypeReference" && type.typeName.type === "Identifier" && scope.has(type.typeName.name)) return true;
-      return (visitorKeys[type.type] ?? []).some((key) => [type[key]].flat().some((child) => names(child, scope)));
+      if (type.type === "TSTypeReference" && type.typeName.type === "Identifier" && isOuterParameter(type.typeName, cast, seen))
+        return true;
+      return (sourceCode.visitorKeys[type.type] ?? []).some((key) => [type[key]].flat().some((child) => mentions(child, cast, seen)));
     };
     const check = (node) => {
-      const scope = inScope(node);
-      if (scope.size > 0 && names(node.typeAnnotation, scope)) context.report({ node, message: MESSAGE });
+      if (mentions(node.typeAnnotation, node, new Set())) context.report({ node, message: MESSAGE });
     };
     return { TSAsExpression: check, TSTypeAssertion: check };
   },

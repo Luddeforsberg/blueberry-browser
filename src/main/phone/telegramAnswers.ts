@@ -64,8 +64,12 @@ const updateOf = (value: unknown): Update | null => {
   };
 };
 
-// Null if it isn't a list, which getUpdates always answers with.
-export const updatesOf = (result: unknown): Update[] | null => (Array.isArray(result) ? entriesOf(result, updateOf).entries : null);
+// Null if it isn't a list of updates, which getUpdates always answers with. One with no id of its own can't be moved past,
+// so asking again would only get it again at once.
+export const updatesOf = (result: unknown): Update[] | null => {
+  const { entries, dropped } = entriesOf(result, updateOf);
+  return Array.isArray(result) && dropped === 0 ? entries : null;
+};
 
 // The id of a message just sent, or null if the answer doesn't say.
 export const sentId = (result: unknown): string | null => {

@@ -83,3 +83,20 @@ describe("an answer that should be a list", () => {
     expect(await server.cloudJobs("token", ["j"])).toEqual([{}, {}, {}, {}]);
   });
 });
+
+describe("a sign-in's answer", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const server = new GalleryServer({ url: "https://example.supabase.co", key: "sb_publishable_x" });
+  const answering = (body: string) => vi.stubGlobal("fetch", async () => new Response(body, { status: 200 }));
+
+  // Taken for no session, a refresh would sign the user out over an answer nobody could read.
+  it.each(["", "null", "[]", "<html>Signed out of the network</html>"])("that isn't one fails as the server: %j", async (body) => {
+    answering(body);
+    await expect(server.refresh("refresh", "a@example.com")).rejects.toThrow(expect.objectContaining({ status: 500 }));
+  });
+
+  it("with no session in it, as a signup waiting on the email gives, is none", async () => {
+    answering(JSON.stringify({ id: "user", email: "a@example.com" }));
+    expect(await server.signUp("a@example.com", "password")).toBeNull();
+  });
+});

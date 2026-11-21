@@ -244,7 +244,7 @@ export class TelegramChannel implements PhoneChannel {
           : { offset: -1, limit: 1, timeout: 0, allowed_updates: ONLY_THESE_UPDATES };
         const updates = updatesOf(await this.call("getUpdates", params, AbortSignal.any([signal, AbortSignal.timeout(POLL_ABORT_MS)])));
         // Read as none, it would ask again at once, so it waits as when Telegram can't be reached.
-        if (!updates) throw new Error("Telegram's updates weren't a list");
+        if (!updates) throw new Error("Telegram's updates couldn't be read");
         if (signal.aborted) return;
         backoff = FIRST_BACKOFF_MS;
         if (this.problem === NO_NETWORK || this.problem === OTHER_POLLER) this.setProblem(null);
