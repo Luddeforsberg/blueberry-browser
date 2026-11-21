@@ -85,6 +85,7 @@ export const BrowserSections: React.FC = () => (
         <DownloadsProgress downloads={SAMPLE_DOWNLOADS.slice(0, 1)} />
         <DownloadsProgress downloads={SAMPLE_DOWNLOADS.slice(1, 2)} />
         <DownloadsProgress downloads={[{ ...SAMPLE_DOWNLOAD, id: "starting", receivedBytes: 0 }]} />
+        <DownloadsProgress downloads={[]} unseen={SAMPLE_DOWNLOADS.filter((download) => download.id === "finished")} />
       </div>
       <ul className="mt-4 rounded-sheet bg-sheet shadow-up">
         {SAMPLE_DOWNLOADS.map((download) => (
