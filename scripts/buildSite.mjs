@@ -44,6 +44,7 @@ const SHARED = [
   // Work that finishes later: whose answer still counts, one at a time, and what stays in a box once it has sent.
   `export { Latest, OneAtATime } from "./src/shared/lateWork";`,
   `export { leftAfterSend } from "./src/shared/draft";`,
+  `export { stripWww } from "./src/shared/sites";`,
   `export { asContinuation, withSiteNames } from "./src/renderer/chrome/src/siteNames";`,
   // Times written the one way the app writes them.
   `export { finishedWhen, rowTime } from "./src/renderer/chrome/src/shortWords";`,
@@ -107,7 +108,7 @@ await build({
   format: "esm",
   platform: "node",
   jsx: "automatic",
-  alias: { "@shared": join(root, "src/shared") },
+  alias,
   // Bundled React still asks for Node's built-ins by require, so those are given to it.
   banner: {
     js: `import { createRequire } from "node:module"; const require = createRequire(${JSON.stringify(join(root, "package.json"))});`,

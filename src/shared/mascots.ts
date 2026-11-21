@@ -1,4 +1,5 @@
 import { fieldsOf } from "./fields";
+import { siteOf } from "./sites";
 import type { MascotAccessory, MascotDraft, MascotPalette, MascotProfile, MascotTool } from "./library";
 
 // Runtime code shared by main and the chrome renderer. Preloads may only `import type` from here.
@@ -56,35 +57,21 @@ export const MAX_MASCOT_NAME = 24;
 export const MAX_MASCOT_INSTRUCTIONS = 2000;
 const MAX_SITES = 20;
 
-const stripWww = (host: string) => host.replace(/^www\./, "");
-
 // A hostname from however it was typed, or null if it can't be one. A bare top-level name like "com" would let in far
 // more than anyone meant, so it needs a dot, apart from localhost.
 export const normaliseSite = (input: string): string | null => {
   const text = input.trim().toLowerCase().replace(/^\*\./, "");
   if (!text) return null;
-  try {
-    const { hostname, protocol } = new URL(/^[a-z][a-z0-9+.-]*:\/\//.test(text) ? text : `https://${text}`);
-    if (protocol !== "http:" && protocol !== "https:") return null;
-    const host = stripWww(hostname);
-    return host.includes(".") || host === "localhost" ? host : null;
-  } catch {
-    return null;
-  }
+  const host = siteOf(/^[a-z][a-z0-9+.-]*:\/\//.test(text) ? text : `https://${text}`);
+  return host !== null && (host.includes(".") || host === "localhost") ? host : null;
 };
 
 // The one rule for where a mascot may go. No list means no limit. With one, only http and https addresses on those
 // hosts or their subdomains count, so a blank tab, a file or a data address is off-limits.
 export const siteAllowed = (url: string, sites: readonly string[]): boolean => {
   if (sites.length === 0) return true;
-  try {
-    const { protocol, hostname } = new URL(url);
-    if (protocol !== "http:" && protocol !== "https:") return false;
-    const host = stripWww(hostname.toLowerCase());
-    return sites.some((site) => host === site || host.endsWith(`.${site}`));
-  } catch {
-    return false;
-  }
+  const host = siteOf(url);
+  return host !== null && sites.some((site) => host === site || host.endsWith(`.${site}`));
 };
 
 // Where something may go when two lists both apply. It only ever gets narrower: with no overlap it can go nowhere,

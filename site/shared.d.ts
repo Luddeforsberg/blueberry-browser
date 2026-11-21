@@ -6,6 +6,7 @@ export { conversationsOf, mascotsFromSharedRows, followUpHistory, mascotSnapshot
 export { fetchWithin, oneAtATime, runnerLinkDue } from "../src/shared/phoneCalls";
 export { Latest, OneAtATime } from "../src/shared/lateWork";
 export { leftAfterSend } from "../src/shared/draft";
+export { stripWww } from "../src/shared/sites";
 export { asContinuation, withSiteNames } from "../src/renderer/chrome/src/siteNames";
 export { finishedWhen, rowTime } from "../src/renderer/chrome/src/shortWords";
 export { plausibleCode } from "../src/main/phone/phoneReplies";

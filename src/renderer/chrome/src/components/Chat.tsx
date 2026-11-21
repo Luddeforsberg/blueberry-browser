@@ -13,14 +13,7 @@ import { PageChip } from "./AttachmentChips";
 import { ChatComposer } from "./ChatComposer";
 import { answerInBox } from "./answerInBox";
 import { siteAllowed } from "@shared/mascots";
-
-const hostOf = (url: string) => {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return null;
-  }
-};
+import { siteOf } from "@shared/sites";
 
 // The chat panel's conversation: the same messages, steps, cards and prompt box as the main chat, beside a page.
 export const Chat: React.FC = () => {
@@ -53,7 +46,7 @@ export const Chat: React.FC = () => {
   );
   const name = useAssistantName(mascot);
   const { activeTab } = useBrowser();
-  const host = activeTab && !activeTab.page ? hostOf(activeTab.url) : null;
+  const host = activeTab && !activeTab.page ? siteOf(activeTab.url) : null;
   const canUseSite = !!activeTab && siteAllowed(activeTab.url, mascot.sites);
   const heldByUser = library.needsYou.some(({ approval }) => !!activeTab && approval.handoff?.tabId === activeTab.id);
 

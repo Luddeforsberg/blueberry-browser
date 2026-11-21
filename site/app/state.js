@@ -1,4 +1,13 @@
-import { asContinuation, BERRY_ID, conversationsOf, finishedWhen, mascotsFromSharedRows, rowTime, withSiteNames } from "../shared.js";
+import {
+  asContinuation,
+  BERRY_ID,
+  conversationsOf,
+  finishedWhen,
+  mascotsFromSharedRows,
+  rowTime,
+  stripWww,
+  withSiteNames,
+} from "../shared.js";
 import { ApiError, onAccountChange } from "./api.js";
 
 /** @import { MascotProfile, PhoneAsk, PhoneJob, PhoneJobStatus } from "../shared.js" */
@@ -240,7 +249,7 @@ export const sitesOf = (job) => {
   const found = new Set();
   for (const step of job.steps) {
     for (const [name] of step.text.matchAll(SITE)) {
-      const site = name.toLowerCase().replace(/^www\./, "");
+      const site = stripWww(name.toLowerCase());
       if (!NOT_SITES.test(site)) found.add(site);
     }
   }

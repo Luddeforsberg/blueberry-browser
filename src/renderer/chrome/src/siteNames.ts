@@ -1,3 +1,5 @@
+import { siteOf } from "@shared/sites";
+
 // A piece of a sentence, marked if it's the site an address was cut down to.
 export type SitePart = { text: string; site: boolean };
 
@@ -9,13 +11,9 @@ export const siteParts = (text: string): SitePart[] => {
   for (const match of text.matchAll(/https?:\/\/[^\s,”"<>]+/g)) {
     const found = match[0];
     const trailing = /[.)]+$/.exec(found)?.[0] ?? "";
-    let hostname: string;
-    try {
-      hostname = new URL(found.slice(0, found.length - trailing.length)).hostname;
-    } catch {
-      continue;
-    }
-    parts.push({ text: text.slice(at, match.index), site: false }, { text: hostname.replace(/^www\./, ""), site: true });
+    const site = siteOf(found.slice(0, found.length - trailing.length));
+    if (!site) continue;
+    parts.push({ text: text.slice(at, match.index), site: false }, { text: site, site: true });
     at = match.index + found.length - trailing.length;
   }
   parts.push({ text: text.slice(at), site: false });

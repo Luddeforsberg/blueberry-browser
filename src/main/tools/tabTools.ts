@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { PageTarget } from "./pageTarget";
 import { pageTool, tabId } from "./pageTool";
 import type { ToolContext } from "./toolContext";
-import { isWebAddress, siteOf } from "./askFirst";
+import { isWebAddress, siteName } from "../../shared/sites";
 import { NO_ACCESS, NOT_WEB } from "./toolMessages";
 
 // The tools that move a tab or open and close one.
@@ -79,13 +79,13 @@ export const tabTools = <T extends PageTarget>(context: ToolContext<T>) => {
       kind: "open",
       description: "Go to an address in an existing tab. The user is asked first.",
       schema: z.object({ tabId, url: z.string().max(2000) }),
-      label: ({ url }) => `Went to ${siteOf(url)}`,
+      label: ({ url }) => `Went to ${siteName(url)}`,
       describe: async ({ tabId: id, url }) => `Go to ${url} in the tab showing ${find(id)?.url ?? "no page"}`,
       whyRisky: async ({ tabId: id, url }) => whyCard(url, find(id)),
       run: ({ tabId: id, url }) =>
         withTab(id, async (tab) => {
           if (!isWebAddress(url)) return NOT_WEB;
-          await actorOn(tab)?.say(`Going to ${siteOf(url)}`, "flying");
+          await actorOn(tab)?.say(`Going to ${siteName(url)}`, "flying");
           if (!carryOn(tab)) return leftOff(tab);
           // A failed load is reported by `whereNow`. Anything else, like a download, still counts as not working.
           await Promise.race([
@@ -103,7 +103,7 @@ export const tabTools = <T extends PageTarget>(context: ToolContext<T>) => {
       description:
         "Open an address in a new tab behind the user, which never takes over their screen. It becomes the tab you're working in, and they can go to it with one click. The user is asked first when it could send something out.",
       schema: z.object({ url: z.string().max(2000) }),
-      label: ({ url }) => `Opened ${siteOf(url)}`,
+      label: ({ url }) => `Opened ${siteName(url)}`,
       describe: async ({ url }) => `Open ${url} in a new tab`,
       whyRisky: async ({ url }) => whyCard(url, find()),
       run: async ({ url }) => {

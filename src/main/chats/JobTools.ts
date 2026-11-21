@@ -1,6 +1,7 @@
 import { firecrawlSearch } from "../tools/webSearch";
 import { firecrawlFetch } from "../tools/webFetch";
-import { createPageTools, siteOf, type PageTool } from "../tools/browserTools";
+import { createPageTools, type PageTool } from "../tools/browserTools";
+import { siteOf } from "../../shared/sites";
 import type { Tab } from "../tabs/Tab";
 import type { CdpTab } from "../tools/CdpTab";
 import type { MascotProfile } from "../../shared/library";
@@ -20,6 +21,14 @@ export class CloudBusyError extends Error {
 // Berry as it comes, with nothing taken away, needs no limits at all.
 const unlimited = (mascot: MascotProfile): boolean =>
   mascot.id === BERRY.id && mascot.sites.length === 0 && BERRY.tools.every((tool) => mascot.tools.includes(tool));
+
+// The site a tab was just used on goes last, so the newest is at the end. A page with no site isn't one it has been on.
+const addSite = (run: Run, url: string): void => {
+  const site = siteOf(url);
+  if (!site) return;
+  run.sites.delete(site);
+  run.sites.add(site);
+};
 
 // The tools a reply gets, in the window's tabs or the cloud browser's pages, reaching only what its job may.
 export class JobTools {
@@ -71,8 +80,7 @@ export class JobTools {
         run.usedInCloud ??= new Set();
         run.usedInCloud.delete(tab);
         run.usedInCloud.add(tab);
-        run.sites.delete(siteOf(tab.url));
-        run.sites.add(siteOf(tab.url));
+        addSite(run, tab.url);
       },
       stopped: () => run.controller.signal.aborted,
       ownsEveryTab: true,
@@ -127,8 +135,7 @@ export class JobTools {
             run.tabs.add(tab);
             run.used.delete(tab);
             run.used.add(tab);
-            run.sites.delete(siteOf(tab.url));
-            run.sites.add(siteOf(tab.url));
+            addSite(run, tab.url);
             this.publishWorkingTabs();
           },
           stopped: () => run.controller.signal.aborted,

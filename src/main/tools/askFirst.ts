@@ -1,25 +1,10 @@
-import { NOWHERE, siteAllowed } from "../../shared/mascots";
+import { siteAllowed } from "../../shared/mascots";
+import { isWebAddress, siteOf } from "../../shared/sites";
 import type { AskReason, AskWhy } from "../../shared/asking";
 import type { PageTarget } from "./pageTarget";
 
 // Whether going to an address or sending something out asks first in the default mode, and why. The tools' own
 // `whyRisky` use these.
-
-export const siteOf = (url: string): string => {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "") || "a local file";
-  } catch {
-    return "a page";
-  }
-};
-
-export const isWebAddress = (url: string): boolean => {
-  try {
-    return ["http:", "https:"].includes(new URL(url).protocol);
-  } catch {
-    return false;
-  }
-};
 
 // Search text is short. A long one could be private text on its way out through a search box.
 export const MAX_SAFE_TYPED_LENGTH = 100;
@@ -60,7 +45,7 @@ export const namedSites = (said: string): string[] => {
   const text = said.normalize("NFC");
   return [...text.matchAll(ADDRESS), ...text.replace(ADDRESS, " ").matchAll(SITE_NAME)].flatMap(([named]) => {
     const address = named.includes("://") ? named : `https://${named}`;
-    return URL.canParse(address) ? [new URL(address).hostname.replace(/^www\./, "")] : [];
+    return siteOf(address) ?? [];
   });
 };
 
@@ -81,6 +66,15 @@ const isSearchPage = ({ hostname, pathname }: URL): boolean => {
   return (SEARCH_PAGES.get(hostname) ?? SEARCH_PAGES.get(`www.${hostname}`)) === pathname;
 };
 
+// Whether an address is on one of these sites. None is none here, where a mascot's empty list means anywhere.
+const onOneOf = (url: string, sites: readonly string[]): boolean => sites.length > 0 && siteAllowed(url, sites);
+
+// A subdomain of a site the job has only been to, and wasn't sent to.
+const isNewSubdomain = (url: string, chosen: readonly string[], visited: readonly string[]): boolean => {
+  const host = siteOf(url);
+  return !onOneOf(url, chosen) && (host === null || !visited.includes(host)) && onOneOf(url, visited);
+};
+
 // In the default mode, going somewhere asks unless it's plainly safe: an address the user gave, a short search on a
 // well-known search page, or a plain address on a site this job is on or has reason to be on. A reason to be on a
 // site never covers data: a query, a path or host name that looks like it carries some, or a new subdomain of a site
@@ -98,16 +92,11 @@ export const whyCardFor =
       const carries = address.search.length + address.hash.length > MAX_SAFE_TYPED_LENGTH || !isSearchPage(address);
       return carries ? because("carries-data", details) : null;
     }
-    const visited = [...been, ...(from ? [siteOf(from.url)] : [])];
-    const host = siteOf(url);
+    const fromSite = from ? siteOf(from.url) : null;
+    const visited = fromSite ? [...been, fromSite] : [...been];
     const shownHost = writtenHost(writtenAs, address);
-    const newSubdomain =
-      !siteAllowed(url, chosen.length > 0 ? chosen : [NOWHERE]) &&
-      !visited.includes(host) &&
-      siteAllowed(url, visited.length > 0 ? visited : [NOWHERE]);
     if (looksLikeData(address.hostname)) return because("looks-like-data", shownHost);
     if (looksLikeData(address.pathname)) return because("looks-like-data", path);
-    if (newSubdomain) return because("new-subdomain", shownHost);
-    const sites = [...chosen, ...visited];
-    return siteAllowed(url, sites.length > 0 ? sites : [NOWHERE]) ? null : because("new-site", shownHost);
+    if (isNewSubdomain(url, chosen, visited)) return because("new-subdomain", shownHost);
+    return onOneOf(url, [...chosen, ...visited]) ? null : because("new-site", shownHost);
   };
