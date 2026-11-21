@@ -73,23 +73,17 @@ const Picture: React.FC<{ tab: WorkTab; frames: WorkFrames; name: string; big?: 
   );
 };
 
-// The user has this tab, so there's no picture to show.
-const isUsers = (tab: WorkTab) => tab.state === "held" || tab.state === "yours";
-
-// The tab it's working in, on a sheet with `lift`, with its site along the top. While the user has the tab there's
-// nothing to picture, so it's only that row, saying so.
+// The tab it's working in, on a sheet with `lift`, with its site along the top. Where there's no picture, as while the
+// user has the tab, the page keeps its shape and says why in its place, so the view never stands empty.
 const WorkWindow: React.FC<{ tab: WorkTab; frames: WorkFrames; name: string; aspect: number }> = ({ tab, frames, name, aspect }) => (
   <div className="overflow-hidden rounded-tile bg-sheet shadow-lift">
     <div className="h-[26px] px-2.5 flex items-center gap-[7px] border-b bg-sheet-2 text-11 text-ink-3">
       <Favicon src={tab.favicon} site={tab.site} className="size-3" />
       <span className="truncate">{tab.site}</span>
-      {isUsers(tab) && <span className="ml-auto shrink-0 text-ink-2">You have this tab</span>}
     </div>
-    {!isUsers(tab) && (
-      <div className="relative bg-tray" style={{ aspectRatio: aspect }}>
-        <Picture tab={tab} frames={frames} name={name} big />
-      </div>
-    )}
+    <div className="relative bg-tray" style={{ aspectRatio: aspect }}>
+      <Picture tab={tab} frames={frames} name={name} big />
+    </div>
   </div>
 );
 

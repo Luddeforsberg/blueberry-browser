@@ -1,6 +1,6 @@
 # The cloud runner, built from the whole repo because it runs the app's own agent and tool code. Build it from the repo
 # root, as .railway/railway.ts tells Railway to. No key is baked in: every one comes from the environment.
-FROM node:22-slim
+FROM node:24-slim
 WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./

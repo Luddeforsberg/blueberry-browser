@@ -115,9 +115,9 @@ describe("memory and everything that copies a mascot", () => {
 
   it("starts empty on a copy from the Gallery, which has an id of its own", () => {
     const store = new MascotStore(join(mkdtempSync(join(tmpdir(), "mascots-")), "mascots.json"));
-    const first = store.addFromGallery("entry", mascot);
+    const first = store.addFromGallery("entry", mascot, "A line.");
     store.delete(first.ok ? first.id : "");
-    const second = store.addFromGallery("entry", mascot);
+    const second = store.addFromGallery("entry", mascot, "A line.");
     expect(second.ok && first.ok && second.id !== first.id).toBe(true);
   });
 });

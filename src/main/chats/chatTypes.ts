@@ -4,7 +4,7 @@ import type { ActionApproval } from "../../shared/ipc";
 import type { ChatStore } from "./ChatStore";
 import type { Tab } from "../tabs/Tab";
 import type { CdpTab } from "../tools/CdpTab";
-import type { ChatApproval, ChatStep, ChatThread, MascotProfile, SaidOnTheWay, WorkOutcome } from "../../shared/library";
+import type { ChatApproval, ChatStep, ChatThread, ChatThreadMessage, MascotProfile, SaidOnTheWay, WorkOutcome } from "../../shared/library";
 import type { ChatMemory } from "./jobMemory";
 
 // What the parts of `Chats` work with: what it was made with, the state it owns and the few things every part does.
@@ -72,6 +72,8 @@ export interface EndedRun {
   // The sites this reply was on, latest last, and every site this chat's replies have been on, for the next one.
   readonly sites: readonly string[];
   readonly beenTo: readonly string[];
+  // Its answer, when saving it failed, so the chat still shows it and the next message can save it first.
+  readonly unsaved?: ChatThreadMessage;
 }
 
 // How one reply ended, for whoever started it.

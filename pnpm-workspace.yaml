@@ -1,3 +1,5 @@
+# package.json's engines say which Node it needs, and an install on any other fails, naming the version.
+engineStrict: true
 allowBuilds:
   electron: true
   esbuild: true

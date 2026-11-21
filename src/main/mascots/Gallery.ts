@@ -110,7 +110,7 @@ export class Gallery {
   add(id: unknown, version: unknown, name: string | null): MascotSaveResult {
     const entry = this.entry(id, version);
     if (!entry) return { ok: false, error: "This mascot changed or left the Gallery since it was shown. Look it over again." };
-    const result = this.mascots.addFromGallery(entry.id, name === null ? entry.draft : { ...entry.draft, name });
+    const result = this.mascots.addFromGallery(entry.id, name === null ? entry.draft : { ...entry.draft, name }, entry.description);
     if (result.ok) this.countAdd(entry);
     return result;
   }

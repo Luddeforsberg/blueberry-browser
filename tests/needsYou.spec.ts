@@ -210,7 +210,9 @@ test("from the phone: pair, press Allow, and a code goes in the page without eve
     telegram.strangerSends("Hello");
     await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ phoneAlways: true }));
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("needs-you"));
-    await expect(chrome.getByText("Replies from your phone are on")).toBeVisible();
+    // With nothing waiting, the page is only that, so the phone line waits for the list.
+    await expect(chrome.getByText("Nothing needs you right now.")).toBeVisible();
+    await expect(chrome.getByText("Replies from your phone are on")).toHaveCount(0);
     expect(telegram.sent.length).toBe(known);
 
     // An approval, in the same words as the card, answered with a button.
@@ -219,6 +221,7 @@ test("from the phone: pair, press Allow, and a code goes in the page without eve
     model.callTools({ name: "hand_to_user", args: { need: "code" } });
     const sent = await chrome.evaluate(() => window.chromeAPI.chat.send(null, "Check my orders", { seePage: false }));
     const asked = await lastSent(`Open ${address} in a new tab`);
+    await expect(chrome.getByText("Replies from your phone are on")).toBeVisible();
     expect(asked.buttons.map(({ text }) => text)).toEqual(["Allow", "Don’t allow"]);
     telegram.userPresses(defined(asked.buttons[0]), asked.message_id);
     await expect.poll(() => telegram.editsOf.get(asked.message_id) ?? "").toContain("Allowed. Berry carries on.");

@@ -68,7 +68,7 @@ test("a relay job runs as a chat on this Mac only while the switch is on, and it
     expect(await startJob("mac")).toBeNull();
 
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings", { param: "Cloud" }));
-    const toggle = chrome.getByRole("switch", { name: "Run their jobs on this Mac when it’s on" });
+    const toggle = chrome.getByRole("switch", { name: "Run their jobs on this computer when it’s on" });
     await toggle.scrollIntoViewIfNeeded();
     await expect(toggle).toHaveAttribute("aria-checked", "false");
     await toggle.click();

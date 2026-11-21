@@ -285,33 +285,32 @@ export const NeedsYouPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
   return (
     <PageFrame>
       <PageHeader title="Needs you">{waitingLine(waiting, now) ?? undefined}</PageHeader>
+      {/* With nothing waiting, the page is only that: the lines under the list are about the list, so they go with it. */}
       {waiting.length === 0 && !justAnswered ? (
         <AllClear />
       ) : (
-        <div className="mt-5">
-          {justAnswered ? (
-            <AnsweredCard item={justAnswered.item} said={justAnswered.said} />
-          ) : (
-            open && <WaitingCard key={open.approval.id} item={open} now={now} onAnswered={onAnswered(open)} />
-          )}
-          {rest.length > 0 && (
-            <ul aria-label="Also waiting" className="mt-3">
-              {rest.map((item) => (
-                <WaitingRow key={item.approval.id} item={item} now={now} onOpen={() => setChosen(item.approval.id)} />
-              ))}
-            </ul>
-          )}
-        </div>
+        <>
+          <div className="mt-5">
+            {justAnswered ? (
+              <AnsweredCard item={justAnswered.item} said={justAnswered.said} />
+            ) : (
+              open && <WaitingCard key={open.approval.id} item={open} now={now} onAnswered={onAnswered(open)} />
+            )}
+            {rest.length > 0 && (
+              <ul aria-label="Also waiting" className="mt-3">
+                {rest.map((item) => (
+                  <WaitingRow key={item.approval.id} item={item} now={now} onOpen={() => setChosen(item.approval.id)} />
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="mt-3 px-2 min-h-7 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+            <span className="font-mono text-11.5 text-ink-2 tabular-nums">{tallyWords(answered, waiting.length)}</span>
+            <PhoneLine />
+          </div>
+          <p className="mt-6 px-2 text-13 text-ink-2">Passwords and codes go in the page, not through the model.</p>
+        </>
       )}
-      <div className="mt-3 px-2 min-h-7 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-        {answered > 0 || waiting.length > 0 ? (
-          <span className="font-mono text-11.5 text-ink-2 tabular-nums">{tallyWords(answered, waiting.length)}</span>
-        ) : (
-          <span />
-        )}
-        <PhoneLine />
-      </div>
-      <p className="mt-6 px-2 text-13 text-ink-2">Passwords and codes go in the page, not through the model.</p>
     </PageFrame>
   );
 };

@@ -109,8 +109,24 @@ test("a Gallery tile opens its page, which shows its moods, adds a limited copy,
 
     const saved = JSON.parse(readFileSync(join(profile, "mascots.json"), "utf8")) as Record<string, unknown>[];
     const copy = saved.find(({ name }) => name === "Briefer");
-    expect(Object.keys(copy ?? {}).sort()).toEqual(["deletedAt", "galleryId", "id", "instructions", "look", "name", "sites", "tools"]);
-    expect(copy).toMatchObject({ sites: [], tools: ["visit"], galleryId: "meeting-prep", deletedAt: null });
+    expect(Object.keys(copy ?? {}).sort()).toEqual([
+      "deletedAt",
+      "galleryId",
+      "id",
+      "instructions",
+      "line",
+      "look",
+      "name",
+      "sites",
+      "tools",
+    ]);
+    expect(copy).toMatchObject({
+      sites: [],
+      tools: ["visit"],
+      galleryId: "meeting-prep",
+      line: "Reads up on a company and the people you’ll meet, then writes a brief.",
+      deletedAt: null,
+    });
 
     // A chat runs as the copy: its tools are narrowed and its words come after the safety rules.
     model.replyWith("Good morning.");

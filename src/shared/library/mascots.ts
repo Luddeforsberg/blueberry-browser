@@ -31,6 +31,9 @@ export interface MascotProfile extends MascotDraft {
   deletedAt: number | null;
   // The Gallery entry this is a copy of, only so the Gallery can say it's added. The copy never reads from the entry.
   galleryId?: string;
+  // The Gallery's line on what a copy is for, kept only while its instructions are the ones it was added with, so it's
+  // never a description of words the user has since changed. Shown, never sent anywhere.
+  line?: string;
   // Its row on the Gallery's server, if the user published it. Saving here doesn't change that row.
   publishedId?: string | undefined;
   // Choosing it turns on Do this in the cloud. Only the user's own choice here, so it's never published or shared.
