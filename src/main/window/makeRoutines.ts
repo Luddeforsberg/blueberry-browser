@@ -1,30 +1,23 @@
-import { app } from "electron";
-import { join } from "path";
 import { InternalTab } from "../tabs/InternalTab";
-import type { RoutineStore } from "../routines/RoutineStore";
 import { Routines } from "../routines/Routines";
 import { Recordings } from "../recordings/Recordings";
-import { Suggestions } from "../suggestions/Suggestions";
-import { PATTERN_WINDOW_MS } from "../suggestions/suggestionPatterns";
 import { generateTitle, hasModel, writeWithCheapModel } from "../chats/agent";
 import { notifyRoutine } from "./routineNotices";
-import type { WindowParts, WindowStores } from "./WindowParts";
+import type { WindowParts } from "./WindowParts";
 
-// Plenty for a habit to show, and few enough to look through on every new tab.
-const MAX_SUGGESTION_VISITS = 5000;
-const MAX_SUGGESTION_CHATS = 100;
+// Jobs the user repeats, wired to the window: routines and Show Berry how. Routines are kept by the app's store, and
+// their times run in a window, since a run works in its tabs: with the window closed, one that comes due runs once the
+// next window opens. Each is made in its turn by the window's constructor, and reaches the rest of the window only when
+// it's called.
 
-// Jobs the user repeats, wired to the window: routines, Show Berry how, and the suggestions on the new tab. Each is made
-// in its turn by the window's constructor, and reaches the rest of the window only when it's called.
-
-export const createRoutines = (w: WindowParts, routineStore: RoutineStore): Routines =>
-  new Routines(routineStore, w.chats, {
+export const createRoutines = (w: WindowParts): Routines =>
+  new Routines(w.stores.routineStore, w.app.chats, {
     onChanged: () => {
       w.library.publishLibrary();
-      void w.runnerJobs.routinesChanged();
+      void w.app.runnerJobs.routinesChanged();
     },
-    stillInCloud: (id) => w.runnerJobs.stillInCloud(id),
-    cloudFailed: (id) => w.runnerJobs.cloudFailed(id),
+    stillInCloud: (id) => w.app.runnerJobs.stillInCloud(id),
+    cloudFailed: (id) => w.app.runnerJobs.cloudFailed(id),
     // Named the way a chat is titled, from the user's own words for what it does and nothing else.
     writeName: async (instructions) => (hasModel() ? generateTitle([{ role: "user", content: instructions }]) : null),
     onAttention: (routine, kind) => {
@@ -60,25 +53,5 @@ export const createRecordings = (w: WindowParts): Recordings =>
     },
     hasModel,
     // Page labels go in this, and a careless page may have put a code from the phone in one.
-    write: (system, data) => writeWithCheapModel(system, w.chats.withoutCodes(data)),
-  });
-
-export const createSuggestions = (w: WindowParts, stores: WindowStores): Suggestions =>
-  new Suggestions(join(app.getPath("userData"), "suggestions.json"), {
-    enabled: () => w.settings.suggestions,
-    // Both newest first.
-    visits: () => stores.history.since(Date.now() - PATTERN_WINDOW_MS, MAX_SUGGESTION_VISITS),
-    chats: () =>
-      stores.chatStore.firstMessages(MAX_SUGGESTION_CHATS).map((chat) => {
-        // Failed and stopped are only known for replies since launch.
-        const outcome = w.chats.outcome(chat.id);
-        return { ...chat, outcome: outcome === "failed" || outcome === "stopped" ? outcome : chat.replied ? "done" : "no reply" };
-      }),
-    routines: () => w.routines.list(),
-    runs: (routineId) => w.routines.runs(routineId),
-    mascots: () => stores.mascotStore.all(),
-    hasModel,
-    // Page titles go in this, and a careless page may have put a code from the phone in its title.
-    write: (system, data) => writeWithCheapModel(system, w.chats.withoutCodes(data)),
-    onChanged: () => w.library.publishSuggestions(),
+    write: (system, data) => writeWithCheapModel(system, w.app.chats.withoutCodes(data)),
   });

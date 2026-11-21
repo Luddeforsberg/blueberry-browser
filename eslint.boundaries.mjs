@@ -18,7 +18,7 @@ const folder = (name) => `(^|/)${name}/`;
 const main = (...paths) => paths.map((p) => `src/main/${p}`);
 
 // The Electron folders, and the adapters that are the only Electron files in a folder that's otherwise free of it.
-const ELECTRON_FOLDERS = main("window", "menus", "tabs", "desktop", "index.ts");
+const ELECTRON_FOLDERS = main("app", "window", "menus", "tabs", "desktop", "index.ts");
 const ELECTRON_ADAPTERS = main(
   "account/Account.ts",
   "cloud/CloudTabs.ts",
@@ -120,6 +120,7 @@ const rules = [
       "cloud/cloudLogins.test.ts",
       "cloud/cloudLoginLists.test.ts",
       "cloud/cloudLoginAccess.test.ts",
+      "app/makeCloud.ts",
       "window/makeCloud.ts",
     ],
     "Only the chrome's cloud:*-login* channels start it: no tool, mascot, MCP app or phone reaches it.",
@@ -135,9 +136,9 @@ const rules = [
     file("Account"),
     [
       "account/Account.test.ts",
+      "app/AppServices.ts",
+      "app/makeAccount.ts",
       "window/Window.ts",
-      "window/WindowParts.ts",
-      "window/makeAccount.ts",
       "mascots/Gallery.ts",
       "mascots/Gallery.test.ts",
       "remoteJobs/MacJobs.ts",
@@ -151,11 +152,10 @@ const rules = [
     [
       "settings/AiKey.ts",
       "settings/AiKey.test.ts",
-      // Where the app's one key is made, beside the stores, and handed to each window.
-      "index.ts",
+      // Where the app's one key is made, with the stores, and what each window shows of it.
+      "app/appStores.ts",
+      "app/makeAccount.ts",
       "window/Window.ts",
-      "window/WindowParts.ts",
-      "window/makeAccount.ts",
       "window/SettingsChanges.ts",
     ],
     "No tool, mascot, app or phone can reach the AI key: modelConfig.ts gets it through setSavedKeyReader.",
@@ -196,7 +196,7 @@ const rules = [
   onlyFrom(
     "the Telegram bot",
     file("TelegramChannel"),
-    ["phone/TelegramChannel.test.ts", "window/Window.ts", "window/WindowParts.ts", "window/makeAccount.ts"],
+    ["phone/TelegramChannel.test.ts", "app/AppServices.ts", "app/makeAccount.ts", "window/Window.ts"],
     "The bot's token never leaves main, Phone knows nothing about Telegram, and MCP can't reach it.",
   ),
   onlyFrom(
@@ -226,7 +226,7 @@ const rules = [
   onlyFrom(
     "memory",
     folder("memory"),
-    ["memory", "chats/jobMemory.ts", "window/Window.ts", "window/WindowParts.ts", "window/makeChats.ts"],
+    ["memory", "chats/jobMemory.ts", "app/AppServices.ts", "app/makeChats.ts", "window/Window.ts"],
     "No tool or mascot can reach what a mascot remembers.",
   ),
   onlyFrom(
@@ -306,7 +306,7 @@ const rules = [
       "settings/PermissionPromptView.ts",
       "settings/sessionHandlers.ts",
       "settings/SitePermissions.test.ts",
-      "index.ts",
+      "app/appStores.ts",
       "window/Window.ts",
       "window/WindowParts.ts",
       "window/makeViews.ts",
@@ -328,9 +328,9 @@ const rules = [
       "cloud/cloudLifetime.test.ts",
       "cloud/cloudCheckTesting.ts",
       "cloud/cloudCheckApp.ts",
-      "index.ts",
+      "app/AppServices.ts",
+      "app/makeCloud.ts",
       "window/Window.ts",
-      "window/WindowParts.ts",
       "window/makeCloud.ts",
     ],
     "The cloud's key and live view go to the chrome only, never to a tool or a chat.",

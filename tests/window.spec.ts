@@ -1,11 +1,14 @@
-import { expect, test } from "@playwright/test";
-import { mkdtempSync } from "node:fs";
+import { expect, test, type ElectronApplication } from "@playwright/test";
+import { mkdtempSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { answerAsk, findView, launchApp } from "./app";
+import { answerAsk, closeWindow, findView, launchApp, reopenWindow } from "./app";
 import { startFakeModel } from "./fakeModel";
+import { DEMO_LINES, demoProposals } from "./suggestionReplies";
+import { demoVisits, seedChats } from "../evals/seedHistory";
+import { HistoryStore } from "../src/main/library/HistoryStore";
 import { defined } from "../src/shared/testing";
 
 const startSite = async () => {
@@ -254,5 +257,73 @@ test("in the horizontal layout, Chats and a mascot's card open over a web page, 
     await app.close();
     model.close();
     site.close();
+  }
+});
+
+// The window closes and another opens, as on a Mac, where the app keeps running with none. Elsewhere the app quits with
+// its last window, so here it's kept from quitting until that has passed.
+// Presses a row of the app's menu, as the Mac's menu bar does, and says whether it was on.
+const pressMenu = (app: ElectronApplication, label: string) =>
+  app.evaluate(({ Menu }, label) => {
+    const row = Menu.getApplicationMenu()
+      ?.items.flatMap((menu) => menu.submenu?.items ?? [])
+      .find((item) => item.label === label);
+    if (row?.enabled) row.click();
+    return row?.enabled;
+  }, label);
+
+test("with no window open, the app's menu opens a page in a new window and has what acts on a window off", async () => {
+  const app = await launchApp();
+  try {
+    await findView(app, "view=chrome");
+    await closeWindow(app);
+    expect(await pressMenu(app, "Toggle Fullscreen")).toBe(false);
+    expect(await pressMenu(app, "Close Tab")).toBe(false);
+
+    expect(await pressMenu(app, "Settings…")).toBe(true);
+    const chrome = await findView(app, "view=chrome");
+    const active = async () => (await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).find((tab) => tab.isActive);
+    await expect.poll(async () => (await active())?.page).toBe("settings");
+    // The new window's menu acts on it.
+    expect(await pressMenu(app, "Toggle Fullscreen")).toBe(true);
+  } finally {
+    await app.close();
+  }
+});
+
+test("work a closed window started finishes in the next one: its suggestion is asked for once, and kept with what the next one changed", async () => {
+  test.setTimeout(90_000);
+  const model = await startFakeModel();
+  model.suggestFrom(demoProposals);
+  const answer = model.holdSuggestions();
+  const profile = mkdtempSync(join(tmpdir(), "blueberry-reopen-"));
+  new HistoryStore(join(profile, "history.db")).importVisits(demoVisits());
+  seedChats(profile);
+  const app = await launchApp(profile, { modelEnv: model.env });
+  try {
+    // The first window's new tab asks the cheap model, which hasn't answered when the window closes.
+    await findView(app, "view=chrome");
+    await expect.poll(() => model.suggestionRequests.length, { timeout: 20_000 }).toBe(1);
+    await reopenWindow(app);
+
+    // The next window's new tab has the old rules' cards meanwhile, and one is dismissed there.
+    const chrome = await findView(app, "view=chrome");
+    const [card] = await chrome.evaluate(() => window.chromeAPI.suggestions.list());
+    await chrome.evaluate((id) => window.chromeAPI.suggestions.dismiss(id), defined(card).id);
+    answer();
+
+    // The answer shows in the window that's open, and nothing asked again.
+    await expect(chrome.getByText(DEMO_LINES.routine)).toBeVisible({ timeout: 20_000 });
+    expect(model.suggestionRequests).toHaveLength(1);
+    // Kept along with the dismissal made after it was asked for.
+    const saved = JSON.parse(readFileSync(join(profile, "suggestions.json"), "utf8")) as {
+      dismissed: string[];
+      proposals: Array<{ card: { title: string } }>;
+    };
+    expect(saved.dismissed).not.toEqual([]);
+    expect(saved.proposals.map(({ card }) => card.title).sort()).toEqual(Object.values(DEMO_LINES).sort());
+  } finally {
+    await app.close();
+    model.close();
   }
 });

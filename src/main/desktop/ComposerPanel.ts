@@ -10,7 +10,7 @@ import {
 } from "./desktopBerryState";
 import { desktopBoxPlace, desktopSheetsPlace, type DesktopPlace } from "../window/desktopPlaces";
 import type { DesktopBox, DesktopDecided, DesktopPanelState } from "../../shared/ipc";
-import type { MascotProfile, NeedsYouItem } from "../../shared/library";
+import type { LibrarySnapshot, MascotProfile, NeedsYouItem } from "../../shared/library";
 import { DESKTOP_SHADOW, DESKTOP_SHEET } from "../../shared/desktopSizes";
 import { BERRY } from "../../shared/mascots";
 import { sendToRenderer } from "../window/ipc";
@@ -96,7 +96,6 @@ export class ComposerPanel {
     // The tray and the ask are as tall as what's in them, so the window waits to hear that before it shows.
     const sized = this.panelOpen === "sheets" ? this.nextHeight() : Promise.resolve();
     this.placePanel();
-    this.publishPanel();
     this.d.publish();
     await sized;
     if (!this.panelOpen || this.closing || this.d.panelWindow !== window || window.isDestroyed()) return;
@@ -206,7 +205,7 @@ export class ComposerPanel {
     const target = typeof key === "string" && this.trayOpen && !this.closing ? this.trayKeys.get(key) : undefined;
     if (!target) return;
     if (target.kind === "ask") {
-      const item = this.d.news.facts.needsYou.find(({ id, approval }) => id === target.chatId && approval.id === target.approvalId);
+      const item = this.d.host.library().needsYou.find(({ id, approval }) => id === target.chatId && approval.id === target.approvalId);
       if (item) this.openAsk(item, true);
       return;
     }
@@ -222,7 +221,7 @@ export class ComposerPanel {
   decide(decision: unknown): DesktopDecided {
     if (this.panelOpen !== "sheets" || this.closing) return "gone";
     const shown = this.asking;
-    const check = checkDecision(shown, this.d.news.facts.needsYou, decision);
+    const check = checkDecision(shown, this.d.host.library().needsYou, decision);
     if (!check.ok || !shown) {
       if (check.ok === false && check.why === "code") return "code";
       if (check.ok === false && check.why === "gone" && shown && !shown.decided) this.askGone();
@@ -259,9 +258,8 @@ export class ComposerPanel {
     this.d.host.seePage(shown.item);
   }
 
-  private get box(): DesktopBox {
+  private boxOf(library: LibrarySnapshot): DesktopBox {
     const chosen = this.chosen;
-    const library = this.d.host.library();
     const face = (mascot: MascotProfile) => ({ id: mascot.id, name: this.d.host.nameOf(mascot.id), look: mascot.look });
     return {
       chosen: face(chosen),
@@ -272,10 +270,10 @@ export class ComposerPanel {
     };
   }
 
-  get panelState(): DesktopPanelState {
+  // Everything in it from one read of the library.
+  panelStateOf(library: LibrarySnapshot): DesktopPanelState {
     const { showBerry } = this.d.host.settings();
-    const facts = this.d.news.facts;
-    const library = this.d.host.library();
+    const facts = this.d.news.factsOf(library);
     let tray: DesktopPanelState["tray"] = null;
     if (this.trayOpen && this.panelOpen === "sheets") {
       // A row keeps its key while it's showing, so a press made just as the tray changes still reaches it.
@@ -301,7 +299,7 @@ export class ComposerPanel {
       closing: this.closing,
       edge: this.d.drop.standing.spot.edge,
       anchor: place?.anchor ?? { x: 0, y: 0 },
-      box: this.box,
+      box: this.boxOf(library),
       tray,
       ask: shown && askFace ? { ...desktopAsk(shown.item, askFace), key: shown.key, said: this.said } : null,
       showBerry,
@@ -309,7 +307,7 @@ export class ComposerPanel {
     };
   }
 
-  publishPanel(): void {
-    if (this.d.panel) sendToRenderer(this.d.panel.view.webContents, "desktop:panel-state", this.panelState);
+  publishPanel(library: LibrarySnapshot = this.d.host.library()): void {
+    if (this.d.panel) sendToRenderer(this.d.panel.view.webContents, "desktop:panel-state", this.panelStateOf(library));
   }
 }

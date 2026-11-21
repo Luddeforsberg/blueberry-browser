@@ -7,12 +7,13 @@ import type { SitePermissions } from "../settings/SitePermissions";
 import { PermissionPromptView } from "../settings/PermissionPromptView";
 import { sendToRenderer } from "./ipc";
 import { BERRY } from "../../shared/mascots";
-import type { WindowParts, WindowStores } from "./WindowParts";
+import type { WindowParts } from "./WindowParts";
+import type { AppStores } from "../app/appStores";
 
 // The views the window makes over its pages and wires to it, each made in its turn by the window's constructor, since
 // views stack in the order they're added.
 
-export const createPreviews = (w: WindowParts, stores: WindowStores): TabPreviews =>
+export const createPreviews = (w: WindowParts, stores: AppStores): TabPreviews =>
   new TabPreviews(w.baseWindow.contentView, {
     tab: (id) => w.tabs.find(id) ?? null,
     layout: () => w.panels.layout,

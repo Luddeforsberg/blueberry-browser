@@ -1,4 +1,4 @@
-import { _electron as electron, errors, type ElectronApplication, type Page } from "@playwright/test";
+import { _electron as electron, errors, expect, type ElectronApplication, type Page } from "@playwright/test";
 import electronPath from "electron";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
@@ -172,10 +172,31 @@ export async function answerAsk(app: ElectronApplication, button: string): Promi
 
 // Each WebContentsView shows up as its own Playwright window. A window can exist before it reaches
 // its address, and no event says when it does, so this keeps looking.
+// Closes every window, as on a Mac, where the app keeps running with none, and waits until each of their views has gone,
+// so nothing found afterwards is one of them.
+export async function closeWindow(app: ElectronApplication): Promise<void> {
+  const before = app.windows();
+  await app.evaluate(({ app, BaseWindow }) => {
+    const quit = app.quit.bind(app);
+    app.quit = () => {};
+    app.once("window-all-closed", () => setImmediate(() => (app.quit = quit)));
+    BaseWindow.getAllWindows().forEach((window) => window.close());
+  });
+  await expect.poll(() => app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows().length)).toBe(0);
+  await expect.poll(() => before.every((page) => page.isClosed())).toBe(true);
+}
+
+// Closes the window and opens a new one, as the Dock does.
+export async function reopenWindow(app: ElectronApplication): Promise<void> {
+  await closeWindow(app);
+  await app.evaluate(({ app }) => app.emit("activate"));
+}
+
 export async function findView(app: Pick<ElectronApplication, "windows">, urlPart: string): Promise<Page> {
   const started = Date.now();
   while (Date.now() - started < VIEW_TIMEOUT_MS) {
-    const view = app.windows().find((page) => page.url().includes(urlPart));
+    // A window that closed can stay in the list for a moment, as on a Mac after a reopen.
+    const view = app.windows().find((page) => !page.isClosed() && page.url().includes(urlPart));
     if (view) {
       console.log(`Found ${urlPart} in ${Date.now() - started}ms`);
       return view;

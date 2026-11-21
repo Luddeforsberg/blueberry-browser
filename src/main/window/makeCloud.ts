@@ -1,38 +1,13 @@
-import { app } from "electron";
-import { join } from "path";
 import { InternalTab } from "../tabs/InternalTab";
-import type { GalleryServer } from "../account/galleryServer";
-import { CloudTabs, type CloudTabsHooks } from "../cloud/CloudTabs";
-import { browserbase } from "../cloud/browserbase";
-import { localChrome } from "../cloud/localChrome";
-import { confirmCloudLogin, readSiteCookies } from "../cloud/cloudLoginAccess";
-import { suggestLoginSites } from "../cloud/cloudLogins";
-import { RunnerJobs } from "../remoteJobs/RunnerJobs";
+import type { CloudTabsHooks } from "../cloud/CloudTabs";
+import { confirmCloudLogin } from "../cloud/cloudLoginAccess";
 import { MacJobs } from "../remoteJobs/MacJobs";
-import { sendToRenderer } from "./ipc";
 import { BERRY } from "../../shared/mascots";
-import type { WindowParts, WindowStores } from "./WindowParts";
+import type { WindowParts } from "./WindowParts";
 
-// Work that runs away from this window, wired to it: the cloud browser and its tabs, the cloud runner's jobs, and relay
-// jobs run on this Mac. The cloud browser is made once for the app, and each window attaches to it. The rest are made in
-// their turn by the window's constructor, and reach the rest of the window only when they're called.
+// The window's part of the work that runs away from it. The cloud browser and the runner's jobs are the app's.
 
-export const createCloud = (): CloudTabs => {
-  // Only an unpackaged app can be pointed at a Chrome on this computer instead of Browserbase, like the other test hooks.
-  const localCloud = app.isPackaged ? undefined : process.env.BLUEBERRY_CLOUD_LOCAL;
-  const local = localCloud
-    ? localCloud === "1"
-      ? { executable: process.env.BLUEBERRY_CLOUD_CHROME || undefined }
-      : { endpoint: localCloud }
-    : null;
-  return new CloudTabs(
-    join(app.getPath("userData"), "cloud.json"),
-    ({ apiKey, projectId }) => (local ? localChrome(local) : apiKey && projectId ? browserbase({ apiKey, projectId }) : null),
-    (site) => readSiteCookies(site),
-  );
-};
-
-// The window's part of the cloud: its tabs, its chrome and its confirm.
+// What the app's cloud shows and asks in this window: its tabs, its chrome and its confirm. Attached while it's open.
 export const cloudHooks = (w: WindowParts): CloudTabsHooks => ({
   chrome: () => w.chromeView.view.webContents,
   openTab: (title) => w.tabs.openCloudTab(title),
@@ -44,9 +19,9 @@ export const cloudHooks = (w: WindowParts): CloudTabsHooks => ({
   },
   closeTab: (id) => {
     if (w.tabs.has(id) && w.tabs.tabCount > 1) w.tabs.closeTab(id, false);
-    else w.cloud.tabClosed(id);
+    else w.app.cloud.tabClosed(id);
   },
-  takenOver: (id) => w.chats.releaseTab(id),
+  takenOver: (id) => w.app.chats.releaseTab(id),
   showTab: (id) => w.tabs.switchActiveTab(id),
   confirmLogin: (site) => confirmCloudLogin(w.baseWindow, site),
   confirmForget: () =>
@@ -59,46 +34,16 @@ export const cloudHooks = (w: WindowParts): CloudTabsHooks => ({
     }),
 });
 
-// Sites to offer in Settings > Cloud > Signed in to, from history and bookmarks. Names only.
-export const cloudLoginSuggestions = (stores: WindowStores, cloud: CloudTabs): string[] => {
-  const urls = [...stores.history.recent(500), ...stores.bookmarkStore.bookmarks, ...stores.bookmarkStore.pinned].map(({ url }) => url);
-  return suggestLoginSites(
-    urls,
-    cloud.state.logins.map(({ site }) => site),
-  );
-};
-
-export const createRunnerJobs = (w: WindowParts, server: GalleryServer | null, stores: WindowStores): RunnerJobs =>
-  new RunnerJobs(server, w.account, join(app.getPath("userData"), "runner-jobs.json"), {
-    changed: (chatId) => w.chats.runnerChanged(chatId),
-    finished: (chatId, result) => w.chats.runnerFinished(chatId, result),
-    contextId: () => w.cloud.contextId,
-    runnerUpdated: (state) => {
-      sendToRenderer(w.chromeView.view.webContents, "cloud:runner-updated", state);
-      w.macJobs?.sync();
-    },
-    mascots: () => stores.mascotStore.all(),
-    adopt: ({ prompt, mascotId }) => w.chats.adoptRunnerChat(prompt, mascotId),
-    followedUp: (chatId, prompt) => w.chats.runnerFollowedUp(chatId, prompt),
-    routinesSettled: () => w.routines.cloudChanged(),
-    routineIds: () => w.routines.list().map(({ id }) => id),
-    routines: () =>
-      w.routines.cloudRows((id) => stores.mascotStore.resolve(id), {
-        actionApproval: w.settings.actionApproval,
-        contextId: w.cloud.contextId,
-        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      }),
-  });
-
-// Relay jobs on this Mac, run as an MCP job is: no page, a `from`, and every limit and approval of the chat.
-export const createMacJobs = (w: WindowParts, server: GalleryServer | null): MacJobs =>
-  new MacJobs(server, w.account, {
+// Relay jobs on this Mac, while this window is open, run as an MCP job is: no page, a `from`, and every limit and
+// approval of the chat.
+export const createMacJobs = (w: WindowParts): MacJobs =>
+  new MacJobs(w.app.server, w.app.account, {
     enabled: () => w.settings.relayOnMac,
-    linked: () => w.runnerJobs.available(),
+    linked: () => w.app.runnerJobs.available(),
     // The mascot from the row only narrows the one here with its id, and one that isn't here doesn't start.
     start: (prompt, { mascot, askAtLeast, from }, onEnd) => {
-      const clean = (text: string) => w.chats.withoutCodes(text);
-      const sent = w.chats.send(null, prompt, {
+      const clean = (text: string) => w.app.chats.withoutCodes(text);
+      const sent = w.app.chats.send(null, prompt, {
         seePage: false,
         mascotId: mascot.id === BERRY.id ? null : mascot.id,
         sites: mascot.sites,
@@ -116,14 +61,14 @@ export const createMacJobs = (w: WindowParts, server: GalleryServer | null): Mac
       return sent?.id ?? null;
     },
     progress: (chatId) => {
-      const chat = w.chats.thread(chatId);
+      const chat = w.app.chats.thread(chatId);
       if (!chat) return null;
-      const clean = (text: string) => w.chats.withoutCodes(text);
+      const clean = (text: string) => w.app.chats.withoutCodes(text);
       return {
         reply: clean(chat.partial ?? ""),
         steps: chat.steps.map((step) => ({ ...step, text: clean(step.text) })),
-        waiting: w.chats.waiting().some(({ id }) => id === chatId),
+        waiting: w.app.chats.waiting().some(({ id }) => id === chatId),
       };
     },
-    stop: (chatId) => w.chats.stop(chatId),
+    stop: (chatId) => w.app.chats.stop(chatId),
   });

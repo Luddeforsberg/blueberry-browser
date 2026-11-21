@@ -26,7 +26,8 @@ export interface SuggestionSources {
   enabled: () => boolean;
   visits: () => PatternVisit[];
   chats: () => SuggestionChat[];
-  routines: () => Routine[];
+  // Only what's saved, so it reads the same with no window open.
+  routines: () => Array<Pick<Routine, "id" | "name" | "instructions" | "schedule" | "sites">>;
   // A routine's runs, newest first.
   runs: (routineId: string) => RoutineRun[];
   mascots: () => MascotProfile[];

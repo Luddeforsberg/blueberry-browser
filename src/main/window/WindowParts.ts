@@ -1,34 +1,14 @@
 import { app, dialog, nativeTheme, type BaseWindow } from "electron";
 import type { MenuView } from "../menus/MenuView";
 import type { TabPreviews } from "../tabs/TabPreviews";
-import type { SessionStore } from "../tabs/Session";
-import type { SettingsStore } from "../settings/SettingsStore";
 import type { SiteZoom } from "../settings/siteZoom";
-import type { SitePermissions } from "../settings/SitePermissions";
 import type { PermissionPromptView } from "../settings/PermissionPromptView";
-import type { AiKey } from "../settings/AiKey";
-import type { BookmarkStore } from "../library/BookmarkStore";
-import type { HistoryStore } from "../library/HistoryStore";
-import type { Downloads } from "../library/Downloads";
-import type { ChatStore } from "../chats/ChatStore";
-import type { Chats } from "../chats/Chats";
 import { Attachments } from "../chats/Attachments";
 import type { Recordings } from "../recordings/Recordings";
 import type { Phone } from "../phone/Phone";
-import type { TelegramChannel } from "../phone/TelegramChannel";
-import type { RoutineStore } from "../routines/RoutineStore";
 import type { Routines } from "../routines/Routines";
-import type { MascotStore } from "../mascots/MascotStore";
-import type { Gallery } from "../mascots/Gallery";
 import { linkThrottle } from "../mascots/mascotLink";
-import type { Account } from "../account/Account";
-import { GalleryServer, serverConfig } from "../account/galleryServer";
-import type { Suggestions } from "../suggestions/Suggestions";
-import type { MemoryStore } from "../memory/MemoryStore";
 import type { DesktopBerry } from "../desktop/DesktopBerry";
-import type { McpConnector } from "../mcp/McpConnector";
-import type { CloudTabs } from "../cloud/CloudTabs";
-import type { RunnerJobs } from "../remoteJobs/RunnerJobs";
 import type { MacJobs } from "../remoteJobs/MacJobs";
 import { createChromeView, type ChromeView } from "./chromeView";
 import { FindBar } from "./FindBar";
@@ -50,35 +30,26 @@ import { BrowsingHistory } from "./BrowsingHistory";
 import { SettingsChanges } from "./SettingsChanges";
 import { PageCommands } from "./PageCommands";
 import { createMenuView, createPermissionPrompt, createPreviews, createSiteZoom, watchDownloads } from "./makeViews";
-import { createAccount, listenToAiKey, createGallery, createPhone, createTelegram } from "./makeAccount";
-import { createChats, createMemory, createWorkViews } from "./makeChats";
-import { cloudHooks, createMacJobs, createRunnerJobs } from "./makeCloud";
-import { createRecordings, createRoutines, createSuggestions } from "./makeRoutines";
+import { listenToAiKey, createPhone } from "./makeAccount";
+import { createWorkViews } from "./makeChats";
+import { createMacJobs } from "./makeCloud";
+import { createRecordings, createRoutines } from "./makeRoutines";
 import { createDesktopBerry } from "./makeDesktop";
-import { createMcp } from "./makeMcp";
+import { windowMcpTools } from "./makeMcp";
+import type { McpTool } from "../mcp/mcpTools";
+import type { AppServices } from "../app/AppServices";
+import type { AppStores } from "../app/appStores";
 import { startWindow } from "./windowLifecycle";
 import { galleryParam } from "../../shared/galleryPlaces";
 import { iconMascotId } from "../../shared/appIcon";
 import type { EventChannels, Settings, ThemeState } from "../../shared/ipc";
 
-// What the window's parts read and write, handed to each of them.
-export interface WindowStores {
-  settingsStore: SettingsStore;
-  chatStore: ChatStore;
-  // Pinned sites and bookmarks, both.
-  bookmarkStore: BookmarkStore;
-  mascotStore: MascotStore;
-  history: HistoryStore;
-  sessionStore: SessionStore;
-  aiKey: AiKey;
-  // The cloud browser, for the app's whole life. Each window attaches to it.
-  cloud: CloudTabs;
-}
-
-// Everything the window is made of: its `BaseWindow` and the views stacked in it, the services wired to them, and the
-// parts that do the window's work, each in a file of its own. `Window` owns one, and each part is handed it to reach the
-// others, so the tabs, the panels and the views each have one owner.
+// Everything the window is made of: its `BaseWindow` and the views stacked in it, the parts that do the window's work,
+// each in a file of its own, and what works only through its tabs. `Window` owns one, and each part is handed it to
+// reach the others, so the tabs, the panels and the views each have one owner. What outlives the window, the stores and
+// the app's services, it reaches through `app`, and never makes its own (see `AppServices`).
 export class WindowParts {
+  readonly stores: AppStores;
   readonly baseWindow: BaseWindow;
   readonly chromeView: ChromeView;
   readonly overlayView: ChromeView;
@@ -102,35 +73,22 @@ export class WindowParts {
   private readonly glassSupported = supportsGlass();
   // `blueberry://mascot/` links come from any page, so a flood of them can't keep taking the front.
   private readonly linkThrottle = linkThrottle();
-  readonly telegram: TelegramChannel;
-  readonly account: Account;
-  readonly aiKey: AiKey;
-  readonly gallery: Gallery;
   readonly phone: Phone;
-  readonly chats: Chats;
   readonly workViews: WorkViews;
   readonly recordings: Recordings;
   // Files added to a prompt box, kept in main until they're sent or let go.
   readonly attachments = new Attachments(() => this.pickFiles(), preparePicture);
   readonly routines: Routines;
-  readonly suggestions: Suggestions;
   readonly permissionPrompt: PermissionPromptView;
   readonly desktopBerry: DesktopBerry;
-  readonly memory: MemoryStore;
-  readonly mcp: McpConnector;
-  readonly cloud: CloudTabs;
-  // Leaves the cloud as this window closes, which ends its session unless another window has attached since.
-  readonly leaveCloud: ReturnType<CloudTabs["attach"]>;
-  readonly runnerJobs: RunnerJobs;
+  // What apps over MCP can do in this window, for the app's MCP server while it's open.
+  readonly mcpTools: () => McpTool[];
   readonly macJobs: MacJobs;
   readonly appIcon: AppIcon;
 
-  constructor(
-    readonly stores: WindowStores,
-    routineStore: RoutineStore,
-    downloads: Downloads,
-    sitePermissions: SitePermissions,
-  ) {
+  constructor(readonly app: AppServices) {
+    this.stores = app.stores;
+    const { stores } = this;
     const { settingsStore, mascotStore, sessionStore } = stores;
     this.tabs = new TabStrip(this, stores);
     this.webTabs = new WebTabs(this, stores);
@@ -147,7 +105,7 @@ export class WindowParts {
 
     this.baseWindow = createBaseWindow(restored, this.settings.layoutMode, this.glassSupported);
 
-    this.appIcon = new AppIcon(app.getPath("userData"), this.baseWindow, () => ({
+    this.appIcon = new AppIcon(app.folder, this.baseWindow, () => ({
       mascotId: iconMascotId(this.settings.appIconMascotId, mascotStore.all()),
       ground: this.settings.appIconGround,
     }));
@@ -170,29 +128,17 @@ export class WindowParts {
     this.webTabs.openLinksInTabs(this.previews.chromeView.view.webContents);
     this.menus = createMenuView(this);
     this.siteZoom = createSiteZoom(this);
-    this.permissionPrompt = createPermissionPrompt(this, sitePermissions);
-    const stopWatching = watchDownloads(this, downloads, sitePermissions);
+    this.permissionPrompt = createPermissionPrompt(this, stores.sitePermissions);
+    const stopWatching = watchDownloads(this, stores.downloads, stores.sitePermissions);
 
-    const config = serverConfig(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, app.isPackaged);
-    const server = config && new GalleryServer(config);
-    this.account = createAccount(this, server);
-    this.aiKey = stores.aiKey;
     listenToAiKey(this);
-    this.gallery = createGallery(this, server, stores);
-    this.telegram = createTelegram(this);
     this.phone = createPhone(this);
-    this.memory = createMemory(this);
-    this.cloud = stores.cloud;
-    this.leaveCloud = this.cloud.attach(cloudHooks(this));
-    this.runnerJobs = createRunnerJobs(this, server, stores);
-    this.chats = createChats(this, stores);
     this.workViews = createWorkViews(this);
-    this.routines = createRoutines(this, routineStore);
+    this.routines = createRoutines(this);
     this.recordings = createRecordings(this);
-    this.suggestions = createSuggestions(this, stores);
     this.desktopBerry = createDesktopBerry(this, stores);
-    this.mcp = createMcp(this, stores);
-    this.macJobs = createMacJobs(this, server);
+    this.mcpTools = windowMcpTools(this, stores);
+    this.macJobs = createMacJobs(this);
 
     startWindow(this, stores, restored, stopWatching);
   }

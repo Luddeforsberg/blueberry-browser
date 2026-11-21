@@ -7,7 +7,8 @@ import { isMac } from "./windowFrame";
 import type { ChromeRegion, MenuAnchor } from "../../shared/ipc";
 import type { PublishResult } from "../../shared/library";
 import { BERRY } from "../../shared/mascots";
-import type { WindowParts, WindowStores } from "./WindowParts";
+import type { WindowParts } from "./WindowParts";
+import type { AppStores } from "../app/appStores";
 import { fieldsOf } from "../../shared/fields";
 
 // The menus the window opens from its views, and the questions it asks before deleting something or after something
@@ -15,7 +16,7 @@ import { fieldsOf } from "../../shared/fields";
 export class WindowMenus {
   constructor(
     private readonly w: WindowParts,
-    private readonly stores: WindowStores,
+    private readonly stores: AppStores,
   ) {}
 
   // A menu opened from a view, at its button or at the pointer, in the window. The chrome fills the window, and the
@@ -29,7 +30,7 @@ export class WindowMenus {
   }
 
   showChatMenu(chatId: string, anchor: unknown, from: ChromeRegion): Promise<"rename" | null> {
-    if (!this.w.chats.thread(chatId)) return Promise.resolve(null);
+    if (!this.w.app.chats.thread(chatId)) return Promise.resolve(null);
     return new Promise((resolve) => {
       const items: OwnMenuItem[] = [
         { label: "Rename", icon: "rename", click: () => resolve("rename") },
@@ -41,7 +42,7 @@ export class WindowMenus {
   }
 
   private async confirmDeleteChat(chatId: string): Promise<void> {
-    const chat = this.w.chats.thread(chatId);
+    const chat = this.w.app.chats.thread(chatId);
     if (!chat) return;
     const yes = await this.w.menus.ask({
       question: `Delete “${chat.title}”?`,
@@ -49,7 +50,7 @@ export class WindowMenus {
       action: "Delete",
       mascot: null,
     });
-    if (!yes || !this.w.chats.delete(chatId)) return;
+    if (!yes || !this.w.app.chats.delete(chatId)) return;
 
     // Closing the last tab closes the window, and deleting a chat shouldn't do that.
     const tabs = this.w.tabs.chatTabs(chatId);
@@ -73,7 +74,7 @@ export class WindowMenus {
       action: "Unpublish",
       mascot: null,
     });
-    return yes ? this.w.gallery.unpublish(id) : { ok: false, error: "" };
+    return yes ? this.w.app.gallery.unpublish(id) : { ok: false, error: "" };
   }
 
   // Its routines pause rather than move to Berry, which could do more than the user set them up to.
@@ -84,7 +85,7 @@ export class WindowMenus {
     const words = deleteMascotWords(mascot, runs.length, Boolean(mascot.publishedId), !this.w.settings.showBerry);
     if (!(await this.w.menus.ask(words))) return false;
     // The question said what it remembers is forgotten, so it's forgotten first, and nothing is deleted if it can't be.
-    if (!this.w.memory.clear(id)) return this.notSaved(`Could not delete “${mascot.name}”`, "Nothing was deleted or forgotten.");
+    if (!this.w.app.memory.clear(id)) return this.notSaved(`Could not delete “${mascot.name}”`, "Nothing was deleted or forgotten.");
     if (!this.stores.mascotStore.delete(id)) {
       return this.notSaved(`Could not delete “${mascot.name}”`, "What it remembered is forgotten, but it's still here.");
     }
@@ -94,9 +95,9 @@ export class WindowMenus {
   }
 
   async confirmClearMemory(mascotId: string): Promise<boolean> {
-    const count = this.w.memory.factsOf(mascotId).length;
+    const count = this.w.app.memory.factsOf(mascotId).length;
     if (count === 0 || !(await this.w.menus.ask(clearMemoryWords(this.w.library.mascotName(mascotId), count)))) return false;
-    if (!this.w.memory.clear(mascotId)) return this.notSaved("Could not forget what it remembers", "It still remembers everything.");
+    if (!this.w.app.memory.clear(mascotId)) return this.notSaved("Could not forget what it remembers", "It still remembers everything.");
     return true;
   }
 
