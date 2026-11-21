@@ -284,7 +284,7 @@ The live view is a Browserbase frame, locked unless a handoff has been taken ove
 
 [site/](../site) also holds the public page for a mascot at `site/m/?id=`, static, with no build for the host to run, deployed to Netlify with `netlify.toml`. It reads with the publishable key from `site/config.js`, and everything from the server goes in as text.
 
-Nothing in `site/` is built, but all of it is checked. `tsconfig.site.json` (and `tsconfig.site-worker.json` for the service worker) types its JavaScript through JSDoc, and `site/shared.d.ts`, which `pnpm run site:build` writes beside `site/shared.js`, points at the app's own code that `shared.js` is bundled from. So a job row is read by `phoneJobFromRow` in `src/shared/phone.ts` on both sides, and the page never reads a field the parser didn't check. Lint holds it to the app's rules, type-aware ones too, and [eslint.site.mjs](../eslint.site.mjs) says which can't apply and why.
+Nothing in `site/` is built, but all of it is checked. `tsconfig.site.json` (and `tsconfig.site-worker.json` for the service worker) types its JavaScript through JSDoc, and `site/shared.d.ts`, which `pnpm run site:build` writes beside `site/shared.js`, points at the app's own code that `shared.js` is bundled from. So the phone page reads a job row only through `phoneJobFromRow` in `src/shared/phone.ts`, type-checked against the app's own definition, and never reads a field the parser didn't check. Lint holds it to the app's rules, type-aware ones too, and [eslint.site.mjs](../eslint.site.mjs) says which can't apply and why.
 
 ## Local MCP
 
