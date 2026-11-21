@@ -37,8 +37,10 @@ export class CloudSessions extends CloudLife {
     this.held.clear();
   }
 
+  // A hold is on a page, so it goes with it.
   protected dropPages(): void {
     this.pages.clear();
+    this.held.clear();
   }
 
   protected prepare(context: BrowserContext): Promise<void> {
@@ -102,8 +104,8 @@ export class CloudSessions extends CloudLife {
       if (allows) await tab.withNavigationLimit(allows, load);
       else await load();
     } catch (error) {
-      // A limit that couldn't be put on leaves no blank page behind it.
-      await this.close(id);
+      // A limit that couldn't be put on leaves no blank page behind it. Only this one: by now the id may be another's.
+      await this.closeOwn(id, tab);
       throw error;
     }
     this.changed();
@@ -131,7 +133,7 @@ export class CloudSessions extends CloudLife {
     try {
       const tab = await this.newTab(id, "", events);
       if (this.held.get(id) !== hold) {
-        await this.close(id);
+        await this.closeOwn(id, tab);
         return null;
       }
       await tab.loadURL(url).then(
@@ -170,7 +172,8 @@ export class CloudSessions extends CloudLife {
     page.on("close", () => {
       if (this.pages.get(id)?.tab !== tab) return;
       this.pages.delete(id);
-      this.changed();
+      this.held.delete(id);
+      this.settled();
     });
     return tab;
   }
@@ -193,10 +196,16 @@ export class CloudSessions extends CloudLife {
     return [...this.pages.values()].filter((page) => page.jobId === jobId && !page.tab.isClosed).map(({ tab }) => tab);
   }
 
+  // The page called that now, from the window or the job using it.
   async close(id: string): Promise<void> {
     const page = this.pages.get(id);
-    this.pages.delete(id);
-    await page?.tab.close();
+    if (page) await this.closeOwn(id, page.tab);
+  }
+
+  // That tab, and its place under `id` only while it's still there.
+  private async closeOwn(id: string, tab: CdpTab): Promise<void> {
+    if (this.pages.get(id)?.tab === tab) this.pages.delete(id);
+    await tab.close();
     this.changed();
   }
 

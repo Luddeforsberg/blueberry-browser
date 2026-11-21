@@ -3,32 +3,43 @@
 import { vi } from "vitest";
 import type { Breaks, Launch, Setup } from "./cloudCheckApp";
 import { flush, nth, quietly, type Action, type Op } from "./cloudCheckPlan";
+import type { Runners } from "./cloudCheckRunners";
 import type { CloudWorld } from "./cloudWorldTesting";
 
 export const IDLE = 3 * 60_000;
+const HOUR = 61 * 60_000;
 
 export interface StepContext {
   app: () => Launch;
   world: CloudWorld;
   disk: Setup["disk"];
+  runners: Runners;
   breaks: Breaks;
+  // Gives one answer, and checks what it did.
+  deliver: (index: number, how: number) => Promise<string>;
   // A fresh number, for names.
   next: () => number;
 }
 
 type Step = (action: Action) => string | null | Promise<string | null>;
 
-export const runningSteps = ({ app, world, disk, breaks, next }: StepContext): Record<Exclude<Op, "quit" | "crash">, Step> => ({
-  answer: ({ a, b }) => world.answer(a, b % 4),
-  startJob: () => {
+export const runningSteps = (context: StepContext): Record<Exclude<Op, "quit" | "crash">, Step> => ({
+  ...appSteps(context),
+  ...worldSteps(context),
+});
+
+const appSteps = ({ app, world, breaks, next }: StepContext) => ({
+  startJob: ({ a }: Action) => {
     const job = `job-${next()}`;
     if (!app().cloud.tabs.claim(job)) return `${job} isn't let in`;
     if (app().endings > 0) breaks("claim-while-ending", `${job} claimed the cloud browser while an ending was under way`);
     app().jobs.add(job);
-    quietly(app().cloud.tabs.open(job, "https://shop.example/"));
-    return `${job} claims it and opens a page`;
+    // Some are limited mascots, whose limit goes on before the page loads.
+    const limited = a % 2 === 0;
+    quietly(app().cloud.tabs.open(job, "https://shop.example/", limited ? () => true : undefined));
+    return `${job} claims it and opens a page${limited ? ", limited to its sites" : ""}`;
   },
-  endJob: ({ a }) => {
+  endJob: ({ a }: Action) => {
     const job = nth(app().jobs, a);
     if (!job) return null;
     app().jobs.delete(job);
@@ -51,20 +62,20 @@ export const runningSteps = ({ app, world, disk, breaks, next }: StepContext): R
     );
     return `a sign-in check opens ${id ?? "no tab"}`;
   },
-  closeTab: ({ a }) => {
+  closeTab: ({ a }: Action) => {
     const id = nth(app().win.cloudTabs, a);
     if (!id) return null;
     app().closeTab(id);
     return `the user closes ${id}`;
   },
   userTab: () => `the user opens ${app().userTab()}, a tab of their own`,
-  takeOver: ({ a }) => {
+  takeOver: ({ a }: Action) => {
     const id = nth(app().win.cloudTabs, a);
     if (!id || !app().cloud.tabs.takeOver(id)) return null;
     app().held.add(id);
     return `the user takes over ${id}`;
   },
-  watch: ({ a }) => {
+  watch: ({ a }: Action) => {
     const id = nth(app().win.cloudTabs, a);
     if (!id) return null;
     quietly(app().cloud.tabs.watch(id));
@@ -78,17 +89,13 @@ export const runningSteps = ({ app, world, disk, breaks, next }: StepContext): R
     app().ending(app().cloud.tabs.forget());
     return "Settings: Forget";
   },
-  saveKey: () => {
+  // Some keys are for another project, which sees none of the first one's sessions.
+  saveKey: ({ a }: Action) => {
     const key = `key-${next()}`;
-    world.accepted.add(key);
-    app().ending(app().cloud.tabs.saveKey(key, "proj"));
-    return `Settings: save ${key}`;
-  },
-  revokeKey: () => {
-    const key = disk.saved.apiKey;
-    if (!key || app().local) return null;
-    world.accepted.delete(key);
-    return `Browserbase stops taking ${key}`;
+    const project = a % 3 === 0 ? "proj-2" : "proj";
+    world.accept(key, project);
+    app().ending(app().cloud.tabs.saveKey(key, project));
+    return `Settings: save ${key}, for ${project}`;
   },
   windowClose: () => {
     app().closeWindow();
@@ -98,15 +105,6 @@ export const runningSteps = ({ app, world, disk, breaks, next }: StepContext): R
     if (app().win.open) return null;
     app().openWindow();
     return "a window opens";
-  },
-  time: async () => {
-    const sent = world.releases.length;
-    const local = world.localRunning;
-    vi.advanceTimersByTime(IDLE);
-    await flush();
-    const ended = [...world.releases.slice(sent), ...local.filter((name) => !world.localRunning.includes(name))];
-    if (ended.length && app().users() > 0) breaks("idle-under-user", `the idle timer ended ${ended.join(", ")} while it was in use`);
-    return "three minutes pass";
   },
   revokeLogin: () => {
     const launch = app();
@@ -129,7 +127,7 @@ export const runningSteps = ({ app, world, disk, breaks, next }: StepContext): R
     );
     return `Settings: bring the sign-in to ${site}, for ${launch.account}`;
   },
-  confirm: ({ a, b }) => {
+  confirm: ({ a, b }: Action) => {
     const { confirms } = app().win;
     const site = nth(confirms.keys(), a);
     if (!site) return null;
@@ -138,5 +136,53 @@ export const runningSteps = ({ app, world, disk, breaks, next }: StepContext): R
     confirms.delete(site);
     return `the user ${yes ? "confirms" : "declines"} bringing ${site}`;
   },
-  drop: ({ a }) => world.drop(a),
 });
+
+// Time, the network, the disk and the runners.
+const worldSteps = ({ app, world, disk, runners, breaks, deliver, next }: StepContext) => {
+  // Every create on its way lands first, as each does within a minute or so, and then the idle timers run.
+  const pass = async (ms: number, words: string) => {
+    const landed = world.landAll();
+    const sent = world.releases.length;
+    const local = world.localRunning;
+    vi.advanceTimersByTime(ms);
+    await flush();
+    const ended = [
+      ...world.releases.slice(sent).filter((id) => world.isApp(id)),
+      ...local.filter((name) => !world.localRunning.includes(name)),
+    ];
+    if (ended.length && app().users() > 0) breaks("idle-under-user", `the idle timer ended ${ended.join(", ")} while it was in use`);
+    return landed.length ? `${landed.join("; ")}; then ${words}` : words;
+  };
+  return {
+    answer: ({ a, b }: Action) => deliver(a, b % 4),
+    time: () => pass(IDLE, "three minutes pass"),
+    hour: () => pass(HOUR, "an hour passes"),
+    revokeKey: () => {
+      const key = disk.saved.apiKey;
+      if (!key || app().local) return null;
+      world.accepted.delete(key);
+      return `Browserbase stops taking ${key}`;
+    },
+    // The session in use goes with its connection, and so do the pages the user held there.
+    drop: async ({ a }: Action) => {
+      const launch = app();
+      const using = launch.cloud.tabs.state.status === "running";
+      const said = world.drop(a);
+      await flush();
+      if (using && launch.cloud.tabs.state.status !== "running") {
+        launch.held.clear();
+        launch.checking.clear();
+      }
+      return said;
+    },
+    diskFails: ({ a }: Action) => {
+      disk.failsFor = (a % 3) + 1;
+      return `the next ${disk.failsFor} saves fail`;
+    },
+    runnerTakes: () => runners.take(next()),
+    runnerFinishes: ({ a }: Action) => runners.finish(a),
+    runnerStops: ({ a }: Action) => runners.stop(a),
+    runnerStarts: () => runners.sweep(),
+  };
+};

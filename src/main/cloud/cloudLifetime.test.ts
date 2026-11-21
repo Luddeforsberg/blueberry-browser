@@ -18,18 +18,21 @@ const net = vi.hoisted((): Setup["net"] => ({
   connect: () => Promise.reject(new Error("No world.")),
   attach: () => Promise.reject(new Error("No world.")),
 }));
-const disk = vi.hoisted((): Setup["disk"] => ({
-  saved: { apiKey: null, projectId: null, contextId: null, sessionId: null, tags: [], madeBy: null },
-  onWrite: () => {},
-}));
+// In the shape of now, and the one from before, so the checker runs against both.
+const EMPTY = vi.hoisted(() => ({ apiKey: null, projectId: null, contextId: null, handles: [], sessionId: null, tags: [], madeBy: null }));
+const disk = vi.hoisted((): Setup["disk"] => ({ saved: { ...EMPTY }, onWrite: () => {}, failsFor: 0 }));
 
 vi.mock("electron", () => ({ safeStorage: { isEncryptionAvailable: () => true }, app: { isPackaged: true } }));
 vi.mock("playwright-core", () => ({ chromium: { connectOverCDP: (url: string) => net.connect(url) } }));
 vi.mock("./cloudFile", () => ({
-  EMPTY: { apiKey: null, projectId: null, contextId: null, sessionId: null, tags: [], madeBy: null },
+  EMPTY,
   MAX_FIELD_LENGTH: 200,
   readCloudFile: () => ({ ...disk.saved }),
   writeCloudFile: (_file: string, saved: Setup["disk"]["saved"]) => {
+    if (disk.failsFor > 0) {
+      disk.failsFor--;
+      return false;
+    }
     disk.onWrite(saved);
     disk.saved = { ...saved };
     return true;
@@ -49,16 +52,19 @@ const setup: Setup = {
     // As localChrome.ts: closing the session is what ends it, so there's nothing to release.
     const standIn: CloudBrowser = {
       name: "local",
+      origin: "local",
       release: async () => {},
-      releaseTagged: async () => {},
-      create: async () => ({ id: null, connect: () => launchLocal() as Promise<CloudSession> }),
+      releaseTagged: async () => "none",
+      create: async () => ({ id: null, connect: (stop) => launchLocal(stop) as Promise<CloudSession> }),
     };
     const tabs = new CloudTabs(
       join(folder, "cloud.json"),
       ({ apiKey, projectId }) => (local ? standIn : apiKey && projectId ? browserbase({ apiKey, projectId }) : null),
       readCookies,
     );
-    return { tabs, windowOpened: (hooks) => tabs.attach(hooks), windowClosed: () => tabs.detach(), quit: () => tabs.quit() };
+    // What it holds, which only it knows when a save has failed.
+    const key = () => (tabs as unknown as { saved: { apiKey: string | null } }).saved.apiKey;
+    return { tabs, key, windowOpened: (hooks) => tabs.attach(hooks), windowClosed: () => tabs.detach(), quit: () => tabs.quit() };
   },
   // Each run starts with no sign-ins brought along.
   reset: () => rmSync(join(folder, "cloud-logins.json"), { force: true }),
@@ -68,7 +74,8 @@ describe("the cloud session's life", () => {
   beforeAll(() => {
     // Every failed release says so, and the checker makes thousands.
     vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    // Date too, so an hour can pass, and sessions end on their own at their deadline.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
     vi.spyOn(CdpTab, "attach").mockImplementation((id) => net.attach(id) as Promise<CdpTab>);
   });
   afterAll(() => {
@@ -77,20 +84,25 @@ describe("the cloud session's life", () => {
     vi.restoreAllMocks();
   });
 
-  it("loses no session, winds down one nobody uses, and lets nothing claim it while it ends, whatever the order", async () => {
-    const found = new Map<string, number>();
-    for (let seed = FIRST_SEED; seed < FIRST_SEED + RUNS; seed++) {
-      const { broken } = await run(actionsFor(seed), setup);
-      if (!broken || found.has(ruleOf(broken))) continue;
-      found.set(ruleOf(broken), seed);
-      if (process.env.CLOUD_CHECK_ALL !== "1") break;
-    }
-    const reports: string[] = [];
-    for (const [rule, seed] of found) {
-      const shortest = await shrink(actionsFor(seed), rule, setup);
-      const { broken, trace } = await run(shortest, setup);
-      reports.push(`Seed ${seed} breaks ${broken}\n${trace.map((line, i) => `  ${i + 1}. ${line}`).join("\n")}`);
-    }
-    expect(reports.join("\n\n")).toBe("");
-  }, 120_000);
+  it(
+    "loses no session, winds down one nobody uses, and lets nothing claim it while it ends, whatever the order",
+    async () => {
+      const found = new Map<string, number>();
+      for (let seed = FIRST_SEED; seed < FIRST_SEED + RUNS; seed++) {
+        const { broken } = await run(actionsFor(seed), setup);
+        if (!broken || found.has(ruleOf(broken))) continue;
+        found.set(ruleOf(broken), seed);
+        if (process.env.CLOUD_CHECK_ALL !== "1") break;
+      }
+      const reports: string[] = [];
+      for (const [rule, seed] of found) {
+        const shortest = await shrink(actionsFor(seed), rule, setup);
+        const { broken, trace } = await run(shortest, setup);
+        reports.push(`Seed ${seed} breaks ${broken}\n${trace.map((line, i) => `  ${i + 1}. ${line}`).join("\n")}`);
+      }
+      expect(reports.join("\n\n")).toBe("");
+      // A few milliseconds a run, and room for the shrinking.
+    },
+    60_000 + RUNS * 10,
+  );
 });

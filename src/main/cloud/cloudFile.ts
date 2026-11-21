@@ -1,15 +1,17 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { dirname } from "path";
 import { safeStorage } from "electron";
-import { NO_IDS, type CloudIds } from "./cloudProvider";
+import { browserbaseOrigin } from "./browserbase";
+import { NO_IDS, type CloudIds, type Handle } from "./cloudProvider";
 
-// Where Settings > Cloud keeps the Browserbase key and project id, sealed with `safeStorage`, and the ids of the
-// Context and session it last had, with the tags of sessions asked for that no id came back for. Only CloudTabs reads
-// or writes it.
+// Where Settings > Cloud keeps the Browserbase key and project id, sealed with `safeStorage`, the id of the Context it
+// last had, and a handle for every session that may still be running. Only CloudTabs reads or writes it.
 
 export const MAX_FIELD_LENGTH = 200;
 // More than any run of failed asks, so none is dropped, but a damaged file can't grow without end.
-const MAX_TAGS = 100;
+const MAX_HANDLES = 100;
+// A session saved before handles had a deadline began within its hour, as every one was asked for with an hour.
+const OLD_SESSION_MS = 70 * 60_000;
 
 export interface Saved extends CloudIds {
   apiKey: string | null;
@@ -24,11 +26,20 @@ export const readCloudFile = (file: string): Saved => {
     const open = (value: unknown) =>
       typeof value === "string" && safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(Buffer.from(value, "base64")) : null;
     const text = (value: unknown) => (typeof value === "string" && value.length <= MAX_FIELD_LENGTH ? value : null);
-    const sessionId = text(saved.sessionId);
-    const tags = Array.isArray(saved.tags) ? saved.tags.flatMap((tag) => (text(tag) ? [tag as string] : [])).slice(0, MAX_TAGS) : [];
-    // A file from before tags only ever had Browserbase's session in it.
-    const madeBy = saved.madeBy === "local" ? "local" : sessionId || tags.length ? "browserbase" : null;
-    return { apiKey: open(saved.apiKey), projectId: open(saved.projectId), contextId: text(saved.contextId), sessionId, tags, madeBy };
+    const handle = (value: unknown): Handle[] => {
+      const { tag, id, by, until } = (value ?? {}) as Record<string, unknown>;
+      const [tagText, byText, idText] = [text(tag), text(by), id === null ? null : text(id)];
+      if (!tagText || !byText || (id !== null && !idText) || typeof until !== "number" || !Number.isFinite(until)) return [];
+      return [{ tag: tagText, id: idText, by: byText, until }];
+    };
+    const apiKey = open(saved.apiKey);
+    const projectId = open(saved.projectId);
+    const handles = Array.isArray(saved.handles) ? saved.handles.flatMap(handle).slice(0, MAX_HANDLES) : [];
+    // A file from before handles had only Browserbase's session in it, by its id.
+    const old = text(saved.sessionId);
+    if (old && projectId && !Array.isArray(saved.handles))
+      handles.push({ tag: `before-${old}`, id: old, by: browserbaseOrigin(projectId), until: Date.now() + OLD_SESSION_MS });
+    return { apiKey, projectId, contextId: text(saved.contextId), handles };
   } catch {
     return EMPTY;
   }
@@ -40,10 +51,8 @@ export const writeCloudFile = (file: string, saved: Saved): boolean => {
     mkdirSync(dirname(file), { recursive: true });
     const seal = (value: string | null) => value && safeStorage.encryptString(value).toString("base64");
     const temp = `${file}.tmp`;
-    const { apiKey, projectId, contextId, sessionId, tags, madeBy } = saved;
-    writeFileSync(temp, JSON.stringify({ apiKey: seal(apiKey), projectId: seal(projectId), contextId, sessionId, tags, madeBy }), {
-      mode: 0o600,
-    });
+    const { apiKey, projectId, contextId, handles } = saved;
+    writeFileSync(temp, JSON.stringify({ apiKey: seal(apiKey), projectId: seal(projectId), contextId, handles }), { mode: 0o600 });
     renameSync(temp, file);
     return true;
   } catch {

@@ -25,6 +25,8 @@ export interface CloudUnderTest {
     | "revokeLogin"
     | "state"
   >;
+  // The key it has now.
+  key(): string | null;
   windowOpened(hooks: CloudTabsHooks): void;
   windowClosed(): Promise<unknown>;
   quit(): Promise<unknown>;
@@ -33,14 +35,15 @@ export interface CloudUnderTest {
 // How a launch's cloud is made: from the saved key, or with a Chrome on this computer standing in.
 interface Making {
   local: boolean;
-  launchLocal: () => Promise<LocalSession>;
+  launchLocal: (stop?: AbortSignal) => Promise<LocalSession>;
   readCookies: ConstructorParameters<typeof CloudTabs>[2];
 }
 
 // What the test file mocks, so that each run can point it at its own world, and how it makes the cloud.
 export interface Setup {
   net: { connect: (url: string) => Promise<unknown>; attach: (id: string) => Promise<unknown> };
-  disk: { saved: Saved; onWrite: (next: Saved) => void };
+  // `failsFor` is how many of the next saves fail.
+  disk: { saved: Saved; onWrite: (next: Saved) => void; failsFor: number };
   makeCloud: (making: Making) => CloudUnderTest;
   // Before each run: nothing left on disk from the last.
   reset: () => void;
@@ -86,14 +89,12 @@ export class Launch {
   // Sign-ins being brought along, by site, with the account the user confirmed them for.
   readonly transfers = new Map<string, string>();
 
-  private readonly disk: Setup["disk"];
   private readonly breaks: Breaks;
 
   constructor(
     readonly local: boolean,
-    { world, disk, breaks, makeCloud }: { world: CloudWorld; disk: Setup["disk"]; breaks: Breaks; makeCloud: Setup["makeCloud"] },
+    { world, breaks, makeCloud }: { world: CloudWorld; breaks: Breaks; makeCloud: Setup["makeCloud"] },
   ) {
-    this.disk = disk;
     this.breaks = breaks;
     this.cloud = makeCloud({
       local,
@@ -113,8 +114,9 @@ export class Launch {
   }
 
   // Who the provider is for a sign-in confirmed now.
+  // Its own, which a save that failed leaves different from the disk's.
   get account(): string {
-    return this.local ? LOCAL : (this.disk.saved.apiKey ?? "no key");
+    return this.local ? LOCAL : (this.cloud.key() ?? "no key");
   }
 
   users(): number {

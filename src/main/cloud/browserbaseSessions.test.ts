@@ -3,7 +3,7 @@ import type { Browser } from "playwright-core";
 import { CloudSessions } from "./cloudBrowser";
 import type { CloudIds } from "./cloudProvider";
 import { defined } from "../../shared/testing";
-import { at, fakeBrowser, listing, provider, releases, stub } from "./browserbaseTesting";
+import { at, fakeBrowser, handle, keeping, listing, provider, releases, stub } from "./browserbaseTesting";
 
 // A session's life at Browserbase, against a stubbed fetch.
 
@@ -18,7 +18,7 @@ describe("CloudSessions at Browserbase", () => {
     const sessions = new CloudSessions(
       provider(send, async () => fake.browser),
       at({ contextId: "ctx" }),
-      { onIds: (ids) => kept.push(ids) },
+      { onIds: keeping(kept) },
     );
     await sessions.withContext(async () => {});
     expect(sessions.canEnd).toBe(true);
@@ -31,7 +31,7 @@ describe("CloudSessions at Browserbase", () => {
 
   it("ends a session nobody has used for a while, and not one a job or the user picked up again", async () => {
     const { calls, send } = stub({ "POST /sessions/sess-1": { body: { id: "sess-1", status: "COMPLETED" } } });
-    const sessions = new CloudSessions(provider(send), at({ contextId: "ctx", sessionId: "sess-1" }), {}, 20);
+    const sessions = new CloudSessions(provider(send), at({ contextId: "ctx", handles: [handle("sess-1")] }), {}, 20);
 
     sessions.claim("job-1");
     sessions.release("job-1");
@@ -58,10 +58,10 @@ describe("CloudSessions at Browserbase", () => {
       "POST /sessions/sess-1": { body: { id: "sess-1", status: "COMPLETED" } },
     });
     const kept: CloudIds[] = [];
-    const sessions = new CloudSessions(provider(send), at({ contextId: "ctx" }), { onIds: (ids) => kept.push(ids) });
+    const sessions = new CloudSessions(provider(send), at({ contextId: "ctx" }), { onIds: keeping(kept) });
     sessions.claim("job");
     await expect(sessions.open("job", "cloud-1", "https://example.com/", { onChange: () => {} })).rejects.toThrow("how to connect");
-    expect(kept.some(({ sessionId }) => sessionId === "sess-1")).toBe(true);
+    expect(kept.some(({ handles }) => handles.some(({ id }) => id === "sess-1"))).toBe(true);
     await expect.poll(() => kept.at(-1)).toEqual(at({ contextId: "ctx" }));
     expect(releases(calls, "sess-1")).toHaveLength(1);
     expect(sessions.canEnd).toBe(false);
@@ -88,7 +88,7 @@ describe("CloudSessions at Browserbase", () => {
       "GET /sessions/sess-1": { body: { id: "sess-1", status: "RUNNING" } },
     };
     const { calls, send } = stub(answers);
-    const sessions = new CloudSessions(provider(send), at({ contextId: "ctx", sessionId: "sess-1" }));
+    const sessions = new CloudSessions(provider(send), at({ contextId: "ctx", handles: [handle("sess-1")] }));
     expect(sessions.canEnd).toBe(true);
 
     expect(await sessions.end()).toBe("running");
@@ -113,10 +113,10 @@ describe("CloudSessions at Browserbase", () => {
     const fake = fakeBrowser();
     const connect = () => new Promise<Browser>((resolve) => (connected = () => resolve(fake.browser)));
     const kept: CloudIds[] = [];
-    const sessions = new CloudSessions(provider(send, connect), at({ contextId: "ctx" }), { onIds: (ids) => kept.push(ids) });
+    const sessions = new CloudSessions(provider(send, connect), at({ contextId: "ctx" }), { onIds: keeping(kept) });
     sessions.claim("job");
     const opening = sessions.open("job", "cloud-1", "https://example.com/", { onChange: () => {} }).catch(() => null);
-    await expect.poll(() => kept.at(-1)?.sessionId).toBe("sess-1");
+    await expect.poll(() => kept.at(-1)?.handles[0]?.id).toBe("sess-1");
     expect(await sessions.end()).toBe("ended");
     expect(releases(calls, "sess-1")).toHaveLength(1);
     // The connection that arrives afterwards is closed.
@@ -136,16 +136,16 @@ describe("CloudSessions at Browserbase", () => {
     const kept: CloudIds[] = [];
     let onDisk: string[] = [];
     const watching = (async (url: string, init: RequestInit) => {
-      if (url.endsWith("/sessions") && init.method === "POST") onDisk = [...(kept.at(-1)?.tags ?? [])];
+      if (url.endsWith("/sessions") && init.method === "POST") onDisk = (kept.at(-1)?.handles ?? []).map(({ tag }) => tag);
       return send(url, init);
     }) as typeof fetch;
-    const sessions = new CloudSessions(provider(watching), at({ contextId: "ctx" }), { onIds: (ids) => kept.push(ids) });
+    const sessions = new CloudSessions(provider(watching), at({ contextId: "ctx" }), { onIds: keeping(kept) });
     sessions.claim("job");
     await expect(sessions.open("job", "cloud-1", "https://example.com/", { onChange: () => {} })).rejects.toThrow("500");
     const made = defined(calls.find(({ url }) => url.endsWith("/sessions")));
     const tag = (made.body?.userMetadata as { blueberry: string }).blueberry;
     expect(onDisk).toEqual([tag]);
-    expect(kept.at(0)).toMatchObject({ tags: [tag], madeBy: "browserbase" });
+    expect(kept.at(0)).toMatchObject({ handles: [{ tag, id: null, by: "browserbase:p" }] });
     await expect.poll(() => releases(calls, "sess-9").length).toBe(1);
     expect(calls.some(({ method, url }) => `${method} ${url.replace("https://api.browserbase.com/v1", "")}` === listing(tag))).toBe(true);
     await expect.poll(() => kept.at(-1)).toEqual(at({ contextId: "ctx" }));
@@ -156,8 +156,8 @@ describe("CloudSessions at Browserbase", () => {
     const answers: Record<string, { status?: number; body: unknown }> = { [listing("old")]: { status: 500, body: {} } };
     const { calls, send } = stub(answers);
     const kept: CloudIds[] = [];
-    const sessions = new CloudSessions(provider(send), at({ contextId: "ctx", tags: ["old"], madeBy: "browserbase" }), {
-      onIds: (ids) => kept.push(ids),
+    const sessions = new CloudSessions(provider(send), at({ contextId: "ctx", handles: [handle(null, { tag: "old" })] }), {
+      onIds: keeping(kept),
     });
     await expect.poll(() => sessions.unreleased).toBe(true);
     expect(kept).toEqual([]);
@@ -175,5 +175,80 @@ describe("CloudSessions at Browserbase", () => {
     expect(releases(calls, "sess-2")).toHaveLength(0);
     expect(kept.at(-1)).toEqual(at({ contextId: "ctx" }));
     expect(sessions.problem).toBeNull();
+  });
+
+  it("keeps a tag Browserbase lists nothing for until its deadline, since its create may land after the listing", async () => {
+    const { calls, send } = stub({ [listing("late")]: { body: [] } });
+    const kept: CloudIds[] = [];
+    const late = handle(null, { tag: "late", until: Date.now() + 40 });
+    const sessions = new CloudSessions(provider(send), at({ handles: [late] }), { onIds: keeping(kept) });
+    expect(await sessions.end()).toBe("running");
+    expect(kept).toEqual([]);
+    expect(sessions.canEnd).toBe(true);
+    expect(sessions.problem).toBeNull();
+    // Past it, Browserbase has ended anything made with it.
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(await sessions.end()).toBe("ended");
+    expect(sessions.canEnd).toBe(false);
+    expect(calls.every(({ method }) => method === "GET")).toBe(true);
+  });
+
+  it("asks for no session whose tag couldn't be saved", async () => {
+    const { calls, send } = stub({ "POST /sessions": { status: 201, body: { id: "sess-1", status: "RUNNING", connectUrl: "wss://x" } } });
+    const sessions = new CloudSessions(provider(send), at({ contextId: "ctx" }), { onIds: () => false });
+    await expect(sessions.withContext(async () => {})).rejects.toThrow("couldn't be saved");
+    expect(calls).toEqual([]);
+    expect(sessions.canEnd).toBe(false);
+  });
+
+  it("lists and releases only in its own project, and keeps another project's sessions for a key from there", async () => {
+    const { calls, send } = stub({});
+    const elsewhere = [handle("sess-1", { by: "browserbase:other" }), handle(null, { tag: "t", by: "browserbase:other" })];
+    const sessions = new CloudSessions(provider(send), at({ handles: elsewhere }));
+    expect(sessions.canEnd).toBe(false);
+    expect(await sessions.end()).toBe("ended");
+    expect(calls).toEqual([]);
+    expect(sessions.keptBy("browserbase:other")).toBe(true);
+  });
+
+  it("releases a session whose answer comes after it was ended, at once", async () => {
+    let answer = () => {};
+    const released: string[] = [];
+    const send = ((url: string, init: RequestInit) => {
+      if (url.endsWith("/v1/sessions"))
+        return new Promise<Response>(
+          (resolve) =>
+            (answer = () =>
+              resolve(new Response(JSON.stringify({ id: "sess-1", status: "RUNNING", connectUrl: "wss://x" }), { status: 201 }))),
+        );
+      if (init.method === "POST") released.push(url.replace(/^.*\/sessions\//, ""));
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as typeof fetch;
+    const sessions = new CloudSessions(provider(send), at({ contextId: "ctx" }));
+    const starting = sessions.withContext(async () => {}).catch((error: Error) => error.message);
+    await expect.poll(() => typeof answer).toBe("function");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await sessions.end();
+    expect(await starting).toMatch(/ended|ending/);
+    answer();
+    await expect.poll(() => released).toEqual(["sess-1"]);
+  });
+
+  it("keeps no Context that comes back after a new key was saved, since it's the old account's", async () => {
+    let answer: (id: string) => void = () => {};
+    const send = ((url: string) =>
+      url.endsWith("/contexts")
+        ? new Promise<Response>((resolve) => (answer = (id) => resolve(new Response(JSON.stringify({ id }), { status: 201 }))))
+        : Promise.resolve(new Response("{}", { status: 404 }))) as typeof fetch;
+    const kept: CloudIds[] = [];
+    const sessions = new CloudSessions(provider(send), at({}), { onIds: keeping(kept) });
+    const starting = sessions.withContext(async () => {}).catch((error: Error) => error.message);
+    await expect.poll(() => typeof answer).toBe("function");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await sessions.replace(() => ({ browser: provider(stub({}).send) }));
+    answer("ctx-old");
+    expect(await starting).toMatch(/ended|ending/);
+    expect(sessions.contextId).toBeNull();
+    expect(kept.every(({ contextId }) => contextId === null)).toBe(true);
   });
 });

@@ -1,34 +1,34 @@
 import { describe, expect, it } from "vitest";
 import { browserbase, BROWSERBASE_REGION } from "./browserbase";
 import type { CdpTab } from "../tools/CdpTab";
-import { KeyRefused, type CloudBrowser, type CloudIds, type CreateHooks } from "./cloudProvider";
+import { KeyRefused, type CloudBrowser, type CreateHooks } from "./cloudProvider";
 import { defined } from "../../shared/testing";
-import { fakeBrowser, listing, provider, releases, stub } from "./browserbaseTesting";
+import { fakeBrowser, going, listing, provider, releases, stub } from "./browserbaseTesting";
 
 // Against a stubbed fetch, shaped from Browserbase's API reference. Nothing here has talked to the real service.
 
-type Asked = Pick<CloudIds, "contextId" | "sessionId" | "tags">;
+type Ask = Parameters<CloudBrowser["create"]>[0];
 
 // The hooks a create is told through, keeping what it was told.
 const told = (wanted = () => true) => {
-  const seen: Asked = { contextId: null, sessionId: null, tags: [] };
+  const seen = { contextId: null as string | null, sessionId: null as string | null, tags: [] as string[], until: [] as number[] };
   const hooks: CreateHooks = {
     wanted,
-    tag: () => {
+    tag: (until) => {
       const tag = `tag-${seen.tags.length + 1}`;
       seen.tags.push(tag);
+      seen.until.push(until);
       return tag;
     },
     unused: (tag) => void (seen.tags = seen.tags.filter((one) => one !== tag)),
     context: (id) => void (seen.contextId = id),
-    made: (id) => void (seen.sessionId = id),
+    made: (_tag, id) => void (seen.sessionId = id),
   };
   return { seen, hooks };
 };
 
 // Made and connected.
-const start = async (browser: CloudBrowser, ids: Pick<CloudIds, "contextId" | "sessionId">, { hooks } = told()) =>
-  (await browser.create(ids, hooks)).connect();
+const start = async (browser: CloudBrowser, ids: Ask, { hooks } = told()) => (await browser.create(ids, hooks)).connect(going());
 
 describe("Browserbase", () => {
   it("makes a context and a kept-alive session in one region, connects, and keeps both for next time", async () => {
@@ -51,6 +51,7 @@ describe("Browserbase", () => {
         return browser;
       },
     });
+    const before = Date.now();
     const session = await start(bb, { contextId: null, sessionId: null }, asked);
     expect(calls.map(({ method, url }) => `${method} ${url}`)).toEqual([
       "POST https://api.browserbase.com/v1/contexts",
@@ -61,11 +62,15 @@ describe("Browserbase", () => {
       projectId: "proj",
       keepAlive: true,
       region: BROWSERBASE_REGION,
+      timeout: 3600,
       browserSettings: { context: { id: "ctx-1", persist: true } },
       userMetadata: { blueberry: "tag-1" },
     });
     expect(connected).toEqual(["wss://connect.browserbase.com?signingKey=x"]);
-    expect(asked.seen).toEqual({ contextId: "ctx-1", sessionId: "sess-1", tags: ["tag-1"] });
+    expect(asked.seen).toMatchObject({ contextId: "ctx-1", sessionId: "sess-1", tags: ["tag-1"] });
+    // Its deadline is past Browserbase's own, which counts from when the create lands.
+    expect(defined(asked.seen.until[0])).toBeGreaterThan(before + 3600 * 1000);
+    expect(bb.origin).toBe("browserbase:proj");
     expect(session.context).toMatchObject({ name: "context" });
   });
 
@@ -92,14 +97,14 @@ describe("Browserbase", () => {
     expect(defined(gone.calls[1]).body).toMatchObject({ browserSettings: { context: { id: "ctx-1" } } });
   });
 
-  it("makes nothing new once it isn't wanted any more", async () => {
+  it("makes nothing new once it isn't wanted any more, and doesn't keep a Context that came back after", async () => {
     const { calls, send } = stub({ "POST /contexts": { status: 201, body: { id: "ctx-1" } } });
-    let wanted = true;
-    const { seen, hooks } = told(() => wanted);
-    const making = provider(send).create({ contextId: null, sessionId: null }, { ...hooks, context: () => (wanted = false) });
-    await expect(making).rejects.toThrow("ending");
+    let asks = 0;
+    // Wanted when the Context is asked for, and no more by the time it comes back.
+    const { seen, hooks } = told(() => ++asks === 1);
+    await expect(provider(send).create({ contextId: null, sessionId: null }, hooks)).rejects.toThrow("ending");
     expect(calls.map(({ method, url }) => `${method} ${url}`)).toEqual(["POST https://api.browserbase.com/v1/contexts"]);
-    expect(seen.tags).toEqual([]);
+    expect(seen).toMatchObject({ contextId: null, tags: [] });
   });
 
   it("finds the live view for a page, without Browserbase's navbar", async () => {
@@ -135,7 +140,7 @@ describe("Browserbase", () => {
       const asked = told();
       await expect(start(provider(send), { contextId: "ctx", sessionId: "sess-1" }, asked)).rejects.toThrow();
       expect(calls.map(({ method }) => method)).toEqual(["GET"]);
-      expect(asked.seen).toEqual({ contextId: null, sessionId: null, tags: [] });
+      expect(asked.seen).toMatchObject({ contextId: null, sessionId: null, tags: [] });
     }
     // One Browserbase has never heard of is gone.
     const { calls, send } = stub({ "POST /sessions": made });
@@ -166,7 +171,7 @@ describe("Browserbase", () => {
     await expect(provider(send).release("sess-1")).resolves.toBeUndefined();
   });
 
-  it("releases by tag only once every session listed has ended, and by its mark only with one", async () => {
+  it("releases by tag only once every session listed has ended, and says when it listed none", async () => {
     const failing = stub({
       [listing("t")]: {
         body: [
@@ -182,19 +187,44 @@ describe("Browserbase", () => {
     expect(releases(failing.calls, "a")).toHaveLength(1);
     await expect(provider(stub({ [listing("t")]: { body: {} } }).send).releaseTagged("t")).rejects.toThrow("didn't list");
 
+    const ended = stub({ [listing("t")]: { body: [{ id: "a", status: "COMPLETED" }] } });
+    await expect(provider(ended.send).releaseTagged("t")).resolves.toBe("ended");
+    expect(releases(ended.calls, "a")).toHaveLength(0);
+    // Nothing listed, or only another project's, proves nothing.
+    const other = stub({ [listing("t")]: { body: [{ id: "x", status: "RUNNING", projectId: "elsewhere" }] } });
+    await expect(provider(other.send).releaseTagged("t")).resolves.toBe("none");
+    expect(releases(other.calls, "x")).toHaveLength(0);
+    await expect(provider(stub({ [listing("t")]: { body: [] } }).send).releaseTagged("t")).resolves.toBe("none");
+  });
+
+  it("ends a runner's sessions only once their job is over, and leaves one with no job alone", async () => {
     const marked = stub({
-      [listing("runner-1", "blueberryMark")]: { body: [{ id: "c", status: "RUNNING" }] },
-      "POST /sessions/c": { body: {} },
+      [listing("runner-1", "blueberryMark")]: {
+        body: [
+          { id: "over", status: "RUNNING", userMetadata: { blueberryMark: "runner-1", blueberryJob: "job-1" } },
+          { id: "live", status: "RUNNING", userMetadata: { blueberryMark: "runner-1", blueberryJob: "job-2" } },
+          { id: "old", status: "RUNNING", userMetadata: { blueberryMark: "runner-1" } },
+          { id: "done", status: "COMPLETED", userMetadata: { blueberryMark: "runner-1", blueberryJob: "job-3" } },
+        ],
+      },
+      "POST /sessions/over": { body: {} },
     });
-    await provider(marked.send, undefined, "runner-1").releaseMarked();
-    expect(releases(marked.calls, "c")).toHaveLength(1);
+    const asked: string[][] = [];
+    await provider(marked.send, undefined, "runner-1").releaseMarked(async (jobs) => {
+      asked.push(jobs);
+      return new Set(["job-2"]);
+    });
+    expect(asked).toEqual([["job-1", "job-2"]]);
+    expect(["over", "live", "old", "done"].map((id) => releases(marked.calls, id).length)).toEqual([1, 0, 0, 0]);
     const unmarked = stub({});
-    await provider(unmarked.send).releaseMarked();
+    await provider(unmarked.send).releaseMarked(async () => new Set());
     expect(unmarked.calls).toEqual([]);
 
     const making = stub({ "POST /sessions": { status: 201, body: { id: "s", status: "RUNNING", connectUrl: "wss://x" } } });
-    await start(provider(making.send, undefined, "runner-1"), { contextId: "ctx", sessionId: null });
-    expect(defined(making.calls[0]).body).toMatchObject({ userMetadata: { blueberry: "tag-1", blueberryMark: "runner-1" } });
+    await start(provider(making.send, undefined, "runner-1", "job-4"), { contextId: "ctx", sessionId: null });
+    expect(defined(making.calls[0]).body).toMatchObject({
+      userMetadata: { blueberry: "tag-1", blueberryMark: "runner-1", blueberryJob: "job-4" },
+    });
   });
 
   it("says plainly when the key is refused, and lets go of the tag of a session it refused to make", async () => {

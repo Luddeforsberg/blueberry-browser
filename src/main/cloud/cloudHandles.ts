@@ -1,47 +1,73 @@
 import { randomUUID } from "node:crypto";
-import { KeyRefused, type CloudBrowser, type CloudIds, type CreateHooks } from "./cloudProvider";
+import { KeyRefused, type CloudBrowser, type CloudIds, type CreateHooks, type Handle } from "./cloudProvider";
 
-// What is kept of a cloud session so it can be ended: its id, and the tag of each session asked for whose answer hasn't
-// said its id, with the provider that made them. Kept from before a session is asked for until the provider confirms it
-// ended, and released only by the provider that made them. Plain Node, like `CloudLife`, which owns one.
+// What is kept of the cloud's sessions so each can be ended: a handle for every session that may be running, from before
+// it's asked for until there's proof it isn't. Proof is the provider confirming it ended, refusing outright to make it,
+// or its deadline passing. A list that doesn't show it never is, since its create may land afterwards. A handle is
+// released only through the provider and project that made it, and a new key never drops one. Plain Node, like
+// `CloudLife`, which owns one.
+
+const NOT_KEPT = "The cloud settings couldn't be saved, so no cloud session was started.";
+
+export interface HandlesHooks {
+  // Told each time the ids change, to keep for next time. False if they couldn't be kept.
+  onIds?: ((ids: CloudIds) => boolean) | undefined;
+  changed: () => void;
+}
 
 export class CloudHandles {
-  // Ids and tags whose last release wasn't confirmed, and those the provider refused because of the key. Only the ones
-  // still kept count, so a late failure never undoes a release that was confirmed.
+  // Tags whose last release wasn't confirmed, and those the provider refused because of the key. Only the ones still
+  // kept count, so a late failure never undoes a release that was confirmed.
   private readonly failed = new Set<string>();
   private readonly refused = new Set<string>();
-  // Tags of sessions asked for whose answer hasn't come: a session may yet appear with one, so it isn't let go.
+  // Tags of sessions asked for whose answer hasn't come. One may yet appear, so it isn't looked for until then.
   private readonly inFlight = new Set<string>();
-  // Releases on their way, by what they release, so the same one is never asked twice at once.
+  // Releases on their way, by tag, so the same one is never asked twice at once.
   private readonly releasing = new Map<string, Promise<void>>();
+  private ids: CloudIds;
 
   constructor(
-    private ids: CloudIds,
+    ids: CloudIds,
     // The provider now.
     private readonly browser: () => CloudBrowser | null,
-    private readonly hooks: { onIds?: ((ids: CloudIds) => void) | undefined; changed: () => void },
-  ) {}
+    private readonly hooks: HandlesHooks,
+  ) {
+    // Past its deadline, a session has ended on its own, so it isn't kept, here or in `set`.
+    this.ids = { ...ids, handles: ids.handles.filter(({ until }) => until > Date.now()) };
+  }
 
   get current(): CloudIds {
     return this.ids;
   }
 
+  // The handles this provider can end. Another's stay saved, untouched, for that one.
+  mine(): Handle[] {
+    const origin = this.browser()?.origin;
+    const now = Date.now();
+    return origin ? this.ids.handles.filter(({ by, until }) => by === origin && until > now) : [];
+  }
+
+  kept(): string[] {
+    return this.mine().map(({ tag }) => tag);
+  }
+
   get unreleased(): boolean {
-    return this.kept().some((one) => this.failed.has(one));
+    return this.mine().some(({ tag }) => this.failed.has(tag));
   }
 
   get keyRefused(): boolean {
-    return this.kept().some((one) => this.refused.has(one));
+    return this.mine().some(({ tag }) => this.refused.has(tag));
   }
 
   // Whether any of this provider's may still be running and could be ended.
   get endable(): boolean {
-    return this.kept().some((one) => !this.refused.has(one));
+    return this.mine().some(({ tag }) => !this.refused.has(tag));
   }
 
-  // Whether another provider's id or tags are kept, which only that one can end.
-  get othersKept(): boolean {
-    return this.theirs() !== null;
+  // Whether a session from `origin` may still be running, which only a browser from there can end.
+  keptBy(origin: string): boolean {
+    const now = Date.now();
+    return this.ids.handles.some(({ by, until }) => by === origin && until > now);
   }
 
   // Releases still on their way, which Quit waits for.
@@ -49,125 +75,121 @@ export class CloudHandles {
     return [...this.releasing.values()];
   }
 
-  // The ids and tags this provider can end. Another's stay saved, untouched, for that one.
-  kept(): string[] {
-    const browser = this.browser();
-    const { sessionId, tags, madeBy } = this.ids;
-    if (!browser || (madeBy !== null && madeBy !== browser.name)) return [];
-    return [...(sessionId ? [sessionId] : []), ...tags];
+  // The session to use again: this provider's newest with an id, unless it's being released.
+  private get reusable(): string | null {
+    const known = this.mine().filter(({ id, tag }) => id !== null && !this.releasing.has(tag));
+    return known[known.length - 1]?.id ?? null;
   }
 
-  // What another provider made, if anything.
-  theirs(): Pick<CloudIds, "sessionId" | "tags" | "madeBy"> | null {
-    const { sessionId, tags, madeBy } = this.ids;
-    if (madeBy === null || madeBy === this.browser()?.name || (sessionId === null && tags.length === 0)) return null;
-    return { sessionId, tags, madeBy };
-  }
-
-  set(ids: CloudIds): void {
-    const empty = ids.sessionId === null && ids.tags.length === 0;
-    this.ids = { ...ids, tags: [...ids.tags], madeBy: empty ? null : ids.madeBy };
-    this.hooks.onIds?.(this.ids);
-  }
-
-  // A new provider or key, so what the last one said about its releases no longer holds.
-  reset(ids: CloudIds): void {
+  // A new provider or key, so what the last one said about its releases no longer holds. Every handle stays.
+  reset(contextId: string | null): void {
     this.failed.clear();
     this.refused.clear();
-    this.set(ids);
+    this.set({ ...this.ids, contextId });
   }
 
   // Connected to, so it's certainly running, and kept.
   connected(id: string): void {
-    this.failed.delete(id);
+    const handle = this.ids.handles.find((one) => one.id === id);
+    if (handle) this.failed.delete(handle.tag);
   }
 
-  // Hooks for one ask of the provider, and what to do once it's answered. Each tag is kept before its session is asked
-  // for, and each id the moment there is one. Once the id is kept, the tag isn't needed. A session made for a life that
-  // has ended is released at once, and its tag kept until that's confirmed.
+  private set(ids: CloudIds): boolean {
+    const now = Date.now();
+    this.ids = { ...ids, handles: ids.handles.filter(({ until }) => until > now) };
+    return this.hooks.onIds?.(this.ids) ?? true;
+  }
+
+  private without(tag: string): void {
+    const { handles } = this.ids;
+    if (handles.some((one) => one.tag === tag)) this.set({ ...this.ids, handles: handles.filter((one) => one.tag !== tag) });
+  }
+
+  // Hooks for one ask of the provider, and what to do once it's answered. Each session's handle is kept before it's
+  // asked for, and its id added the moment there is one. Only what records a paid session acts for a life that has
+  // ended: a session made for one is released at once, and a Context goes to nothing rather than into a new key's.
   asking(
     browser: CloudBrowser,
     current: () => boolean,
-  ): { ids: Pick<CloudIds, "contextId" | "sessionId">; hooks: Omit<CreateHooks, "wanted">; answered: () => void } {
+  ): { ids: { contextId: string | null; sessionId: string | null }; hooks: Omit<CreateHooks, "wanted">; answered: () => void } {
     const tags: string[] = [];
-    let madeId: string | null = null;
-    const { contextId, sessionId } = this.ids;
     const hooks: Omit<CreateHooks, "wanted"> = {
-      tag: () => {
-        const tag = randomUUID();
-        tags.push(tag);
-        this.inFlight.add(tag);
-        this.set({ ...this.ids, tags: [...this.ids.tags, tag], madeBy: browser.name });
-        return tag;
+      tag: (until) => {
+        const handle: Handle = { tag: randomUUID(), id: null, by: browser.origin, until };
+        const before = this.ids;
+        if (!this.set({ ...before, handles: [...before.handles, handle] })) {
+          this.set(before);
+          throw new Error(NOT_KEPT);
+        }
+        tags.push(handle.tag);
+        this.inFlight.add(handle.tag);
+        return handle.tag;
       },
       unused: (tag) => {
         if (!tags.includes(tag)) return;
-        tags.splice(tags.indexOf(tag), 1);
         this.inFlight.delete(tag);
-        this.set({ ...this.ids, tags: this.ids.tags.filter((one) => one !== tag) });
+        this.without(tag);
       },
       context: (id) => {
-        if (!this.ids.contextId) this.set({ ...this.ids, contextId: id });
+        if (current() && !this.ids.contextId) this.set({ ...this.ids, contextId: id });
       },
-      made: (id) => {
-        madeId = id;
-        if (current()) this.set({ ...this.ids, sessionId: id, madeBy: browser.name });
-        else void this.releaseOne("id", id);
+      made: (tag, id) => {
+        if (!tags.includes(tag)) return;
+        this.set({ ...this.ids, handles: this.ids.handles.map((one) => (one.tag === tag ? { ...one, id } : one)) });
+        if (!current()) void this.releaseOne(tag);
       },
     };
     const answered = () => {
       tags.forEach((tag) => this.inFlight.delete(tag));
-      if (madeId !== null && this.ids.sessionId === madeId)
-        this.set({ ...this.ids, tags: this.ids.tags.filter((tag) => !tags.includes(tag)) });
-      else tags.forEach((tag) => void this.releaseOne("tag", tag));
+      // One whose answer didn't say its id may still have been made, and is looked for by its tag.
+      const unnamed = this.ids.handles.filter(({ tag, id }) => tags.includes(tag) && id === null);
+      unnamed.forEach(({ tag }) => void this.releaseOne(tag));
       this.hooks.changed();
     };
-    // Another provider's session is never reused, or replaced, here.
-    return { ids: { contextId, sessionId: this.othersKept ? null : sessionId }, hooks, answered };
+    return { ids: { contextId: this.ids.contextId, sessionId: this.reusable }, hooks, answered };
   }
 
-  // Every id and tag this provider can end, but a tag whose answer is still on its way, and any in `skip`.
-  releaseKept(skip: Set<string> = new Set()): Promise<void> {
-    const { sessionId, tags } = this.ids;
-    const kept = new Set(this.kept());
-    const work = [
-      ...(sessionId && kept.has(sessionId) && !skip.has(sessionId) ? [this.releaseOne("id", sessionId)] : []),
-      ...tags.filter((tag) => kept.has(tag) && !skip.has(tag) && !this.inFlight.has(tag)).map((tag) => this.releaseOne("tag", tag)),
-    ];
-    return Promise.all(work).then(() => {});
+  // Every handle this provider can end that `only` picks, but one whose create is still on its way with no id yet, and
+  // any in `skip`.
+  releaseKept(skip: Set<string> = new Set(), only: (handle: Handle) => boolean = () => true): Promise<void> {
+    const due = this.mine().filter((one) => only(one) && !skip.has(one.tag) && (one.id !== null || !this.inFlight.has(one.tag)));
+    return Promise.all(due.map(({ tag }) => this.releaseOne(tag))).then(() => {});
   }
 
-  // Asks the provider to end one session by its id, or every session with that tag, unless that's on its way already.
-  // It's let go of only once the provider has confirmed, and only if it's still kept, so a session kept meanwhile keeps
-  // its own.
-  private releaseOne(kind: "id" | "tag", value: string): Promise<void> {
-    const key = `${kind} ${value}`;
-    const known = this.releasing.get(key);
+  // Asks the provider to end one session, by its id if it has one and by its tag if not, unless that's on its way
+  // already. The handle goes only on proof, and only if it's still kept.
+  private releaseOne(tag: string): Promise<void> {
+    const known = this.releasing.get(tag);
     if (known) return known;
     const browser = this.browser();
-    if (!browser) return Promise.resolve();
-    const sent = (kind === "id" ? browser.release(value) : browser.releaseTagged(value))
+    const handle = this.ids.handles.find((one) => one.tag === tag);
+    if (!browser || !handle || handle.by !== browser.origin) return Promise.resolve();
+    const { id, until } = handle;
+    const asked = id
+      ? browser.release(id).then(() => true)
+      : browser.releaseTagged(tag).then((found) => found === "ended" || until <= Date.now());
+    const sent = asked
       .then(
-        () => {
-          this.failed.delete(value);
-          this.refused.delete(value);
-          const { sessionId, tags } = this.ids;
-          if (kind === "id" && sessionId === value) this.set({ ...this.ids, sessionId: null });
-          if (kind === "tag" && tags.includes(value)) this.set({ ...this.ids, tags: tags.filter((tag) => tag !== value) });
+        (proven) => {
+          this.failed.delete(tag);
+          this.refused.delete(tag);
+          if (proven) this.without(tag);
         },
         (error: unknown) => {
           // Only that it failed, since this runs on the cloud runner too. Settings > Cloud says what to do.
           console.error("Couldn't release the cloud session.");
-          this.failed.add(value);
-          if (error instanceof KeyRefused) this.refused.add(value);
-          else this.refused.delete(value);
+          this.failed.add(tag);
+          if (error instanceof KeyRefused) this.refused.add(tag);
+          else this.refused.delete(tag);
+          // Past its deadline it has ended anyway.
+          if (until <= Date.now()) this.without(tag);
         },
       )
       .finally(() => {
-        this.releasing.delete(key);
+        this.releasing.delete(tag);
         this.hooks.changed();
       });
-    this.releasing.set(key, sent);
+    this.releasing.set(tag, sent);
     return sent;
   }
 }

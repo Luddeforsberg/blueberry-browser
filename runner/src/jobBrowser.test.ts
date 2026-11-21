@@ -34,8 +34,9 @@ describe("a job's browser", () => {
     const context = { route: async () => {}, on: () => {}, browser: () => null };
     const sessions = new CloudSessions({
       name: "local",
+      origin: "local",
       release: async () => {},
-      releaseTagged: async () => {},
+      releaseTagged: async () => "none",
       create: async () => ({
         id: null,
         connect: async () => ({

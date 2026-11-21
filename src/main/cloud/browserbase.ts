@@ -1,13 +1,5 @@
 import type { CdpTab } from "../tools/CdpTab";
-import {
-  connectOverCdp,
-  KeyRefused,
-  NOT_WANTED,
-  type CloudBrowser,
-  type CloudIds,
-  type CreateHooks,
-  type MadeSession,
-} from "./cloudProvider";
+import { connectOverCdp, KeyRefused, NOT_WANTED, type CloudBrowser, type CreateHooks, type MadeSession } from "./cloudProvider";
 
 // Browserbase, from its REST API (docs.browserbase.com/reference/api) and connected to over CDP. One persistent Context
 // keeps the profile between sessions, and a session is kept alive between jobs, ended a few minutes after the last one, by the user, or after an hour.
@@ -16,8 +8,11 @@ import {
 const API = "https://api.browserbase.com/v1";
 // Closest to the user, in Sweden. One region, so the profile always lives in the same place.
 export const BROWSERBASE_REGION = "eu-central-1";
-// Seconds. A kept-alive session runs, and costs, until this or until it's released.
+// Seconds. A kept-alive session runs, and costs, until this or until it's released. Sent with every create, so each has a
+// deadline the app knows.
 const SESSION_TIMEOUT_S = 3600;
+// How late a create may land after it's sent and still start its clock. Its answer is waited on for far less.
+const LANDING_MS = 10 * 60_000;
 // What Browserbase says of a session that has stopped, and costs nothing more.
 const ENDED = ["COMPLETED", "ERROR", "TIMED_OUT"];
 const NOT_YET = "The last cloud session hasn't said whether it's still running, so no new one was started. Try again in a moment.";
@@ -27,8 +22,10 @@ const REQUEST_MS = 30_000;
 export interface BrowserbaseOptions {
   apiKey: string;
   projectId: string;
-  // Goes out with every session made, so all of them can be found again by it, as the runner does when it starts.
+  // Go out with every session made: the runner's mark, so all of them can be found again by it, and the job each is for,
+  // so only those whose job is over are ended.
   mark?: string;
+  job?: string;
   fetch?: typeof fetch;
   connect?: typeof connectOverCdp;
 }
@@ -39,10 +36,22 @@ interface Session {
   connectUrl?: string;
 }
 
+// What a listing says of each session.
+interface Listed {
+  id?: unknown;
+  status?: unknown;
+  projectId?: unknown;
+  userMetadata?: Record<string, unknown>;
+}
+
 export type Browserbase = CloudBrowser & {
-  // Ends every session made with this browser's mark, whoever made it.
-  releaseMarked(): Promise<void>;
+  // Ends every session with this browser's mark whose job `live` doesn't name, and leaves one without a job alone, as it
+  // ends on its own. Rejects unless every one it asked to end has.
+  releaseMarked(live: (jobs: string[]) => Promise<Set<string>>): Promise<void>;
 };
+
+// Which sessions a key for that project can end.
+export const browserbaseOrigin = (projectId: string): string => `browserbase:${projectId}`;
 
 interface LiveUrls {
   debuggerFullscreenUrl?: string;
@@ -76,6 +85,7 @@ export const browserbase = ({
   apiKey,
   projectId,
   mark,
+  job,
   fetch: send = fetch,
   connect = connectOverCdp,
 }: BrowserbaseOptions): Browserbase => {
@@ -109,7 +119,7 @@ export const browserbase = ({
   // The kept-alive session from last time if it's still running, or a new one. Its id is the only way to release it, so
   // it's replaced only once Browserbase says it has ended, never on a lookup that failed. A new one goes out with a tag
   // that's already kept, so it can be found and ended even if its answer never comes.
-  const session = async (ids: Pick<CloudIds, "contextId" | "sessionId">, hooks: CreateHooks): Promise<Session & { connectUrl: string }> => {
+  const session = async (ids: Parameters<CloudBrowser["create"]>[0], hooks: CreateHooks): Promise<Session & { connectUrl: string }> => {
     if (ids.sessionId) {
       const known = await lookUp(ids.sessionId);
       if (known?.status === "RUNNING" && known.connectUrl) return { ...known, connectUrl: known.connectUrl };
@@ -119,10 +129,12 @@ export const browserbase = ({
     if (!contextId) {
       if (!hooks.wanted()) throw new Error(NOT_WANTED);
       ({ id: contextId } = await call<{ id: string }>("POST", "/contexts", { projectId }));
+      // Only for what still wants it. A key saved meanwhile may be another account's.
+      if (!hooks.wanted()) throw new Error(NOT_WANTED);
       hooks.context(contextId);
     }
     if (!hooks.wanted()) throw new Error(NOT_WANTED);
-    const tag = hooks.tag();
+    const tag = hooks.tag(Date.now() + SESSION_TIMEOUT_S * 1000 + LANDING_MS);
     let made: Session;
     try {
       made = await call<Session>("POST", "/sessions", {
@@ -131,7 +143,7 @@ export const browserbase = ({
         region: BROWSERBASE_REGION,
         timeout: SESSION_TIMEOUT_S,
         browserSettings: { context: { id: contextId, persist: true } },
-        userMetadata: { blueberry: tag, ...(mark ? { blueberryMark: mark } : {}) },
+        userMetadata: { blueberry: tag, ...(mark ? { blueberryMark: mark } : {}), ...(job ? { blueberryJob: job } : {}) },
       });
     } catch (error) {
       // An answer that refuses the ask means nothing was made. Any other failure may come after the session was.
@@ -140,7 +152,7 @@ export const browserbase = ({
     }
     if (typeof made.id !== "string" || !made.id) throw new Error("Browserbase didn't say which session it made.");
     // Kept before anything else about it is checked, so it can be released whatever comes next.
-    hooks.made(made.id);
+    hooks.made(tag, made.id);
     if (!made.connectUrl) throw new Error("Browserbase didn't say how to connect to the session.");
     return { ...made, connectUrl: made.connectUrl };
   };
@@ -156,26 +168,44 @@ export const browserbase = ({
     }
   };
 
-  // Every session Browserbase lists for that metadata that hasn't ended, released. Rejects unless all of them were.
-  const releaseWhere = async (field: string, value: string): Promise<void> => {
-    const listed = await call<Partial<Session>[]>("GET", byMetadata(field, value));
-    if (!Array.isArray(listed)) throw new Error("Browserbase didn't list the sessions.");
-    const running = listed.flatMap(({ id, status }) => (typeof id === "string" && !ENDED.includes(String(status)) ? [id] : []));
-    const failed = (await Promise.allSettled(running.map(release))).find((one) => one.status === "rejected");
+  // The sessions of this project Browserbase lists for that metadata.
+  const listed = async (field: string, value: string): Promise<{ id: string; running: boolean; job: string | null }[]> => {
+    const found = await call<Listed[]>("GET", byMetadata(field, value));
+    if (!Array.isArray(found)) throw new Error("Browserbase didn't list the sessions.");
+    return found.flatMap(({ id, status, projectId: project, userMetadata }) => {
+      if (typeof id !== "string" || (project !== undefined && project !== projectId)) return [];
+      const job = userMetadata?.blueberryJob;
+      return [{ id, running: !ENDED.includes(String(status)), job: typeof job === "string" ? job : null }];
+    });
+  };
+
+  // Rejects unless every one of them was confirmed.
+  const releaseAll = async (ids: string[]): Promise<void> => {
+    const failed = (await Promise.allSettled(ids.map(release))).find((one) => one.status === "rejected");
     if (failed) throw failed.reason;
   };
 
   return {
     name: "browserbase",
+    origin: browserbaseOrigin(projectId),
     release,
-    releaseTagged: (tag) => releaseWhere("blueberry", tag),
-    releaseMarked: async () => {
-      if (mark) await releaseWhere("blueberryMark", mark);
+    releaseTagged: async (tag) => {
+      const sessions = await listed("blueberry", tag);
+      await releaseAll(sessions.filter(({ running }) => running).map(({ id }) => id));
+      return sessions.length ? "ended" : "none";
+    },
+    releaseMarked: async (live) => {
+      if (!mark) return;
+      const running = (await listed("blueberryMark", mark)).filter((one) => one.running && one.job !== null);
+      if (!running.length) return;
+      const going = await live([...new Set(running.map(({ job }) => job as string))]);
+      await releaseAll(running.filter(({ job }) => !going.has(job as string)).map(({ id }) => id));
     },
     create: async (ids, hooks): Promise<MadeSession> => {
       const { id, connectUrl } = await session(ids, hooks);
       return {
         id,
+        // A connection that comes back after its life ended is closed by `CloudLife`, and the session released by its id.
         connect: async () => {
           const browser = await connect(connectUrl);
           const context = browser.contexts()[0] ?? (await browser.newContext());

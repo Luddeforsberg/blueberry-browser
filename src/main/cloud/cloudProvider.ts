@@ -17,47 +17,61 @@ export interface CloudSession {
   close(): Promise<void>;
 }
 
-// What is kept of a cloud session, from the moment it's asked for until the provider confirms it ended.
-export interface CloudIds {
-  contextId: string | null;
-  sessionId: string | null;
-  // One for each session asked for whose answer hasn't come, or didn't say its id: such a session may be running with
-  // no id to end it by. Each went out with its session, so the provider can still find it.
-  tags: string[];
-  // The provider that made the session id and tags. Only that one can say they've ended.
-  madeBy: ProviderName | null;
+// One paid session a provider may be running, kept from before it's asked for until there's proof it isn't: the provider
+// confirmed it ended, refused to make it, or its own deadline has passed.
+export interface Handle {
+  // Sent with its create, so it can be found without its id.
+  tag: string;
+  // Once the provider has said it.
+  id: string | null;
+  // Who can end it, as `CloudBrowser.origin` says: the provider, and for Browserbase the project.
+  by: string;
+  // Milliseconds since 1970. By then the provider has ended it on its own.
+  until: number;
 }
 
-export const NO_IDS: CloudIds = { contextId: null, sessionId: null, tags: [], madeBy: null };
+// What is kept of the cloud: the Context the profile lives in, and every session that may still be running.
+export interface CloudIds {
+  contextId: string | null;
+  handles: Handle[];
+}
+
+export const NO_IDS: CloudIds = { contextId: null, handles: [] };
 
 // Told as a session is made, each the moment the provider has it.
 export interface CreateHooks {
   // False once nothing new should be made.
   wanted(): boolean;
-  // A fresh tag for the session about to be asked for, already kept by the time it's returned.
-  tag(): string;
+  // A fresh tag for the session about to be asked for, which the provider ends by `until` whatever happens. It's kept, on
+  // disk where there is one, by the time it's returned, and it throws if it couldn't be, so nothing is asked for.
+  tag(until: number): string;
   // The provider refused that ask outright, so nothing was made with the tag.
   unused(tag: string): void;
   context(id: string): void;
-  made(id: string): void;
+  made(tag: string, id: string): void;
 }
 
 // A session the provider has made, or found still running, before anything has connected to it.
 export interface MadeSession {
   // Null where closing the connection ends it, as for a browser on this computer.
   readonly id: string | null;
-  connect(): Promise<CloudSession>;
+  // `stop` aborts when its life ends, so a browser this computer is still starting is killed rather than left running.
+  connect(stop: AbortSignal): Promise<CloudSession>;
 }
 
 export interface CloudBrowser {
   readonly name: ProviderName;
-  // The saved session if it's still running, or a new one.
-  create(ids: Pick<CloudIds, "contextId" | "sessionId">, hooks: CreateHooks): Promise<MadeSession>;
+  // Which sessions it can end: those of its own provider and, for Browserbase, its own project. Nothing else is listed
+  // or released through it.
+  readonly origin: string;
+  // The session `sessionId` names if it's still running, or a new one.
+  create(ids: { contextId: string | null; sessionId: string | null }, hooks: CreateHooks): Promise<MadeSession>;
   // Ends that session at the provider, from its id alone, so nothing keeps running or costing. Rejects if that wasn't
   // confirmed, with `KeyRefused` when the provider no longer takes the key, which then can't end it at all.
   release(id: string): Promise<void>;
-  // Ends every session made with that tag, and resolves once none of them is running. Rejects as `release` does.
-  releaseTagged(tag: string): Promise<void>;
+  // Ends every session made with that tag, and says "ended" once the provider has shown one and none of them is running.
+  // "none" when it shows none, which proves nothing: a create still on its way may land afterwards. Rejects as `release`.
+  releaseTagged(tag: string): Promise<"ended" | "none">;
 }
 
 export class KeyRefused extends Error {}

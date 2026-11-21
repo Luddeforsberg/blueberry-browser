@@ -1,6 +1,6 @@
 import type { Browser } from "playwright-core";
 import { browserbase } from "./browserbase";
-import { NO_IDS, type CloudIds } from "./cloudProvider";
+import { NO_IDS, type CloudIds, type Handle } from "./cloudProvider";
 
 // A stubbed fetch shaped from Browserbase's API reference, for its tests. Nothing here has talked to the real service.
 
@@ -47,9 +47,28 @@ export const provider = (
   send: typeof fetch,
   connect: (url: string) => Promise<Browser> = async () => fakeBrowser().browser,
   mark?: string,
-) => browserbase({ apiKey: "k", projectId: "p", fetch: send, connect, ...(mark ? { mark } : {}) });
+  job?: string,
+) => browserbase({ apiKey: "k", projectId: "p", fetch: send, connect, ...(mark ? { mark } : {}), ...(job ? { job } : {}) });
+
+// A signal for a connection whose life never ends.
+export const going = (): AbortSignal => new AbortController().signal;
 
 export const at = (ids: Partial<CloudIds>): CloudIds => ({ ...NO_IDS, ...ids });
+
+// A session that may be running, made by `provider`'s project unless `by` says otherwise, an hour from its deadline.
+export const handle = (id: string | null, more: Partial<Handle> = {}): Handle => ({
+  tag: `tag-of-${id ?? "nothing"}`,
+  id,
+  by: "browserbase:p",
+  until: Date.now() + 3_600_000,
+  ...more,
+});
+
+// Keeps every save in `kept`, each one working.
+export const keeping = (kept: CloudIds[]) => (ids: CloudIds) => {
+  kept.push(ids);
+  return true;
+};
 
 export const listing = (tag: string, field = "blueberry") => `GET /sessions?q=user_metadata%5B'${field}'%5D%3A'${tag}'`;
 

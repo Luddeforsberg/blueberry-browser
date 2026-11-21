@@ -23,6 +23,12 @@ const WEIGHTS = [
   ["bringLogin", 3],
   ["confirm", 4],
   ["drop", 1],
+  ["diskFails", 2],
+  ["hour", 1],
+  ["runnerTakes", 2],
+  ["runnerFinishes", 2],
+  ["runnerStops", 1],
+  ["runnerStarts", 2],
   ["crash", 1],
   ["quit", 1],
 ] as const;

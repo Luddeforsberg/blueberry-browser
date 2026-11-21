@@ -1,12 +1,12 @@
 import { dirname, join } from "path";
 import { safeStorage, type WebContents } from "electron";
 import type { CloudState, CloudView } from "../../shared/ipc";
-import { isLiveView } from "./browserbase";
+import { browserbaseOrigin, isLiveView } from "./browserbase";
 import { EMPTY, MAX_FIELD_LENGTH, readCloudFile, writeCloudFile, type Saved } from "./cloudFile";
 import type { CdpTab } from "../tools/CdpTab";
 import type { ChatCloud } from "../chats/Chats";
 import { CloudSessions } from "./cloudBrowser";
-import { NO_IDS, type CloudBrowser, type Released } from "./cloudProvider";
+import type { CloudBrowser, Released } from "./cloudProvider";
 import { CloudLogins, loginSite, type StoredCookie } from "./cloudLogins";
 import { sendToRenderer } from "../window/ipc";
 import { CloudPictures } from "./cloudPictures";
@@ -19,6 +19,7 @@ import { CloudPictures } from "./cloudPictures";
 
 const NOT_SAFE = "This computer can't keep the key encrypted, so it wasn't saved.";
 const NOT_SAVED = "The key couldn't be saved.";
+const NO_WINDOW = "Blueberry has no window open.";
 // The session's id is the only way to end it, and it goes with the key, unless Browserbase no longer takes that key.
 const STILL_RUNNING = "The cloud session didn't confirm it ended, so the key was kept to end it with. Press End again first.";
 const KEPT_FOR_OTHER = "A Browserbase session from before may still be running, so its key was kept to end it with.";
@@ -39,13 +40,9 @@ export interface CloudTabsHooks {
   confirmLogin: (site: string) => Promise<boolean>;
 }
 
-const NO_WINDOW = "Blueberry has no window open.";
-
 // One window's time with the cloud. Anything that finishes late acts only through the one it started in, and only while
 // that window is still the one attached, since a reopened window's tabs have the same ids as the last one's.
-interface Attachment {
-  hooks: CloudTabsHooks;
-}
+type Attachment = { hooks: CloudTabsHooks };
 
 export class CloudTabs implements ChatCloud {
   private saved: Saved;
@@ -68,15 +65,15 @@ export class CloudTabs implements ChatCloud {
     readCookies: (site: string) => Promise<StoredCookie[]>,
   ) {
     this.saved = readCloudFile(file);
-    const { contextId, sessionId, tags, madeBy } = this.saved;
+    const { contextId, handles } = this.saved;
     this.sessions = new CloudSessions(
       provider(this.saved),
-      { contextId, sessionId, tags, madeBy },
+      { contextId, handles },
       {
         onChange: () => this.changed(),
         onIds: (ids) => {
           this.saved = { ...this.saved, ...ids };
-          this.save();
+          return this.save();
         },
       },
     );
@@ -108,8 +105,7 @@ export class CloudTabs implements ChatCloud {
     return at === this.attached ? at.hooks : null;
   }
 
-  // The window closed, so the session ends, at the provider from its saved id if need be. Nothing waits on a page or a
-  // tab first, as they're gone with the window.
+  // The window closed, so the session ends, at the provider if need be. Its pages and tabs went with the window.
   detach(): Promise<Released> {
     this.attached = null;
     const ending = this.sessions.end();
@@ -140,7 +136,14 @@ export class CloudTabs implements ChatCloud {
   private get waitedFor(): string | null {
     if (!this.endFirst) return null;
     if (this.sessions.canEnd) return STILL_RUNNING;
-    return this.sessions.othersKept ? KEPT_FOR_OTHER : null;
+    return this.keyNeeded ? KEPT_FOR_OTHER : null;
+  }
+
+  // Whether the saved key is the only way to end a session the browser now can't, as when a Chrome on this computer
+  // stands in for Browserbase.
+  private get keyNeeded(): boolean {
+    const origin = this.saved.projectId ? browserbaseOrigin(this.saved.projectId) : null;
+    return origin !== null && origin !== this.sessions.origin && this.sessions.keptBy(origin);
   }
 
   private changed(): void {
@@ -162,16 +165,13 @@ export class CloudTabs implements ChatCloud {
     } else {
       this.letGoOfTabs();
       await this.sessions.replace((released) => {
-        // Another provider's session ends only with the key it was made with, so that stays too.
-        if (released === "running" || this.sessions.othersKept) {
+        if (released === "running" || this.keyNeeded) {
           this.endFirst = true;
           return null;
         }
-        // A new key may be a new account, without the old context. A session the old key couldn't end is kept for this one.
-        const { sessionId, tags, madeBy } = this.saved;
-        const ids = released === "refused" ? { ...NO_IDS, sessionId, tags, madeBy } : NO_IDS;
-        this.saved = { apiKey: key, projectId: project, ...ids };
-        return { browser: this.provider(this.saved), ids };
+        // Every session that may still be running stays, for a key from its own project to end.
+        this.saved = { ...this.saved, apiKey: key, projectId: project, contextId: null };
+        return { browser: this.provider(this.saved) };
       });
     }
     this.changed();
@@ -183,11 +183,11 @@ export class CloudTabs implements ChatCloud {
     this.problem = null;
     this.endFirst = false;
     await this.sessions.replace((released) => {
-      this.endFirst = released === "running" || this.sessions.othersKept;
+      this.endFirst = released === "running" || this.keyNeeded;
       this.problem = released === "refused" ? LEFT_RUNNING : null;
       if (this.endFirst) return null;
-      this.saved = EMPTY;
-      return { browser: this.provider(EMPTY), ids: NO_IDS };
+      this.saved = { ...EMPTY, handles: this.saved.handles };
+      return { browser: this.provider(this.saved) };
     });
     this.changed();
     return this.state;
@@ -314,8 +314,10 @@ export class CloudTabs implements ChatCloud {
   async bringLogin(input: unknown): Promise<string | null> {
     const site = loginSite(input);
     if (!site) return "That isn't a site's address.";
+    const at = this.attached;
     const problem = await this.logins.bring(site);
-    return problem ?? (await this.checkLogin(input));
+    // The check opens in the window it was asked from, or nowhere.
+    return problem ?? (at && this.still(at) ? await this.checkLogin(input) : NO_WINDOW);
   }
 
   // Opens the site in a cloud tab in front, for the user to see whether they're signed in there.
@@ -372,8 +374,10 @@ export class CloudTabs implements ChatCloud {
     });
   }
 
-  private save(): void {
-    if (!writeCloudFile(this.file, this.saved)) this.problem = NOT_SAVED;
+  private save(): boolean {
+    const saved = writeCloudFile(this.file, this.saved);
+    if (!saved) this.problem = NOT_SAVED;
+    return saved;
   }
 
   // The app is quitting. The session ends at the provider, from its saved id, without waiting for a connection, and a

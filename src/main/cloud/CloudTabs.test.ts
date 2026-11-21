@@ -39,8 +39,9 @@ const fakeLocal = () => {
   };
   const browser: CloudBrowser = {
     name: "local",
+    origin: "local",
     release: async () => {},
-    releaseTagged: async () => {},
+    releaseTagged: async () => "none",
     create: async () => ({
       id: null,
       connect: async () => ({ context: context as unknown as BrowserContext, liveView: async () => null, close: async () => {} }),
@@ -86,23 +87,20 @@ const makeTabs = (file = tempFile(), provider: Provider = () => fakeLocal().brow
 
 // Sealed as the mocked safeStorage seals, which is no more than base64.
 const sealed = (text: string) => Buffer.from(text).toString("base64");
-const OLD = {
-  apiKey: sealed("bb_old"),
-  projectId: sealed("proj"),
-  contextId: "ctx-1",
-  sessionId: "sess-1",
-  tags: [],
-  madeBy: "browserbase",
-};
+// As the app before handles saved it, with only the session's id.
+const OLD = { apiKey: sealed("bb_old"), projectId: sealed("proj"), contextId: "ctx-1", sessionId: "sess-1" };
+// That session, as it's kept now.
+const OLD_SESSION = { tag: "before-sess-1", id: "sess-1", by: "browserbase:proj" };
 
 // Browserbase as far as releasing goes, answering as `answer.now` says, and noting the key each release used.
 const releasing = () => {
   const answer: { now: "ok" | "fails" | "refused" } = { now: "fails" };
   const calls: string[] = [];
-  const provider: Provider = ({ apiKey }) =>
+  const provider: Provider = ({ apiKey, projectId }) =>
     apiKey
       ? {
           name: "browserbase",
+          origin: `browserbase:${projectId}`,
           create: async () => Promise.reject(new Error("Not in this test.")),
           releaseTagged: async () => Promise.reject(new Error("Not in this test.")),
           release: async (id) => {
@@ -212,19 +210,12 @@ describe("CloudTabs", () => {
 
     answer.now = "ok";
     expect((await tabs.saveKey("bb_new", "proj")).problem).toBeNull();
-    expect(saved()).toEqual({
-      apiKey: sealed("bb_new"),
-      projectId: sealed("proj"),
-      contextId: null,
-      sessionId: null,
-      tags: [],
-      madeBy: null,
-    });
+    expect(saved()).toEqual({ apiKey: sealed("bb_new"), projectId: sealed("proj"), contextId: null, handles: [] });
     expect(calls).toEqual(["bb_old sess-1", "bb_old sess-1", "bb_old sess-1"]);
     encryption.available = false;
   });
 
-  it("takes a new key, or forgets one, when Browserbase no longer takes the old one, keeping its session for the new key", async () => {
+  it("takes a new key, or forgets one, when Browserbase no longer takes the old one, keeping its session until it's ended", async () => {
     encryption.available = true;
     const file = tempFile();
     writeFileSync(file, JSON.stringify(OLD));
@@ -233,18 +224,31 @@ describe("CloudTabs", () => {
     answer.now = "refused";
     const tabs = makeTabs(file, provider);
     await tabs.saveKey("bb_new", "proj");
-    expect(saved()).toEqual({
-      apiKey: sealed("bb_new"),
-      projectId: sealed("proj"),
-      contextId: null,
-      sessionId: "sess-1",
-      tags: [],
-      madeBy: "browserbase",
-    });
-    // Ended once more, with the new key.
+    expect(saved()).toMatchObject({ apiKey: sealed("bb_new"), projectId: sealed("proj"), contextId: null, handles: [OLD_SESSION] });
+    // Ended once more, with the new key, which is for the same project.
     expect(calls).toEqual(["bb_old sess-1", "bb_new sess-1"]);
     expect((await tabs.forget()).problem).toMatch(/ends on its own within an hour/);
-    expect(saved()).toEqual({ apiKey: null, projectId: null, contextId: null, sessionId: null, tags: [], madeBy: null });
+    expect(saved()).toMatchObject({ apiKey: null, projectId: null, contextId: null, handles: [OLD_SESSION] });
+    encryption.available = false;
+  });
+
+  it("never ends, or forgets, a session through a key for another project", async () => {
+    encryption.available = true;
+    const file = tempFile();
+    writeFileSync(file, JSON.stringify(OLD));
+    const saved = () => JSON.parse(readFileSync(file, "utf8")) as Record<string, string | null>;
+    const { answer, calls, provider } = releasing();
+    answer.now = "refused";
+    const tabs = makeTabs(file, provider);
+    await tabs.saveKey("bb_other", "proj-2");
+    answer.now = "ok";
+    await tabs.end();
+    expect(calls).toEqual(["bb_old sess-1"]);
+    expect(saved()).toMatchObject({ projectId: sealed("proj-2"), handles: [OLD_SESSION] });
+    // A key for its own project ends it.
+    await tabs.saveKey("bb_again", "proj");
+    expect(calls).toEqual(["bb_old sess-1", "bb_again sess-1"]);
+    expect(saved()).toMatchObject({ handles: [] });
     encryption.available = false;
   });
 

@@ -44,22 +44,25 @@ if (!local && (!apiKey || !projectId)) fail("Set BROWSERBASE_API_KEY and BROWSER
 // The user's Context comes with each job, from the app. Without one, the runner makes one for itself and keeps it while
 // it runs, so jobs at least share theirs.
 let ownContext: string | null = process.env.BROWSERBASE_CONTEXT_ID || null;
-// Every session this runner makes carries its mark, so one left by a runner that stopped without ending it is found and
-// ended when it starts again. From the runner's own account, which is its alone, and never the address itself.
+// Every session this runner makes carries its mark and its job, so one left by a runner that stopped without ending it is
+// found and ended once its job is over. Never sooner, since another runner on the same account, as during a redeploy,
+// may still be working in it. The mark is from the runner's own account, which is its alone, and never the address.
 const mark = `runner-${createHash("sha256")
   .update(process.env.BLUEBERRY_RUNNER_EMAIL ?? "")
   .digest("hex")
   .slice(0, 16)}`;
-const hosted = local ? null : browserbase({ apiKey: apiKey!, projectId: projectId!, mark });
-const cloudBrowser = hosted ?? localChrome({ executable: localExecutable, endpoint: localEndpoint });
+const hosted = (job?: string) => browserbase({ apiKey: apiKey!, projectId: projectId!, mark, ...(job ? { job } : {}) });
+const sweeper = local ? null : hosted();
+const localBrowser = local ? localChrome({ executable: localExecutable, endpoint: localEndpoint }) : null;
 // A new session each job, ended with it.
-const jobSessions = (contextId: string | null): CloudSessions =>
+const jobSessions = (jobId: string, contextId: string | null): CloudSessions =>
   new CloudSessions(
-    cloudBrowser,
+    localBrowser ?? hosted(jobId),
     { ...NO_IDS, contextId: contextId ?? ownContext },
     {
       onIds: (ids) => {
         if (!contextId) ownContext = ids.contextId;
+        return true;
       },
     },
   );
@@ -106,6 +109,24 @@ process.on("SIGINT", quit);
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// How often it looks for sessions left from jobs that are over, once it has looked without a problem.
+const SWEEP_MS = 5 * 60_000;
+let sweepAt = 0;
+let sweepFailing = false;
+// Each time round until a look works, before any job of its own, and every few minutes after.
+const sweep = async (): Promise<void> => {
+  if (!sweeper || Date.now() < sweepAt) return;
+  const swept = await sweeper
+    .releaseMarked((jobs) => db.liveJobs(jobs))
+    .then(
+      () => true,
+      () => false,
+    );
+  sweepAt = swept ? Date.now() + SWEEP_MS : 0;
+  if (!swept && !sweepFailing) console.error("Couldn't end the cloud sessions left from jobs that are over. Trying again.");
+  sweepFailing = !swept;
+};
+
 // Until the owner has linked this runner in Blueberry, there's nothing it may do.
 const LINK_RETRY_MS = 30_000;
 const NOT_LINKED =
@@ -134,17 +155,8 @@ const loop = async () => {
   let unreachable = false;
   let routinesFailing = false;
   let addressFailing = false;
-  // Until Browserbase confirms none is left from before, it asks again each time round, before any job of its own.
-  let leftovers = hosted !== null;
   while (!shutdown.signal.aborted) {
     await unreleased.retry();
-    if (leftovers && hosted) {
-      leftovers = !(await hosted.releaseMarked().then(
-        () => true,
-        () => false,
-      ));
-      if (leftovers) console.error("Couldn't end the cloud sessions left from before. Trying again.");
-    }
     if (!linked) {
       await link();
       if (!linked) {
@@ -152,6 +164,8 @@ const loop = async () => {
         continue;
       }
     }
+    // Only once linked, since only the server can say which jobs are over.
+    await sweep();
     // Tried every round until Blueberry has the relay's address, as it is now. Nothing else depends on it.
     const shared = await relayAddress.share();
     if (!shared && !addressFailing) console.error("Couldn't share the relay's address with Blueberry. Trying again.");
@@ -190,7 +204,7 @@ const loop = async () => {
     working = runJob(job, {
       db,
       claimedAt,
-      browser: (contextId) => sessionBrowser(jobSessions(contextId)),
+      browser: (contextId) => sessionBrowser(jobSessions(id, contextId)),
       signal: shutdown.signal,
       unreleased,
       notify,
