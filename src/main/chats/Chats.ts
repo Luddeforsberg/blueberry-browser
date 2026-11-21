@@ -319,13 +319,14 @@ export class Chats {
     this.runs.delete(chatId);
     this.publishWorkingTabs();
     this.errors.delete(chatId);
-    this.finished.delete(chatId);
     this.jobs.delete(chatId);
     this.cloudChats.delete(chatId);
     this.runnerChats.runnerPending.delete(chatId);
     this.runner?.forget(chatId);
     this.memory?.dropOffers(chatId);
     if (!this.store.deleteChat(chatId)) return false;
+    // Only once it's gone, since an answer that couldn't be saved is kept here.
+    this.finished.delete(chatId);
     this.events.onListChanged();
     return true;
   }

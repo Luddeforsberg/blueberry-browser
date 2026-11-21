@@ -184,7 +184,8 @@ export class Replies {
     if (kept) this.putAway(chatId, run, steps);
     carryOn("tell who started a reply", () => run.onEnd?.({ reply: run.partial, steps, outcome, error }));
     carryOn("show a reply ended", () => this.notify(chatId));
-    if (kept) carryOn("look back on a reply", () => this.lookBack(chatId, run, error));
+    // With its answer unsaved, the model would look back on a chat missing it.
+    if (kept && !this.finished.get(chatId)?.unsaved) carryOn("look back on a reply", () => this.lookBack(chatId, run, error));
   }
 
   // A save that fails keeps the answer readable from `finished`, which the next message saves first.

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { StreamReply } from "./agent";
-import { replying, setup } from "./chatsTesting";
+import { replying, setup, tab } from "./chatsTesting";
 import { REPLY_NOT_SAVED } from "../../shared/library";
 
 vi.mock("./agent", async (importOriginal) => {
@@ -15,7 +15,8 @@ beforeEach(() => {
 // However a reply ends, whoever started it and the thread hear it once.
 describe("Chats, as a reply ends", () => {
   it("still says a reply ended, and keeps its answer readable, when saving the answer fails", async () => {
-    const { chats, store, threads } = setup(replying("Booked the table."));
+    const title = vi.fn(async () => null);
+    const { chats, store, threads } = setup(replying("Booked the table."), tab(), title);
     const save = store.addMessage.bind(store);
     let full = true;
     vi.spyOn(store, "addMessage").mockImplementation((chatId, message, files) => {
@@ -33,6 +34,14 @@ describe("Chats, as a reply ends", () => {
       { role: "user", content: "Book a table" },
       { role: "assistant", content: "Booked the table." },
     ];
+    expect(chats.thread(id)?.messages).toMatchObject(answered);
+    // Nothing asks the model about a chat missing its answer.
+    expect(title).not.toHaveBeenCalled();
+    // A delete that fails keeps it too.
+    vi.spyOn(store, "deleteChat").mockImplementationOnce(() => {
+      throw new Error("database is locked");
+    });
+    expect(() => chats.delete(id)).toThrow();
     expect(chats.thread(id)?.messages).toMatchObject(answered);
 
     // The next message saves it first, so it's there for the model and after a restart.
