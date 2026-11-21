@@ -166,6 +166,32 @@ describe("TelegramChannel", () => {
     vi.unstubAllGlobals();
   });
 
+  it("gives no message id for a send that finished after its connection closed", async () => {
+    const file = join(folder(), "phone.json");
+    writeFileSync(file, JSON.stringify({ token: Buffer.from(B).toString("base64"), botName: "bot_b", chatId: 7 }));
+    const held: { finish: (() => void) | null } = { finish: null };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, { signal }: RequestInit) => {
+        if (url.endsWith("/sendMessage")) {
+          await new Promise<void>((resolve) => (held.finish = resolve));
+          return new Response(JSON.stringify({ ok: true, result: { message_id: 42 } }));
+        }
+        return new Promise<Response>((_, reject) => signal?.addEventListener("abort", () => reject(new Error("stopped"))));
+      }),
+    );
+    const channel = new TelegramChannel(file, () => {}, "http://127.0.0.1:1");
+    channel.start();
+    const sending = channel.send("Berry needs you");
+    await vi.waitFor(() => expect(held.finish).not.toBeNull());
+    channel.close();
+    channel.start();
+    held.finish?.();
+    expect(await sending).toBeNull();
+    channel.close();
+    vi.unstubAllGlobals();
+  });
+
   it("stays disconnected in the next window when the bot's file couldn't be removed", async () => {
     const telegram = fakeTelegram();
     const file = join(folder(), "phone.json");

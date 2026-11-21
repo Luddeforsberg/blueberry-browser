@@ -222,7 +222,9 @@ export class TelegramChannel implements PhoneChannel {
           ? { reply_markup: { inline_keyboard: [choices.map(({ label, data }) => ({ text: label, callback_data: data }))] } }
           : {}),
       });
-      if (on?.current && this.problem === CANT_MESSAGE) this.setProblem(null);
+      // A message sent on a connection that has since ended belongs to that chat, so its id means nothing to this one.
+      if (!on?.current) return null;
+      if (this.problem === CANT_MESSAGE) this.setProblem(null);
       return sentId(sent);
     } catch (error) {
       if (error instanceof TelegramError && error.status === 403) {
