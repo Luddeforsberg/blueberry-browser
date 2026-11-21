@@ -90,10 +90,10 @@ test("Enter in the prompt box while an approval waits never allows it", async ()
     await chrome.waitForTimeout(600);
     await chrome.keyboard.press("Enter");
 
-    // The keyboard was never put on the card, so it shows no keys and Enter went to the box. A reply that's running
-    // takes no new message, so the words stay there to send, and the approval still waits.
+    // The keyboard was never put on the card, so it shows no keys and Enter went to the box. The words wait for the
+    // running reply, and the approval still waits.
     await expect(card.locator("kbd")).toHaveCount(0);
-    await expect(box).toHaveValue("Actually, use the other account");
+    await expect(chrome.getByRole("list", { name: "Waiting to send" })).toContainText("Actually, use the other account");
     await chrome.waitForTimeout(300);
     expect(await chrome.evaluate(() => window.chromeAPI.library.getLibrary().then(({ needsYou }) => needsYou.length))).toBe(1);
     await expect(card).toBeVisible();
