@@ -206,7 +206,7 @@ export const CloudSettings: React.FC = () => {
           />
         )}
 
-        {cloud.provider !== "local" && !cloud.configured && (
+        {cloud.provider !== "local" && !cloud.configured && !cloud.unreadable && (
           <SettingsRow
             id="setting-cloud-key"
             title="Key"
@@ -243,11 +243,15 @@ export const CloudSettings: React.FC = () => {
           />
         )}
 
-        {cloud.configured && (
+        {(cloud.configured || cloud.unreadable) && (
           <SettingsRow
             id="setting-cloud-forget"
             title="Key"
-            description="Saved, encrypted on this computer. Forgetting it ends the cloud session too."
+            description={
+              cloud.configured
+                ? "Saved, encrypted on this computer. Forgetting it ends the cloud session too."
+                : "Blueberry couldn’t read what it saved."
+            }
           >
             <Button variant="raised" size="sm" onClick={() => void api.forget().then(setCloud)}>
               Forget key

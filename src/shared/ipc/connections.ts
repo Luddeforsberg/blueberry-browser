@@ -76,6 +76,8 @@ export interface CloudState {
   canEnd: boolean;
   // The provider didn't confirm the last end, so a paid session may still be running.
   unreleased: boolean;
+  // Something it saved couldn't be read, so nothing can start or be saved until the key is forgotten.
+  unreadable: boolean;
   problem: string | null;
   // Sites brought into the cloud browser signed in, newest first. Names and dates only, never a cookie.
   logins: CloudLogin[];

@@ -52,7 +52,7 @@ import { PageCommands } from "./PageCommands";
 import { createMenuView, createPermissionPrompt, createPreviews, createSiteZoom, watchDownloads } from "./makeViews";
 import { createAccount, listenToAiKey, createGallery, createPhone, createTelegram } from "./makeAccount";
 import { createChats, createMemory, createWorkViews } from "./makeChats";
-import { createCloud, createMacJobs, createRunnerJobs } from "./makeCloud";
+import { cloudHooks, createMacJobs, createRunnerJobs } from "./makeCloud";
 import { createRecordings, createRoutines, createSuggestions } from "./makeRoutines";
 import { createDesktopBerry } from "./makeDesktop";
 import { createMcp } from "./makeMcp";
@@ -71,6 +71,8 @@ export interface WindowStores {
   history: HistoryStore;
   sessionStore: SessionStore;
   aiKey: AiKey;
+  // The cloud browser, for the app's whole life. Each window attaches to it.
+  cloud: CloudTabs;
 }
 
 // Everything the window is made of: its `BaseWindow` and the views stacked in it, the services wired to them, and the
@@ -117,6 +119,8 @@ export class WindowParts {
   readonly memory: MemoryStore;
   readonly mcp: McpConnector;
   readonly cloud: CloudTabs;
+  // Leaves the cloud as this window closes, which ends its session unless another window has attached since.
+  readonly leaveCloud: ReturnType<CloudTabs["attach"]>;
   readonly runnerJobs: RunnerJobs;
   readonly macJobs: MacJobs;
   readonly appIcon: AppIcon;
@@ -178,8 +182,8 @@ export class WindowParts {
     this.telegram = createTelegram(this);
     this.phone = createPhone(this);
     this.memory = createMemory(this);
-    this.cloud = createCloud(this);
-    this.cloud.start();
+    this.cloud = stores.cloud;
+    this.leaveCloud = this.cloud.attach(cloudHooks(this));
     this.runnerJobs = createRunnerJobs(this, server, stores);
     this.chats = createChats(this, stores);
     this.workViews = createWorkViews(this);

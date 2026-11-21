@@ -75,7 +75,7 @@ describe.skipIf(!findChrome())("a page in a browser over CDP", () => {
   }, 90_000);
 
   afterAll(async () => {
-    await cloud?.end();
+    await cloud?.quit();
     server?.close();
   });
 

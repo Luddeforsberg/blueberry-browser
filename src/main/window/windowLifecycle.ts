@@ -43,7 +43,7 @@ export const startWindow = (w: WindowParts, stores: WindowStores, restored: Sess
     w.phone.stop();
     w.telegram.close();
     w.mcp.close();
-    void w.cloud.destroy();
+    void w.leaveCloud();
     w.runnerJobs.destroy();
     w.macJobs.destroy();
     w.permissionPrompt.destroy();

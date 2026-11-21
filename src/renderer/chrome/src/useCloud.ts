@@ -8,6 +8,7 @@ const OFF: CloudState = {
   busy: false,
   canEnd: false,
   unreleased: false,
+  unreadable: false,
   problem: null,
   logins: [],
 };
