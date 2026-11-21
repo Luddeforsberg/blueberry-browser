@@ -11,6 +11,9 @@ export type { FocusInfo } from "../../page/tools/keys";
 export const inPage = <Args>(script: PageScript<Args>, args: NoInfer<Args>): string =>
   `(${script.code})(${args === undefined ? "" : JSON.stringify(args)})`;
 
+// Answers once a tab parked for its picture has been shown and drawn there.
+export const drawnWhereParked = (): string => inPage(page.framesPassed, { shown: true });
+
 export interface ListOptions {
   query?: string | undefined;
   limit: number;

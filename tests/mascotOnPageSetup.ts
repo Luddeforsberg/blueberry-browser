@@ -112,7 +112,7 @@ export const setup = async (settings: object = {}) => {
         )
         .toBe(true);
     };
-    // The first message loads LangChain and sends the page, about 3s before the model is first asked, and then the mascot
+    // The first message may wait for LangChain to finish loading, and sends the page, about 3s before the model is first asked, and then the mascot
     // flies to each step, so these jobs take 4 to 6s alone: past the default 5s, and more under load.
     return {
       chatId,

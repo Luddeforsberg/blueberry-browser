@@ -50,7 +50,7 @@ export class TabPreviews {
     return this.chromeView.view.webContents;
   }
 
-  // Keeps how the tab looks now. As the user leaves a tab, it's started before the tab is hidden and never waited for,
+  // Keeps how the tab looks now. As the user leaves a tab, it's taken once the tab is out of sight, and never waited for,
   // so it doesn't hold up the switch.
   async keep(tab: Tab): Promise<void> {
     const take = this.taking.next(tab.id);

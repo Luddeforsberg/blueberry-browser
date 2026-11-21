@@ -7,7 +7,7 @@ import type { PageTool } from "../tools/browserTools";
 import type { ActionApproval } from "../../shared/ipc";
 import type { AskWhy } from "../../shared/asking";
 import type { ChatThreadMessage, StepKind } from "../../shared/library";
-import { createModel } from "./modelConfig";
+import { createModel, hasModel, loadProvider } from "./modelConfig";
 import { ReplySorter } from "./replySorter";
 
 export { ReplySorter };
@@ -160,6 +160,23 @@ export const systemPrompt = (withTools: boolean, userPresent: boolean): string =
 const callsTools = (message: Pick<AIMessageChunk, "tool_calls" | "tool_call_chunks">): boolean =>
   (message.tool_call_chunks?.length ?? 0) > 0 || (message.tool_calls?.length ?? 0) > 0;
 
+// What every reply loads: from disk the first time, from Node's own cache after that.
+const loadAgent = () => Promise.all([import("langchain"), import("@langchain/langgraph"), import("@langchain/core/messages")]);
+
+// LangChain and the provider take a second or more to load, which a first message would otherwise wait for. This loads
+// them once the window has drawn, so opening it never waits, and a message sent meanwhile waits only for the rest. One
+// package at a time, since each runs on the main thread as it loads, and the window gets a turn between them.
+const AHEAD = [() => import("@langchain/core/messages"), () => import("@langchain/langgraph"), loadAgent, loadProvider];
+export const loadAhead = (): void => {
+  if (!hasModel()) return;
+  void (async () => {
+    for (const load of AHEAD) {
+      await load();
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+  })().catch((error) => console.error("Couldn't load the model ahead of time:", error));
+};
+
 export async function* streamReply(
   messages: ReplyMessage[],
   signal: AbortSignal,
@@ -170,7 +187,7 @@ export async function* streamReply(
     { createAgent, createMiddleware, humanInTheLoopMiddleware, isToolApprovalInterrupt, tool },
     { Command, MemorySaver },
     { AIMessage, HumanMessage },
-  ] = await Promise.all([import("langchain"), import("@langchain/langgraph"), import("@langchain/core/messages")]);
+  ] = await loadAgent();
   let modelCalls = 0;
   // Shortens what goes to the model, and makes its last call one that can only write.
   const stepLimit = createMiddleware({

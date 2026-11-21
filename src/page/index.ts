@@ -28,5 +28,6 @@ export {
   clearCodeFields,
 } from "./code/codeFields";
 export { installActor } from "./actor/install";
-export { actorCommand, ifThere } from "./actor/command";
+export { actorCommand, beforeCapture, ifThere } from "./actor/command";
+export { framesPassed } from "./actor/frames";
 export { nextNotes, finishWatching } from "./recorder/notes";

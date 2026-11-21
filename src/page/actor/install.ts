@@ -32,7 +32,7 @@ export interface ActorApi {
   hop(args: { words?: string; name?: string }): boolean;
   typing(): boolean;
   read(args: { words?: string }): boolean;
-  hide(): Promise<boolean>;
+  hide(): boolean;
   show(): boolean;
   frameSpot(args: { origin: string }): FrameSpot | null;
   leave(args: { ms: number }): boolean;
@@ -53,9 +53,11 @@ interface InstallArgs {
   // Each pose of this mascot's drawing, and the stylesheet that colours it, made from the app's own by `pnpm run site:build`.
   art: Record<string, ArtNode>;
   artSheet: string;
+  // A capture is on its way, so it starts out of sight.
+  hidden: boolean;
 }
 
-export const installActor = ({ key, look, start, art, artSheet }: InstallArgs): boolean => {
+export const installActor = ({ key, look, start, art, artSheet, hidden }: InstallArgs): boolean => {
   globalThis.__berryActor?.remove();
   // An image, a PDF or an SVG document has nowhere to put this.
   if (document.documentElement?.namespaceURI !== XHTML) return false;
@@ -77,6 +79,7 @@ export const installActor = ({ key, look, start, art, artSheet }: InstallArgs): 
     lineAt: null,
   };
   const { host, sky, mascot, line } = a.stage;
+  if (hidden) sky.style.visibility = "hidden";
   const core = makeCore(a);
   const lines = makeLine(a, core);
   const motion = makeMotion(a, core, lines);
@@ -122,14 +125,10 @@ export const installActor = ({ key, look, start, art, artSheet }: InstallArgs): 
     ...makeMoves(a, kit),
     read: makeRead(a, kit),
 
-    // Out of sight for a capture, with two frames so it's gone from what the capture sees. A busy or covered page may
-    // give no frame, and a capture can't wait on that.
+    // Out of sight for a capture. `beforeCapture` waits for the frame without it.
     hide: () => {
       sky.style.visibility = "hidden";
-      return Promise.race([
-        new Promise<boolean>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)))),
-        new Promise<boolean>((resolve) => setTimeout(() => resolve(true), 120)),
-      ]);
+      return true;
     },
     show: () => {
       sky.style.visibility = "";

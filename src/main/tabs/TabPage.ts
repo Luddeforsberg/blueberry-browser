@@ -122,7 +122,8 @@ export class TabPage {
     };
     mayCapture();
     const { sinceHeld } = this;
-    const image = await this.fromPage(() => this.tab.actor.whileHidden(() => this.tab.view.webContents.capturePage()));
+    // The limit is inside the hide, so a capture that never comes back still lets the mascot show again.
+    const image = await this.tab.actor.whileHidden(() => this.fromPage(() => this.tab.view.webContents.capturePage()));
     mayCapture();
     if (!sinceHeld.current) throw new Error("The user had this tab");
     return image;

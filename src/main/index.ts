@@ -20,6 +20,7 @@ import { openStore, type StoreProblem } from "./library/database";
 import { holdQuit } from "./window/holdQuit";
 import type { CloudTabs } from "./cloud/CloudTabs";
 import { LINK_SCHEME, mascotFromArgs, mascotFromLink } from "./mascots/mascotLink";
+import { loadAhead } from "./chats/agent";
 import { join } from "path";
 import * as dotenv from "dotenv";
 
@@ -160,6 +161,8 @@ void app.whenReady().then(() => {
   if (!app.isPackaged) app.dock?.setIcon(join(__dirname, "../../resources/icon.png"));
 
   mainWindow ??= createWindow();
+  // Once the chrome has drawn and asked for what it shows, so opening the window never waits for it.
+  mainWindow.chromeView.view.webContents.once("did-finish-load", loadAhead);
   if (linkedMascot) mainWindow.openMascotLink(linkedMascot);
   linkedMascot = null;
 

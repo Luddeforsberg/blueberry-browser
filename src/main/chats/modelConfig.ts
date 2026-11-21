@@ -66,7 +66,11 @@ export const modelConfig = (
   return { provider, apiKey, ownAddressOnly: false, ...modelsFor(provider, env) };
 };
 
-// LangChain and the providers load on first use, so opening the browser never waits for them.
+// The provider's LangChain package, which `loadAhead` loads before anything asks.
+export const loadProvider = (): Promise<unknown> =>
+  modelConfig().provider === "anthropic" ? import("@langchain/anthropic") : import("@langchain/openai");
+
+// LangChain and the providers load after the window has drawn, or on first use, so opening the browser never waits.
 export const createModel = async (use: "model" | "titleModel" = "model"): Promise<BaseChatModel> => {
   const { provider, apiKey, ownAddressOnly, [use]: model } = modelConfig();
   // An address given here comes before any the client would take from the environment.
