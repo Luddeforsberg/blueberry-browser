@@ -134,6 +134,8 @@ export class Replies {
   // Never rejects: whatever goes wrong ends up on the thread.
   async reply(chatId: string, run: Run, seePage: boolean, attachedTabs: readonly Tab[]): Promise<void> {
     const { signal } = run.controller;
+    const probeAt = performance.now();
+    console.error("[probe] reply starts", Math.round(probeAt));
     try {
       // Read before anything waits, so it's the page the message was sent from wherever the user has gone since.
       const page = seePage && this.pageAccess() ? this.reader.activeTab : null;
@@ -142,6 +144,7 @@ export class Replies {
       if (page) this.handoffs.letGo(page);
       run.withPage = page !== null;
       const messages = await this.reader.requestMessages(chatId, seePage, run.mascot, attachedTabs);
+      console.error("[probe] page read +", Math.round(performance.now() - probeAt));
       // Only what the user typed. Nothing attached is their words, so no address in a file or a page skips a card.
       const said = this.jobMemory.userWords(chatId).join("\n");
       const tools = this.tools.jobTools(chatId, run, page, said, attachedTabs);

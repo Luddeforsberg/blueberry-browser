@@ -169,9 +169,11 @@ const loadAgent = () => Promise.all([import("langchain"), import("@langchain/lan
 const AHEAD = [() => import("@langchain/core/messages"), () => import("@langchain/langgraph"), loadAgent, loadProvider];
 export const loadAhead = (): void => {
   if (!hasModel()) return;
+  const at = performance.now();
   void (async () => {
     for (const load of AHEAD) {
       await load();
+      console.error("[probe] ahead step at", Math.round(performance.now() - at));
       await new Promise((resolve) => setImmediate(resolve));
     }
   })().catch((error) => console.error("Couldn't load the model ahead of time:", error));
@@ -188,12 +190,14 @@ export async function* streamReply(
     { Command, MemorySaver },
     { AIMessage, HumanMessage },
   ] = await loadAgent();
+  const probeAt = performance.now();
   let modelCalls = 0;
   // Shortens what goes to the model, and makes its last call one that can only write.
   const stepLimit = createMiddleware({
     name: "StepLimit",
     wrapModelCall: async (request, handler) => {
       modelCalls++;
+      if (modelCalls === 1) console.error("[probe] first model call +", Math.round(performance.now() - probeAt));
       const shorter = { ...request, messages: await shortenOldResults(request.messages) };
       if (modelCalls < MAX_MODEL_CALLS) return handler(shorter);
       // Said last, because at the end of a long run a model given this any earlier has come back with nothing.
