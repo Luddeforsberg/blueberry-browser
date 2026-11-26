@@ -292,7 +292,7 @@ export class Chats {
     this.events.onListChanged();
   }
 
-  // The chat's tab came to the front.
+  // The chat's tab came to the front, or the user said Not now to it on the new tab page.
   markSeen(chatId: string): void {
     if (this.store.setSeen(chatId, true)) this.events.onListChanged();
   }

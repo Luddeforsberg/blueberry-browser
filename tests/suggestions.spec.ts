@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { demoVisits, seedChats } from "../evals/seedHistory";
 import { HistoryStore } from "../src/main/library/HistoryStore";
+import { ChatStore } from "../src/main/chats/ChatStore";
 import { findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
 import { DEMO_LINES, REFUSED_LINES, demoProposals } from "./suggestionReplies";
@@ -16,6 +17,12 @@ test("only suggestions whose evidence checks out show, a row fills things in, an
   const profile = mkdtempSync(join(tmpdir(), "blueberry-suggestions-"));
   new HistoryStore(join(profile, "history.db")).importVisits(demoVisits());
   seedChats(profile);
+  // A chat that finished while the user was somewhere else, and that they haven't opened since.
+  const store = new ChatStore(join(profile, "chats.db"));
+  const unread = store.createChat("Flats on Södermalm");
+  store.addMessage(unread, { role: "user", content: "Find flats on Södermalm" });
+  store.addMessage(unread, { role: "assistant", content: "## Five flats\n\nThe newest is a **two-room** flat on Hornsgatan." });
+  store.setSeen(unread, false);
 
   let app = await launchApp(profile, { modelEnv: model.env });
   try {
@@ -26,9 +33,9 @@ test("only suggestions whose evidence checks out show, a row fills things in, an
 
     // The page doesn't wait for the model, and only what checks out comes from it.
     await expect(chrome.getByText(DEMO_LINES.routine)).toBeVisible({ timeout: 20_000 });
-    // The newest chat to pick up comes first, then the three that checked out.
+    // The chat the user hasn't looked at comes first, then the three that checked out. Chats already seen aren't offered.
     await expect(list().getByRole("listitem")).toHaveCount(4);
-    await expect(list().getByRole("listitem").first()).toContainText("Pick up");
+    await expect(list().getByRole("listitem").first()).toContainText("Flats on Södermalm");
     for (const line of Object.values(DEMO_LINES)) await expect(chrome.getByText(line)).toBeVisible();
     for (const line of REFUSED_LINES) await expect(chrome.getByText(line)).toHaveCount(0);
     // Not just left off the page: only these got past the checks.
@@ -43,8 +50,16 @@ test("only suggestions whose evidence checks out show, a row fills things in, an
     expect(sent).not.toContain("Inbox");
     expect(sent).not.toContain("/pull/412");
 
-    // A prompt waits in the composer with the cursor ready, and nothing has gone to the main model.
+    // Resting on a row shows all of it to read: the words that would go in the box, and for a finished chat the start
+    // of its reply, as plain words.
     const words = DEMO_LINES.prompt;
+    const peek = list().getByRole("tooltip");
+    await row(words).hover();
+    await expect(peek).toContainText("list the newest five with price and size");
+    await row("Flats on Södermalm").hover();
+    await expect(peek).toHaveText("Five flats The newest is a two-room flat on Hornsgatan.");
+
+    // A prompt waits in the composer with the cursor ready, and nothing has gone to the main model.
     await row(words).click();
     await expect(composer).not.toHaveValue("");
     await expect(composer).toBeFocused();
@@ -80,8 +95,16 @@ test("only suggestions whose evidence checks out show, a row fills things in, an
     ]);
 
     await chrome.evaluate(() => window.chromeAPI.browser.createTab());
-    await chrome.getByRole("button", { name: `Dismiss: ${words}` }).click();
-    await expect(chrome.getByRole("button", { name: `Dismiss: ${words}` })).toHaveCount(0);
+    await chrome.getByRole("button", { name: `Not now: ${words}` }).click();
+    await expect(chrome.getByRole("button", { name: `Not now: ${words}` })).toHaveCount(0);
+    // Not now on a finished chat counts as having seen it, so it isn't offered again.
+    await chrome.getByRole("button", { name: "Not now: Flats on Södermalm" }).click();
+    await expect(row("Flats on Södermalm")).toHaveCount(0);
+    await expect
+      .poll(() =>
+        chrome.evaluate(async (id) => (await window.chromeAPI.library.getLibrary()).chats.find((chat) => chat.id === id)?.unseen, unread),
+      )
+      .toBe(false);
 
     await app.close();
     const asked = model.suggestionRequests.length;
@@ -90,7 +113,8 @@ test("only suggestions whose evidence checks out show, a row fills things in, an
     await chrome.evaluate(() => window.chromeAPI.browser.createTab());
 
     await expect(row(DEMO_LINES.mascot)).toBeVisible();
-    await expect(chrome.getByRole("button", { name: `Dismiss: ${words}` })).toHaveCount(0);
+    await expect(chrome.getByRole("button", { name: `Not now: ${words}` })).toHaveCount(0);
+    await expect(row("Flats on Södermalm")).toHaveCount(0);
     expect(model.suggestionRequests).toHaveLength(asked);
   } finally {
     await app.close();

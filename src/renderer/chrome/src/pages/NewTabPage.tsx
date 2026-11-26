@@ -35,6 +35,7 @@ import { useMascotSwitch } from "./useMascotSwitch";
 import { leftAfterSend } from "@shared/draft";
 import { useSendOnce } from "../components/promptSend";
 import { useFromMain } from "@common/lib/latest";
+import { sayNotNow, useNotNow } from "../suggestionsNotNow";
 
 // DESIGN.md section 10, New tab: no page yet, so no sheet. The well, the greeting, the prompt box, and what's real under it.
 
@@ -223,7 +224,14 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     }
   };
 
-  const dismiss = (id: string) => void window.chromeAPI.suggestions.dismiss(id).then(setSuggestions);
+  // Gone from the list at once. A suggestion is dismissed for good and a finished chat counts as seen; a mascot's example
+  // is only left out until the app quits.
+  const notNow = useNotNow();
+  const sayNotNowTo = (row: SuggestionRow) => {
+    sayNotNow(row.key);
+    if (row.kind === "suggestion") void window.chromeAPI.suggestions.dismiss(row.suggestion.id).then(setSuggestions);
+    if (row.kind === "pick-up") void window.chromeAPI.chat.markSeen(row.chat.id);
+  };
 
   const press = (row: SuggestionRow) => {
     if (row.kind === "pick-up") openJob({ id: row.chat.id, job: row.chat.title, routineId: null });
@@ -285,7 +293,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
 
   const name = useAssistantName(shown);
   const asking = new Set(library.needsYou.map(({ id }) => id));
-  const rows = suggestionRows({ chats: library.chats, asking, suggestions, mascots, examples, chosenAtOpen });
+  const rows = suggestionRows({ chats: library.chats, asking, suggestions, mascots, examples, chosenAtOpen, notNow });
 
   if (recording) return <ShowMeHow tab={tab} />;
 
@@ -370,7 +378,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                         row={row}
                         used={filled?.key === row.key && text === filled.prompt}
                         onPress={() => press(row)}
-                        onDismiss={row.kind === "suggestion" ? () => dismiss(row.suggestion.id) : undefined}
+                        onNotNow={() => sayNotNowTo(row)}
                       />
                     ))}
                   </ul>

@@ -96,6 +96,7 @@ const chromeAPI: ChromeAPI = {
   chat: {
     send: (chatId, text, options) => invoke("chat:send", chatId, text, options),
     stop: (chatId) => invoke("chat:stop", chatId),
+    markSeen: (chatId) => invoke("chat:mark-seen", chatId),
     followUp: (chatId, id, action) => invoke("chat:follow-up", chatId, id, action),
     panelShows: (chatId) => invoke("chat:panel-shows", chatId),
     decide: (chatId, approvalId, allow, answer) => invoke("chat:decide", chatId, approvalId, allow, answer),

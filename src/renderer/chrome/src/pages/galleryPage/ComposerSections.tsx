@@ -214,16 +214,11 @@ export const ComposerSections: React.FC = () => (
       <div className="max-w-[640px] flex flex-col gap-4">
         <ul aria-label="Every kind">
           {SAMPLE_ROWS.map((row) => (
-            <SuggestionItem
-              key={row.key}
-              row={row}
-              onPress={() => undefined}
-              onDismiss={row.kind === "suggestion" ? () => undefined : undefined}
-            />
+            <SuggestionItem key={row.key} row={row} onPress={() => undefined} onNotNow={() => undefined} />
           ))}
         </ul>
         <ul aria-label="Its prompt in the box">
-          <SuggestionItem row={SAMPLE_ROWS.at(-1) ?? missing("a sample row")} used onPress={() => undefined} />
+          <SuggestionItem row={SAMPLE_ROWS.at(-1) ?? missing("a sample row")} used onPress={() => undefined} onNotNow={() => undefined} />
         </ul>
       </div>
     </Section>

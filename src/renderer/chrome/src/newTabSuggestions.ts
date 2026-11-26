@@ -18,12 +18,15 @@ interface Sources {
   examples: Readonly<Record<string, string>>;
   // Who was chosen when the page opened. Try rows from others come first, and choosing one later doesn't reorder them.
   chosenAtOpen: string;
+  // Rows the user said Not now to while the app is open, by key.
+  notNow?: ReadonlySet<string>;
 }
 
-// The newest finished chat to pick up, then the suggestions as they come, then mascots to try with a real example.
-export const suggestionRows = ({ chats, asking, suggestions, mascots, examples, chosenAtOpen }: Sources): SuggestionRow[] => {
+// The newest chat that finished while the user was elsewhere and that they haven't opened since, then the suggestions as
+// they come, then mascots to try with a real example.
+export const suggestionRows = ({ chats, asking, suggestions, mascots, examples, chosenAtOpen, notNow }: Sources): SuggestionRow[] => {
   const finished = chats
-    .filter((chat) => !chat.running && !asking.has(chat.id) && !chat.from)
+    .filter((chat) => chat.unseen && !chat.running && !asking.has(chat.id) && !chat.from && !notNow?.has(`chat-${chat.id}`))
     .reduce<ChatThreadSummary | null>((newest, chat) => (!newest || chat.updatedAt > newest.updatedAt ? chat : newest), null);
   const pickUp: SuggestionRow[] = finished ? [{ kind: "pick-up", key: `chat-${finished.id}`, chat: finished }] : [];
   const ideas: SuggestionRow[] = suggestions.map((suggestion) => ({ kind: "suggestion", key: `suggestion-${suggestion.id}`, suggestion }));
@@ -33,5 +36,5 @@ export const suggestionRows = ({ chats, asking, suggestions, mascots, examples, 
   });
   const others = (row: SuggestionRow) => row.kind === "try" && row.mascot.id !== chosenAtOpen;
   const tries = [...withExamples.filter(others), ...withExamples.filter((row) => !others(row))];
-  return [...pickUp, ...ideas, ...tries].slice(0, MOST_SUGGESTIONS);
+  return [...pickUp, ...ideas, ...tries].filter(({ key }) => !notNow?.has(key)).slice(0, MOST_SUGGESTIONS);
 };
