@@ -88,6 +88,23 @@ test.describe("a job's tabs", () => {
     await expect(userTabs().getByText("Page /a")).toBeVisible();
   });
 
+  test("closing the tab in front never brings a job's tab forward, which would make it the user's", async () => {
+    await startJob(["/a"], "Done.");
+    await expect(underChat().getByRole("button")).toHaveText(["Page /a"]);
+    // Only the chat's tab is left of the user's, and it's in front.
+    for (const { id } of (await tabs()).filter(({ isActive, jobChatId }) => !isActive && !jobChatId))
+      await chrome.evaluate((tabId) => window.chromeAPI.browser.closeTab(tabId), id);
+    const chat = (await tabs()).find(({ isActive }) => isActive)!;
+    expect(chat.page).toBe("chat");
+
+    await chrome.evaluate((id) => window.chromeAPI.browser.closeTab(id), chat.id);
+    // A new tab comes forward, and the job's page stays behind it, still the job's and out of history.
+    await expect.poll(async () => (await tabs()).find(({ isActive }) => isActive)?.page).toBe("new-tab");
+    const page = (await tabs()).find(({ url }) => url === `${site.origin}/a`);
+    expect(page?.jobChatId).toBeTruthy();
+    expect((await chrome.evaluate(() => window.chromeAPI.browser.getRecent())).map(({ title }) => title)).not.toContain("Page /a");
+  });
+
   test("a tab the user took over mid-job stays theirs, and the rest close", async () => {
     const { finish } = await startJob(["/a", "/b"], "All done");
     await expect(underChat().getByRole("button")).toHaveCount(2);

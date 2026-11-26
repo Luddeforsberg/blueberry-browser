@@ -86,24 +86,36 @@ export class JobNews {
         { chatId, mascotId: chat.mascotId, failed: chat.error !== null, text, endedAt },
       ].slice(-MAX_RESULTS);
       this.announce(chatId, text);
-      if (this.expiryTimer) clearTimeout(this.expiryTimer);
-      this.expiryTimer = setTimeout(() => {
-        this.expiryTimer = null;
-        this.results = this.results.filter(({ endedAt: at }) => Date.now() - at < RESULT_LASTS_MS);
-        this.d.publish();
-      }, RESULT_LASTS_MS);
     });
+    this.expireResults();
     // Answered somewhere else, or changed, while it was showing here.
     const shown = this.d.composer.asking;
     if (shown && !shown.decided) {
       const live = library.needsYou.find(({ id }) => id === shown.item.id);
       if (!live || !sameAsk(shown.item.approval, live.approval)) this.d.composer.askGone();
     }
-    this.d.publish();
+    this.d.publish(library);
   }
 
-  get facts(): DesktopFacts {
-    const library = this.d.host.library();
+  // Each result goes when its own time is up, so a newer one never keeps an older one showing.
+  private expireResults(): void {
+    if (this.expiryTimer) clearTimeout(this.expiryTimer);
+    this.expiryTimer = null;
+    const now = Date.now();
+    this.results = this.results.filter(({ endedAt }) => now - endedAt < RESULT_LASTS_MS);
+    if (this.results.length === 0) return;
+    const oldest = Math.min(...this.results.map(({ endedAt }) => endedAt));
+    this.expiryTimer = setTimeout(
+      () => {
+        this.expireResults();
+        this.d.publish();
+      },
+      oldest + RESULT_LASTS_MS - now,
+    );
+  }
+
+  // From the library as one publication read it, since every read builds it again.
+  factsOf(library: LibrarySnapshot): DesktopFacts {
     const now = Date.now();
     const running: DesktopRunning[] = [
       ...library.chats

@@ -9,7 +9,7 @@ import { BerrySpot } from "../components/Berry";
 import { useAssistantName } from "../components/useAssistantName";
 import { ChatError } from "../components/ChatMessage";
 import { SettingsGroup, StepInHeader } from "../components/SettingsRow";
-import { EmptyPage } from "../components/PageFrame";
+import { EmptyPage, EndAction } from "../components/PageFrame";
 import { LINE_BETWEEN, ROW } from "../components/pageRows";
 
 // DESIGN.md section 10, Your mascots: what one mascot remembers, one step in from its page. Everything it knows is on
@@ -157,7 +157,7 @@ export const MascotMemoryView: React.FC<{ mascot: MascotProfile; facts: MemoryFa
       {facts.length === 0 ? (
         offers.length === 0 && (
           <EmptyPage face={<BerrySpot size={40} mascot={mascot} />}>
-            Nothing yet. After a job it may ask to remember how you like something done, and it’s kept only if you say yes.
+            Nothing yet. After a job it may ask to remember how you like something done.
           </EmptyPage>
         )
       ) : (
@@ -179,9 +179,7 @@ export const MascotMemoryView: React.FC<{ mascot: MascotProfile; facts: MemoryFa
               </ul>
             </SettingsGroup>
           ))}
-          <Button size="sm" variant="ghost" className="self-start mt-5 text-ask hover:text-ask" onClick={() => void api().clear(mascot.id)}>
-            Forget everything
-          </Button>
+          <EndAction onAct={() => void api().clear(mascot.id)}>Forget everything</EndAction>
         </>
       )}
     </section>

@@ -11,7 +11,6 @@ import { withLimits } from "./mascotLimits";
 
 export type { PageTool } from "./pageTool";
 export type { PageToolAccess } from "./toolContext";
-export { siteOf } from "./askFirst";
 export { showsFrameOffLimits } from "./mascotLimits";
 export { HANDOFF_WORDS } from "./handoffWords";
 

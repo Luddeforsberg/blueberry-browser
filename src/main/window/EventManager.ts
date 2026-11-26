@@ -231,11 +231,11 @@ export class EventManager {
     this.handle("cloud:fit", (tabId, width, height) => this.mainWindow.cloud.fit(tabId, width, height));
     this.handle("cloud:take-over", (tabId) => this.mainWindow.cloud.takeOver(tabId));
     this.handle("cloud:login-suggestions", () => this.mainWindow.cloudLoginSuggestions());
-    this.handle("cloud:bring-login", (site) => this.mainWindow.cloud.bringLogin(site));
-    this.handle("cloud:check-login", (site) => this.mainWindow.cloud.checkLogin(site));
-    this.handle("cloud:mark-login", (site, signedIn) => this.mainWindow.cloud.markLogin(site, signedIn));
-    this.handle("cloud:revoke-login", (site) => this.mainWindow.cloud.revokeLogin(site));
-    this.handle("cloud:forget-logins", () => this.mainWindow.cloud.forgetLogins());
+    this.handle("cloud:bring-login", (site) => this.mainWindow.cloud.signedIn.bring(site));
+    this.handle("cloud:check-login", (site) => this.mainWindow.cloud.signedIn.check(site));
+    this.handle("cloud:mark-login", (site, signedIn) => this.mainWindow.cloud.signedIn.mark(site, signedIn));
+    this.handle("cloud:revoke-login", (site) => this.mainWindow.cloud.signedIn.revoke(site));
+    this.handle("cloud:forget-logins", () => this.mainWindow.cloud.signedIn.forgetAll());
   }
 
   private handleChatEvents(): void {
@@ -269,6 +269,9 @@ export class EventManager {
     this.handle("recording:discard", () => this.mainWindow.recordings.discard());
     this.handle("recording:draft", () => this.mainWindow.recordings.draft());
     this.handle("chat:stop", (chatId) => this.mainWindow.chats.stop(chatId));
+    this.handle("chat:follow-up", (chatId, id, action) =>
+      typeof id === "string" && (action === "send-now" || action === "remove") ? this.mainWindow.chats.followUp(chatId, id, action) : false,
+    );
     this.handle("chat:panel-shows", (chatId) => this.mainWindow.panelShows(typeof chatId === "string" ? chatId : null));
     this.handle("chat:decide", (chatId, approvalId, allow, answer) => this.mainWindow.chats.decide(chatId, approvalId, allow, answer));
 

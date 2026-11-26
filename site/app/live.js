@@ -1,4 +1,6 @@
-import { el, icon } from "./dom.js";
+import { el, icon, region } from "./dom.js";
+
+/** @import { IconName } from "./dom.js" */
 
 // The live page, Browserbase's view of the page in the cloud. It shows in three places: at the top of a job, inside the
 // sheet that asks, and full screen. Moving an iframe in the page reloads it, and a reload would take away what the user
@@ -6,9 +8,23 @@ import { el, icon } from "./dom.js";
 // place is showing, by position alone. A place is an empty slot of the right size in what's drawn; the box follows it
 // on every draw, scroll and slide, and hides while something covers it.
 
+/** @typedef {"job" | "ask" | "full"} Place */
+/**
+ * @typedef {object} Box
+ * @property {HTMLElement} box
+ * @property {HTMLIFrameElement} frame
+ * @property {HTMLElement} tag
+ * @property {HTMLElement} sign The icon in the tag.
+ * @property {HTMLElement} words
+ * @property {HTMLButtonElement} grow
+ * @property {number | null} placeless When it last lost its place, or null while it has one.
+ */
+
+/** @type {Map<string, Box>} */
 const boxes = new Map();
 
 // Where a live page goes. `url` is null before there is one, and the slot says what's coming instead.
+/** @param {string | null} url @param {Place} place */
 export const liveSlot = (url, place, { name = "Berry", conversation = "", yours = false, empty = "" } = {}) =>
   el(
     "div",
@@ -23,35 +39,40 @@ export const liveSlot = (url, place, { name = "Berry", conversation = "", yours 
     url ? null : el("p", { className: "live-empty", textContent: empty }),
   );
 
+/** @param {string} url @returns {Box} */
 const make = (url) => {
-  const frame = el("iframe", {
-    title: "The page in the cloud",
-    sandbox: "allow-same-origin allow-scripts allow-forms",
-    referrerPolicy: "no-referrer",
-  });
+  const frame = el("iframe", { title: "The page in the cloud", referrerPolicy: "no-referrer" });
+  frame.setAttribute("sandbox", "allow-same-origin allow-scripts allow-forms");
   frame.src = url;
   const words = el("span");
-  const tag = el("span", { className: "live-tag" }, el("span", { className: "live-tag-icon" }), words);
+  const sign = el("span", { className: "live-tag-icon" });
+  const tag = el("span", { className: "live-tag" }, sign, words);
   const grow = el("button", { type: "button", className: "live-grow", ariaLabel: "Show the page full screen" }, icon("grow"));
   const box = el("div", { className: "live-box", dataUrl: url }, frame, tag, grow);
-  document.getElementById("live").append(box);
-  const entry = { box, frame, tag, words, grow, placeless: null };
+  region("live").append(box);
+  const entry = { box, frame, tag, sign, words, grow, placeless: null };
   boxes.set(url, entry);
   return entry;
 };
 
-const layerOf = (node) => Number(node.closest("[data-layer]")?.dataset.layer ?? 1);
+/** @param {Element} node */
+const layerOf = (node) => Number(node.closest("[data-layer]")?.getAttribute("data-layer") ?? 1);
 // The highest layer showing: a sheet over the screen, unless it's on its way out.
 const topLayer = () =>
-  Math.max(1, ...[...document.querySelectorAll("#sheets [data-layer]:not([data-closing])")].map((node) => Number(node.dataset.layer)));
+  Math.max(
+    1,
+    ...[...document.querySelectorAll("#sheets [data-layer]:not([data-closing])")].map((node) => Number(node.getAttribute("data-layer"))),
+  );
 
+/** @type {Partial<Record<string, [IconName, (name: string) => string]>>} */
 const TAGS = {
   job: ["lock", (name) => `Locked while ${name} works`],
   ask: ["eye", (name) => `What ${name} sees`],
 };
 
+/** @param {Box} entry @param {HTMLElement} slot @param {boolean} showing */
 const place = (entry, slot, showing) => {
-  const { box, frame, tag, words, grow } = entry;
+  const { box, frame, tag, sign, words, grow } = entry;
   const rect = slot.getBoundingClientRect();
   const yours = slot.dataset.yours === "1" && showing;
   if (!showing || rect.width === 0 || rect.height === 0) {
@@ -80,15 +101,16 @@ const place = (entry, slot, showing) => {
   frame.tabIndex = yours ? 0 : -1;
   box.classList.toggle("yours", yours);
   // Full screen, the bar over the page says it already.
-  const shown = slot.dataset.place === "full" ? null : yours ? ["unlocked", () => "It’s yours"] : TAGS[slot.dataset.place];
+  /** @type {[IconName, (name: string) => string] | null | undefined} */
+  const shown = slot.dataset.place === "full" ? null : yours ? ["unlocked", () => "It’s yours"] : TAGS[slot.dataset.place ?? ""];
   tag.hidden = !shown;
   if (shown) {
     const [mark, sentence] = shown;
     if (tag.dataset.mark !== mark) {
       tag.dataset.mark = mark;
-      tag.firstChild.replaceChildren(icon(mark));
+      sign.replaceChildren(icon(mark));
     }
-    words.textContent = sentence(slot.dataset.name);
+    words.textContent = sentence(slot.dataset.name ?? "Berry");
   }
   grow.hidden = slot.dataset.place !== "job";
   grow.onclick = () => {
@@ -102,10 +124,13 @@ const KEEP_MS = 2_000;
 
 // Lays every box over its place.
 export const placeLive = () => {
+  /** @type {Map<string, HTMLElement>} */
   const best = new Map();
   for (const slot of document.querySelectorAll("[data-live-slot]")) {
+    if (!(slot instanceof HTMLElement)) continue;
     const url = slot.dataset.liveSlot;
-    if (url && (!best.has(url) || layerOf(slot) > layerOf(best.get(url)))) best.set(url, slot);
+    const known = url ? best.get(url) : undefined;
+    if (url && (!known || layerOf(slot) > layerOf(known))) best.set(url, slot);
   }
   const now = performance.now();
   for (const [url, entry] of boxes) {
@@ -113,7 +138,7 @@ export const placeLive = () => {
       entry.placeless = null;
       continue;
     }
-    if (entry.placeless === null || entry.placeless === undefined) {
+    if (entry.placeless === null) {
       entry.placeless = now;
       entry.box.classList.add("hidden");
       entry.frame.inert = true;
@@ -153,5 +178,5 @@ addEventListener("scroll", soon, { capture: true, passive: true });
 addEventListener("resize", soon);
 visualViewport?.addEventListener("resize", soon);
 visualViewport?.addEventListener("scroll", soon);
-document.fonts?.ready.then(soon);
+void document.fonts?.ready.then(soon);
 new ResizeObserver(soon).observe(document.body);

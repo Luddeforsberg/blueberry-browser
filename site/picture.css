@@ -1,20 +1,5 @@
-/* The type, and the app's parts as the front page draws them, from tokens.css only (DESIGN.md sections 3 to 9). Each
-   direction's own stylesheet places them. */
-
-@font-face {
-  font-family: "Geist";
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: swap;
-  src: url("./fonts/geist-latin-wght-normal.woff2") format("woff2");
-}
-@font-face {
-  font-family: "Geist Mono";
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: swap;
-  src: url("./fonts/geist-mono-latin-wght-normal.woff2") format("woff2");
-}
+/* The app's parts as the front page draws them, in the type from fonts.css and from tokens.css only (DESIGN.md
+   sections 3 to 9). Each direction's own stylesheet places them. */
 
 * {
   box-sizing: border-box;

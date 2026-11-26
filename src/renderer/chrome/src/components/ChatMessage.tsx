@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import type { ChatStep, MascotProfile, SaidOnTheWay, UsedPage } from "@shared/library";
-import { linkSite } from "@shared/publishing";
-import { NO_KEY } from "@shared/aiKey";
+import { REPLY_NOT_SAVED, type ChatStep, type MascotProfile, type SaidOnTheWay, type UsedPage } from "@shared/library";
+import { siteOf } from "@shared/sites";
+import { NEEDS_A_KEY } from "@shared/aiKey";
 import { ArrowUpRight, Check, Cloud, Copy, Repeat } from "lucide-react";
 import { stepsWord } from "../workLine";
 import { useShell } from "../contexts/useShell";
@@ -88,7 +88,7 @@ const PageChips: React.FC<{ pages: UsedPage[] }> = ({ pages }) => (
           >
             <Favicon src={siteIcon(page.url)} site={page.url} />
             <span className="min-w-0 truncate max-w-56">{page.title || page.url}</span>
-            {linkSite(page.url) && <span className="shrink-0 text-ink-2">{linkSite(page.url)}</span>}
+            {siteOf(page.url) && <span className="shrink-0 text-ink-2">{siteOf(page.url)}</span>}
             <ArrowUpRight aria-hidden className="size-3.5 shrink-0 text-faint" strokeWidth={1.75} />
           </button>
         </Tooltip>
@@ -185,17 +185,21 @@ const TroubleLine: React.FC<{ words: string; alert?: boolean; children?: React.R
   </div>
 );
 
-// What went wrong, in plain words, with Try again. The folded line above it opens the steps it got through. With no
-// key, trying again can't work, so it's Add a key, which opens Settings where the key is kept.
+// What went wrong, in plain words, with Try again. The folded line above it opens the steps it got through. With no key,
+// or one the service turned down, trying again can't work, so it's Add a key, which opens Settings where the key is kept.
+// An answer that only couldn't be saved has neither, since trying again would do its job twice.
 const WhatWentWrong: React.FC<{ message: string; actions?: ReplyActions | undefined }> = ({ message, actions }) => (
   <TroubleLine words={message} alert>
-    {message === NO_KEY ? (
+    {NEEDS_A_KEY.includes(message) ? (
       <Button onClick={() => openSettings("ai-service")}>Add a key</Button>
     ) : (
-      actions && <Button onClick={() => actions.onSay("Try again")}>Try again</Button>
+      message !== REPLY_NOT_SAVED && actions && <Button onClick={() => actions.onSay("Try again")}>Try again</Button>
     )}
   </TroubleLine>
 );
+
+// An answer that only couldn't be saved still stands, so it can be copied like one that went right.
+const canCopy = (error: string | undefined): boolean => error === undefined || error === REPLY_NOT_SAVED;
 
 // A mascot's reply: plain text on the sheet, with its face beside it. While it works, one line leads it with its steps
 // under; once it's done, that line folds where it is, above the answer, and what it found comes after the answer, then
@@ -287,7 +291,7 @@ export const AssistantMessage: React.FC<{
       )}
       {failed && <WhatWentWrong message={error} actions={actions} />}
       {/* Only while the pointer or the keyboard is in this reply. The row keeps its height, so nothing moves. */}
-      {actions && !isStreaming && !stopped && !failed && content && (
+      {actions && !isStreaming && !stopped && canCopy(error) && content && (
         <div className="-mt-3.5 -ml-1.5 h-7 flex gap-0.5 opacity-0 transition-opacity duration-fast group-hover/reply:opacity-100 group-focus-within/reply:opacity-100">
           <CopyAction content={content} />
           {actions.routineFromChat && (

@@ -3,6 +3,7 @@ import { createChromeView, type ChromeView } from "../window/chromeView";
 import { MenuView } from "../menus/MenuView";
 import { sendToRenderer } from "../window/ipc";
 import type { Rect } from "../window/Layout";
+import type { LibrarySnapshot } from "../../shared/library";
 import { SHORTCUTS } from "../../shared/shortcuts";
 import { ComposerPanel } from "./ComposerPanel";
 import type { DesktopBerryHost } from "./DesktopBerry";
@@ -223,9 +224,10 @@ export class DesktopParts {
     this.publish();
   };
 
-  publish(): void {
-    if (this.view) sendToRenderer(this.view.view.webContents, "desktop:state", this.drop.state);
-    if (this.composer.panelOpen && !this.composer.closing) this.composer.publishPanel();
+  // The drop and the panel from one read of the library, which is built again on every read.
+  publish(library: LibrarySnapshot = this.host.library()): void {
+    if (this.view) sendToRenderer(this.view.view.webContents, "desktop:state", this.drop.stateOf(library));
+    if (this.composer.panelOpen && !this.composer.closing) this.composer.publishPanel(library);
   }
 
   notifyTheme(): void {

@@ -5,6 +5,17 @@
 var isRecord = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
 var fieldsOf = (value) => isRecord(value) ? value : {};
 
+// src/shared/sites.ts
+var stripWww = (host) => host.replace(/^www\./, "");
+var siteOf = (url) => {
+  try {
+    const { protocol, hostname } = new URL(url);
+    return protocol === "http:" || protocol === "https:" ? stripWww(hostname) || null : null;
+  } catch {
+    return null;
+  }
+};
+
 // src/shared/mascots.ts
 var BERRY_ID = "berry";
 var PALETTES = [
@@ -42,18 +53,11 @@ var BERRY = {
 var MAX_MASCOT_NAME = 24;
 var MAX_MASCOT_INSTRUCTIONS = 2e3;
 var MAX_SITES = 20;
-var stripWww = (host) => host.replace(/^www\./, "");
 var normaliseSite = (input) => {
   const text = input.trim().toLowerCase().replace(/^\*\./, "");
   if (!text) return null;
-  try {
-    const { hostname, protocol } = new URL(/^[a-z][a-z0-9+.-]*:\/\//.test(text) ? text : `https://${text}`);
-    if (protocol !== "http:" && protocol !== "https:") return null;
-    const host = stripWww(hostname);
-    return host.includes(".") || host === "localhost" ? host : null;
-  } catch {
-    return null;
-  }
+  const host = siteOf(/^[a-z][a-z0-9+.-]*:\/\//.test(text) ? text : `https://${text}`);
+  return host !== null && (host.includes(".") || host === "localhost") ? host : null;
 };
 var isOneOf = (list, value) => list.some(({ id }) => id === value);
 var parseMascotDraft = (input) => {
@@ -169,16 +173,8 @@ var parsePublishedRow = (input) => {
     publishedAt: Number.isNaN(publishedAt) ? 0 : publishedAt
   };
 };
-var linkSite = (href) => {
-  try {
-    const url = new URL(href);
-    return url.protocol === "http:" || url.protocol === "https:" ? url.hostname.replace(/^www\./, "") : null;
-  } catch {
-    return null;
-  }
-};
 var linkWords = (text, href) => {
-  const site = linkSite(href);
+  const site = siteOf(href);
   if (!site || text === site) return text;
   return text === href || text === "" ? site : `${text} (${site})`;
 };
@@ -244,9 +240,55 @@ var conversationsOf = (jobs) => {
   const groups = /* @__PURE__ */ new Map();
   for (const job of [...jobs].sort((a, b) => a.turn - b.turn)) {
     const id = conversationIdOf(job);
-    groups.set(id, [...groups.get(id) ?? [], job]);
+    const before = groups.get(id);
+    groups.set(id, before ? [...before, job] : [job]);
   }
   return [...groups].map(([id, grouped]) => ({ id, jobs: grouped, latest: grouped.at(-1) })).sort((a, b) => b.latest.created_at.localeCompare(a.latest.created_at));
+};
+var STATUSES = ["queued", "running", "waiting", "done", "failed", "stopped"];
+var isStatus = (value) => STATUSES.some((status) => status === value);
+var textOr = (value, otherwise) => typeof value === "string" ? value : otherwise;
+var phoneJobFromRow = (input) => {
+  const row = fieldsOf(input);
+  const { id, prompt, created_at: createdAt, status, mascot, steps, history, turn } = row;
+  if (typeof id !== "string" || typeof prompt !== "string" || typeof createdAt !== "string") return null;
+  if (typeof turn !== "number" || !Number.isInteger(turn) || turn < 1) return null;
+  const who = fieldsOf(mascot);
+  return {
+    id,
+    conversation_id: textOr(row.conversation_id, null),
+    turn,
+    prompt,
+    created_at: createdAt,
+    updated_at: textOr(row.updated_at, createdAt),
+    status: isStatus(status) ? status : "stopped",
+    mascot: { id: textOr(who.id, ""), name: textOr(who.name, "") },
+    // Every one, since a follow-up's history notes them all. The server holds a job to 500.
+    steps: (Array.isArray(steps) ? steps : []).flatMap((step) => {
+      const { text, done, kind } = fieldsOf(step);
+      return typeof text === "string" ? [{ text, done: done === true, kind: textOr(kind, null) }] : [];
+    }),
+    reply: textOr(row.reply, ""),
+    error: textOr(row.error, null),
+    live_view_url: textOr(row.live_view_url, null),
+    context_id: textOr(row.context_id, null),
+    ...history === void 0 ? {} : { history },
+    ask: null
+  };
+};
+var phoneAskFromRow = (input) => {
+  const row = fieldsOf(input);
+  const { id, approval_id: approvalId, approval_kind: kind } = row;
+  if (typeof id !== "string" || typeof approvalId !== "string") return null;
+  return {
+    id,
+    approval_id: approvalId,
+    approval_kind: kind === "question" || kind === "handoff" ? kind : "approval",
+    approval_text: textOr(row.approval_text, ""),
+    approval_need: textOr(row.approval_need, null),
+    approval_site: textOr(row.approval_site, null),
+    approval_asked_at: textOr(row.approval_asked_at, null)
+  };
 };
 
 // src/shared/lateWork.ts
@@ -328,13 +370,9 @@ var siteParts = (text) => {
   for (const match of text.matchAll(/https?:\/\/[^\s,”"<>]+/g)) {
     const found = match[0];
     const trailing = /[.)]+$/.exec(found)?.[0] ?? "";
-    let hostname;
-    try {
-      hostname = new URL(found.slice(0, found.length - trailing.length)).hostname;
-    } catch {
-      continue;
-    }
-    parts.push({ text: text.slice(at, match.index), site: false }, { text: hostname.replace(/^www\./, ""), site: true });
+    const site = siteOf(found.slice(0, found.length - trailing.length));
+    if (!site) continue;
+    parts.push({ text: text.slice(at, match.index), site: false }, { text: site, site: true });
     at = match.index + found.length - trailing.length;
   }
   parts.push({ text: text.slice(at), site: false });
@@ -397,6 +435,7 @@ export {
   asContinuation,
   conversationsOf,
   fetchWithin,
+  fieldsOf,
   finishedWhen,
   followUpHistory,
   isUuid,
@@ -406,9 +445,12 @@ export {
   oneAtATime,
   parsePublishedRow,
   permissionsInWords,
+  phoneAskFromRow,
+  phoneJobFromRow,
   plainFromMarkdown,
   plausibleCode,
   rowTime,
   runnerLinkDue,
+  stripWww,
   withSiteNames
 };

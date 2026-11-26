@@ -1,9 +1,13 @@
 import { plausibleCode, withSiteNames } from "../shared.js";
 import * as api from "./api.js";
-import { drawMascot, el, grow, submitsOnce, typing } from "./dom.js";
+import { drawMascot, el, grow, isDrawn, submitsOnce, typing } from "./dom.js";
 import { liveSlot, placeLive } from "./live.js";
 import { closeSheet, openSheet, sheetBody, sheetKind } from "./sheet.js";
 import { asked, handoffWords, hooks, liveOf, problemWords, state, waiting, wanted } from "./state.js";
+
+/** @import { PhoneAsk } from "../shared.js" */
+/** @import { Drawn } from "../draw.js" */
+/** @import { Waiting } from "./state.js" */
 
 // Being asked: a sheet that rises by itself when the page opens with an ask waiting and when one arrives, but never
 // over something being typed, where it waits as its card on home. One ask at a time, the oldest first. After an answer
@@ -12,13 +16,21 @@ import { asked, handoffWords, hooks, liveOf, problemWords, state, waiting, wante
 const SAID_MS = 1_500;
 
 // Which ask is up, and whether it's saying what just happened.
+/** @type {{ id: string, saying: true } | { id: string, saying: false, signature: string, mascot: Drawn } | null} */
 let up = null;
 
 // Answers on their way, by approval id. An ask takes one answer, and until it's back the ask stays as it is.
+/** @type {Set<string>} */
 const deciding = new Set();
 
 // Writes an answer as the user. What to say about it, what went wrong in words, or null if this ask has an answer on
 // its way or written already.
+/**
+ * @param {{ ask: PhoneAsk }} entry
+ * @param {boolean} allow
+ * @param {string | null} answer
+ * @param {string} said
+ */
 export const decide = async (entry, allow, answer, said) => {
   const { ask } = entry;
   if (deciding.has(ask.approval_id) || state.answered.has(ask.approval_id)) return null;
@@ -35,16 +47,18 @@ export const decide = async (entry, allow, answer, said) => {
 };
 
 // The answers to one ask go off together while one is on its way, and come back if it didn't go.
+/** @param {Element | null} row @param {boolean} on */
 export const hold = (row, on) => {
-  for (const button of row.querySelectorAll("button")) button.disabled = on;
+  for (const button of row?.querySelectorAll("button") ?? []) button.disabled = on;
 };
 
 // What happened to the ask that's up, said in its place for a moment, then the next oldest or nothing. Only in the
 // sheet showing that ask: one put away meanwhile, or another sheet, is left alone.
+/** @param {string} id @param {Drawn} mascot @param {string} words */
 const say = (id, mascot, words) => {
   if (sheetKind() !== "ask" || up?.id !== id) return;
   up = { id, saying: true };
-  sheetBody().replaceChildren(
+  sheetBody()?.replaceChildren(
     el(
       "div",
       { className: "ask-said", role: "status" },
@@ -62,6 +76,11 @@ const say = (id, mascot, words) => {
 };
 
 // After an answer: whether it went.
+/**
+ * @param {Waiting} entry
+ * @param {Awaited<ReturnType<typeof decide>>} result
+ * @param {HTMLElement} problem
+ */
 const answered = (entry, result, problem) => {
   if (result === null) return false;
   if (typeof result === "string") {
@@ -73,16 +92,28 @@ const answered = (entry, result, problem) => {
   return true;
 };
 
+/** @param {...HTMLButtonElement} children */
 const buttons = (...children) => el("div", { className: "two" }, ...children);
 // A button that answers.
-const answering = (entry, problem, allow, said) => async (event) => {
-  const row = event.currentTarget.closest(".two");
+/** @param {Waiting} entry @param {HTMLElement} problem @param {boolean} allow @param {string} said */
+const answering = (entry, problem, allow, said) => /** @param {HTMLButtonElement} button */ async (button) => {
+  const row = button.closest(".two");
   hold(row, true);
   if (!answered(entry, await decide(entry, allow, null, said), problem)) hold(row, false);
 };
-const big = (text, kind, onClick, type = "button") =>
-  el("button", { type, className: `btn big ${kind}`, textContent: text, onclick: onClick });
+/**
+ * @param {string} text
+ * @param {string} kind
+ * @param {((button: HTMLButtonElement) => unknown) | undefined} press
+ * @param {"button" | "submit"} [type]
+ */
+const big = (text, kind, press, type = "button") => {
+  const button = el("button", { type, className: `btn big ${kind}`, textContent: text });
+  if (press) button.onclick = () => void press(button);
+  return button;
+};
 
+/** @param {Waiting} entry @param {HTMLElement} problem */
 const approval = (entry, problem) => {
   const { job, ask, mascot } = entry;
   const url = liveOf(job);
@@ -100,6 +131,7 @@ const approval = (entry, problem) => {
   ];
 };
 
+/** @param {Waiting} entry @param {HTMLElement} problem */
 const question = (entry, problem) => {
   const { ask, mascot } = entry;
   const box = grow(
@@ -148,6 +180,7 @@ const question = (entry, problem) => {
   ];
 };
 
+/** @param {Waiting} entry @param {HTMLElement} problem */
 const handoff = (entry, problem) => {
   const { ask, mascot } = entry;
   return [
@@ -168,6 +201,7 @@ const handoff = (entry, problem) => {
   ];
 };
 
+/** @param {Waiting} entry */
 const draw = (entry) => {
   const body = sheetBody();
   if (!body) return;
@@ -186,17 +220,20 @@ const draw = (entry) => {
       ...content,
       // What job it's for, which opens it.
       el("a", { className: "ask-for", href: `#job/${entry.conversation}`, textContent: `For “${entry.job.prompt}”` }),
-    ].filter(Boolean),
+    ].filter(isDrawn),
   );
-  body.closest("[role=dialog]")?.setAttribute("aria-label", asked(entry.mascot.name, entry.ask));
+  const dialog = body.closest("[role=dialog]");
+  dialog?.setAttribute("aria-label", asked(entry.mascot.name, entry.ask));
   body.scrollTop = 0;
-  if (hadKeyboard) body.closest("[role=dialog]")?.focus({ preventScroll: true });
+  if (hadKeyboard && dialog instanceof HTMLElement) dialog.focus({ preventScroll: true });
   placeLive();
 };
 
 // What the sheet shows of an ask, so a poll draws it again only when that has changed.
+/** @param {Waiting} entry */
 const signatureOf = (entry) => JSON.stringify([entry.ask, liveOf(entry.job), entry.job.prompt, entry.mascot.name, waiting().length]);
 
+/** @param {Waiting} entry */
 export const openAsk = (entry) => {
   openSheet({
     kind: "ask",
@@ -220,7 +257,8 @@ export const refreshAsk = () => {
   const all = waiting();
   if (sheetKind() === "ask") {
     if (!up || up.saying || deciding.has(up.id)) return;
-    const still = all.find((one) => one.ask.approval_id === up.id);
+    const { id } = up;
+    const still = all.find((one) => one.ask.approval_id === id);
     if (!still) {
       // Answered somewhere else, or the job ended. It says so before the next one comes, so the next ask's buttons
       // never arrive under a finger that was on this one's.

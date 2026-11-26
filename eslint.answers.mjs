@@ -15,7 +15,6 @@ const ALLOWED = {
   "src/main/library/database.ts": "rowOf and rowsOf: a SQLite row has the columns its statement's own SQL names.",
 };
 const HELD_BACK = {
-  "src/main/cloud/browserbase.ts": "Browserbase's answers, which move once #170 has rewritten the cloud folder.",
   "src/main/tools/CdpTab.ts": "What a page script gives back over CDP, which each tool reads as its own script's shape.",
   "src/main/tabs/TabPage.ts": "What a page script gives back in a tab, the same, and held back in eslint.config.mjs too.",
   "src/main/window/EventManager.ts":

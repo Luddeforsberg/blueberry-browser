@@ -141,6 +141,8 @@ module.exports = {
         "menu-in-above": `menu-in-above ${ms("menu")} ${motion.ease}`,
         "menu-out": `menu-out ${ms("fast")} ${motion.ease} forwards`,
         "menu-out-above": `menu-out-above ${ms("fast")} ${motion.ease} forwards`,
+        // A download starting: the toolbar's arrow drops into place.
+        drop: `drop ${ms("panel")} ${motion.ease}`,
         // The Gallery's page opening and going back.
         "gallery-fade": `mascot-fade ${ms("panel")} ${motion.ease}`,
       },
@@ -165,6 +167,10 @@ module.exports = {
         "menu-out-above": {
           "0%": { transform: "none", opacity: "1" },
           "100%": { transform: "scale(.96) translateY(4px)", opacity: "0" },
+        },
+        drop: {
+          "0%": { transform: "translateY(-6px)", opacity: "0" },
+          "100%": { transform: "none", opacity: "1" },
         },
         "mascot-fade": {
           "0%": { opacity: "0" },

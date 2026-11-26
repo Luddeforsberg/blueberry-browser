@@ -1,13 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  linkSite,
-  parsePublicDraft,
-  parsePublishChoices,
-  parsePublishedRow,
-  plainFromMarkdown,
-  publicRow,
-  publishWarnings,
-} from "./publishing";
+import { parsePublicDraft, parsePublishChoices, parsePublishedRow, plainFromMarkdown, publicRow, publishWarnings } from "./publishing";
 import { MAX_MASCOT_INSTRUCTIONS, MAX_MASCOT_NAME } from "./mascots";
 
 const ID = "00000000-0000-4000-8000-000000000001";
@@ -157,12 +149,6 @@ describe("what strangers publish", () => {
 });
 
 describe("a stranger's example as plain words", () => {
-  it("names a link's site instead of its whole address", () => {
-    expect(linkSite("https://www.svt.se/nyheter/utrikes/a?inlagg=64849633")).toBe("svt.se");
-    expect(linkSite("mailto:someone@example.com")).toBeNull();
-    expect(linkSite("not a link")).toBeNull();
-  });
-
   it("keeps the words and drops the markdown", () => {
     const answer = [
       "## Morning briefing",

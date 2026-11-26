@@ -24,6 +24,19 @@ export const FINISHED: readonly CloudJobStatus[] = ["done", "failed", "stopped"]
 export const SERVER_SILENCE_MS = 2 * 60_000;
 export const JOB_LEASE_MS = SERVER_SILENCE_MS - 30_000;
 
+const JOB_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Which of `jobs` a runner may still be working on, as `runner_live_jobs` answers through `ask`. One that isn't a job's
+// id can't be asked about, so it counts as live. Anything but a list of ids, even an empty body, is an error rather
+// than "none", so a sweep ends nothing on it.
+export const liveJobsOf = async (jobs: string[], ask: (ids: string[]) => Promise<unknown>): Promise<Set<string>> => {
+  const asked = jobs.filter((id) => JOB_ID.test(id));
+  const answer = asked.length ? await ask(asked) : [];
+  if (!Array.isArray(answer) || !answer.every((id) => typeof id === "string"))
+    throw new Error("The server didn't say which jobs are still going.");
+  return new Set([...jobs.filter((id) => !JOB_ID.test(id)), ...answer]);
+};
+
 // A row is written with the user's session, so it can only say what the user could have sent: a stolen session could
 // already make any mascot and answer its approvals. What this stops is a row that's odd or edited. Berry's id is the only
 // one with no limits, and only with none in the row, which is how the app always sends Berry. A routine of Berry's

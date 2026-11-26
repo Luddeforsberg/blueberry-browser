@@ -18,12 +18,10 @@ body {
   min-height: 100dvh;
   background: rgb(var(--ground));
   font:
-    16px/1.5 -apple-system,
-    BlinkMacSystemFont,
-    "SF Pro Text",
-    "Segoe UI Variable",
-    "Segoe UI",
+    16px/1.5 "Geist",
+    system-ui,
     sans-serif;
+  -webkit-font-smoothing: antialiased;
   overflow-wrap: anywhere;
   -webkit-text-size-adjust: 100%;
 }

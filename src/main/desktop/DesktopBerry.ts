@@ -100,7 +100,7 @@ export class DesktopBerry {
     this.parts.drop.showMenu();
   }
   get state(): DesktopDropState {
-    return this.parts.drop.state;
+    return this.parts.drop.stateOf(this.parts.host.library());
   }
 
   // The panel: the prompt box, the tray and the ask.
@@ -132,7 +132,7 @@ export class DesktopBerry {
     this.parts.composer.seePage();
   }
   get panelState(): DesktopPanelState {
-    return this.parts.composer.panelState;
+    return this.parts.composer.panelStateOf(this.parts.host.library());
   }
 
   // What the jobs have done.

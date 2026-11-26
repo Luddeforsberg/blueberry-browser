@@ -6,12 +6,37 @@ import { sendOnEnter } from "@common/lib/keys";
 import { SHELL } from "@common/components/cardShell";
 import { AddMenu, type AddMenuOptions } from "./AddMenu";
 import { Tooltip } from "@common/components/Tooltip";
+import { Button } from "@common/components/Button";
 import { IconSwap } from "@common/components/IconSwap";
 import { usePresence } from "@common/components/motion";
 import { FOCUS, type PillFace, MascotMenu, MascotPill, WhereSwitch } from "./ComposerPills";
 export type { PillFace } from "./ComposerPills";
 
 // DESIGN.md section 10, The prompt box: one component everywhere, a card set into a shell.
+
+const labelFor = (stopping: boolean, cloud: { on: boolean } | undefined): string =>
+  stopping ? "Stop" : cloud?.on ? "Send to the cloud" : "Send";
+
+// Stop, beside Send while a reply runs and there's something to send after it.
+const StopBeside: React.FC<{ onStop: (() => void) | undefined; shown: boolean; small: boolean; onCard: boolean }> = ({
+  onStop,
+  shown,
+  small,
+  onCard,
+}) =>
+  onStop && shown ? (
+    <Tooltip words="Stop">
+      <Button
+        variant="ghost"
+        size={small ? "icon-xs" : "icon"}
+        aria-label="Stop"
+        onClick={onStop}
+        className={cn("text-ink", small && "size-7", onCard ? "bg-card-2" : "bg-sheet-2")}
+      >
+        <span className={cn("block rounded-[2.5px] bg-current", small ? "size-[9px]" : "size-2.5")} />
+      </Button>
+    </Tooltip>
+  ) : null;
 
 // The one input for talking to a mascot, on the new tab, the main chat and the chat panel.
 export const Composer: React.FC<{
@@ -165,14 +190,16 @@ export const Composer: React.FC<{
       }
     : {};
 
-  const sendLabel = onStop ? "Stop" : cloud?.on ? "Send to the cloud" : "Send";
+  // While a reply runs the button is Stop, until there's something to send. Then Stop moves beside it, so both stay.
+  const stop = canSend ? undefined : onStop;
+  const sendLabel = labelFor(!!stop, cloud);
   const sendButton = (
     <Tooltip words={sendLabel}>
       <button
         type="button"
         aria-label={sendLabel}
-        onClick={onStop ?? (() => onSend(false))}
-        disabled={!onStop && !canSend}
+        onClick={stop ?? (() => onSend(false))}
+        disabled={!stop && !canSend}
         className={cn(
           "shrink-0 rounded-full flex items-center justify-center transition-[background-color,color,transform] duration-move ease-crisp active:scale-[.96]",
           small ? "size-7" : "size-8",
@@ -182,7 +209,7 @@ export const Composer: React.FC<{
         )}
       >
         <IconSwap
-          shown={onStop ? "stop" : "send"}
+          shown={stop ? "stop" : "send"}
           icons={{
             send: <ArrowUp className="size-4" strokeWidth={1.75} />,
             stop: <span className={cn("block rounded-[2.5px] bg-current", small ? "size-[9px]" : "size-2.5")} />,
@@ -230,6 +257,7 @@ export const Composer: React.FC<{
         className="w-full flex items-end gap-1 p-1.5 pl-3 cursor-text"
       >
         <div className="flex-1 min-w-0 py-[5px]">{textarea}</div>
+        <StopBeside onStop={onStop} shown={canSend} small={small} onCard={onCard} />
         {sendButton}
       </div>
     );
@@ -313,6 +341,7 @@ export const Composer: React.FC<{
                   }
                 />
               )}
+              <StopBeside onStop={onStop} shown={canSend} small={small} onCard={onCard} />
               {sendButton}
             </div>
           </div>

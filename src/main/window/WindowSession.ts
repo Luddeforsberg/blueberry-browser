@@ -1,7 +1,8 @@
 import { InternalTab } from "../tabs/InternalTab";
 import { Tab } from "../tabs/Tab";
 import type { SavedTab, Session } from "../tabs/Session";
-import type { WindowParts, WindowStores } from "./WindowParts";
+import type { WindowParts } from "./WindowParts";
+import type { AppStores } from "../app/appStores";
 
 // The open tabs and panels, saved soon after each change and brought back at the next launch.
 export class WindowSession {
@@ -11,7 +12,7 @@ export class WindowSession {
 
   constructor(
     private readonly w: WindowParts,
-    private readonly stores: WindowStores,
+    private readonly stores: AppStores,
   ) {}
 
   noteSize(): void {

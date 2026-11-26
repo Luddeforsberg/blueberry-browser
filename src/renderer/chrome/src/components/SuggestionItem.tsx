@@ -7,7 +7,7 @@ import { buttonVariants } from "@common/components/buttonVariants";
 import { cn } from "@common/lib/utils";
 import { useMascots } from "../contexts/useLibrary";
 import { Berry } from "./Berry";
-import { finishedWhen, firstSentence } from "../shortWords";
+import { finishedWhen, mascotLine } from "../shortWords";
 import type { SuggestionRow } from "../newTabSuggestions";
 import { Tooltip } from "@common/components/Tooltip";
 
@@ -33,7 +33,7 @@ const looksOf = (
       mascot: row.mascot,
       mood: "rest",
       title: row.prompt,
-      reason: `${nameOf(row.mascot)}: ${firstSentence(row.mascot.instructions)}`,
+      reason: `${nameOf(row.mascot)}: ${mascotLine(row.mascot)}`,
       action: "Try",
     };
   }

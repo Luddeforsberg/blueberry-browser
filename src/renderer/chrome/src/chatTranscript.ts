@@ -1,4 +1,4 @@
-import type { ChatThread, ChatThreadMessage } from "@shared/library";
+import type { ChatThread, ChatThreadMessage, QueuedMessage } from "@shared/library";
 
 interface TranscriptEntry {
   // Its place in the chat. The reply being written holds the place it's saved in, so it stays the same element when it
@@ -17,11 +17,13 @@ export interface Transcript {
   running: boolean;
   // Why the last reply went wrong, when there's no reply of its own to say it on, as when there's no key.
   error: string | null;
+  // What the user sent while a reply ran, waiting for it.
+  queued: QueuedMessage[];
 }
 
 // A chat as both layouts show it, the panel beside a page and the chat page: what's saved, then the reply being written.
 export const transcriptOf = (thread: ChatThread | null): Transcript => {
-  if (!thread) return { entries: [], running: false, error: null };
+  if (!thread) return { entries: [], running: false, error: null, queued: [] };
   const running = thread.partial !== null;
   const messages: ChatThreadMessage[] =
     thread.partial === null
@@ -48,5 +50,6 @@ export const transcriptOf = (thread: ChatThread | null): Transcript => {
     })),
     running,
     error: running || onReply ? null : thread.error,
+    queued: thread.queued,
   };
 };

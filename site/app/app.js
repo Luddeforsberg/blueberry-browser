@@ -1,8 +1,9 @@
-import { mascotsFromSharedRows, oneAtATime, runnerLinkDue } from "../shared.js";
+import { fieldsOf, mascotsFromSharedRows, oneAtATime, runnerLinkDue } from "../shared.js";
 import * as api from "./api.js";
 import { refreshAsk } from "./ask.js";
 import { mountHome } from "./home.js";
-import { mountFull, mountJob } from "./job.js";
+import { mountFull } from "./full.js";
+import { mountJob } from "./job.js";
 import { placeLive } from "./live.js";
 import { pushState, register } from "./push.js";
 import { refreshSettings } from "./settings.js";
@@ -24,6 +25,7 @@ const POLL_MS = 3_000;
 
 // When the page last heard whether a runner is linked. Linking or unlinking happens on the computer, so it asks again
 // now and then.
+/** @type {number | null} */
 let linkCheckedAt = null;
 
 // What's shown is never older than what was shown before: a read that lands after a newer one has is dropped. One that
@@ -37,7 +39,11 @@ const load = async () => {
   const current = () => asked.current && read > readShown;
   try {
     const askLink = state.linked === null || runnerLinkDue(linkCheckedAt, Date.now());
-    const [jobs, shared, linked] = await Promise.all([api.jobs(), api.mascots(), askLink ? api.runner() : Promise.resolve(undefined)]);
+    const [jobs, shared, linked] = await Promise.all([
+      api.jobs(),
+      api.mascots(),
+      askLink ? api.runnerAccepted() : Promise.resolve(undefined),
+    ]);
     // Someone signed out or in while it was asking, so none of this is theirs, or a newer read has landed already.
     if (!current()) return;
     readShown = read;
@@ -48,11 +54,14 @@ const load = async () => {
     state.mascots = mascotsFromSharedRows(shared);
     state.mascotsShared =
       shared
-        .map((row) => row.updated_at)
+        .flatMap((row) => {
+          const { updated_at: at } = fieldsOf(row);
+          return typeof at === "string" ? [at] : [];
+        })
         .sort()
         .at(-1) ?? null;
     if (linked !== undefined) {
-      state.linked = linked?.accepted === true;
+      state.linked = linked;
       linkCheckedAt = Date.now();
     }
     state.problem = null;
@@ -62,7 +71,8 @@ const load = async () => {
 };
 
 // One poll at a time: one asked for while another is out is that one, so there's only ever one timer going.
-let timer = null;
+/** @type {ReturnType<typeof setTimeout> | undefined} */
+let timer;
 const poll = oneAtATime(async () => {
   clearTimeout(timer);
   if (!api.signedIn()) return show();
@@ -81,22 +91,33 @@ document.addEventListener("visibilitychange", () => {
 
 // --- The screen ---
 
+/** @returns {{ name: "home" } | { name: "job" | "full" | "yours", id: string }} */
 const route = () => {
-  const match = /^job\/([\w-]{1,100})(?:\/(live|yours))?$/.exec(location.hash.replace(/^#/, ""));
-  if (!match) return { name: "home", id: null };
-  return { name: match[2] === "live" ? "full" : match[2] === "yours" ? "yours" : "job", id: match[1] };
+  const [, id, place] = /^job\/([\w-]{1,100})(?:\/(live|yours))?$/.exec(location.hash.replace(/^#/, "")) ?? [];
+  if (!id) return { name: "home" };
+  return { name: place === "live" ? "full" : place === "yours" ? "yours" : "job", id };
+};
+
+/** @param {HTMLElement} app @param {ReturnType<typeof route>} where */
+const mount = (app, where) => {
+  if (where.name === "home") return mountHome(app);
+  if (where.name === "job") return mountJob(app, where.id);
+  return mountFull(app, where.id, where.name === "yours");
 };
 
 // The browser's own bar takes the colour of the ground or the sheet, whichever is showing.
+/** @param {"ground" | "sheet"} surface */
 const themeColor = (surface) => {
   const channels = getComputedStyle(document.documentElement).getPropertyValue(`--${surface}`).trim();
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (channels && meta) meta.content = `rgb(${channels})`;
+  if (channels && meta instanceof HTMLMetaElement) meta.content = `rgb(${channels})`;
 };
 
+/** @type {{ key: string, update: (force: boolean) => void }} */
 let screen = { key: "", update: () => {} };
 const show = (force = false) => {
   const app = document.getElementById("app");
+  if (!app) return;
   if (!api.signedIn()) {
     if (screen.key !== "signin" || force) {
       closeSheet({ instant: true });
@@ -106,23 +127,17 @@ const show = (force = false) => {
     placeLive();
     return;
   }
-  const { name, id } = route();
-  const key = `${name}/${id ?? ""}`;
+  const where = route();
+  const key = where.name === "home" ? "home/" : `${where.name}/${where.id}`;
   if (key !== screen.key) {
-    const mount = {
-      home: () => mountHome(app),
-      job: () => mountJob(app, id),
-      full: () => mountFull(app, id, false),
-      yours: () => mountFull(app, id, true),
-    }[name];
-    screen = { key, update: mount() };
+    screen = { key, update: mount(app, where) };
     scrollTo(0, 0);
   }
   screen.update(force);
   refreshAsk();
   refreshSettings();
   placeLive();
-  themeColor(name === "job" ? "sheet" : "ground");
+  themeColor(where.name === "job" ? "sheet" : "ground");
   tick();
 };
 
@@ -131,7 +146,8 @@ hooks.load = () => poll();
 hooks.refresh = load;
 
 // How long things have been going, counted on screen each second while anything is.
-let ticking = null;
+/** @type {ReturnType<typeof setInterval> | undefined} */
+let ticking;
 const tick = () => {
   const counting = () => document.querySelectorAll("[data-since]");
   if (ticking || !counting().length) return;
@@ -139,10 +155,10 @@ const tick = () => {
     const all = counting();
     if (!all.length) {
       clearInterval(ticking);
-      ticking = null;
+      ticking = undefined;
       return;
     }
-    for (const node of all) node.textContent = lasted(node.dataset.since);
+    for (const node of all) if (node instanceof HTMLElement) node.textContent = lasted(node.dataset.since);
   }, 1_000);
 };
 

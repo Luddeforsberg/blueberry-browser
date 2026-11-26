@@ -1,0 +1,21 @@
+/* Geist and Geist Mono, served by the site itself (DESIGN.md section 5), for every page: the front page, a mascot's
+   page and the phone page. Each page's CSP allows fonts from 'self' only. */
+
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src:
+    url("./fonts/geist-latin-wght-normal.woff2") format("woff2-variations"),
+    url("./fonts/geist-latin-wght-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Geist Mono";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src:
+    url("./fonts/geist-mono-latin-wght-normal.woff2") format("woff2-variations"),
+    url("./fonts/geist-mono-latin-wght-normal.woff2") format("woff2");
+}

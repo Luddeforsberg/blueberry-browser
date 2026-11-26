@@ -1,0 +1,117 @@
+import type { Browser, BrowserContext } from "playwright-core";
+import type { CdpTab } from "../tools/CdpTab";
+
+// What a cloud browser's provider does: make a session, connect to it, and end it by its id or by the tag it was made
+// with. Browserbase is one, and a Chrome on this computer stands in for it in tests. Plain Node, so the runner uses the
+// same code.
+
+type ProviderName = "browserbase" | "local";
+
+// A running browser, from whichever provider.
+export interface CloudSession {
+  readonly context: BrowserContext;
+  // An address for an iframe showing this page live, which the user can work in. Null where there's none, as for a
+  // local browser, which shows pictures instead.
+  liveView(page: CdpTab): Promise<string | null>;
+  // Ends a browser this computer started, and settles once it has gone. The connection is let go of without waiting,
+  // since nothing costs once a paid session is released.
+  close(): Promise<void>;
+}
+
+// One paid session a provider may be running, kept from before it's asked for until there's proof it isn't: the provider
+// confirmed it ended or refused to make it. Past its deadline, by more than any session can last, it's forgotten too.
+export interface Handle {
+  // Sent with its create, so it can be found without its id.
+  tag: string;
+  // Once the provider has said it.
+  id: string | null;
+  // Who can end it, as `CloudBrowser.origin` says: the provider, and for Browserbase the project.
+  by: string;
+  // The key it was made with, by the id its owner keeps that key under, so it's ended with that key whatever key is
+  // used now. Null where the provider's key now ends it, as for a local browser, the runner, or a session from before.
+  keyId: string | null;
+  // Milliseconds since 1970. By then the provider has ended it on its own.
+  until: number;
+}
+
+// What is kept of the cloud: the Context the profile lives in for each provider and project, by `CloudBrowser.origin`,
+// and every session that may still be running.
+export interface CloudIds {
+  contexts: Record<string, string>;
+  handles: Handle[];
+}
+
+export const NO_IDS: CloudIds = { contexts: {}, handles: [] };
+
+// Told as a session is made, each the moment the provider has it.
+export interface CreateHooks {
+  // False once nothing new should be made.
+  wanted(): boolean;
+  // A fresh tag for the session about to be asked for, which the provider ends by `until` whatever happens. It's kept, on
+  // disk where there is one, by the time it's returned, and it throws if it couldn't be, so nothing is asked for.
+  tag(until: number): string;
+  // The provider refused that ask outright, so nothing was made with the tag.
+  unused(tag: string): void;
+  context(id: string): void;
+  // `until` is the provider's own deadline for it, when it says one.
+  made(tag: string, id: string, until?: number): void;
+}
+
+// A session the provider has made, or found still running, before anything has connected to it.
+export interface MadeSession {
+  // Null where closing the connection ends it, as for a browser on this computer.
+  readonly id: string | null;
+  // `stop` aborts when its life ends, and it settles then, once a browser this computer is still starting has been
+  // killed, without waiting for a connection on its way.
+  connect(stop: AbortSignal): Promise<CloudSession>;
+}
+
+export interface CloudBrowser {
+  readonly name: ProviderName;
+  // Which sessions it can end: those of its own provider and, for Browserbase, its own project. Nothing else is listed
+  // or released through it.
+  readonly origin: string;
+  // The id its owner keeps its key under, which the handles of sessions it makes carry.
+  readonly keyId?: string;
+  // The session `sessionId` names if it's still running, or a new one.
+  create(ids: { contextId: string | null; sessionId: string | null }, hooks: CreateHooks): Promise<MadeSession>;
+  // Ends that session at the provider, from its id alone, so nothing keeps running or costing. Rejects if that wasn't
+  // confirmed, with `KeyRefused` when the provider no longer takes the key, which then can't end it at all.
+  release(id: string): Promise<void>;
+  // Ends every session made with that tag, and says "ended" once the provider has shown one and none of them is running.
+  // "none" when it shows none, which proves nothing: a create still on its way may land afterwards. Rejects as `release`.
+  releaseTagged(tag: string): Promise<"ended" | "none">;
+}
+
+export class KeyRefused extends Error {}
+
+// How an ending went at the provider: confirmed, not confirmed, or refused because the key no longer works there.
+export type Released = "ended" | "running" | "refused";
+
+export const NOT_WANTED = "The cloud browser is ending, so no new session was started.";
+const STOPPED = "The cloud browser was stopped while it started.";
+
+// `work`, unless `stop` aborts first, which rejects at once. What comes after that goes to `late`, to let go of.
+export const stoppable = <T>(work: Promise<T>, stop: AbortSignal, late: (value: T) => void): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    const stopped = () => reject(new Error(STOPPED));
+    if (stop.aborted) stopped();
+    else stop.addEventListener("abort", stopped, { once: true });
+    work.then(
+      (value) => {
+        stop.removeEventListener("abort", stopped);
+        if (stop.aborted) late(value);
+        else resolve(value);
+      },
+      (error: unknown) => {
+        stop.removeEventListener("abort", stopped);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      },
+    );
+  });
+
+// Playwright loads only when a cloud browser is first used, so startup never waits for it.
+export const connectOverCdp = async (endpoint: string): Promise<Browser> => {
+  const { chromium } = await import("playwright-core");
+  return chromium.connectOverCDP(endpoint);
+};

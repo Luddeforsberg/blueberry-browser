@@ -5,8 +5,11 @@ import { pushState, turnOff, turnOn } from "./push.js";
 import { closeSheet, openSheet, sheetBody, sheetKind } from "./sheet.js";
 import { finished, hooks, SET_UP, state } from "./state.js";
 
+/** @import { Appearance } from "../theme.js" */
+
 // Settings, a sheet from the initial on home: the account, the look, notifications and the cloud, then Sign out.
 
+/** @type {[Appearance, string][]} */
 const APPEARANCES = [
   ["system", "System"],
   ["light", "Light"],
@@ -14,13 +17,16 @@ const APPEARANCES = [
 ];
 
 // Why a notification can't be turned on here, in place of the switch.
+/** @type {Partial<Record<string, string>>} */
 const CANT = {
   "add-to-home": "On an iPhone, add this page to your Home Screen first, then open it from there.",
   blocked: "Notifications are blocked for this site in your browser’s settings.",
   unavailable: "This browser can’t show notifications from this page.",
 };
 
+/** @param {string} title @param {...(Node | null)} rows */
 const group = (title, ...rows) => el("section", { className: "group", ariaLabel: title }, el("h3", { textContent: title }), ...rows);
+/** @param {Node | null} lead @param {string} words @param {string | undefined} sub @param {Node | null} [end] */
 const row = (lead, words, sub, end) =>
   el(
     "div",
@@ -70,26 +76,22 @@ const notifications = () => {
   const on = state.push === "on";
   const toggle =
     state.push === "on" || state.push === "off"
-      ? el("button", {
-          type: "button",
-          className: "switch",
-          role: "switch",
-          ariaChecked: String(on),
-          ariaLabel: "Notifications",
-          onclick: async (event) => {
-            event.currentTarget.disabled = true;
-            let problem = null;
-            try {
-              if (on) await turnOff();
-              else if (!(await turnOn())) problem = "Notifications weren’t turned on.";
-            } catch {
-              problem = "Notifications couldn’t be turned on here.";
-            }
-            state.push = await pushState();
-            draw(problem);
-          },
-        })
+      ? el("button", { type: "button", className: "switch", role: "switch", ariaChecked: String(on), ariaLabel: "Notifications" })
       : null;
+  const flip = async () => {
+    if (toggle) toggle.disabled = true;
+    /** @type {string | null} */
+    let problem = null;
+    try {
+      if (on) await turnOff();
+      else if (!(await turnOn())) problem = "Notifications weren’t turned on.";
+    } catch {
+      problem = "Notifications couldn’t be turned on here.";
+    }
+    state.push = await pushState();
+    draw(problem);
+  };
+  if (toggle) toggle.onclick = () => void flip();
   return row(
     null,
     "When a mascot needs you or has finished",
@@ -134,12 +136,14 @@ let drawnAs = "";
 const signature = () =>
   JSON.stringify([api.signedIn()?.email, state.push, state.linked, state.mascots.length, state.mascotsShared, appearance()]);
 
+/** @param {string | null} [problem] */
 const draw = (problem = null) => {
   const body = sheetBody();
   if (sheetKind() !== "settings" || !body) return;
   drawnAs = signature();
   const email = api.signedIn()?.email ?? "";
-  const hadKeyboard = body.contains(document.activeElement) ? document.activeElement.dataset.key : null;
+  const active = document.activeElement;
+  const hadKeyboard = active instanceof HTMLElement && body.contains(active) ? active.dataset.key : undefined;
   body.replaceChildren(
     el(
       "div",
@@ -155,9 +159,10 @@ const draw = (problem = null) => {
     group("Look", look()),
     group("Notifications", notifications(), problem ? el("p", { className: "problem", role: "alert", textContent: problem }) : null),
     group("In the cloud", ...cloud()),
-    el("button", { type: "button", className: "btn big raised wide sign-out", textContent: "Sign out", onclick: signOut }),
+    el("button", { type: "button", className: "btn big raised wide sign-out", textContent: "Sign out", onclick: () => void signOut() }),
   );
-  if (hadKeyboard) body.querySelector(`[data-key="${hadKeyboard}"]`)?.focus({ preventScroll: true });
+  const again = hadKeyboard ? body.querySelector(`[data-key="${CSS.escape(hadKeyboard)}"]`) : null;
+  if (again instanceof HTMLElement) again.focus({ preventScroll: true });
 };
 
 export const openSettings = () => {

@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Folder } from "lucide-react";
 import { Button } from "@common/components/Button";
 import { DownloadRow } from "../components/DownloadRow";
+import { markDownloadsSeen } from "../components/downloadsSeen";
 import { useDownloads } from "../components/useDownloads";
 import { EmptyPage, PageFrame, PageHeader } from "../components/PageFrame";
 import { SettingsGroup } from "../components/SettingsRow";
@@ -11,6 +12,7 @@ import { byDay } from "./historyDays";
 // folder files are saved to, which main knows, so nothing here names a path.
 export const DownloadsPage: React.FC = () => {
   const downloads = useDownloads();
+  useEffect(() => markDownloadsSeen(downloads), [downloads]);
 
   return (
     <PageFrame>

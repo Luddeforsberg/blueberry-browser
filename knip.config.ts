@@ -21,6 +21,8 @@ const config: KnipConfig = {
     "src/page/index.ts",
     // The public site and the phone page, static pages with no build.
     "site/**/*.html",
+    // Read by tsconfig.site.json for site/shared.js's types, which the site imports in JSDoc, which knip doesn't read.
+    "site/shared.d.ts",
     // Registered by site/app/push.js with `serviceWorker.register("./sw.js")`, a string, not an import.
     "site/app/sw.js",
   ],

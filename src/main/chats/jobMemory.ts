@@ -1,4 +1,4 @@
-import { siteOf } from "../tools/browserTools";
+import { siteOf } from "../../shared/sites";
 import { memoryNote } from "./mascotNote";
 import { relevantFacts, worthRemembering } from "../memory/mascotMemory";
 import type { MemoryToOffer } from "../memory/MemoryStore";
@@ -52,7 +52,7 @@ export class JobMemory {
     if (facts.length === 0) return;
     const job = this.jobs.get(id);
     const tabs = this.browser.allTabs().filter((tab) => tab.id === job?.current || job?.own.has(tab.id));
-    const sites = [...run.mascot.sites, ...run.earlierSites, ...tabs.map((tab) => siteOf(tab.url))];
+    const sites = [...run.mascot.sites, ...run.earlierSites, ...tabs.flatMap((tab) => siteOf(tab.url) ?? [])];
     const relevant = relevantFacts(facts, { sites, text, allowed: run.mascot.sites });
     run.memoryIds = relevant.map((fact) => fact.id);
     run.memoryNote = memoryNote(relevant);

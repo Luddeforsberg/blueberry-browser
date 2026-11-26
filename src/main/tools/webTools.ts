@@ -2,7 +2,8 @@ import { z } from "zod";
 import type { PageTarget } from "./pageTarget";
 import { pageTool } from "./pageTool";
 import type { ToolContext } from "./toolContext";
-import { because, isWebAddress, plainSearch, siteOf } from "./askFirst";
+import { because, plainSearch } from "./askFirst";
+import { isWebAddress, siteName, siteOf } from "../../shared/sites";
 import { MAX_READ_LENGTH } from "./readingTools";
 import { clipWords, NO_ACCESS, NOT_WEB } from "./toolMessages";
 import { cleanLine } from "../../shared/publishing";
@@ -17,9 +18,10 @@ const MAX_FETCHED = 10;
 
 // Where a page is, for the screen only: its site and path, without any query.
 const shownAddress = (url: string): string => {
-  if (!URL.canParse(url)) return siteOf(url);
+  const site = siteOf(url);
+  if (!site) return siteName(url);
   const { pathname } = new URL(url);
-  return clipWords(cleanLine(`${siteOf(url)}${pathname === "/" ? "" : pathname}`));
+  return clipWords(cleanLine(`${site}${pathname === "/" ? "" : pathname}`));
 };
 
 // What goes out is only the query, so it gets the same check as a search through go_to, and the card names it whole.
@@ -73,7 +75,7 @@ export const fetchPageTool = <T extends PageTarget>(context: ToolContext<T>, fet
       url: z.string().max(2000),
       offset: z.number().int().min(0).optional().describe("Where to start reading, in characters."),
     }),
-    label: ({ url }) => `Read ${siteOf(url)}`,
+    label: ({ url }) => `Read ${siteName(url)}`,
     shownLabel: ({ url }) => `Read ${shownAddress(url)}`,
     describe: async ({ url }) => `Read ${url} through Firecrawl, which visits it from its own servers, without opening a tab`,
     whyRisky: async ({ url }) => whyCard(url, find()),
@@ -90,8 +92,9 @@ export const fetchPageTool = <T extends PageTarget>(context: ToolContext<T>, fet
       }
       if (!canSee()) return NO_ACCESS;
       // A redirect is the site's doing, and a mascot's sites hold wherever it ends.
-      if (!allowed(page.url)) return `${offLimits(page.url).message} ${siteOf(url)} sent it there by itself.`;
-      been.add(siteOf(url));
+      if (!allowed(page.url)) return `${offLimits(page.url).message} ${siteName(url)} sent it there by itself.`;
+      const site = siteOf(url);
+      if (site) been.add(site);
       const refused = page.status !== null && page.status >= 400;
       if (refused || !page.markdown) {
         const came = refused ? `answered ${page.status}` : "came back empty";

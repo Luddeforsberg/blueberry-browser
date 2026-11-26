@@ -2,19 +2,19 @@ import { nativeTheme } from "electron";
 import type { Session } from "../tabs/Session";
 import { sendToRenderer } from "./ipc";
 import { titleBarOverlay } from "./windowFrame";
-import type { WindowParts, WindowStores } from "./WindowParts";
+import type { WindowParts } from "./WindowParts";
+import type { AppStores } from "../app/appStores";
 
 // What runs once the window has everything it needs: its first tabs, starting what works in the background, the window
 // events it follows, and everything closing the window ends.
-export const startWindow = (w: WindowParts, stores: WindowStores, restored: Session | null, stopWatching: () => void): void => {
+export const startWindow = (w: WindowParts, stores: AppStores, restored: Session | null, stopWatching: () => void): void => {
   if (restored) w.session.restoreSession(restored);
   else w.tabs.createTab();
   w.panels.updateAllBounds();
   w.desktopBerry.sync();
+  w.app.windowOpened(w);
   w.routines.start();
-  w.telegram.start();
   w.phone.start();
-  w.mcp.start();
   w.macJobs.start();
 
   w.session.noteSize();
@@ -41,16 +41,13 @@ export const startWindow = (w: WindowParts, stores: WindowStores, restored: Sess
     nativeTheme.off("updated", onThemeUpdated);
     w.routines.shutdown();
     w.phone.stop();
-    w.telegram.close();
-    w.mcp.close();
-    void w.cloud.destroy();
-    w.runnerJobs.destroy();
     w.macJobs.destroy();
     w.permissionPrompt.destroy();
     // A question still waiting is answered no.
     w.menus.destroy();
     stopWatching();
-    w.chats.stopAll();
+    // After this nothing the app does reaches this window, and anything still finishing tells the next one, if any.
+    w.app.windowClosed(w);
     stores.settingsStore.flush();
     // Before the tabs close below, and nothing after this, which would save a window with none.
     stores.sessionStore.saveSoon(() => w.session.currentSession);

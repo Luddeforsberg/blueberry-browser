@@ -1,4 +1,5 @@
 import type { HistoryEntry } from "@shared/ipc";
+import { siteOf } from "@shared/sites";
 
 export interface HistoryDay {
   key: string;
@@ -47,13 +48,8 @@ export const byDay = <T>(
 export const groupByDay = (entries: HistoryEntry[], now = Date.now()): HistoryDay[] =>
   byDay(entries, (entry) => entry.visitedAt, now).map(({ key, label, date, items }) => ({ key, label, date, entries: items }));
 
-export const siteOf = (url: string) => {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return url;
-  }
-};
+// A visit's site, or its address where it has none.
+export const shownSite = (url: string): string => siteOf(url) ?? url;
 
 // Visits in a row to the same site, as one run. A run of one is a plain row, and a longer one folds into a row with the
 // site and how many, which opens in place.
@@ -66,7 +62,7 @@ export interface VisitRun {
 export const foldVisits = (entries: HistoryEntry[]): VisitRun[] => {
   const runs: VisitRun[] = [];
   for (const entry of entries) {
-    const site = siteOf(entry.url);
+    const site = shownSite(entry.url);
     const last = runs.at(-1);
     if (last?.site === site) last.entries.push(entry);
     else runs.push({ key: String(entry.id), site, entries: [entry] });

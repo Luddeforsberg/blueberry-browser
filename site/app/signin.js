@@ -15,6 +15,7 @@ const STANDING = [
   { ...BERRY, name: "Cloudberry", look: { palette: "cloudberry", accessory: "none" } },
 ];
 
+/** @param {HTMLElement} app */
 export const mountSignIn = (app) => {
   const problem = el("div", { className: "problem-slot" });
   const email = el("input", {
@@ -70,7 +71,10 @@ export const mountSignIn = (app) => {
           el("p", {
             className: "problem",
             role: "alert",
-            textContent: error.status === 400 ? "That email and password don’t match an account." : problemWords(error),
+            textContent:
+              error instanceof api.ApiError && error.status === 400
+                ? "That email and password don’t match an account."
+                : problemWords(error),
           }),
         );
         submit.disabled = false;

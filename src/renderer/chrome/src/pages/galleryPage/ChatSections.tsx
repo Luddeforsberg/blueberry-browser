@@ -1,6 +1,7 @@
 import type { RoutineFormValues } from "../../routinesView";
 import React from "react";
 import { AssistantMessage, ChatError, StepTrail, UserMessage, WentWrong } from "../../components/ChatMessage";
+import { QueuedMessages } from "../../components/QueuedMessages";
 import { ChatComposer } from "../../components/ChatComposer";
 import { PageChip } from "../../components/AttachmentChips";
 import { ChatRow } from "../../components/Sidebar";
@@ -8,6 +9,7 @@ import { StepCard } from "../../components/StepCard";
 import { MascotMemoryView } from "../MascotMemory";
 import { MemoryOffersLine, RememberedFacts } from "../../components/MemoryInChat";
 import { BERRY } from "@shared/mascots";
+import { REPLY_NOT_SAVED } from "@shared/library";
 import { RoutineRunRow } from "../../components/RoutineRunRow";
 import { ScheduleSentence, WhenAnswer } from "../RoutineSteps";
 import { blankForm } from "../../routinesView";
@@ -26,6 +28,15 @@ export const ChatSections: React.FC<{
     <Section title="Chat">
       <div className="max-w-xl flex flex-col gap-5">
         <UserMessage content="What did the Monday digest find?" />
+        <QueuedMessages
+          chatId="gallery"
+          queued={[
+            { id: "a", content: "Only braided ones, and under 100 kr" },
+            { id: "b", content: "Then put it in my cart" },
+          ]}
+          running
+          onEdit={() => undefined}
+        />
         <AssistantMessage
           content="Two things changed: **flight prices** and the studio invoice."
           origin={{ words: "in the cloud", cloud: true }}
@@ -75,6 +86,12 @@ export const ChatSections: React.FC<{
           content=""
           error="Couldn't reach the model. Check your connection and try again."
           steps={[{ text: "Opened klm.com", done: true, kind: "open" }]}
+          actions={{ onSay: () => undefined }}
+        />
+        <AssistantMessage
+          content="Booked a table for two at 19:00 on Friday. The confirmation went to your email."
+          error={REPLY_NOT_SAVED}
+          steps={[{ text: "Opened thefork.com", done: true, kind: "open" }]}
           actions={{ onSay: () => undefined }}
         />
         <WentWrong message="Couldn't reach the model. Check your connection and try again." actions={{ onSay: () => undefined }} />

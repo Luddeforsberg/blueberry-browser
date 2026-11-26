@@ -1,8 +1,6 @@
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import type { AIMessageChunk, BaseMessage, StandardMessageStructure } from "@langchain/core/messages";
 import type { Interrupt } from "langchain";
-import * as dotenv from "dotenv";
-import { join } from "path";
 import type { PageTool } from "../tools/browserTools";
 import type { ActionApproval } from "../../shared/ipc";
 import type { AskWhy } from "../../shared/asking";
@@ -14,9 +12,6 @@ export { ReplySorter };
 
 export { ModelConfigError, SERVICE_ADDRESS, hasModel, modelConfig, modelsFor, setSavedKeyReader, type SavedKey } from "./modelConfig";
 export { generateTitle, writeWithCheapModel } from "./cheapModel";
-
-// Load environment variables from .env file
-dotenv.config({ path: join(__dirname, "../../.env") });
 
 // A PDF is said the same way here whoever the provider is, and `forProvider` turns it into that provider's own block.
 export type ReplyBlock =

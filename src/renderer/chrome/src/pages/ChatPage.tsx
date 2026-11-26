@@ -8,6 +8,7 @@ import { chatRoutine } from "../routinesView";
 import { useAssistantName } from "../components/useAssistantName";
 import { MemoryOffers } from "../components/MemoryInChat";
 import { ChatComposer } from "../components/ChatComposer";
+import { QueuedMessages } from "../components/QueuedMessages";
 import { useMascots, useLibrary } from "../contexts/useLibrary";
 import { WorkingStrip, WorkingView } from "../components/WorkingView";
 import { useWorkView } from "../components/useWorkView";
@@ -33,7 +34,9 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
   // A chat stays with the mascot it started with.
   const mascot = find(thread?.mascotId ?? null);
   const name = useAssistantName(mascot);
-  const { entries, running, error } = transcriptOf(thread);
+  const { entries, running, error, queued } = transcriptOf(thread);
+  // Edit on a message waiting to be sent puts its words back in the prompt box.
+  const [draft, setDraft] = useState<string | null>(null);
   const messages = entries.map(({ message }) => message);
   const last = messages.at(-1);
   const pageRef = useRef<HTMLDivElement>(null);
@@ -128,6 +131,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             {thread.runner && running && !roomBeside && thread.approval?.handoff && (
               <RunnerView chatId={chatId} steps={thread.steps} approval={thread.approval} />
             )}
+            {queued.length > 0 && <QueuedMessages chatId={chatId} queued={queued} running={running} onEdit={setDraft} />}
             {error && <WentWrong message={error} mascot={mascot} actions={actions} gutter />}
             {!running && <MemoryOffers key={chatId} sourceId={chatId} mascot={mascot} />}
           </div>
@@ -147,7 +151,10 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             answering={!!question}
             // A runner chat goes on with this computer off, and a cloud chat works in its own browser there.
             attach={{ chatId, mascot, place: thread.runner ? "runner" : inCloud ? "cloud" : "here" }}
-            disabled={running && !question}
+            // A runner chat's next message waits for its job to end.
+            disabled={running && !question && !!thread.runner}
+            draft={draft}
+            onDraftTaken={() => setDraft(null)}
             onStop={running ? () => void window.chromeAPI.chat.stop(chatId) : undefined}
             placeholder={
               question
@@ -156,9 +163,11 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                   : `Answer ${name}`
                 : name === "Assistant"
                   ? "Write a message"
-                  : running
-                    ? `Tell ${name} something while it works`
-                    : `Tell ${name} something`
+                  : running && thread.runner
+                    ? `${name} is working in the cloud`
+                    : running
+                      ? `Tell ${name} what to do next`
+                      : `Tell ${name} something`
             }
             autoFocus
             mascot={mascot}

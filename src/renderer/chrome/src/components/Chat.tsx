@@ -11,21 +11,15 @@ import { chatRoutine } from "../routinesView";
 import { MemoryOffers } from "./MemoryInChat";
 import { PageChip } from "./AttachmentChips";
 import { ChatComposer } from "./ChatComposer";
+import { QueuedMessages } from "./QueuedMessages";
 import { answerInBox } from "./answerInBox";
 import { siteAllowed } from "@shared/mascots";
-
-const hostOf = (url: string) => {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return null;
-  }
-};
+import { siteOf } from "@shared/sites";
 
 // The chat panel's conversation: the same messages, steps, cards and prompt box as the main chat, beside a page.
 export const Chat: React.FC = () => {
   const {
-    transcript: { entries, running, error },
+    transcript: { entries, running, error, queued },
     chatId,
     title,
     approval,
@@ -35,6 +29,7 @@ export const Chat: React.FC = () => {
     setPageAccess: change,
     draft,
     takeDraft,
+    putInBox,
     mascotId,
   } = useChat();
   const { find, chosen, choose } = useMascots();
@@ -53,7 +48,7 @@ export const Chat: React.FC = () => {
   );
   const name = useAssistantName(mascot);
   const { activeTab } = useBrowser();
-  const host = activeTab && !activeTab.page ? hostOf(activeTab.url) : null;
+  const host = activeTab && !activeTab.page ? siteOf(activeTab.url) : null;
   const canUseSite = !!activeTab && siteAllowed(activeTab.url, mascot.sites);
   const heldByUser = library.needsYou.some(({ approval }) => !!activeTab && approval.handoff?.tabId === activeTab.id);
 
@@ -100,6 +95,7 @@ export const Chat: React.FC = () => {
                 <ChatApprovalCard chatId={chatId} approval={approval} mascot={mascot} />
               </div>
             )}
+            {chatId && queued.length > 0 && <QueuedMessages chatId={chatId} queued={queued} running={running} onEdit={putInBox} />}
             {error && <WentWrong message={error} mascot={mascot} actions={actions} />}
             {!running && <MemoryOffers key={chatId} sourceId={chatId} mascot={mascot} />}
           </div>
@@ -116,7 +112,6 @@ export const Chat: React.FC = () => {
           onChooseMascot={chatId ? undefined : choose}
           draft={draft}
           onDraftTaken={takeDraft}
-          disabled={running && !question}
           onStop={running ? stop : undefined}
           placeholder={
             question
@@ -126,7 +121,7 @@ export const Chat: React.FC = () => {
               : name === "Assistant"
                 ? "Write a message"
                 : running
-                  ? `Tell ${name} something while it works`
+                  ? `Tell ${name} what to do next`
                   : `Tell ${name} something`
           }
           attachment={

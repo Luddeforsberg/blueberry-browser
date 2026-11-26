@@ -5,7 +5,8 @@ import { PLAIN_WORDS, type FirstJob } from "../../shared/firstRun";
 import type { ResizablePanel, Settings } from "../../shared/ipc";
 import type { ChatThread } from "../../shared/library";
 import { titleBarOverlay, windowButtonPosition } from "./windowFrame";
-import type { WindowParts, WindowStores } from "./WindowParts";
+import type { WindowParts } from "./WindowParts";
+import type { AppStores } from "../app/appStores";
 
 export const HORIZONTAL_TABS_MENU_ID = "horizontal-tabs";
 
@@ -14,7 +15,7 @@ export const HORIZONTAL_TABS_MENU_ID = "horizontal-tabs";
 export class SettingsChanges {
   constructor(
     private readonly w: WindowParts,
-    private readonly stores: WindowStores,
+    private readonly stores: AppStores,
   ) {}
 
   updateSettings(patch: Partial<Settings>): Settings {

@@ -110,6 +110,8 @@ test("a download saves without a dialog and can be followed, paused, cancelled a
   await expect.poll(() => existsSync(join(folder, "report (1).txt"))).toBe(true);
   await expect.poll(() => chrome.evaluate(() => window.chromeAPI.browser.getTabs().then((tabs) => tabs.length))).toBe(tabCount);
   expect(readFileSync(join(folder, "report.txt"), "utf8")).toBe("finished");
+  // A quick one ends before the ring could show, so the button marks it until Downloads is opened.
+  await expect(chrome.getByRole("button", { name: /^Downloads: .*report \(1\)\.txt done/ })).toBeVisible();
 
   // Save Image in the page's right-click menu arrives through the same handler.
   await switchToFiles();

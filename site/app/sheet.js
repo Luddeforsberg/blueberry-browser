@@ -1,9 +1,13 @@
-import { el, icon } from "./dom.js";
+import { el, icon, region } from "./dom.js";
 import { followLive, placeLive } from "./live.js";
 
 // A sheet over the screen: starting a job, being asked, Settings. One at a time, rising from the bottom over a dimmed
 // screen, which can't be reached while it's up. Escape, the cross, tapping outside or dragging it down puts it away.
 
+/** @typedef {"start" | "ask" | "settings"} SheetKind */
+/**
+ * @type {{ kind: SheetKind, node: HTMLElement, veil: HTMLElement, body: HTMLElement, onClose?: () => void, returnTo: Element | null } | null}
+ */
 let current = null;
 
 export const sheetKind = () => current?.kind ?? null;
@@ -13,11 +17,13 @@ const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const FOCUSABLE = "button:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])";
 
 // Dragging the top of a sheet down takes it with the finger, and far enough puts it away.
+/** @param {HTMLElement} handle @param {HTMLElement} node */
 const draggable = (handle, node) => {
+  /** @type {number | null} */
   let from = null;
   let moved = 0;
   handle.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0 || event.target.closest("button")) return;
+    if (event.button !== 0 || (event.target instanceof Element && event.target.closest("button"))) return;
     from = event.clientY;
     moved = 0;
     handle.setPointerCapture(event.pointerId);
@@ -42,6 +48,7 @@ const draggable = (handle, node) => {
 };
 
 // `top` is what sits in the draggable top of the sheet, under its handle.
+/** @param {{ kind: SheetKind, label: string, top?: Node[], onClose?: () => void }} sheet */
 export const openSheet = ({ kind, label, top = [], onClose }) => {
   if (current) closeSheet({ instant: true });
   const returnTo = document.activeElement;
@@ -60,8 +67,8 @@ export const openSheet = ({ kind, label, top = [], onClose }) => {
     body,
   );
   const veil = el("div", { className: "veil", ariaHidden: "true", onclick: () => closeSheet() });
-  document.getElementById("sheets").append(veil, node);
-  document.getElementById("app").inert = true;
+  region("sheets").append(veil, node);
+  region("app").inert = true;
   draggable(handle, node);
   current = { kind, node, veil, body, onClose, returnTo };
   // Drawn once out of sight, then risen, so it slides.
@@ -81,7 +88,7 @@ export const closeSheet = ({ instant = false } = {}) => {
   node.dataset.closing = "1";
   node.classList.remove("in");
   veil.classList.remove("in");
-  document.getElementById("app").inert = false;
+  region("app").inert = false;
   let gone = false;
   const remove = () => {
     if (gone) return;
@@ -97,7 +104,7 @@ export const closeSheet = ({ instant = false } = {}) => {
   }
   followLive();
   onClose?.();
-  if (returnTo?.isConnected) returnTo.focus({ preventScroll: true });
+  if (returnTo instanceof HTMLElement && returnTo.isConnected) returnTo.focus({ preventScroll: true });
 };
 
 // The keyboard stays in the sheet while it's up, and Escape puts it away.
@@ -109,10 +116,10 @@ document.addEventListener("keydown", (event) => {
     return;
   }
   if (event.key !== "Tab") return;
-  const inside = [...current.node.querySelectorAll(FOCUSABLE)].filter((node) => node.offsetParent !== null);
-  if (!inside.length) return;
+  const inside = [...current.node.querySelectorAll(FOCUSABLE)].filter((node) => node instanceof HTMLElement && node.offsetParent !== null);
   const first = inside[0];
   const last = inside.at(-1);
+  if (!(first instanceof HTMLElement) || !(last instanceof HTMLElement)) return;
   if (event.shiftKey && (document.activeElement === first || document.activeElement === current.node)) {
     event.preventDefault();
     last.focus();

@@ -105,6 +105,9 @@ export interface ChatThreadSummary {
   unseen?: boolean;
 }
 
+// Said on a reply whose answer couldn't be saved. It stays on screen, and the next message tries to save it first.
+export const REPLY_NOT_SAVED = "This reply couldn't be saved, so it's only here until you quit.";
+
 export interface ChatThread extends ChatThreadSummary {
   messages: ChatThreadMessage[];
   // The reply being written, which is saved once it ends. Null when no reply is running.
@@ -122,6 +125,15 @@ export interface ChatThread extends ChatThreadSummary {
   memoryIds: string[];
   // Its replies come from the cloud runner, which keeps going with this computer off.
   runner?: boolean;
+  // What the user sent while a reply ran, oldest first. Each goes once the reply before it ends. Kept only while the app
+  // is open.
+  queued: QueuedMessage[];
+}
+
+export interface QueuedMessage {
+  id: string;
+  content: string;
+  attached?: SentAttachment[];
 }
 
 // Whether a tab in a job's working view has a picture, and why not if it doesn't.

@@ -1,6 +1,7 @@
 import type { AddressSuggestion, InternalPage, TabInfo, VisitedPage } from "@shared/ipc";
 import type { Bookmark, MascotLook } from "@shared/library";
 import { looksLikeUrl, toUrl } from "@common/lib/url";
+import { stripWww } from "@shared/sites";
 
 // What the address field offers while it's being edited: open tabs, saved sites, history, a search, and asking a
 // mascot, in that order. Everything comes from this computer, and nothing here leaves it.
@@ -44,7 +45,7 @@ export const shownAddress = (url: string): string => {
   try {
     const { hostname, port, pathname, search } = new URL(url);
     const path = pathname === "/" ? "" : pathname;
-    return `${hostname.replace(/^www\./, "")}${port ? `:${port}` : ""}${path}${search}`;
+    return `${stripWww(hostname)}${port ? `:${port}` : ""}${path}${search}`;
   } catch {
     return url;
   }
@@ -145,8 +146,8 @@ export const addressSuggestions = ({ text, tabs, saved, history, ask, complete, 
   // Only to an address the person has been to or saved, whose host starts with what they typed, and never for words.
   const canComplete = complete && typed.length >= MIN_COMPLETION && !/\s/.test(typed) && !typed.includes("://");
   // Typed with `www.`, it completes with it, so the field still starts with exactly what was typed.
-  const www = lower.startsWith("www.") ? "www." : "";
-  const bare = lower.slice(www.length);
+  const bare = stripWww(lower);
+  const www = lower.slice(0, lower.length - bare.length);
   // It has to add something: the exact address typed in full goes where Enter takes it today.
   const target = canComplete
     ? [...saved.map(({ url }) => url), ...history.map(({ url }) => url)]

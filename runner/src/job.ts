@@ -50,10 +50,8 @@ export const sessionBrowser = (sessions: CloudSessions): JobBrowser => ({
     giveBack: () => {},
   },
   liveView: (pageId) => sessions.liveView(pageId),
-  end: async () => {
-    await sessions.end();
-    return !sessions.unreleased;
-  },
+  // Each job's own, so nothing starts in it again, and its local browser has gone by the time this says so.
+  end: async () => (await sessions.quit()) === "ended",
 });
 
 // Browsers whose end the provider didn't confirm, tried again until it does, so a passing failure doesn't leave a paid

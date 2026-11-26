@@ -4,7 +4,8 @@ import { sendToRenderer } from "./ipc";
 import type { MascotSaveResult } from "../../shared/ipc";
 import type { LibrarySnapshot, NeedsYouItem } from "../../shared/library";
 import { BERRY } from "../../shared/mascots";
-import type { WindowParts, WindowStores } from "./WindowParts";
+import type { WindowParts } from "./WindowParts";
+import type { AppStores } from "../app/appStores";
 
 // How long with no input before the phone gets what's waiting, even with the window in front.
 const AWAY_AFTER_IDLE_SECONDS = 60;
@@ -17,12 +18,12 @@ export class LibraryUpdates {
 
   constructor(
     private readonly w: WindowParts,
-    private readonly stores: WindowStores,
+    private readonly stores: AppStores,
   ) {}
 
   get needsYou(): NeedsYouItem[] {
     const routines = this.w.routines.list();
-    return this.w.chats.waiting().map(({ chatTitle, ...waiting }) => {
+    return this.w.app.chats.waiting().map(({ chatTitle, ...waiting }) => {
       const routine = routines.find(({ latestRun }) => latestRun?.id === waiting.id);
       return { ...waiting, job: chatTitle ?? routine?.name ?? "A job", routineId: routine?.id ?? null };
     });
@@ -52,7 +53,7 @@ export class LibraryUpdates {
   }
 
   publishSuggestions(): void {
-    sendToRenderer(this.w.chromeView.view.webContents, "suggestions:updated", this.w.suggestions.list());
+    sendToRenderer(this.w.chromeView.view.webContents, "suggestions:updated", this.w.app.suggestions.list());
   }
 
   mascotName(mascotId: string): string {
@@ -66,11 +67,11 @@ export class LibraryUpdates {
       bookmarks: this.stores.bookmarkStore.bookmarks,
       chats: this.stores.chatStore
         .summaries()
-        .map((chat) => ({ ...chat, running: this.w.chats.isRunning(chat.id), cloud: this.w.chats.inCloud(chat.id) })),
+        .map((chat) => ({ ...chat, running: this.w.app.chats.isRunning(chat.id), cloud: this.w.app.chats.inCloud(chat.id) })),
       routines: this.w.routines.list(),
       mascots: this.stores.mascotStore.all(),
       needsYou: this.needsYou,
-      memory: this.w.memory.state,
+      memory: this.w.app.memory.state,
     };
   }
 
@@ -81,16 +82,16 @@ export class LibraryUpdates {
   }
 
   async addFromGallery(galleryId: string, version: string, name: string | null): Promise<MascotSaveResult> {
-    const result = this.w.gallery.add(galleryId, version, name);
+    const result = this.w.app.gallery.add(galleryId, version, name);
     if (result.ok) this.mascotsChanged();
     return result;
   }
 
   mascotsChanged(): void {
     this.w.broadcast("library:updated", this.librarySnapshot);
-    void this.w.runnerJobs.mascotsChanged();
+    void this.w.app.runnerJobs.mascotsChanged();
     // A mascot's limits go with its routines in the cloud.
-    void this.w.runnerJobs.routinesChanged();
+    void this.w.app.runnerJobs.routinesChanged();
   }
 
   // In the app already, or somewhere a notification would interrupt: fullscreen, or anything playing sound.

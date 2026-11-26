@@ -1,13 +1,17 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { CloudLogin, CloudLoginStatus } from "../../shared/ipc";
+import { fieldsOf } from "../../shared/fields";
 import { Latest } from "../../shared/lateWork";
+import { stripWww } from "../../shared/sites";
 
 // Sites the user has brought into the cloud browser, signed in. Plain Node, so a runner without a window can use it.
 // Cookie values pass through here on their way into the cloud browser and are never kept: the list on disk has each
-// site's name and dates and nothing else.
+// site's name and dates and nothing else. Each project has its own list, as it has its own Context, which is where the
+// sign-ins are.
 
 export const MAX_SITES = 50;
+export const MAX_PROJECTS = 100;
 const MAX_SITE_LENGTH = 253;
 const STATUSES: CloudLoginStatus[] = ["brought", "checked", "signed-out"];
 
@@ -24,7 +28,7 @@ export const loginSite = (input: unknown): string | null => {
   } catch {
     return null;
   }
-  host = host.replace(/^www\./, "").replace(/\.$/, "");
+  host = stripWww(host).replace(/\.$/, "");
   if (!host.includes(".") || host.length > MAX_SITE_LENGTH || !/^[a-z0-9.-]+$/.test(host) || host.split(".").some((label) => !label))
     return null;
   return host;
@@ -129,8 +133,7 @@ export const parseLogins = (data: unknown): CloudLogin[] => {
   if (!Array.isArray(data)) return [];
   const seen = new Set<string>();
   return data.slice(0, MAX_SITES).flatMap((entry): CloudLogin[] => {
-    if (typeof entry !== "object" || entry === null) return [];
-    const { site: rawSite, addedAt, checkedAt, status } = entry as Record<string, unknown>;
+    const { site: rawSite, addedAt, checkedAt, status } = fieldsOf(entry);
     const site = loginSite(rawSite);
     const added = time(addedAt);
     if (!site || site !== rawSite || !added || seen.has(site)) return [];
@@ -144,6 +147,14 @@ export const parseLogins = (data: unknown): CloudLogin[] => {
       },
     ];
   });
+};
+
+// Each project's list, by the origin its Context is kept under, every one of them. A list from before there was one per
+// project is an array, and goes to each of the projects in `upgradeTo` it may be in.
+const parseLists = (data: unknown, upgradeTo: string[]): Record<string, CloudLogin[]> => {
+  if (Array.isArray(data)) return Object.fromEntries(upgradeTo.map((origin) => [origin, parseLogins(data)]));
+  const lists = Object.entries(fieldsOf(fieldsOf(data).projects));
+  return Object.fromEntries(lists.map(([origin, list]) => [origin, parseLogins(list)]));
 };
 
 // Bringing a site along again starts its check over.
@@ -166,8 +177,13 @@ export interface CookieJar {
 }
 
 export interface CloudLoginsHooks {
-  // Runs `act` on the cloud browser's context, starting it if need be. Null while the cloud is off.
-  jar: () => { withContext<T>(act: (jar: CookieJar) => Promise<T>): Promise<T> } | null;
+  // Runs `act` on the cloud browser's context, starting it if need be. `account` is who the provider is, a new one with
+  // each key, and `origin` the project whose Context it is. Null while the cloud is off.
+  jar: () => {
+    readonly account: object;
+    readonly origin: string | null;
+    withContext<T>(act: (jar: CookieJar) => Promise<T>): Promise<T>;
+  } | null;
   // Touch ID, or a plain confirm where there's none. Asked before any cookie is read.
   confirm: (site: string) => Promise<boolean>;
   // This site's cookies from the user's own browser, and nobody else's.
@@ -177,12 +193,16 @@ export interface CloudLoginsHooks {
 
 const NOT_TAKEN = "The cloud browser didn't take that. Try again.";
 const BROWSER_GONE = "Nothing was brought along, because the cloud browser ended or its key changed meanwhile.";
+const KEY_CHANGED = "Nothing was taken out, because the cloud browser's key changed meanwhile. Try again.";
 
 // Bringing a site's sign-in into the cloud browser, one site at a time, and taking it out again. Only main calls this,
-// from Settings, and the list of sites goes to `cloud-logins.json` with names and dates only. A cookie lives only in
-// memory on its way to the cloud browser, and no error that might quote one is passed on.
+// from Settings, and the list of sites goes to `cloud-logins.json` with names and dates only, one list for each project.
+// Each act is on the project of the browser it started with. A cookie lives only in memory on its way to the cloud
+// browser, and no error that might quote one is passed on.
 export class CloudLogins {
-  private list: CloudLogin[] = [];
+  private lists: Record<string, CloudLogin[]> = {};
+  // A list from before there was one per project, while it can't be told whose it is, which nothing may write over.
+  private undecided = false;
   private busy = false;
   // The cloud browser as it is now. It ends or is replaced with a new one, so a copy still waiting on the user never lands
   // in it.
@@ -192,16 +212,35 @@ export class CloudLogins {
   constructor(
     private readonly file: string,
     private readonly hooks: CloudLoginsHooks,
+    // The projects a list from before there was one per project may be in, or null while that can't be told.
+    upgradeTo: string[] | null = [],
   ) {
-    try {
-      this.list = parseLogins(JSON.parse(readFileSync(file, "utf8")));
-    } catch {
-      this.list = [];
-    }
+    this.load(upgradeTo);
   }
 
+  // What the file lists, read as a launch reads it, in place of what's kept: on a launch, and when the cloud's files are
+  // read again on Forget. A list from before there was one per project goes to the projects in `upgradeTo` and is kept
+  // as theirs at once, so a key saved later can't take it, or stays as it is while that's null. False if it was decided
+  // and couldn't be kept.
+  load(upgradeTo: string[] | null): boolean {
+    let data: unknown = null;
+    try {
+      data = JSON.parse(readFileSync(this.file, "utf8"));
+    } catch {
+      // Nothing listed.
+    }
+    this.undecided = Array.isArray(data) && upgradeTo === null;
+    this.lists = parseLists(data, upgradeTo ?? []);
+    return !(Array.isArray(data) && upgradeTo) || this.write();
+  }
+
+  // The current project's.
   get logins(): CloudLogin[] {
-    return this.list;
+    return this.listOf(this.hooks.jar()?.origin ?? null);
+  }
+
+  private listOf(origin: string | null): CloudLogin[] {
+    return origin ? (this.lists[origin] ?? []) : [];
   }
 
   // The cloud browser ended, or its key was forgotten or changed. Anything still waiting copies nothing.
@@ -213,10 +252,16 @@ export class CloudLogins {
   async bring(site: string): Promise<string | null> {
     const jar = this.hooks.jar();
     if (!jar) return "The cloud browser is off.";
-    // Every site on the list needs its Remove, so a full list takes no more until one comes off.
-    if (this.list.length >= MAX_SITES && !this.list.some((login) => login.site === site))
-      return `There are already ${MAX_SITES} sites in the cloud browser. Remove one first.`;
+    // What the user confirms is for this browser and this account, so nothing lands after either has changed.
     const { browser } = this;
+    const { account, origin } = jar;
+    if (!origin) return "The cloud browser is off.";
+    const list = () => this.listOf(origin);
+    // Every site on the list needs its Remove, so a full list takes no more until one comes off.
+    if (list().length >= MAX_SITES && !list().some((login) => login.site === site))
+      return `There are already ${MAX_SITES} sites in the cloud browser. Remove one first.`;
+    if (!this.lists[origin] && Object.keys(this.lists).length >= MAX_PROJECTS)
+      return `Sign-ins are kept for ${MAX_PROJECTS} projects already. Forget all cloud logins under another project's key first.`;
     return this.oneAtATime(async () => {
       if (!(await this.hooks.confirm(site))) return "Nothing was brought along, because it wasn't confirmed.";
       const stored = await this.hooks.readCookies(site).catch(() => null);
@@ -225,7 +270,7 @@ export class CloudLogins {
       if (cookies.length === 0)
         return `Blueberry isn't signed in to ${site}, so there's nothing to bring along. Sign in there in a tab first.`;
       // The user took a while to confirm, and the browser it was for may have gone meanwhile, even while it was starting.
-      const gone = () => !browser.current || this.hooks.jar() !== jar;
+      const gone = () => !browser.current || this.hooks.jar() !== jar || jar.account !== account;
       if (gone()) return BROWSER_GONE;
       try {
         const copied = await jar.withContext(async (context) => {
@@ -237,43 +282,49 @@ export class CloudLogins {
       } catch {
         return NOT_TAKEN;
       }
-      if (!this.save(withLogin(this.list, site)))
+      if (!this.save(origin, withLogin(list(), site)))
         return `The sign-in to ${site} is in the cloud browser, but the list here couldn't be saved, so it may not show after a restart. Try again, or use Forget all cloud logins.`;
       return null;
     });
   }
 
-  async revoke(site: string): Promise<string | null> {
-    const jar = this.hooks.jar();
-    if (!jar) return "The cloud browser is off.";
-    return this.oneAtATime(async () => {
-      try {
-        await jar.withContext((context) => context.clearCookies({ domain: cookieDomainPattern(site) }));
-      } catch {
-        return NOT_TAKEN;
-      }
-      this.save(withoutLogin(this.list, site));
-      return null;
-    });
+  revoke(site: string): Promise<string | null> {
+    return this.takeOut({ domain: cookieDomainPattern(site) }, (list) => withoutLogin(list, site));
   }
 
-  // Every cookie in the cloud browser, including any a job or a sign-in there left, and the whole list.
-  async forgetAll(): Promise<string | null> {
+  // Every cookie in the cloud browser, including any a job or a sign-in there left, and the whole list for its project.
+  // Another project's Context keeps its own.
+  forgetAll(): Promise<string | null> {
+    return this.takeOut(undefined, () => []);
+  }
+
+  // Clears cookies in the cloud browser of the account the user asked under, and nothing once its key has changed, even
+  // while it was starting, since the list it changes is that account's project's.
+  private takeOut(cookies: { domain: RegExp } | undefined, next: (list: CloudLogin[]) => CloudLogin[]): Promise<string | null> {
     const jar = this.hooks.jar();
-    if (!jar) return "The cloud browser is off.";
+    if (!jar?.origin) return Promise.resolve("The cloud browser is off.");
+    const { account, origin } = jar;
+    const gone = () => this.hooks.jar() !== jar || jar.account !== account;
     return this.oneAtATime(async () => {
       try {
-        await jar.withContext((context) => context.clearCookies());
+        const cleared = await jar.withContext(async (context) => {
+          if (gone()) return false;
+          await context.clearCookies(cookies);
+          return true;
+        });
+        if (!cleared || gone()) return KEY_CHANGED;
       } catch {
         return NOT_TAKEN;
       }
-      this.save([]);
+      this.save(origin, next(this.listOf(origin)));
       return null;
     });
   }
 
   mark(site: string, signedIn: boolean): void {
-    if (this.list.some((login) => login.site === site)) this.save(withCheck(this.list, site, signedIn));
+    const origin = this.hooks.jar()?.origin ?? null;
+    const list = this.listOf(origin);
+    if (origin && list.some((login) => login.site === site)) this.save(origin, withCheck(list, site, signedIn));
   }
 
   private async oneAtATime(act: () => Promise<string | null>): Promise<string | null> {
@@ -286,20 +337,27 @@ export class CloudLogins {
     }
   }
 
-  // False if it couldn't be written, though the list in memory has changed.
-  private save(next: CloudLogin[]): boolean {
-    this.list = parseLogins(next);
-    let saved = true;
+  // False if it couldn't be written, though the list in memory has changed. A project with nothing listed goes.
+  private save(origin: string, next: CloudLogin[]): boolean {
+    const { [origin]: _old, ...others } = this.lists;
+    const list = parseLogins(next);
+    this.lists = list.length ? { ...others, [origin]: list } : others;
+    const saved = this.write();
+    this.hooks.onChange();
+    return saved;
+  }
+
+  private write(): boolean {
+    if (this.undecided) return false;
     try {
       mkdirSync(dirname(this.file), { recursive: true });
       const temp = `${this.file}.tmp`;
-      writeFileSync(temp, JSON.stringify(this.list), { mode: 0o600 });
+      writeFileSync(temp, JSON.stringify({ projects: this.lists }), { mode: 0o600 });
       renameSync(temp, this.file);
+      return true;
     } catch {
-      saved = false;
       console.error("Couldn't save the list of cloud logins.");
+      return false;
     }
-    this.hooks.onChange();
-    return saved;
   }
 }
