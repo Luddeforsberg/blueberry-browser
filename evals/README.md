@@ -41,3 +41,15 @@ env -u ELECTRON_RUN_AS_NODE pnpm exec electron . --user-data-dir=/tmp/blueberry-
 ```
 
 The app then shows the checked cards without asking again within the hour.
+
+## Taking the README's pictures
+
+`pnpm run readme:pictures` builds the app and retakes every picture in `docs/images/` with a made-up founder, Maja Ekholm, who runs Tidvik, a 14-person booking startup for physio clinics in Stockholm. `evals/pictures/founder.ts` holds her history, tabs, mascots, routines and what they remember, and `seedFounder.ts` writes them into a new folder with the app's own stores. The jobs in the pictures are real runs with the key in `.env`, on real sites, and cost about US$0.10 together.
+
+It's Windows only, and takes over a screen: the window is maximized on the first display that isn't the main one, brought in front and captured as it really is, frame and all. Leave that screen alone while it runs. `PICTURES_SCREEN_X` picks another display by its left edge.
+
+- `PICTURES=new-tab,gallery` takes only those. The profile is kept between runs, in `PICTURES_PROFILE` or `blueberry-founder` in the temp folder, so a picture can be retaken alone. Delete the folder to start over.
+- It stops starting real jobs once the profile has spent `PICTURES_BUDGET` dollars, 6 unless set.
+- The desktop picture is only taken when no other app's window is at that screen's right edge.
+- Each picture is also saved as a PNG in `test-results/pictures/`, to look at before committing.
+

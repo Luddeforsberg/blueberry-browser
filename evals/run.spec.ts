@@ -3,9 +3,9 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
-import { config as readEnv } from "dotenv";
 import { findView, launchApp } from "../tests/app";
 import { jobs } from "./jobs";
+import { readModelEnv } from "./modelEnv";
 import { costOf, installGuard, installMeter, readCalls, readRefused, type ModelCall } from "./meter";
 import { writeReport, type RunRecord } from "./report";
 import { recordWithoutQueries } from "./addresses";
@@ -32,14 +32,9 @@ const saveRun = (record: RunRecord) => {
   writeFileSync(RUNS_FILE, json + "\n");
 };
 
-// The values go only to the app, the same way the tests pass theirs.
+// EVAL_MODEL compares another model on the same jobs without editing .env.
 const modelEnv = (): Record<string, string> => {
-  const { parsed } = readEnv({
-    path: join(__dirname, "../.env"),
-    processEnv: {},
-  });
-  if (!parsed?.OPENAI_API_KEY && !parsed?.ANTHROPIC_API_KEY) throw new Error("Link .env from the main checkout first.");
-  // EVAL_MODEL compares another model on the same jobs without editing .env.
+  const parsed = readModelEnv();
   return process.env.EVAL_MODEL ? { ...parsed, LLM_MODEL: process.env.EVAL_MODEL } : parsed;
 };
 
