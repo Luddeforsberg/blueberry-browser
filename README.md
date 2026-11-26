@@ -2,7 +2,7 @@
 
 An AI browser that works on your behalf. Make mascots for the jobs you repeat, and it notices what you do and offers to take it over.
 
-![The new tab page suggests turning CI incidents into a Linear action plan, preparing a weekly release-readiness brief, and setting up a mascot to watch for launch blockers](docs/images/new-tab.webp)
+![The new tab page suggests picking up a finished chat, comparing Stockholm salaries for senior backend roles, and a fresh Jane App and Cliniko comparison](docs/images/new-tab.webp)
 
 ## What it does
 
@@ -16,7 +16,7 @@ Strawberry's routines run on your own computer, so they only run while it's open
 
 In Blueberry, a job or scheduled routine can run in a browser in the cloud instead. With the runner set up, close the laptop on the train and the job keeps going. The morning routine runs at 08:00 whether the Mac is on or not, and the summary is there when you open it. The job gets its own browser on Browserbase, signed in to the sites you chose to bring along, so it never takes over your tabs or slows your computer down. A small runner on Railway starts and follows it with the Mac off, as the same mascot with the same limits and the same approvals as at your desk. You can start one from the phone app, or from ChatGPT or Claude, wherever you are.
 
-![Berry compares larger runners in a cloud chat with GitHub Docs visible in the working view](docs/images/cloud-chat.webp)
+![Berry checks Calendly’s release notes and Jane’s blog in a cloud chat, with the Jane blog in the working view](docs/images/cloud-chat.webp)
 
 ### Answering from your phone
 
@@ -24,19 +24,19 @@ Strawberry marks a chat that needs you, for a sign-in or anything else, but only
 
 In Blueberry, you can answer job approvals and questions from your phone. With notifications on, it buzzes at the table, you tap Allow or type the code, and the job carries on while you eat. You come back to finished work instead of a queue of questions, so the hour away still counted. Jobs in the cloud show up in the phone app, which you add to your home screen, and where you can start a new job on the way back too. Jobs on your Mac come through your own Telegram bot. On either you can allow or refuse a step or answer a question. For a cloud sign-in you type the code into the live page, and for a job on your Mac the Telegram bot can pass the code to the held tab without giving it to the model. With several cloud jobs running at once, it's one list on your phone for all of them, so none of them sits idle waiting for you. Telegram is a channel behind a small interface, so WhatsApp or iMessage could come next.
 
-![A cloud job on the phone asks to open filtered GitHub issues, with Allow and Don't allow](docs/images/phone-approval.webp)
+![A cloud job on the phone asks before filtering backend developer jobs on The Hub, with Allow and Don't allow](docs/images/phone-approval.webp)
 
 ### Your mascots, from ChatGPT and Claude
 
 Strawberry lets you connect MCP servers to it, but it isn't one itself, so nothing else can use it. Most people will keep ChatGPT or Claude open next to whatever browser they use, so Blueberry doesn't try to replace them. It gives them your browser. Claude Code and Claude Desktop on the same computer can hand whole jobs to your mascots over MCP, enabled in Settings > Connections > Claude and other apps, and with the runner and relay set up, so can ChatGPT and Claude on the web. The chat keeps its threads and plans, and the mascot brings your logins and what it sees in the browser. Plan outreach in ChatGPT, then ask it to have a mascot find the twenty leads, and it does it in your browser, signed in. You get something out of Blueberry without switching browsers all at once, which also fits where Strawberry seems to be heading, as an agent platform rather than only a browser.
 
-![A chat from Claude Code shows Berry’s runner migration brief](docs/images/claude-code.webp)
+![A chat from Claude Code shows Berry’s five rules for a seed extension, drawn from YC’s guide](docs/images/claude-code.webp)
 
 ### Show Berry how
 
 Strawberry's advice for making a routine is to talk it through with your companion, which still means describing the job well enough in words, and that's harder than doing it. It has no built-in way to just show it. In Blueberry you press Show Berry how, do the job once, and press **Done**. Berry writes up what it saw as notes you can read and trim, and a cheap model turns them into a routine with numbered steps and the values that might change. It watches only the tab in front, only between start and **Done**, and never keeps what's typed into a password or payment field.
 
-![The recording review shows seven steps for researching larger runners before turning them into a routine](docs/images/show-berry-how.webp)
+![The recording review shows six steps on Jane App, Cliniko and Calendly pricing pages before turning them into a routine](docs/images/show-berry-how.webp)
 
 ### The Gallery
 
@@ -48,7 +48,7 @@ Strawberry gives each companion a public page you can send to someone, and nine 
 
 The hard part of a new agent is knowing what to ask it. Strawberry uses onboarding to make its first suggestions. Its companion reads your imported history and what you tell it, then suggests your role, apps to connect and a first task, and the Routines page offers routine ideas such as a morning summary or industry news. Strawberry also offers personalized ideas in its Knowledge hub. I haven't seen it suggest a new companion based on repeated browsing. In Blueberry, suggestions on the new tab page keep coming from what you actually do. At most about once an hour, a cheap model reads a digest of your recent browsing, chats and routine runs and proposes a prompt, a routine or a new mascot, and code checks each one against what it cites before it shows. They change as your week does. On the first day, Blueberry can bring in the last 90 days of history from Chrome, Brave or Edge, or from Arc on a Mac, in Settings > Privacy > Bring in history, so the first suggestions are already about you.
 
-![Berry compares GitHub and GitLab plans with the GitHub pricing page beside the chat](docs/images/working-view.webp)
+![Berry compares Jane App and Cliniko for 40 physios with the Cliniko pricing page beside the chat](docs/images/working-view.webp)
 
 ### Berry on the desktop
 
@@ -68,7 +68,7 @@ Your mascots, routines on a schedule, jobs that work in tabs behind yours with a
 
 The Your mascots page starts with Berry, Plain Words, Competitor Watch, Meeting Prep and Newsletter Builder on a fresh profile.
 
-![Your mascots shows Berry and the four starter mascots with their limits in dark mode](docs/images/your-mascots.webp)
+![Your mascots shows Berry, three starter mascots and an Investor Update mascot with their limits in dark mode](docs/images/your-mascots.webp)
 
 ## How it grows
 
@@ -87,7 +87,7 @@ Three of the features above are also how Blueberry gets users and keeps them.
 - The working view's pictures go only to the window, never to the model or the disk, and a cloud live view never goes to the model.
 - No service key is in the repo, the app or the runner. Everything uses Supabase's publishable key and a signed-in user's session.
 
-![An approval card gives the full address Berry wants to open on GitHub](docs/images/approval.webp)
+![An approval card asks before ticking the Backend developer filter on The Hub’s job board](docs/images/approval.webp)
 
 ## How it's built
 
