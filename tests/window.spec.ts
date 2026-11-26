@@ -148,7 +148,10 @@ test("a new profile starts with four mascots beside Berry, once, and a deleted o
     await expect(suggestions).toHaveCount(2);
     await expect(suggestions.nth(0)).toContainText("Competitor Watch");
     await expect(suggestions.nth(1)).toContainText("Meeting Prep");
-    await suggestions.nth(1).getByRole("button", { name: /^Prep me for a call/ }).click();
+    await suggestions
+      .nth(1)
+      .getByRole("button", { name: /^Prep me for a call/ })
+      .click();
     await expect(chrome.getByRole("button", { name: /Choose who to ask/ })).toHaveAccessibleName("Asking Meeting Prep. Choose who to ask");
     const box = chrome.getByRole("textbox", { name: /Search, enter a URL, or ask/ });
     await expect(box).toHaveValue("Prep me for a call with Spotify's ads team.");
