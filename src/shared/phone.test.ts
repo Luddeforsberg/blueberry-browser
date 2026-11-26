@@ -92,6 +92,11 @@ describe("conversations in the cloud", () => {
     prompt: `Prompt ${id}`,
     ...more,
   });
+  const inTurn = (id: string, at: string, conversation: string | null, turn: number) => ({
+    ...job(id, at),
+    conversation_id: conversation,
+    turn,
+  });
 
   it("follows up with the job before's history, then its prompt and its reply with notes of its steps", () => {
     const earlier = [
@@ -148,12 +153,12 @@ describe("conversations in the cloud", () => {
     expect(fitHistory("nope")).toEqual([]);
   });
 
-  it("groups jobs into conversations, newest first, each oldest first, and a job from before conversations alone", () => {
+  it("groups jobs into conversations, newest first, each in its turns, and a job from before conversations alone", () => {
     const grouped = conversationsOf([
-      job("c1-2", "05", { conversation_id: "c1" }),
-      job("legacy", "02", { conversation_id: null }),
-      job("c1", "01", { conversation_id: "c1" }),
-      job("c2", "03", { conversation_id: "c2" }),
+      inTurn("c1-2", "05", "c1", 2),
+      inTurn("legacy", "02", null, 1),
+      inTurn("c1", "01", "c1", 1),
+      inTurn("c2", "03", "c2", 1),
     ]);
     expect(grouped.map(({ id, jobs, latest }) => [id, jobs.map((one) => one.id), latest.id])).toEqual([
       ["c1", ["c1", "c1-2"], "c1-2"],
@@ -161,6 +166,14 @@ describe("conversations in the cloud", () => {
       ["legacy", ["legacy"], "legacy"],
     ]);
     expect(conversationsOf([])).toEqual([]);
+  });
+
+  it("takes the latest job by its turn, whatever the clock said, as the server does", () => {
+    // Made in the same instant, the older with the higher id, and then a third that the clock put first.
+    const [one] = conversationsOf([inTurn("b", "01", "c", 1), inTurn("a", "01", "c", 2)]);
+    expect(one?.latest.id).toBe("a");
+    const [two] = conversationsOf([...defined(one).jobs, inTurn("z", "00", "c", 3)]);
+    expect(two?.jobs.map(({ id }) => id)).toEqual(["b", "a", "z"]);
   });
 });
 
@@ -173,6 +186,7 @@ describe("a job row as the phone reads it", () => {
   const ROW = {
     id: "j-1",
     conversation_id: "c-1",
+    turn: 2,
     prompt: "Find a cable",
     created_at: "2026-11-21T10:00:00Z",
     updated_at: "2026-11-21T10:05:00Z",
@@ -195,12 +209,14 @@ describe("a job row as the phone reads it", () => {
 
   it("leaves out a row it can't place in a conversation", () => {
     for (const missing of ["id", "prompt", "created_at"]) expect(phoneJobFromRow({ ...ROW, [missing]: 1 }), missing).toBeNull();
+    for (const turn of [undefined, null, "2", 0, 1.5]) expect(phoneJobFromRow({ ...ROW, turn }), String(turn)).toBeNull();
     for (const row of [null, "j-1", [ROW], 3]) expect(phoneJobFromRow(row)).toBeNull();
   });
 
   it("reads anything else that's off as nothing", () => {
     const job = read({
       id: "j-2",
+      turn: 1,
       prompt: "Go",
       created_at: "2026-11-21T10:00:00Z",
       status: "paused",

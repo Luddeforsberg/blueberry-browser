@@ -238,7 +238,7 @@ var followUpHistory = (last) => {
 var conversationIdOf = (job) => job.conversation_id || job.id;
 var conversationsOf = (jobs) => {
   const groups = /* @__PURE__ */ new Map();
-  for (const job of [...jobs].sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))) {
+  for (const job of [...jobs].sort((a, b) => a.turn - b.turn)) {
     const id = conversationIdOf(job);
     const before = groups.get(id);
     groups.set(id, before ? [...before, job] : [job]);
@@ -250,12 +250,14 @@ var isStatus = (value) => STATUSES.some((status) => status === value);
 var textOr = (value, otherwise) => typeof value === "string" ? value : otherwise;
 var phoneJobFromRow = (input) => {
   const row = fieldsOf(input);
-  const { id, prompt, created_at: createdAt, status, mascot, steps, history } = row;
+  const { id, prompt, created_at: createdAt, status, mascot, steps, history, turn } = row;
   if (typeof id !== "string" || typeof prompt !== "string" || typeof createdAt !== "string") return null;
+  if (typeof turn !== "number" || !Number.isInteger(turn) || turn < 1) return null;
   const who = fieldsOf(mascot);
   return {
     id,
     conversation_id: textOr(row.conversation_id, null),
+    turn,
     prompt,
     created_at: createdAt,
     updated_at: textOr(row.updated_at, createdAt),

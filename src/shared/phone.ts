@@ -137,10 +137,13 @@ export const followUpHistory = (last: ConversationJob): HistoryMessage[] => {
 
 const conversationIdOf = (job: Pick<ConversationJob, "id" | "conversation_id">): string => job.conversation_id || job.id;
 
-// One per conversation, the newest first, each with its jobs oldest first. A job from before conversations is one alone.
-export const conversationsOf = <T extends ConversationJob>(jobs: readonly T[]): { id: string; jobs: [T, ...T[]]; latest: T }[] => {
+// One per conversation, the newest first, each with its jobs in their turns, the latest last, as the server decides which
+// job a follow-up must be built on. A job from before conversations is one alone.
+export const conversationsOf = <T extends ConversationJob & { turn: number }>(
+  jobs: readonly T[],
+): { id: string; jobs: [T, ...T[]]; latest: T }[] => {
   const groups = new Map<string, [T, ...T[]]>();
-  for (const job of [...jobs].sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))) {
+  for (const job of [...jobs].sort((a, b) => a.turn - b.turn)) {
     const id = conversationIdOf(job);
     const before = groups.get(id);
     groups.set(id, before ? [...before, job] : [job]);
@@ -176,6 +179,8 @@ export interface PhoneAsk {
 
 export interface PhoneJob extends ConversationJob {
   conversation_id: string | null;
+  // Its place in its conversation, from 1, given by the server.
+  turn: number;
   updated_at: string;
   status: PhoneJobStatus;
   // Who it runs as, by id and name only: its look and limits are the phone's own mascot's.
@@ -195,12 +200,14 @@ const textOr = <T>(value: unknown, otherwise: T): string | T => (typeof value ==
 // nothing: a status the page doesn't know as stopped, and only steps with words, done only when they say so.
 export const phoneJobFromRow = (input: unknown): PhoneJob | null => {
   const row = fieldsOf(input);
-  const { id, prompt, created_at: createdAt, status, mascot, steps, history } = row;
+  const { id, prompt, created_at: createdAt, status, mascot, steps, history, turn } = row;
   if (typeof id !== "string" || typeof prompt !== "string" || typeof createdAt !== "string") return null;
+  if (typeof turn !== "number" || !Number.isInteger(turn) || turn < 1) return null;
   const who = fieldsOf(mascot);
   return {
     id,
     conversation_id: textOr(row.conversation_id, null),
+    turn,
     prompt,
     created_at: createdAt,
     updated_at: textOr(row.updated_at, createdAt),

@@ -184,7 +184,7 @@ export const rpc = (name, body = {}) => asUser(`/rest/v1/rpc/${name}`, { method:
 /** @param {unknown} answer */
 const jobsOf = (answer) => listOf(answer).flatMap((row) => phoneJobFromRow(row) ?? []);
 
-const JOB_COLUMNS = "id,conversation_id,prompt,mascot,status,steps,reply,error,live_view_url,context_id,created_at,updated_at";
+const JOB_COLUMNS = "id,conversation_id,prompt,mascot,status,steps,reply,error,live_view_url,context_id,created_at,updated_at,turn";
 
 // The user's newest jobs in the cloud, and every one still going however old, then what each waiting one is asking. The
 // page puts them together into conversations. One run on the Mac is answered there, so it isn't here.
