@@ -14,6 +14,7 @@ const config: KnipConfig = {
     // Run by name with `pnpm dlx tsx`, as evals/README.md says.
     "evals/seedBrowserFolder.ts",
     "evals/suggestionsCheck.ts",
+    "evals/pictures/seedFounder.ts",
     // Loaded by path into the test app's main process: tests/app.ts and tests/features/driver.ts.
     "tests/*.cjs",
     "tests/features/*.cjs",
@@ -40,7 +41,7 @@ const config: KnipConfig = {
   },
   playwright: {
     // tests/features/drive.config.ts is run by scripts/drive.mjs with `-c`, which knip can't see in a spawn.
-    config: ["playwright.config.ts", "evals/playwright.config.ts", "tests/features/drive.config.ts"],
+    config: ["playwright.config.ts", "evals/playwright.config.ts", "evals/pictures/playwright.config.ts", "tests/features/drive.config.ts"],
   },
 };
 

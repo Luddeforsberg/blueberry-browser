@@ -68,7 +68,8 @@ const killApp = (app: ElectronApplication) => {
 // Tests skip onboarding unless they ask for a first launch, and start with only Berry unless they ask for the starters.
 // They have no model unless they pass one, and a .env file can't change that: it never overrides these.
 // `preload` adds scripts for the main process to load first, as tests/features/driveFakes.cjs is for `drive`, and `args`
-// adds switches for Chromium that have to be there from the start.
+// adds switches for Chromium that have to be there from the start. `onScreen` leaves out background.cjs, so the window is
+// a real one on the screen, for pictures of it as it really looks.
 export async function launchApp(
   userDataDir = mkdtempSync(join(tmpdir(), "blueberry-test-")),
   {
@@ -77,7 +78,15 @@ export async function launchApp(
     modelEnv = {},
     preload = [],
     args = [],
-  }: { firstLaunch?: boolean; starters?: boolean; modelEnv?: Record<string, string>; preload?: string[]; args?: string[] } = {},
+    onScreen = false,
+  }: {
+    firstLaunch?: boolean;
+    starters?: boolean;
+    modelEnv?: Record<string, string>;
+    preload?: string[];
+    args?: string[];
+    onScreen?: boolean;
+  } = {},
 ): Promise<ElectronApplication> {
   const settingsFile = join(userDataDir, "settings.json");
   if (!firstLaunch && !existsSync(settingsFile)) {
@@ -92,6 +101,7 @@ export async function launchApp(
     LLM_TITLE_MODEL: "",
     OPENAI_API_KEY: "",
     ANTHROPIC_API_KEY: "",
+    FIRECRAWL_API_KEY: "",
     SUPABASE_URL: "",
     SUPABASE_PUBLISHABLE_KEY: "",
     BLUEBERRY_SITE_URL: "",
@@ -108,8 +118,7 @@ export async function launchApp(
       // A fresh profile keeps tests apart and away from the developer's real browsing data.
       args: [
         // The same on every computer, CI included: a window off-screen, which may be larger than a runner's small screen.
-        "-r",
-        join(__dirname, "background.cjs"),
+        ...(onScreen ? [] : ["-r", join(__dirname, "background.cjs")]),
         ...preload.flatMap((file) => ["-r", file]),
         "-r",
         join(__dirname, "motion.cjs"),

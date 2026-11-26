@@ -26,6 +26,7 @@
     "baseline": "node scripts/drive.mjs baseline",
     "baseline:compare": "node scripts/baselineCompare.mjs",
     "eval": "electron-vite build && playwright test -c evals/playwright.config.ts",
+    "readme:pictures": "electron-vite build && playwright test -c evals/pictures/playwright.config.ts",
     "site:build": "node scripts/buildSite.mjs",
     "site:check": "node scripts/buildSite.mjs --check",
     "page:build": "node scripts/buildPage.mjs",

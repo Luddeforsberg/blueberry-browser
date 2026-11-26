@@ -45,11 +45,13 @@ export interface PhoneDrive {
 }
 
 // The page's clock is fixed at `now`, and `settleTimes` puts the server's times just before it, as the app's clock is in
-// driveFakes.cjs.
+// driveFakes.cjs. `scale` is the phone's pixels to a point: 1 for a baseline, 3 for a picture of a real phone. `livePage`
+// is what the live view shows.
 export async function drivePhone(
   open: (phone: PhoneDrive) => Promise<void>,
   theme: Theme,
   now: number,
+  { scale = 1, livePage = LIVE_PAGE }: { scale?: number; livePage?: string } = {},
 ): Promise<{ png: Buffer; restless: string | null }> {
   const supabase = await startFakeSupabase({ cloudJobs: true });
   const base = supabase.env.SUPABASE_URL;
@@ -114,14 +116,14 @@ export async function drivePhone(
 
     const context = await browser.newContext({
       viewport: { width: 390, height: 844 },
-      deviceScaleFactor: 1,
+      deviceScaleFactor: scale,
       isMobile: true,
       hasTouch: true,
       colorScheme: theme,
       reducedMotion: "reduce",
     });
     await context.clock.setFixedTime(now);
-    await context.route("https://www.browserbase.com/**", (route) => route.fulfill({ contentType: "text/html", body: LIVE_PAGE }));
+    await context.route("https://www.browserbase.com/**", (route) => route.fulfill({ contentType: "text/html", body: livePage }));
     const page = await context.newPage();
     await page.goto(app);
     await page.getByRole("heading", { name: "Your mascots, from your phone" }).waitFor();
