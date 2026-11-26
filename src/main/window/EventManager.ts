@@ -269,6 +269,9 @@ export class EventManager {
     this.handle("recording:discard", () => this.mainWindow.recordings.discard());
     this.handle("recording:draft", () => this.mainWindow.recordings.draft());
     this.handle("chat:stop", (chatId) => this.mainWindow.chats.stop(chatId));
+    this.handle("chat:mark-seen", (chatId) => {
+      if (typeof chatId === "string") this.mainWindow.chats.markSeen(chatId);
+    });
     this.handle("chat:follow-up", (chatId, id, action) =>
       typeof id === "string" && (action === "send-now" || action === "remove") ? this.mainWindow.chats.followUp(chatId, id, action) : false,
     );

@@ -119,6 +119,7 @@ interface ChatAPI {
   // Starts a chat when `chatId` is null. The reply arrives through the events.
   send: (chatId: string | null, text: string, options: ChatSendOptions) => Promise<ChatThread | null>;
   stop: (chatId: string) => Promise<void>;
+  markSeen: (chatId: string) => Promise<void>;
   followUp: (chatId: string, id: string, action: "send-now" | "remove") => Promise<boolean>;
   panelShows: (chatId: string | null) => Promise<void>;
   decide: (chatId: string, approvalId: string, allow: boolean, answer?: string) => Promise<boolean>;

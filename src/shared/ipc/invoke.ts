@@ -190,6 +190,8 @@ export interface InvokeChannels {
   // The user's tabs that could go with a message in this chat, or a new one as this mascot, each with why not if it can't.
   "attachments:tabs": { region: "chrome"; args: [chatId: string | null, mascotId: string | null]; result: TabChoice[] };
   "chat:stop": { region: "chrome"; args: [chatId: string]; result: void };
+  // Not now on a finished chat the new tab page offers: it counts as seen, as if it had been opened.
+  "chat:mark-seen": { region: "chrome"; args: [chatId: string]; result: void };
   // Send now or Remove on a message the user sent while a reply ran, which waits for that reply to end.
   "chat:follow-up": { region: "chrome"; args: [chatId: string, id: string, action: "send-now" | "remove"]; result: boolean };
   // Which chat the chat panel has, or null for a new one, so a reply that ends in the open panel counts as seen.

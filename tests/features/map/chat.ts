@@ -43,6 +43,26 @@ export const chatFeatures: Feature[] = [
           await drive.chrome.getByText("Shall I check the cable prices again?").waitFor();
         },
       },
+      // Resting on one shows all of it, to read before pressing.
+      "suggestion-peek": {
+        needs: {
+          profile: (dir, now) => writeBrowserHistory(join(dir, "browsers"), habitVisits(now)),
+          env: (dir) => ({ BLUEBERRY_BROWSER_DATA: join(dir, "browsers") }),
+          model: (model) => model.suggestFrom(habitProposals),
+        },
+        open: async (drive) => {
+          await drive.chrome.evaluate(async () => {
+            const [chrome] = await window.chromeAPI.browser.importSources();
+            if (!chrome) throw new Error("No browser to import from");
+            await window.chromeAPI.browser.importHistory(chrome.id);
+            await window.chromeAPI.browser.createTab();
+          });
+          const list = drive.chrome.getByRole("region", { name: "Suggestions" });
+          await list.getByRole("button").filter({ hasText: "Shall I check the cable prices again?" }).hover();
+          await list.getByRole("tooltip").waitFor();
+          await drive.chrome.waitForTimeout(250);
+        },
+      },
       "from-starters": {
         needs: { starters: true },
         open: (drive) => seen(drive.chrome, "Suggestions"),

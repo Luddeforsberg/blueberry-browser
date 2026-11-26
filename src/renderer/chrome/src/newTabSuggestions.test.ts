@@ -9,6 +9,7 @@ const chat = (id: string, updatedAt: number, more: Partial<ChatThreadSummary> = 
   updatedAt,
   mascotId: null,
   from: null,
+  unseen: true,
   ...more,
 });
 const idea = (id: string): Suggestion => ({ id, title: id, why: "You do it often", kind: "prompt", prompt: id });
@@ -39,6 +40,23 @@ describe("suggestionRows", () => {
       chat("from-app", 7, { from: "Claude Code" }),
     ];
     expect(keys(suggestionRows({ ...none, chats, asking: new Set(["asking"]) }))).toEqual(["chat-newer"]);
+  });
+
+  it("picks up only a chat the user hasn't opened since it finished", () => {
+    const chats = [chat("older-unread", 1), chat("read", 5, { unseen: false }), chat("never-marked", 6, { unseen: undefined })];
+    expect(keys(suggestionRows({ ...none, chats }))).toEqual(["chat-older-unread"]);
+    expect(suggestionRows({ ...none, chats: chats.slice(1) })).toEqual([]);
+  });
+
+  it("leaves out what the user said Not now to, and the next takes its place", () => {
+    const rows = suggestionRows({
+      ...none,
+      chats: [chat("old", 1), chat("new", 2)],
+      suggestions: [idea("a")],
+      mascots: [BERRY, mascot("prep", "meeting-prep"), mascot("watch", "competitor-watch")],
+      notNow: new Set(["chat-new", "try-prep"]),
+    });
+    expect(keys(rows)).toEqual(["chat-old", "suggestion-a", "try-watch"]);
   });
 
   it("goes pick up, then the suggestions in their order, then mascots to try, four at most", () => {
