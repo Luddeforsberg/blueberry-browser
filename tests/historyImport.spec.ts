@@ -42,7 +42,7 @@ test("the first run brings in another browser's history, and the mascots speak a
     const cards = chrome.getByRole("region", { name: "Suggestions" }).getByRole("listitem");
     // The three that checked out, then a mascot to try fills the last of the four rows.
     await expect(cards).toHaveCount(4, { timeout: 20_000 });
-    await expect(cards.last()).toContainText(/Try$/);
+    await expect(cards.last()).toContainText("Competitor Watch: ");
     await expect(chrome.getByText(DEMO_LINES.routine)).toBeVisible();
 
     // What the step says goes out is what went out.
